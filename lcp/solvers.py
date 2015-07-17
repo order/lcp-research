@@ -8,7 +8,7 @@ import scipy.sparse
 import matplotlib.pyplot as plt
 import math
 from lcp.util import *
-import mdp.mdp as mdp
+import mdp
 
 ##############################
 # MDP block split
