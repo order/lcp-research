@@ -7,8 +7,9 @@ import grid
 
 import scipy.stats
 
-# Norm pdf and derivative; move to another file?
 def normpdf(x,mu,sigma):
+    """Norm pdf and derivative; move to another file?
+    """
     return scipy.stats.norm.pdf(x,loc=mu,scale=sigma)
 
 def derv_normpdf(x,mu,sigma):
@@ -69,7 +70,7 @@ def plot_dynamics(points,action,slope):
     plt.show()
 
 
-def generate_hillcar_mdp(x_disc,v_disc,**kwargs):
+def generate_mdp(x_disc,v_disc,**kwargs):
     """
     Generate an MDP based on a regular grid discretization
     """

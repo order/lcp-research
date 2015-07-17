@@ -11,13 +11,15 @@ import scipy.sparse.linalg
 import matplotlib.pylab as plt
 import time
 
-import hillcar
+import mdp.hillcar as hillcar
+import mdp.hallway as hallway
 
 class Nothing:
     pass
     
 def compare_final(MDP,records):
-    Img = []    
+    Img = []
+    f, ax = plt.subplots() 
     for record in records:
         Img.append(record.states[-1])
     ax.imshow(Img)
@@ -39,7 +41,8 @@ def run_compare():
     reg = 1e-9    
     n = 12;
 
-    (MDP,G) = hillcar.generate_hillcar_mdp(n,n)
+    #(MDP,G) = hillcar.generate_mdp(n,n)
+    MDP = hallway.generate_mdp(n)
     (M,q) = MDP.tolcp()
     N = M.shape[0]
     print 'Problem size',N
@@ -75,7 +78,10 @@ def run_compare():
     solver.params['MDP'] = MDP
 
 
-    solver_list = [solvers.basic_ip_iter,solvers.kojima_ip_iter,solvers.mdp_value_iter,solvers.mdp_ip_iter]
+    solver_list = [solvers.basic_ip_iter,\
+        solvers.kojima_ip_iter,\
+        solvers.mdp_value_iter,\
+        solvers.mdp_ip_iter] 
     records = []
     for iter in solver_list:
         print 'Starting', iter.__name__
@@ -86,7 +92,7 @@ def run_compare():
         print 'Elapsed', elapsed
         records.append(record)
         
-    compare_final(records)
+    compare_final(MDP,records)
     
 
 run_compare()
