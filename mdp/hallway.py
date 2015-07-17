@@ -1,7 +1,8 @@
 import numpy as np
 from mdp import MDP
+import scipy.sparse
 
-def generate_hallway_mdp(num_states,**kwargs):
+def generate_mdp(num_states,**kwargs):
     """ Generates an MDP based on the hallway problem
     Arguments: num_states (int)
     Returns: MDP object
@@ -25,5 +26,6 @@ def generate_hallway_mdp(num_states,**kwargs):
            + (1 - wheel_slip)*scipy.sparse.diags(np.ones(num_states-1),i)
         Transitions.append(P)
 
-    return MDP(Transitions,Costs,Actions)
+    return MDP(Transitions,Costs,Actions,name='Hallway')
     
+print generate_mdp(5)

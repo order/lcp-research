@@ -114,5 +114,5 @@ def generate_hillcar_mdp(x_disc,v_disc,**kwargs):
         # Use COO; may be using either T or T.T
         Transitions.append(scipy.sparse.coo_matrix(T))
         Costs.append(c)
-    M = MDP(Transitions,Costs,Actions)
+    M = MDP(Transitions,Costs,Actions,name='Hillcar')
     return (M,statespace)

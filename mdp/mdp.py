@@ -64,6 +64,7 @@ class MDP(object):
         self.transitions = transitions
         self.costs = costs
         self.actions = actions
+        self.name = kwargs.get('name','unnamed')
         
         A = len(actions)
         N = costs[0].size
@@ -109,6 +110,11 @@ class MDP(object):
             q[((a+1)*n):((a+2)*n)] = self.costs[a]
         M = scipy.sparse.vstack((Top,Bottom))
         return (M,q)
+
+    def __str__(self):
+        return '<{0} MDP with {1} actions and {1} states>'.\
+            format(self.name, self.num_actions,self.num_states)
+        
         
 
 def value_iteration(MDP,**kwargs):
