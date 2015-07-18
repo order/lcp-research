@@ -39,7 +39,7 @@ def run_compare():
     # Generate instance
     #N = 1500
     reg = 1e-9    
-    n = 12;
+    n = 50;
 
     #(MDP,G) = hillcar.generate_mdp(n,n)
     MDP = hallway.generate_mdp(n)
@@ -92,7 +92,10 @@ def run_compare():
         print 'Elapsed', elapsed
         records.append(record)
         
-    compare_final(MDP,records)
+    for record in records:
+        util.plot_state_img(record,max_len=27)
+    #compare_final(MDP,records)
+    
     
 
 run_compare()

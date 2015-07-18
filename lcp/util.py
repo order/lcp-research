@@ -5,6 +5,7 @@ import copy
 import math
 
 import scipy.sparse
+import matplotlib.pyplot as plt
 
 # Utilities; put in another file?
 
@@ -139,10 +140,16 @@ class Params(object):
 #############################
 # Plotting for records
 
-def plot_state_img(record):
-    S = np.array(r.states)
-    Img = (S - r.states[-1]) / (r.states[-1] + 1e-12)
-    plt.imshow(np.log(np.abs(Img.T)))
-    plt.settitle('Relative log change from final iter')
+def plot_state_img(record,**kwargs):
+    """ Plots the state trajectory as an image
+    """
+    max_len = kwargs.get('max_len',2**64-1)    
+    S = np.array(record.states)
+    f,ax = plt.subplots()
+    Img = (S - record.states[-1]) / (record.states[-1] + 1e-12) + 1e-12
+    l = min(max_len,Img.shape[0])
+    print l
+    ax.imshow(np.log(np.abs(Img[:l,:].T)))
+    ax.set_title('Relative log change from final iter')
     plt.show()
     

@@ -7,7 +7,7 @@ import math
 import scipy.sparse
 import matplotlib.pyplot as plt
 import math
-from lcp.util import *
+from util import *
 import mdp
 
 ##############################
