@@ -63,6 +63,8 @@ def mdp_ip_iter(M,q,state,**kwargs):
     sigma = kwargs.get('centering_coeff',0.1)
     beta = kwargs.get('linesearch_backoff',0.8)
     
+    solve_thresh = kwargs.get('mdp_split_inner_thresh',1e-6)
+    
     N = q.size
     x = np.ones(N)
     y = np.ones(N)
@@ -83,7 +85,8 @@ def mdp_ip_iter(M,q,state,**kwargs):
 
         inner_solver = kojima_ip_iter(B,q_k,state,**kwargs)   
         II = 0        
-        while x.dot(y) >= 1e-6 or np.linalg.norm(y - (q_k + B.dot(x))) > 1e-6:
+        while x.dot(y) >= solve_thresh\
+            or np.linalg.norm(y - (q_k + B.dot(x))) > solve_thresh:
             #print '\tInner loop iter',II
             #print '\t* Inner Residual:', np.linalg.norm(y - (q_k + B.dot(x)))
             #print '\t* InnerComplementarity:',x.dot(y)
