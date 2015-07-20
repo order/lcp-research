@@ -45,8 +45,8 @@ def run_MDP_value_compare():
 
     #(MDP,G) = hillcar.generate_mdp(n,n)
     MDP = hallway.generate_mdp(n)
-    (M,q) = MDP.tolcp()
-    N = M.shape[0]
+    LCP = MDP.tolcp()
+    N = LCP.dim
 
     # Set up solver
     solver = solvers.iter_solver()
@@ -67,7 +67,7 @@ def run_MDP_value_compare():
         print 'Starting', iter.__name__
         start = time.time()
         solver.iter_fn = iter
-        (record,state) = solver.solve(M,q,x0=np.ones(q.size));
+        (record,state) = solver.solve(LCP,x0=np.ones(LCP.dim));
         elapsed = time.time() - start
         print 'Elapsed', elapsed
         records.append(record)
@@ -90,8 +90,6 @@ def run_MDP_value_compare():
     rel_diff_norm = np.linalg.norm(rel_diff,axis=1)
     plt.semilogy(rel_diff_norm)
     plt.show()
-
-    
     
 def run_compare():
     # Generate instance

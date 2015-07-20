@@ -10,20 +10,33 @@ import matplotlib.pyplot as plt
 # Utilities; put in another file?
 
 def col_vect(v):
+    """
+    Convert a n-vector into a nx1 np array.
+    This is an annoying distinct in numpy.
+    """
     assert(len(v.shape) == 1)
-    return v[:,np.newaxis]
-    
+    return v[:,np.newaxis]    
 
 def max_eigen(M):
+    """
+    Find the max eigenvalue; wraps around a simple scipy call
+    """
     return scipy.sparse.linalg.eigs(M,k=1,return_eigenvectors=False)
 
 def quad(a,b,c):
-    #print "{0}x^2 + {1}x + {2} = 0".format(a,b,c)
+    """
+    Solve a simple 1d quadratic formula
+    """
     d = b**2 - 4*a*c
-    assert(d > 0)
+    if d < 0:
+        # Only report real solutions
+        return None
     return ((-b + math.sqrt(d))/2,(-b - math.sqrt(d))/2)
 
 def has_pos_diag(M):
+    """
+    Check if diagonal is positive
+    """
     [n,m] = M.shape
     assert(n==m)
     for i in xrange(n):
@@ -35,21 +48,18 @@ def isvector(x):
     S = x.shape
     return len(S) == 1
     
-def issquare(A):
-    S = A.shape
-    return len(S) == 2 and S[0] == S[1]
-
-def check_lcp(M,q):
-    assert(isvector(q))
-    assert(issquare(M))
-    assert(q.size == M.shape[0])
-    return True
-    
 def nonneg_proj(x):
+    """
+    Projections onto non-negative orthant; the []_+ operator
+    """
     assert(isvector(x))
     return np.maximum(np.zeros(x.size),x)
     
+
 def proj_forward_prop(x,M,q,w):
+    """
+    Does the projected version of Gauss-Siedel-ish forward solving
+    """
     N = len(x)
     y = np.zeros(N)
     for i in xrange(N):
@@ -59,6 +69,9 @@ def proj_forward_prop(x,M,q,w):
     return y
     
 def basic_residual(x,w):
+    """
+    A basic residual for LCPs; will be zero if 
+    """
     res = np.minimum(x,w)
     return np.linalg.norm(res)
     
@@ -71,10 +84,23 @@ def fb_residual(x,w):
 # State
     
 class State(object):
+    """An object representing a point in the state-space of an LCP
+    Note that the point may not be feasible or complementary
+    (and so w != Mx+q)
+    We have a separate field Mxq to cache Mx+q
+    """
     def __init__(self,**kwargs):
-        self.x = None
+        self.x = None # 
         self.w = None
+        self.Mxq = None
         self.iter = 0
+    def set_x(self,x):
+        self.x = x
+        self.Mxq = None
+    def cache_Mxq(self,mxq):
+        self.Mxq = mxq
+    def inc(self):
+        self.iter+=1
         
 ###############
 # Record stuff

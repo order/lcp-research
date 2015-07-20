@@ -9,11 +9,20 @@ import matplotlib.pyplot as plt
 import math
 from util import *
 import mdp
+import lcp
 
-##############################
-# MDP block split
-def mdp_value_iter(M,q,state,**kwargs):  
+"""
+This file contains a number of different solvers
+"""
+
+def mdp_value_iter(lcp_obj,state,**kwargs): 
+    """
+    Do basic value iteration, but also try to recover the flow variables.
+    This is for comparison to MDP-split lcp_obj solving (see mdp_ip_iter)
+    """
     MDP = kwargs['MDP']
+    M = lcp_obj.M
+    q = lcp_obj.q
     
     N = q.size
     n = MDP.num_states
@@ -55,11 +64,15 @@ def mdp_value_iter(M,q,state,**kwargs):
         I += 1
         yield state
         
-    
+def mdp_ip_iter(lcp_obj,state,**kwargs):
+    """
+    Splits an lcp_obj based on an MDP into (B,C) blocks that correspond to
+    value iteration. Cottle 5.2 has more details on general splitting
+    methods like PSOR
+    """
 
-##############################
-# MDP block split
-def mdp_ip_iter(M,q,state,**kwargs):
+    M = lcp_obj.M
+    q = lcp_obj.q
     sigma = kwargs.get('centering_coeff',0.1)
     beta = kwargs.get('linesearch_backoff',0.8)
     
@@ -69,42 +82,47 @@ def mdp_ip_iter(M,q,state,**kwargs):
     x = np.ones(N)
     y = np.ones(N)
     
-    MDP = kwargs['MDP']
-    split = mdp.MDPValueIterSplitter(MDP)
+    MDP = kwargs['MDP'] # Must be present; don't want to do size inference
+    split = mdp.MDPValueIterSplitter(MDP) # Splitter based on value iter
 
-    I = 0
-    OI = 0
+    Total_I = 0
+    Outer_I = 0
     while True:
-        #print 'Outer loop iter',OI
-        #print '* Outer Residual:\t', np.linalg.norm(y - (q + M.dot(x)))
-        #print '* Complementarity:\t',x.dot(y)
-
-        # Outer loop solved by solving different LCP(B,q_k)
-        (B,q_k) = split.update(x)
-        state = State()
-
-        inner_solver = kojima_ip_iter(B,q_k,state,**kwargs)   
-        II = 0        
+        # Update q split based on current x
+        (B,q_k) = split.update(x) 
+        # Use Kojima's UIP to solve lcp_obj(B,q_k)
+        inner_solver = kojima_ip_iter(lcp.LCP(B,q_k),state,**kwargs)
+        Inner_I = 0        
+        
+        # Want both complementarity and residual to be small before
+        # stopping the inner iter
         while x.dot(y) >= solve_thresh\
             or np.linalg.norm(y - (q_k + B.dot(x))) > solve_thresh:
-            #print '\tInner loop iter',II
-            #print '\t* Inner Residual:', np.linalg.norm(y - (q_k + B.dot(x)))
-            #print '\t* InnerComplementarity:',x.dot(y)
-
             state = inner_solver.next()
             x = state.x
             y = state.w
-            II += 1
+            Inner_I += 1
+            Total_I += 1
+        
+        #Use the actual Mx+q rather than IP solver's 
         state.w = M.dot(x) + q
-        state.iter = OI
+        state.iter = Outer_I # Could use other counters
         yield state  
-        OI += 1
+        Outer_I += 1
         
 
 ##############################
-# Kojima LCP
+# Kojima lcp_obj
 
-def kojima_ip_iter(M,q,state,**kwargs):
+def kojima_ip_iter(lcp_obj,state,**kwargs):
+    """Interior point solver based on Kojima et al's
+    "A Unified Approach to Interior Point Algorithms for lcp_objs"
+    Uses a log-barrier w/centering parameter
+    (How is this different than the basic scheme a la Nocedal and Wright?)
+    """
+    M = lcp_obj.M
+    q = lcp_obj.q
+
     sigma = kwargs.get('centering_coeff',0.1)
     beta = kwargs.get('linesearch_backoff',0.8)   
     
@@ -163,7 +181,10 @@ def kojima_ip_iter(M,q,state,**kwargs):
 
 ##############################
 # Basic infeasible-start interior point (p.159 / pdf 180 Wright)
-def basic_ip_iter(M,q,state,**kwargs):
+def basic_ip_iter(lcp_obj,state,**kwargs):
+    M = lcp_obj.M
+    q = lcp_obj.q
+
     N = q.size
     k = 0
     Top = scipy.sparse.hstack([M,-scipy.sparse.eye(M.shape[0])])
@@ -215,7 +236,10 @@ def basic_ip_iter(M,q,state,**kwargs):
 ##############################
 # Iteration generators
     
-def euler_iter(M,q,state,**kwargs):
+def euler_iter(lcp_obj,state,**kwargs):
+    M = lcp_obj.M
+    q = lcp_obj.q
+
     N = q.size
     step = kwargs['step']
     
@@ -234,7 +258,10 @@ def euler_iter(M,q,state,**kwargs):
         yield state
         
         
-def euler_barrier_iter(M,q,state,**kwargs):
+def euler_barrier_iter(lcp_obj,state,**kwargs):
+    M = lcp_obj.M
+    q = lcp_obj.q
+
     N = q.size
     step = kwargs['step']
     
@@ -277,7 +304,9 @@ def euler_barrier_iter(M,q,state,**kwargs):
         state.w = w
         yield state
         
-def euler_linesearch_iter(M,q,state,**kwargs):
+def euler_linesearch_iter(lcp_obj,state,**kwargs):
+    M = lcp_obj.M
+    q = lcp_obj.q
 
     wolfe_const = kwargs.get('wolfe_const',1e-4)
     step_decay = kwargs.get('step_decay',0.9)
@@ -311,7 +340,10 @@ def euler_linesearch_iter(M,q,state,**kwargs):
         state.w = w
         yield state 
         
-def euler_speedy(M,q,state,**kwargs):
+def euler_speedy(lcp_obj,state,**kwargs):
+    M = lcp_obj.M
+    q = lcp_obj.q
+
     N = q.size
     step_base = kwargs['step']
     
@@ -368,7 +400,10 @@ def euler_speedy(M,q,state,**kwargs):
         state.w = w
         yield state   
     
-def projected_jacobi_iter(M,q,state,**kwargs):
+def projected_jacobi_iter(lcp_obj,state,**kwargs):
+    M = lcp_obj.M
+    q = lcp_obj.q
+
     assert(has_pos_diag(M))
     N = q.size
     D_inv = np.diag(np.diag(M))
@@ -387,7 +422,9 @@ def projected_jacobi_iter(M,q,state,**kwargs):
         state.w = w
         yield state
         
-def psor_iter(M,q,state,**kwargs):
+def psor_iter(lcp_obj,state,**kwargs):
+    M = lcp_obj.M
+    q = lcp_obj.q
     assert(has_pos_diag(M))
     N = q.size
     relax = kwargs.get('omega',1.0)
@@ -405,7 +442,9 @@ def psor_iter(M,q,state,**kwargs):
         state.w = w
         yield state
         
-def extragrad_iter(M,q,state,**kwargs):
+def extragrad_iter(lcp_obj,state,**kwargs):
+    M = lcp_obj.M
+    q = lcp_obj.q
     N = q.size
     step = kwargs['step']
     
@@ -428,7 +467,10 @@ def extragrad_iter(M,q,state,**kwargs):
 		
 # Based on "Adaptive Restart for Accelerated Gradient Schemes" by O'Donoghue and Candes
 # http://arxiv.org/pdf/1204.3982v1.pdf
-def accelerated_prox_iter(M,q,state,**kwargs):
+def accelerated_prox_iter(lcp_obj,state,**kwargs):
+    M = lcp_obj.M
+    q = lcp_obj.q
+
     N = q.size
     step = kwargs['step']
     restart = kwargs.get('restart',0.1)
@@ -475,9 +517,8 @@ class iter_solver():
         self.iter_fn = None
         self.params = {}
         
-    def solve(self,M,q,**kwargs):
-        assert(check_lcp(M,q))        
-        N = q.size
+    def solve(self,lcp_obj,**kwargs):
+        N = lcp_obj.dim
         
         # Init
         record = Record()
@@ -487,7 +528,7 @@ class iter_solver():
             
         args = self.params.copy()
         args.update(kwargs)
-        iter = self.iter_fn(M,q,state,**args)
+        iter = self.iter_fn(lcp_obj,state,**args)
         while True:
             for tf in self.term_fns:
                 if tf(state):

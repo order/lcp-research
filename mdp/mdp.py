@@ -1,6 +1,7 @@
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
+import lcp
 
 class MDPValueIterSplitter(object):
     """
@@ -9,20 +10,18 @@ class MDPValueIterSplitter(object):
     """
     def __init__(self,MDP,**kwargs):
         self.MDP = MDP
+        self.num_actions = self.MDP.num_actions
+        self.num_states = self.MDP.num_states
         
         # Builds an LCP based on an MPD
-        (M,q) = MDP.tolcp()
-        self.M = M
-        self.q = q
-        
-        # 
+        self.LCP = MDP.tolcp()
         self.value_iter_split()      
     
     def update(self,v):
         """
         Builds a q-vector based on current v
         """
-        q_k = self.q + self.C.dot(v)
+        q_k = self.LCP.q + self.C.dot(v)
         return (self.B,q_k)    
 
     def value_iter_split(self):
@@ -32,12 +31,11 @@ class MDPValueIterSplitter(object):
         """
         I_list = []
         P_list = []
-        for i in xrange(self.MDP.num_actions):
-            I_list.append(scipy.sparse.eye(self.MDP.num_states))
-            #P_list.append(-self.MDP.discount*self.MDP.transitions[i].T)
+        # Build the B matrix
+        for i in xrange(self.num_actions):
+            I_list.append(scipy.sparse.eye(self.num_states))
         self.B = mdp_skew_assembler(I_list)
-        #self.C = mdp_skew_assembler(P_list)
-        self.C = self.M - self.B
+        self.C = self.LCP.M - self.B
 
 def mdp_skew_assembler(A_list):
     """
@@ -47,7 +45,7 @@ def mdp_skew_assembler(A_list):
     (n,m) = A_list[0].shape
     assert(n == m) # Square
     N = (A+1)*n
-    M = scipy.sparse.dok_matrix((N,N))
+    M = scipy.sparse.lil_matrix((N,N))
     for i in xrange(A):
         I = xrange(n)
         J = xrange((i+1)*n,(i+2)*n)
@@ -109,7 +107,7 @@ class MDP(object):
             Top = scipy.sparse.hstack((Top,E.T))
             q[((a+1)*n):((a+2)*n)] = self.costs[a]
         M = scipy.sparse.vstack((Top,Bottom))
-        return (M,q)
+        return lcp.LCP(M,q)
 
     def __str__(self):
         return '<{0} MDP with {1} actions and {1} states>'.\
