@@ -48,6 +48,11 @@ def isvector(x):
     S = x.shape
     return len(S) == 1
     
+def issquare(x):
+    S = x.shape
+    
+    return len(S) == 2 and (S[0] == S[1])
+    
 def nonneg_proj(x):
     """
     Projections onto non-negative orthant; the []_+ operator

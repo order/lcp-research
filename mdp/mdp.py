@@ -14,7 +14,7 @@ class MDPValueIterSplitter(object):
         self.num_states = self.MDP.num_states
         
         # Builds an LCP based on an MPD
-        self.LCP = MDP.tolcp()
+        self.LCP = lcp.MDPLCPObj(MDP)
         self.value_iter_split()      
     
     def update(self,v):
@@ -107,7 +107,7 @@ class MDP(object):
             Top = scipy.sparse.hstack((Top,E.T))
             q[((a+1)*n):((a+2)*n)] = self.costs[a]
         M = scipy.sparse.vstack((Top,Bottom))
-        return lcp.LCP(M,q)
+        return (M,q)
 
     def __str__(self):
         return '<{0} MDP with {1} actions and {1} states>'.\

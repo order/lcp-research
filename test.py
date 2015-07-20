@@ -1,3 +1,4 @@
+import lcp
 import lcp.gen as gen
 import lcp.solvers as solvers
 import lcp.util as util
@@ -45,7 +46,7 @@ def run_MDP_value_compare():
 
     #(MDP,G) = hillcar.generate_mdp(n,n)
     MDP = hallway.generate_mdp(n)
-    LCP = MDP.tolcp()
+    LCP = lcp.MDPLCPObj(MDP)
     N = LCP.dim
 
     # Set up solver
