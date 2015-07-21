@@ -19,26 +19,58 @@ the generators and provides a standardized framework for recording per-iteration
 
 def projective_ip_iteration(proj_lcp_obj,state,**kwargs):
     """
-    A projective interior point algorithm based on "Fast solutions to projective monotone LCPs" by Geoff Gordon (http://arxiv.org/pdf/1212.6958v1.pdf). If M = \Phi U + \Pi_\bot where Phi is low rank (k << n) and \Pi_\bot is projection onto the nullspace of \Phi^\top, then each iteration only costs O(nk^2), rather than O(n^{2 + \eps}) for a full system solve. 
+    A projective interior point algorithm based on "Fast solutions to projective monotone LCPs" by Geoff Gordon (http://arxiv.org/pdf/1212.6958v1.pdf). If M = \Phi U + \Pi_\bot where Phi is low rank (k << n) and \Pi_\bot is projection onto the nullspace of \Phi^\top, then each iteration only costs O(nk^2), rather than O(n^{2 + \eps}) for a full system solve.
+
+    This is a straight-forward implementation of Figure 2
     """
  
-    sigma = kwargs.get('centering_coeff',0.1)
-    beta = kwargs.get('linesearch_backoff',0.8) 
+    sigma = kwargs.get('centering_coeff',0.5)
+    beta = kwargs.get('linesearch_backoff',0.9995) 
  
     Phi = lcp_obj.Phi
     U = lcp_obj.U
     q = lcp.obj.q
     N = lcp_obj.dim
-    (Q,R) = lcp_obj.get_qr()
-    RtR = np.dot(R.T,R)
+
+    PtP = (Phi.T).dot(Phi)
+    PtPU = PtP.dot(U)
+    PtPUP = PtPU.dot(Phi)
+    PtPU_P = PtPU - Phi.T
     
     x = np.ones(N)
     y = np.ones(N)
-    w = scipy.linalg.solve(RtR,np.dot(Phi.T,q))    
+    w = scipy.linalg.lstsq(Phi,x - y + q)[0] # Phi w = x - y + q  
+    
     while True:
-        g = sigma * dot / float(N) * np.ones(N)
-        # M = (Phi U + Pi_bot)x 
-        r = (M.dot(x) + q) - y 
+        # Step 3
+        g = sigma * x.dot(y) / float(N) * np.ones(N) - x * y
+        pinv_phi_x = scipy.linalg.lstsq(Phi,x)[0]
+        r = Phi * (U * x - pinv_phi_x) + x + q - y # M*x + q - y
+        
+        # Step 4
+        inv_XY = scipy.sparse.diags(1.0/(x * y),0)
+        A = PtPU_P.dot(inv_XY) # precompute
+        G = (A * y).doc(Phi) - PtPUP.dot(Phi)
+        h = A.dot(g) + (Phi.T).dot(r)
+        
+        # Step 5
+        del_w = scipy.linalg.solve(G,h)
+        
+        # Step 6
+        del_y = inv_XY*(g - y*Phi.dot(del_w))
+        
+        # Step 7
+        del_x = del_y+Phi.dog(del_w)
+        
+        # Step 8
+        S = np.sqrt(x * y)
+        s_0 = np.amin(S)
+        theta = 3.0 / 7.0 * s_0 / np.linalg.norm((1.0/ S) * g )
+        
+        x = x + theta * del_x
+        y = y + theta * del_y
+        w = w + theta * del_w  
+        
         yield None
     
 
