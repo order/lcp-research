@@ -1,6 +1,7 @@
 import numpy as np
 from mdp import MDP
 import scipy.sparse
+import matplotlib.pyplot as plt
 
 def generate_mdp(num_states,**kwargs):
     """ Generates an MDP based on the hallway problem
@@ -24,8 +25,7 @@ def generate_mdp(num_states,**kwargs):
     for i in Actions:
         P = wheel_slip*scipy.sparse.eye(num_states) \
            + (1 - wheel_slip)*scipy.sparse.diags(np.ones(num_states-1),i)
+        P[(num_states-1)*(1+i)/2,(num_states-1)*(1-i)/2] =  (1 - wheel_slip)
         Transitions.append(P)
 
     return MDP(Transitions,Costs,Actions,name='Hallway')
-    
-print generate_mdp(5)
