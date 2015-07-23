@@ -1,4 +1,5 @@
 import util
+import numpy as np
 
 class LCPObj(object):
     """An object that wraps around the matrix M and vector q
@@ -20,9 +21,9 @@ class LCPObj(object):
             
     def write_to_csv(self,filename):
         FH = open(filename,'w')
-        D = self.M.todense()
+        D = np.array(self.M.todense())
         for row in D:
-            FH.write(','.join(map(str,row)) + '\n')
+            FH.write(','.join(map(str,row.flatten())) + '\n')
         FH.write(','.join(map(str,self.q)))
                 
                 

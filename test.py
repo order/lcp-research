@@ -102,7 +102,7 @@ def run_MDP_value_compare():
     
 def run_compare():
     # Generate instance    
-    n = 15
+    n = 3
     MDP = hallway.generate_mdp(n,discount=0.1)
     LCP = lcp.MDPLCPObj(MDP)
     N = LCP.dim
@@ -150,7 +150,8 @@ def run_compare():
         elapsed = time.time() - start
         print 'Elapsed', elapsed
         records.append(record)
-        
+    
+    print state.x
     for record in records:
         util.plot_state_img(record,max_len=27)
         #plt.semilogy(record.residual)
@@ -163,4 +164,5 @@ def write_mdp_to_file():
     LCP = lcp.MDPLCPObj(MDP) 
     LCP.write_to_csv('test.lcp')
 
-write_mdp_to_file()
+#write_mdp_to_file()
+run_compare()
