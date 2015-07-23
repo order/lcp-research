@@ -4,7 +4,8 @@ import os
 import copy
 import math
 
-import scipy.sparse
+import scipy.sparse as sps
+import scipy
 import matplotlib.pyplot as plt
 import math
 from util import *
@@ -17,7 +18,7 @@ Most are phrased as iteration generators. These plug in to the iter_solver class
 the generators and provides a standardized framework for recording per-iteration information (like residuals and state) and termination checking (like maximum iteration count or residual threshold checking.
 """
 
-def projective_ip_iteration(proj_lcp_obj,state,**kwargs):
+def projective_ip_iter(proj_lcp_obj,state,**kwargs):
     """
     A projective interior point algorithm based on "Fast solutions to projective monotone LCPs" by Geoff Gordon (http://arxiv.org/pdf/1212.6958v1.pdf). If M = \Phi U + \Pi_\bot where Phi is low rank (k << n) and \Pi_\bot is projection onto the nullspace of \Phi^\top, then each iteration only costs O(nk^2), rather than O(n^{2 + \eps}) for a full system solve.
 
@@ -25,53 +26,82 @@ def projective_ip_iteration(proj_lcp_obj,state,**kwargs):
     """
  
     sigma = kwargs.get('centering_coeff',0.5)
-    beta = kwargs.get('linesearch_backoff',0.9995) 
+    beta = kwargs.get('linesearch_backoff',0.99)
+    backoff = kwargs.get('central_path_backoff',0.9995)
  
-    Phi = lcp_obj.Phi
-    U = lcp_obj.U
-    q = lcp.obj.q
-    N = lcp_obj.dim
+    Phi = proj_lcp_obj.Phi
+    U = proj_lcp_obj.U
+    q = proj_lcp_obj.q
+    (N,k) = Phi.shape
 
-    PtP = (Phi.T).dot(Phi)
-    PtPU = PtP.dot(U)
-    PtPUP = PtPU.dot(Phi)
-    PtPU_P = PtPU - Phi.T
+    # Preprocess
+    PtP = (Phi.T).dot(Phi) # FTF in Geoff's code
+    PtPUP = (PtP.dot(U)).dot(Phi)
+    PtPU_P = (PtP.dot(U) - Phi.T) # FMI in Geoff's code; I sometimes call it Psi in my notes  
+    print 'PtP:',shape_str(PtP)
+    print 'PtPU_P:',shape_str(PtPU_P)
     
     x = np.ones(N)
     y = np.ones(N)
-    w = scipy.linalg.lstsq(Phi,x - y + q)[0] # Phi w = x - y + q  
+    w = np.zeros(k)
     
+    I = 0
     while True:
-        # Step 3
+        I += 1
+        print '-'*5
+        # Step 3: form right-hand sides
         g = sigma * x.dot(y) / float(N) * np.ones(N) - x * y
-        pinv_phi_x = scipy.linalg.lstsq(Phi,x)[0]
-        r = Phi * (U * x - pinv_phi_x) + x + q - y # M*x + q - y
+        #pinv_phi_x = scipy.linalg.lstsq(Phi,x)[0] # TODO: use QR factorization
+        #r = Phi * (U * x - pinv_phi_x) + x + q - y # M*x + q - y
+        p = x - y + q - Phi.dot(w)
+        # TODO: Geoff doesn't explicitly form r (rhs2 in his code), figure this out
         
-        # Step 4
-        inv_XY = scipy.sparse.diags(1.0/(x * y),0)
-        A = PtPU_P.dot(inv_XY) # precompute
-        G = (A * y).doc(Phi) - PtPUP.dot(Phi)
-        h = A.dot(g) + (Phi.T).dot(r)
+        # Step 4: Form the reduced system G dw = h
+        inv_XY = sps.diags(1.0/(x * y),0)
+        Y = sps.diags(y,0)
+        A = PtPU_P.dot(inv_XY)
         
-        # Step 5
-        del_w = scipy.linalg.solve(G,h)
+        G = (A.dot(Y)).dot(Phi) - PtPUP
+        #h = A.dot(g + y*p) - (Phi.T).dot(r) + PtPU.dot(p)
+        h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
+        
+        # Step 5: Solve for del_w
+
+        del_w = scipy.linalg.lstsq(G.todense(),h)[0] 
+        # No sparse least squares!?
+        # I have to convert it to a dense matrix!? UGH. Come on scipy!
         
         # Step 6
-        del_y = inv_XY*(g - y*Phi.dot(del_w))
+        Phidw= Phi.dot(del_w)
+        del_y = inv_XY*(g + y*p - y*Phidw)
         
         # Step 7
-        del_x = del_y+Phi.dog(del_w)
+        del_x = del_y+Phidw-p
         
-        # Step 8
-        S = np.sqrt(x * y)
-        s_0 = np.amin(S)
-        theta = 3.0 / 7.0 * s_0 / np.linalg.norm((1.0/ S) * g )
+        # Step 8 Step length
+        steplen = max(np.amax(-del_x/x),np.amax(-del_y/x))
+        if steplen <= 0:
+            steplen = float('inf')
+        else:
+            steplen = 1.0 / steplen
+        steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
         
-        x = x + theta * del_x
-        y = y + theta * del_y
-        w = w + theta * del_w  
+        print steplen
         
-        yield None
+        if(steplen > 0.95):
+            sigma = 0.05 # Long step
+        else:
+            sigma = 0.5 # Short step
+        
+        x = x + steplen * del_x
+        y = y + steplen * del_y
+        w = w + steplen * del_w
+        
+        state.x = x
+        state.w = y # Yeah, this is confusing. Should use a different name for this like dual
+        state.iter = I
+        
+        yield state
     
 
 def mdp_value_iter(lcp_obj,state,**kwargs): 
@@ -96,7 +126,7 @@ def mdp_value_iter(lcp_obj,state,**kwargs):
     P_T = []
     for a in xrange(MDP.num_actions):
         # Transpose, and convert to csr sparse
-        P_T.append(scipy.sparse.csr_matrix(MDP.transitions[a].T))
+        P_T.append(sps.csr_matrix(MDP.transitions[a].T))
         
     I = 0
     while True:
@@ -193,11 +223,11 @@ def kojima_ip_iter(lcp_obj,state,**kwargs):
     
     dot = float('inf')
     I = 0
-    Bottom = scipy.sparse.hstack([-scipy.sparse.csr_matrix(M),scipy.sparse.eye(N)])
-    X = scipy.sparse.diags(x,0)
-    Y = scipy.sparse.diags(y,0)
-    Top = scipy.sparse.hstack((Y, X))
-    A = scipy.sparse.vstack([Top,Bottom]).tocsr()
+    Bottom = sps.hstack([-sps.csr_matrix(M),sps.eye(N)])
+    X = sps.diags(x,0)
+    Y = sps.diags(y,0)
+    Top = sps.hstack((Y, X))
+    A = sps.vstack([Top,Bottom]).tocsr()
 
     while True:
         assert(not np.any(x < 0))
@@ -208,15 +238,15 @@ def kojima_ip_iter(lcp_obj,state,**kwargs):
         
         # Set up Newton direction equations         
         b = np.concatenate([sigma * dot / float(N) * np.ones(N) - x*y, r])
-        X = scipy.sparse.diags(x,0)
-        Y = scipy.sparse.diags(y,0)
-        Top = scipy.sparse.hstack((Y, X))
-        A = scipy.sparse.vstack([Top,Bottom]).tocsr()
+        X = sps.diags(x,0)
+        Y = sps.diags(y,0)
+        Top = sps.hstack((Y, X))
+        A = sps.vstack([Top,Bottom]).tocsr()
             
         # Solve Newton direction equations
         #start = time.time()
-        assert(scipy.sparse.issparse(A))
-        dir = scipy.sparse.linalg.spsolve(A,b)
+        assert(sps.issparse(A))
+        dir = sps.linalg.spsolve(A,b)
         #print '\tSparse solve time:', time.time() - start 
         dir_x = dir[:N]
         dir_y = dir[N:]
@@ -248,7 +278,7 @@ def basic_ip_iter(lcp_obj,state,**kwargs):
 
     N = lcp_obj.dim
     k = 0
-    Top = scipy.sparse.hstack([M,-scipy.sparse.eye(M.shape[0])])
+    Top = sps.hstack([M,-sps.eye(M.shape[0])])
     x = np.ones(N)
     s = np.ones(N)
     sigma = kwargs.get('centering_coeff',0.01)
@@ -261,17 +291,17 @@ def basic_ip_iter(lcp_obj,state,**kwargs):
         mu = x.dot(s) / N # Duality measure
         
         # Construct matrix from invariant Top and diagonal bottom
-        X = scipy.sparse.diags(x,0)
-        S = scipy.sparse.diags(s,0)
-        Bottom = scipy.sparse.hstack([S, X])
-        A = scipy.sparse.vstack([Top,Bottom]).tocsr()
+        X = sps.diags(x,0)
+        S = sps.diags(s,0)
+        Bottom = sps.hstack([S, X])
+        A = sps.vstack([Top,Bottom]).tocsr()
         r = s - M.dot(x) - q
         centering = -x*s + sigma*mu*np.ones(N)
 
         b = np.hstack([r, centering])
         
         # Solve, break solution into two parts
-        d = scipy.sparse.linalg.spsolve(A,b)        
+        d = sps.linalg.spsolve(A,b)        
         dx = d[:N]
         ds = d[N:]
         

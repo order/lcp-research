@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 
 # Utilities; put in another file?
 
+def shape_str(M):
+    return 'x'.join(map(str,M.shape))
+
 def col_vect(v):
     """
     Convert a n-vector into a nx1 np array.

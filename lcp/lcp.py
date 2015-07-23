@@ -18,6 +18,15 @@ class LCPObj(object):
         return '<{0} LCP in R^{1}'.\
             format(self.name, self.dim)
             
+    def write_to_csv(self,filename):
+        FH = open(filename,'w')
+        D = self.M.todense()
+        for row in D:
+            FH.write(','.join(map(str,row)) + '\n')
+        FH.write(','.join(map(str,self.q)))
+                
+                
+            
 class MDPLCPObj(LCPObj):
     """LCP generated from an MDP
     """

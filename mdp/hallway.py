@@ -25,7 +25,8 @@ def generate_mdp(num_states,**kwargs):
     for i in Actions:
         P = wheel_slip*scipy.sparse.eye(num_states) \
            + (1 - wheel_slip)*scipy.sparse.diags(np.ones(num_states-1),i)
+        P = P.tolil()
         P[(num_states-1)*(1+i)/2,(num_states-1)*(1-i)/2] =  (1 - wheel_slip)
         Transitions.append(P)
 
-    return MDP(Transitions,Costs,Actions,name='Hallway')
+    return MDP(Transitions,Costs,Actions,name='Hallway',**kwargs)
