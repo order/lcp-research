@@ -24,7 +24,8 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
 
     This is a straight-forward implementation of Figure 2
     """
- 
+    DEBUG = True
+
     sigma = kwargs.get('centering_coeff',0.5)
     beta = kwargs.get('linesearch_backoff',0.99)
     backoff = kwargs.get('central_path_backoff',0.9995)
@@ -38,8 +39,9 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
     PtP = (Phi.T).dot(Phi) # FTF in Geoff's code
     PtPUP = (PtP.dot(U)).dot(Phi)
     PtPU_P = (PtP.dot(U) - Phi.T) # FMI in Geoff's code; I sometimes call it Psi in my notes  
-    print 'PtP:',shape_str(PtP)
-    print 'PtPU_P:',shape_str(PtPU_P)
+
+    debug_mapprint(DEBUG,
+    
     
     x = np.ones(N)
     y = np.ones(N)
@@ -48,14 +50,17 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
     I = 0
     while True:
         I += 1
-        print '-'*5
+        debug_print(DEBUG, '-'*5+str(I)+'-'*5)
+        debug_mapprint(DEBUG,x=x,y=y,w=w)
+
         # Step 3: form right-hand sides
         g = sigma * x.dot(y) / float(N) * np.ones(N) - x * y
         #pinv_phi_x = scipy.linalg.lstsq(Phi,x)[0] # TODO: use QR factorization
         #r = Phi * (U * x - pinv_phi_x) + x + q - y # M*x + q - y
         p = x - y + q - Phi.dot(w)
         # TODO: Geoff doesn't explicitly form r (rhs2 in his code), figure this out
-        
+        debug_mapprint(DEBUG,g=g,p=p)
+
         # Step 4: Form the reduced system G dw = h
         inv_XY = sps.diags(1.0/(x * y),0)
         Y = sps.diags(y,0)
@@ -64,6 +69,8 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
         G = (A.dot(Y)).dot(Phi) - PtPUP
         #h = A.dot(g + y*p) - (Phi.T).dot(r) + PtPU.dot(p)
         h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
+        debug_mapprint(DEBUG,G=G,h=h)        
+        
         
         # Step 5: Solve for del_w
 
@@ -78,6 +85,8 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
         # Step 7
         del_x = del_y+Phidw-p
         
+        debug_mapprint(DEBUG,del_x=del_x,del_y=del_y,del_w=del_w)
+        
         # Step 8 Step length
         steplen = max(np.amax(-del_x/x),np.amax(-del_y/x))
         if steplen <= 0:
@@ -85,9 +94,8 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
         else:
             steplen = 1.0 / steplen
         steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
-        
-        print steplen
-        
+                
+        debug_mapprint(DEBUG,steplen=steplen)
         if(steplen > 0.95):
             sigma = 0.05 # Long step
         else:

@@ -9,6 +9,15 @@ import matplotlib.pyplot as plt
 
 # Utilities; put in another file?
 
+def debug_mapprint(level,**kwargs):
+    if level:
+        for (k,v) in kwargs.items():
+            print k,'=',v
+
+def debug_print(level,str):
+    if level:
+        print str
+
 def shape_str(M):
     return 'x'.join(map(str,M.shape))
 
@@ -183,7 +192,7 @@ def plot_state_img(record,**kwargs):
     Img = (S - record.states[-1]) / (record.states[-1] + 1e-12) + 1e-12
     l = min(max_len,Img.shape[0])
     print l
-    ax.imshow(np.log(np.abs(Img[:l,:].T)))
+    ax.imshow(np.log(np.abs(Img[:l,:].T)), interpolation='nearest')
     ax.set_title('Relative log change from final iter')
     plt.show()
     

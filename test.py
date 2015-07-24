@@ -103,7 +103,7 @@ def run_MDP_value_compare():
 def run_compare():
     # Generate instance    
     n = 3
-    MDP = hallway.generate_mdp(n,discount=0.1)
+    MDP = hallway.generate_mdp(n)
     LCP = lcp.MDPLCPObj(MDP)
     N = LCP.dim
     ProjLCP = lcp.ProjectiveLCPObj(scipy.sparse.eye(N),LCP.M,LCP.q)
@@ -113,7 +113,7 @@ def run_compare():
     # Set up solver
     solver = solvers.iter_solver()
     solver.record_fns = [util.residual_recorder,util.state_recorder]
-    solver.term_fns = [functools.partial(util.max_iter_term, 100),\
+    solver.term_fns = [functools.partial(util.max_iter_term, 5),\
         functools.partial(util.res_thresh_term, util.basic_residual,1e-6)]
 
 
@@ -151,18 +151,18 @@ def run_compare():
         print 'Elapsed', elapsed
         records.append(record)
     
-    print state.x
-    for record in records:
-        util.plot_state_img(record,max_len=27)
+    #print state.x
+    #for record in records:
+        #util.plot_state_img(record,max_len=27)
         #plt.semilogy(record.residual)
-    plt.show()
+    #plt.show()
     #compare_final(MDP,records)
     
 def write_mdp_to_file():
     n = 3
-    MDP = hallway.generate_mdp(n,discount=0.1)
+    MDP = hallway.generate_mdp(n)
     LCP = lcp.MDPLCPObj(MDP) 
     LCP.write_to_csv('test.lcp')
 
-#write_mdp_to_file()
+write_mdp_to_file()
 run_compare()
