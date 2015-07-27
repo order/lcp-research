@@ -191,7 +191,6 @@ def plot_state_img(record,**kwargs):
     f,ax = plt.subplots()
     Img = (S - record.states[-1]) / (record.states[-1] + 1e-12) + 1e-12
     l = min(max_len,Img.shape[0])
-    print l
     ax.imshow(np.log(np.abs(Img[:l,:].T)), interpolation='nearest')
     ax.set_title('Relative log change from final iter')
     plt.show()

@@ -24,9 +24,9 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
 
     This is a straight-forward implementation of Figure 2
     """
-    DEBUG = True
+    DEBUG = False
 
-    sigma = kwargs.get('centering_coeff',0.5)
+    sigma = kwargs.get('centering_coeff',0.99)
     beta = kwargs.get('linesearch_backoff',0.99)
     backoff = kwargs.get('central_path_backoff',0.9995)
  
@@ -40,7 +40,7 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
     PtPUP = (PtP.dot(U)).dot(Phi)
     PtPU_P = (PtP.dot(U) - Phi.T) # FMI in Geoff's code; I sometimes call it Psi in my notes  
 
-    debug_mapprint(DEBUG,
+    #debug_mapprint(DEBUG,PtP=PtP,PtPU_P=PtPU_P)
     
     
     x = np.ones(N)
@@ -62,15 +62,15 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
         debug_mapprint(DEBUG,g=g,p=p)
 
         # Step 4: Form the reduced system G dw = h
-        inv_XY = sps.diags(1.0/(x * y),0)
+        inv_XY = sps.diags(1.0/(x + y),0)
         Y = sps.diags(y,0)
         A = PtPU_P.dot(inv_XY)
         
         G = (A.dot(Y)).dot(Phi) - PtPUP
         #h = A.dot(g + y*p) - (Phi.T).dot(r) + PtPU.dot(p)
         h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
-        debug_mapprint(DEBUG,G=G,h=h)        
-        
+        #h = PtPU_P.dot(inv_XY.dot(g + y*p) -(q-y-Phi.dot(w))) + PtP.dot(w)
+        debug_mapprint(DEBUG,h=h,G=G)
         
         # Step 5: Solve for del_w
 
@@ -88,18 +88,22 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
         debug_mapprint(DEBUG,del_x=del_x,del_y=del_y,del_w=del_w)
         
         # Step 8 Step length
-        steplen = max(np.amax(-del_x/x),np.amax(-del_y/x))
+        steplen = max(np.amax(-del_x/x),np.amax(-del_y/y))
+        debug_mapprint(DEBUG,steplen_pre=steplen,beta=sigma)
         if steplen <= 0:
             steplen = float('inf')
         else:
             steplen = 1.0 / steplen
         steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
                 
-        debug_mapprint(DEBUG,steplen=steplen)
+        # Sigma is beta in Geoff's code
         if(steplen > 0.95):
             sigma = 0.05 # Long step
         else:
             sigma = 0.5 # Short step
+        debug_mapprint(DEBUG,steplen=steplen,beta=sigma)
+           
+        
         
         x = x + steplen * del_x
         y = y + steplen * del_y

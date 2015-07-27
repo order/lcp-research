@@ -113,7 +113,7 @@ def run_compare():
     # Set up solver
     solver = solvers.iter_solver()
     solver.record_fns = [util.residual_recorder,util.state_recorder]
-    solver.term_fns = [functools.partial(util.max_iter_term, 5),\
+    solver.term_fns = [functools.partial(util.max_iter_term, 500),\
         functools.partial(util.res_thresh_term, util.basic_residual,1e-6)]
 
 
@@ -128,8 +128,6 @@ def run_compare():
     # For adaptive restart
     #solver.params['restart'] = 0.01
     
-    solver.params['centering_coeff'] = 0.1
-    solver.params['linesearch_backoff'] = 0.8
     solver.params['MDP'] = MDP
 
     # Set up iteration methods list and problem list
@@ -151,11 +149,11 @@ def run_compare():
         print 'Elapsed', elapsed
         records.append(record)
     
-    #print state.x
-    #for record in records:
-        #util.plot_state_img(record,max_len=27)
-        #plt.semilogy(record.residual)
-    #plt.show()
+    print state.x
+    for record in records:
+        util.plot_state_img(record,max_len=27)
+        plt.semilogy(record.residual)
+    plt.show()
     #compare_final(MDP,records)
     
 def write_mdp_to_file():
