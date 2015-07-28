@@ -183,6 +183,11 @@ class Params(object):
 #############################
 # Plotting for records
 
+def image_matrix(A):
+    f,ax = plt.subplots()
+    ax.imshow(A, interpolation='nearest')
+    plt.show()
+
 def plot_state_img(record,**kwargs):
     """ Plots the state trajectory as an image
     """
