@@ -51,45 +51,10 @@ class ProjectiveLCPObj(LCPObj):
         assert(U.shape[1] == self.dim)
         
         self.name = 'Unnamed'
-    
-    def get_qr(self):
-        """Get QR factorization; factorization cached
-        """
-        if not hasattr(self,'Q'):
-            self.Q, self.R = scipy.linalg.qr(self.Phi,mode='economic')
-            self.rank = self.Q.shape[1]
-            # Q is n x k
-            # R is k x n
-            assert(self.Q.shape[0] == self.dim)
-            assert(self.R.shape[1] == self.dim)
-            assert(self.R.shape[0] == self.rank)
-            
-        return (self.Q,self.R)        
 
     def __str__(self):
         return '<{0} Projective LCP in R^{1}'.\
             format(self.name, self.dim)
-
-def pinv(Q,R,x,**kwargs):
-    """ Calculate the y s.t. Ay is close to x via the pseudo inverse of A = QR
-    """
-    # b = A^T x
-    b = np.dot(R.T,np.dot(Q.T,x))
-    # (R.T*R)y = b
-    y = scipy.linalg.solve(np.dot(R.T,R),b)
-    return y    
- 
-def pi_project(Phi,x,**kwargs):
-    """ Project x using the pseudo inverse of Phi:
-    Pi x = Phi (Phi.T Phi)^-1 Phi.T x
-    """
-    if 'Q' in kwargs and 'R' in kwargs:
-        Q = kwargs['Q']
-        R = kwargs['R']
-    else:
-        (Q,R) = scipy.linalg.qr(A)
-    y = pinv(Q,R,x)
-    return Q.dot(R.dot(y))
     
     
     

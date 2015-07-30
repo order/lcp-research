@@ -93,5 +93,3 @@ def fourier_test():
     w = np.linalg.lstsq(F,f)[0]
     plt.plot(x,f,x,F.dot(w))
     plt.show()
-    
-cmac_test()

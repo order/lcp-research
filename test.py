@@ -10,10 +10,13 @@ import scipy
 import scipy.sparse
 import scipy.sparse.linalg
 import matplotlib.pylab as plt
+from matplotlib import cm
 import time
 
 import mdp.hillcar as hillcar
 import mdp.hallway as hallway
+
+import bases
 
 class Nothing:
     pass
@@ -156,11 +159,39 @@ def run_compare():
     plt.show()
     #compare_final(MDP,records)
     
-def write_mdp_to_file():
+def write_mdp_to_file(filename):
     n = 3
     MDP = hallway.generate_mdp(n)
     LCP = lcp.MDPLCPObj(MDP) 
     LCP.write_to_csv('test.lcp')
 
-write_mdp_to_file()
-run_compare()
+def run_projective():
+    n = 15
+    MDP = hallway.generate_mdp(n)
+    LCP = lcp.MDPLCPObj(MDP)
+    B = bases.fourier(n,n / 2)
+    M = np.array(LCP.M.todense())
+    print 'B shape:', B.shape
+    Phi = np.array(scipy.linalg.block_diag(B,B,B))
+    print 'Phi shape:', Phi.shape
+    print 'M shape', M.shape
+
+    U = np.linalg.lstsq(Phi,M)[0]
+
+    #fig, ax = plt.subplots()
+    #cax = ax.imshow(abs(M - Phi.dot(U)), interpolation='nearest', cmap=cm.jet)
+    #fig.colorbar(cax)
+    #plt.show()
+
+    PLCP = lcp.ProjectiveLCPObj(Phi,U,LCP.q)
+    solver = solvers.iter_solver()
+    solver.record_fns = [util.residual_recorder,util.state_recorder]
+    solver.term_fns = [functools.partial(util.max_iter_term, 500),\
+        functools.partial(util.res_thresh_term, util.basic_residual,1e-6)]
+    solver.iter_fn = solvers.projective_ip_iter
+    solver.params['MDP'] = MDP
+
+    (record,state) = solver.solve(PLCP)
+    util.plot_state_img(record)
+
+run_projective()

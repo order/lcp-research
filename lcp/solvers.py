@@ -26,6 +26,13 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
     """
     DEBUG = False
 
+    """
+    RE-CORE this an all other iterative procedures to deal with matrices
+    rather than arrays. 
+    This leads to better interaction with sparse stuff, and I think is more
+    comprehensible to my matlab sensibilities
+    """
+
     sigma = kwargs.get('centering_coeff',0.99)
     beta = kwargs.get('linesearch_backoff',0.99)
     backoff = kwargs.get('central_path_backoff',0.9995)
@@ -74,9 +81,7 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
         
         # Step 5: Solve for del_w
 
-        del_w = scipy.linalg.lstsq(G.todense(),h)[0] 
-        # No sparse least squares!?
-        # I have to convert it to a dense matrix!? UGH. Come on scipy!
+        del_w = scipy.linalg.lsmr(G,h)[0]
         
         # Step 6
         Phidw= Phi.dot(del_w)
