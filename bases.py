@@ -85,6 +85,12 @@ def cmac_test():
     #axes[2].imshow(B,interpolation='nearest')
     plt.show()
     
+def rbf():
+    """
+    stub for radial basis function basis
+    """
+    pass
+    
 def fourier_test():
     N = 500
     F = fourier(N,25)
