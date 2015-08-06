@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import scipy
 import scipy.sparse
@@ -22,11 +23,25 @@ def fourier(N,k):
     Note that this is the 1D "DFT" so may have kind of strange behaviour
     on "flattened" multidimensional vectors
     """
-    x = np.array(range(N))
-    w = np.array(range(k)) / float(N) # Frequencies 
-    C = np.cos(np.outer(x,w))
-    S = np.sin(np.outer(x,w[1:]))
-    return np.hstack([np.fliplr(C),S])    
+    x = np.linspace(0,2*np.pi, num=N, endpoint=False)
+    w = np.array(range(k)) # Frequencies 
+    C = math.sqrt(2) / math.sqrt(N) * np.cos(np.outer(x,w))
+    C[:,0] /= math.sqrt(2)
+    S = math.sqrt(2) / math.sqrt(N) * np.sin(np.outer(x,w[1:]))
+    return np.hstack([np.fliplr(C),S])
+
+def chebyshev(N,k):
+    if k == 1:
+        return np.ones(N,1)
+
+    x = np.linspace(-1,1,num=N,endpoint=False)
+    B = [np.ones(N),x]
+        
+    while k > 2:
+        T = 2*x*B[-1] - B[-2]
+        B.append(T)
+        k -= 1
+    return np.column_stack(B)
 
 def cmac(shape, grids):
     """

@@ -37,9 +37,15 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
     beta = kwargs.get('linesearch_backoff',0.99)
     backoff = kwargs.get('central_path_backoff',0.9995)
  
-    Phi = proj_lcp_obj.Phi
-    U = proj_lcp_obj.U
-    q = proj_lcp_obj.q
+    # Currently: converting everything to a dense matrix
+    if hasattr(proj_lcp_obj,'todense'):
+        Phi = np.array(proj_lcp_obj.Phi.todense())
+        U = np.array(proj_lcp_obj.U.todense())
+        q = np.array(proj_lcp_obj.q.todense())
+    else:
+        Phi = proj_lcp_obj.Phi
+        U = proj_lcp_obj.U
+        q = proj_lcp_obj.q
     (N,k) = Phi.shape
 
     # Preprocess
@@ -47,7 +53,7 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
     PtPUP = (PtP.dot(U)).dot(Phi)
     PtPU_P = (PtP.dot(U) - Phi.T) # FMI in Geoff's code; I sometimes call it Psi in my notes  
 
-    #debug_mapprint(DEBUG,PtP=PtP,PtPU_P=PtPU_P)
+    debug_mapprint(DEBUG,PtP=PtP.shape,PtPU_P=PtPU_P.shape)
     
     
     x = np.ones(N)
@@ -69,19 +75,15 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
         debug_mapprint(DEBUG,g=g,p=p)
 
         # Step 4: Form the reduced system G dw = h
-        inv_XY = sps.diags(1.0/(x + y),0)
-        Y = sps.diags(y,0)
-        A = PtPU_P.dot(inv_XY)
-        
-        G = (A.dot(Y)).dot(Phi) - PtPUP
-        #h = A.dot(g + y*p) - (Phi.T).dot(r) + PtPU.dot(p)
+        inv_XY = 1.0/(x + y)
+        A = PtPU_P * inv_XY
+        G = (A * y).dot(Phi) - PtPUP
         h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
-        #h = PtPU_P.dot(inv_XY.dot(g + y*p) -(q-y-Phi.dot(w))) + PtP.dot(w)
         debug_mapprint(DEBUG,h=h,G=G)
         
         # Step 5: Solve for del_w
 
-        del_w = scipy.linalg.lsmr(G,h)[0]
+        del_w = np.linalg.lstsq(G,h)[0]
         
         # Step 6
         Phidw= Phi.dot(del_w)

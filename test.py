@@ -166,10 +166,15 @@ def write_mdp_to_file(filename):
     LCP.write_to_csv('test.lcp')
 
 def run_projective():
-    n = 15
-    MDP = hallway.generate_mdp(n)
+    n = 250
+    K = 50 # Basis size (meaning depends on basis)
+
+    MDP = hallway.generate_mdp(n,discount=0.9)
     LCP = lcp.MDPLCPObj(MDP)
-    B = bases.fourier(n,n / 2)
+
+    B = bases.fourier(n,K)
+    #B = np.eye(n)
+
     M = np.array(LCP.M.todense())
     print 'B shape:', B.shape
     Phi = np.array(scipy.linalg.block_diag(B,B,B))
@@ -178,12 +183,22 @@ def run_projective():
 
     U = np.linalg.lstsq(Phi,M)[0]
 
-    #fig, ax = plt.subplots()
-    #cax = ax.imshow(abs(M - Phi.dot(U)), interpolation='nearest', cmap=cm.jet)
-    #fig.colorbar(cax)
-    #plt.show()
+    print "Rank:", np.linalg.matrix_rank(Phi)
+    
+    # plt.subplot(2,2,1).imshow(M)
+    # plt.subplot(2,2,2).imshow(Phi.dot(U))
+    # plt.subplot(2,2,3).imshow(Phi)
+    # plt.subplot(2,2,4).imshow(abs(M - Phi.dot(U)))
+    # plt.show()
+    
+
+    # fig, ax = plt.subplots()
+    # cax = ax.imshow(abs(M - Phi.dot(U)), interpolation='nearest', cmap=cm.jet)
+    # fig.colorbar(cax)
+    # plt.show()
 
     PLCP = lcp.ProjectiveLCPObj(Phi,U,LCP.q)
+    PLCP.write_to_csv('test.lcp')
     solver = solvers.iter_solver()
     solver.record_fns = [util.residual_recorder,util.state_recorder]
     solver.term_fns = [functools.partial(util.max_iter_term, 500),\
@@ -192,6 +207,18 @@ def run_projective():
     solver.params['MDP'] = MDP
 
     (record,state) = solver.solve(PLCP)
-    util.plot_state_img(record)
+    #util.plot_state_img(record)
+    f,(A1,A2) = plt.subplots(2,sharex=True)
+    A1.plot(state.x[0:n],linewidth=2)
+    A2.plot(state.x[n:(2*n)],linewidth=2)
+    A2.plot(state.x[(2*n):(3*n)],linewidth=2)
+    plt.show()
+
+def bases_tests():
+    B = bases.chebyshev(25,3)
+    plt.subplot(1,2,1).imshow(B.T.dot(B), interpolation='nearest', cmap=cm.jet)
+    plt.subplot(1,2,2).imshow(B, interpolation='nearest', cmap=cm.jet)
+    print B.T.dot(B)
+    plt.show()
 
 run_projective()

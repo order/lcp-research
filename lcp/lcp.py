@@ -55,6 +55,21 @@ class ProjectiveLCPObj(LCPObj):
     def __str__(self):
         return '<{0} Projective LCP in R^{1}'.\
             format(self.name, self.dim)
+
+    def write_to_csv(self,filename):
+        FH = open(filename,'w')
+        if hasattr(self.Phi,'todense'):
+            DP = np.array(self.Phi.todense())
+            DU = np.array(self.U.todense())
+        else:
+            DP = self.Phi
+            DU = self.U
+
+        for row in DP:
+            FH.write(','.join(map(str,row.flatten())) + '\n')
+        for row in DU:
+            FH.write(','.join(map(str,row.flatten())) + '\n')
+        FH.write(','.join(map(str,self.q)))
     
     
     
