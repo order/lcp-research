@@ -220,5 +220,9 @@ def bases_tests():
     plt.subplot(1,2,2).imshow(B, interpolation='nearest', cmap=cm.jet)
     print B.T.dot(B)
     plt.show()
+    
+def double_integrator():
+    MDP = double_integrator.generate_mdp(n,discount=0.9)
+    
 
 run_projective()

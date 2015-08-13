@@ -52,6 +52,15 @@ def mdp_skew_assembler(A_list):
         M[np.ix_(I,J)] = A_list[i]
         M[np.ix_(J,I)] = -A_list[i]
     return M.tocsr()
+    
+class Policy(object):
+    def decision(self,states):
+        pass
+        
+class ValueTablePolicy(Policy):
+    def __init__(self,cost_to_go):
+        self.v = cost_to_go
+        
 
 class MDP(object):
     """
@@ -138,6 +147,7 @@ def value_iteration(MDP,**kwargs):
         v = v_new
     return v
             
+
             
 def plot_value(G,v):
     """

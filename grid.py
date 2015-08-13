@@ -7,6 +7,12 @@ import matplotlib.pyplot as plt
 # Transforms a coordinate into flanking indices
 # ASSUMES p_grid is a regular grid
 def regular_index_transform(p,p_grid):
+    """
+    Takes in a 1D coordinate p, and a sorted list of cut points p_grid
+    Returns an ordered pair (GS,LL) where GS is the greatest element in p_grid smaller than p,
+    And LL is the least element larger than p.
+    If p is exactly a cut-point, just return that
+    """
     if p < p_grid[0] or p > p_grid[-1]:
         return None
 
