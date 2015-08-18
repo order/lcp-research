@@ -1,0 +1,3 @@
+
+class NodeMapper(object):
+    pass
