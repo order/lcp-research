@@ -248,7 +248,7 @@ class InterpolatedGridNodeMapper(NodeMapper):
         lengths = map(len, self.grid_desc)
         max_nodes = util.product(lengths)
         node_iter = xrange(self.node_offset,max_nodes + self.node_offset)
-        self.cache = np.reshape(np.array(node_iter,dtype=np.uint32),lengths)
+        self.cache = np.reshape(np.array(node_iter,dtype=np.uint32),lengths,order='F')
         self.built_cache = True
         
     def states_to_node_dists(self,states,ignore):
