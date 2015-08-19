@@ -3,11 +3,20 @@ import time
 import os
 import copy
 import math
+import operator
 
 import scipy.sparse
 import matplotlib.pyplot as plt
 
 # Utilities; put in another file?
+def product(L):
+    return reduce(operator.mul, L)
+    
+def partial_product(L):
+    R = [L[0]]
+    for i in xrange(1,len(L)):
+        R.append(R[-1] * L[i])
+    return R
 
 def debug_mapprint(level,**kwargs):
     if level:
