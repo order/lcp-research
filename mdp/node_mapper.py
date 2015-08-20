@@ -3,15 +3,12 @@ import itertools
 import operator
 import bisect
 
-import util
-from util import debug_mapprint
-
 class NodeMapper(object):
     """
     Abstract class defining state-to-node mappings. 
     For example, basic grid mappings or fixing OOB states.
     """
-    def states_to_node_dists(self,states,ignore):
+    def states_to_node_dists(self,states,**kwargs):
         """
         All node mappers must implement this.
         """
@@ -20,8 +17,26 @@ class NodeMapper(object):
         """
         All node mappers must implement this.
         """
-        raise NotImplementedError()   
-     
+        raise NotImplementedError()  
+        
+    def get_num_nodes(self):
+        """
+        All node mappers must implement this.
+        """
+        raise NotImplementedError()        
+        
+    def get_nodes(self)
+        """
+        All node mappers must implement this.
+        """
+        raise NotImplementedError()
+
+    def get_node_states(self)
+        """
+        All node mappers must implement this.
+        """
+        raise NotImplementedError()  
+        
 class NodeDist(object):
     """
     Stores information for a distribution over nodes
@@ -92,30 +107,38 @@ class OOBSinkNodeMapper(NodeMapper):
         """
         return {}
         
+    def get_nodes(self):
+        return [self.sink_node]
+        
+    def get_num_nodes(self):
+        return 1
+        
+    def get_node_states(self):
+        return None        
+        
 class PiecewiseConstRegularGridNodeMapper(NodeMapper):
-    def __init__(self,node_offset,*vargs):
+    def __init__(self,*vargs):
         """
         This is a class that utilizes a REGULAR N-dimensional grid, and assigns everything with a cell to the same point.
         This representative node is at the center of mass of the cell.
         
         This is equivalent to a nearest-neighbor interpolation given the center of mass points.
         
-        node_offset is where the node range starts
         vargin be a list of triples: (low,high,N)
         This gives the range of discretization [low,high) and the number of cells in that range
         """
         assert(len(vargs) >= 1)
         self.grid_desc = vargs
         
-        self.node_offset = node_offset
-        self.num_nodes = reduce(lambda a,b: a*b, map(lambda x: x[2],vargs))
-        self.node_max = node_offset + self.num_nodes
+        self.num_nodes = np.prod(map(lambda x: x[2],vargs))
         
-    def states_to_node_dists(self,states,ignore):
+    def states_to_node_dists(self,states,**kwargs):
         """
         Assumes states to be an N x d np.array
         This is a partial mapping; if a state isn't mapped, it should be handled by another mapper
         """
+        
+        ignore = kwargs.get('ignore',set())
         
         # Discretize dimensions into grid coordinates
         (N,D) = states.shape
@@ -127,7 +150,7 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         coef = np.ones(D)
         for d in xrange(D):
             coef[:d] *= self.grid_desc[d][2]
-        Nodes = GridCoord.dot(coef) + self.node_offset
+        Nodes = GridCoord.dot(coef)
         
         # Check if in bound
         InBounds = np.ones(N)
@@ -154,7 +177,7 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         D = len(self.grid_desc)
         GridCoord = np.zeros((N,D))
         
-        tmp = np.array(nodes) - self.node_offset # Copy nodes
+        tmp = np.array(nodes)  # Copy nodes
         
         # Figure out the prefix array
         coef = np.ones(D)
@@ -174,10 +197,26 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
             # Add bottom of the range, plus half the grid's "delta"
             
         # Check if any of the points are out of bounds (NaN over the nonsense)
-        OutOfBounds = np.logical_or(nodes < self.node_offset, nodes > self.node_max)
+        OutOfBounds = np.logical_or(nodes < 0, nodes >= self.num_nodes)
         GridCoord[OutOfBounds,:] = np.NaN            
             
         return GridCoord
+        
+    def get_nodes(self):
+        return xrange(self.num_nodes)
+        
+    def get_num_nodes(self):
+        return self.num_nodes
+        
+    def get_node_states(self):
+        # Build the D different uniformly spaced ranges
+        linspaces = [np.linspace(*gd) for gd in self.grid_desc]
+        # Turn these into a mesh
+        meshes = np.meshgrid(*linspaces)
+        # Flatten each into a vector; concat; transpose
+        node_states = np.array(map(lambda x: x.flatten(),meshes)).T
+        return node_states
+        
         
 class PiecewiseConstGridNodeMapper(NodeMapper):
         """
@@ -186,12 +225,11 @@ class PiecewiseConstGridNodeMapper(NodeMapper):
         This representative node is at the center of mass of the cell.
         Compare this to PiecewiseConstRegularGridNodeMapper that assumes a special form for the grid
                 
-        node_offset is where the node range starts
         vargin be a list of sorted cut points: (c_1,...,c_k) for each dimension
         """
         
 class InterpolatedGridNodeMapper(NodeMapper):
-    def __init__(self,node_offset,*vargs):
+    def __init__(self,*vargs):
         """
         This is a class that utilizes a non-regular N-dimensional grid. Interstitial
         points are mapped to a particular convex combination of cell vertices defined
@@ -200,14 +238,12 @@ class InterpolatedGridNodeMapper(NodeMapper):
         rather than to a distribution over vertices. Additionally, these two mappers will have
         different numbers of points because of the vertex / centroid distinction.
         
-        node_offset is where the node range starts
         vargin be a list of sorted cut points: (c_1,...,c_k) for each dimension
         """
         assert(len(vargs) >= 1)
-        self.grid_desc = vargs        
-        self.node_offset = node_offset
-        self.built_cache = False
-        self.cache = None
+        self.grid_desc = vargs       
+        self.num_nodes = np.prod(map(len,self.grid_desc))
+        self.__build_node_id_cache()
         
     def __one_dim_interp(self,x,L):
         """
@@ -234,27 +270,20 @@ class InterpolatedGridNodeMapper(NodeMapper):
         """
         Flattens an n-tuple representing the grid coordinates to a node-id
         """
-        # TODO: cache the transformation by creating xrange(offset, max_node + offset) and reshaping
-        #
-        if self.built_cache:
-            #util.debug_mapprint(True,gid=gid,cache_size = self.cache.shape,ret=self.cache[tuple(gid)])
-            return self.cache[tuple(gid)]
-        else:
-            coeffs = util.partial_product([1.0] + map(len, self.grid_desc[:-1]))
-            comps = map(util.product, zip(gid,coeffs))
-            return int(sum(comps)) + self.node_offset
+        return self.cache[tuple(gid)]
+
             
-    def build_node_id_cache(self):
+    def __build_node_id_cache(self):
         lengths = map(len, self.grid_desc)
-        max_nodes = util.product(lengths)
-        node_iter = xrange(self.node_offset,max_nodes + self.node_offset)
+        node_iter = xrange(self.num_nodes)
         self.cache = np.reshape(np.array(node_iter,dtype=np.uint32),lengths,order='F')
-        self.built_cache = True
         
     def states_to_node_dists(self,states,ignore):
+    
+        ignore = kwargs.get('ignore',set())
         (N,D) = states.shape
-        Mapping = {}
         
+        Mapping = {}
         # Iterate through each elements in the states matrix. Seems slow... vectorize somehow?
         for state_id in xrange(N):
             if state_id in ignore:
@@ -291,34 +320,55 @@ class InterpolatedGridNodeMapper(NodeMapper):
         N = len(nodes)
         D = len(self.grid_desc)
         GridCoord = np.zeros((N,D), dtype=np.uint32)
-        
-        tmp = np.array(nodes) - self.node_offset # Copy nodes
-        
-        # Figure out the prefix array
-        coeffs = util.partial_product([1.0] + map(len, self.grid_desc[:-1]))
-        # Use len? If the grid_desc are np.arrays, then this will 
+
+        lengths = map(len,self.grid_desc)
             
         # Divide and mode to get the grid coords
-        for (dim,coef) in enumerate(coeffs[::-1]):
-            coord_ids = np.floor(tmp / coef)
-            for (index,cid) in enumerate(coord_ids):
-                if cid < 0 or cid >= len(self.grid_desc[dim]):
-                    GridCoord[index,dim] = np.NaN
-                else:
-                    GridCoord[index,dim] = self.grid_desc[dim][cid]
-            np.mod(tmp,coef,tmp)
+        for (i,node_id) in enumerate(nodes):
+            coords = id_to_coords(node_id,lengths)
+            GridCoord[i,:] = coords
             
-        # Check if any of the points are out of bounds (NaN over the nonsense)
-        OutOfBounds = np.logical_or(nodes < self.node_offset, nodes > self.node_max)
-        GridCoord[OutOfBounds,:] = np.NaN      
+        raise NotImplementedError('Still only grid coordinates')
+        return GridCoord
+        
+    def get_nodes(self):
+        return xrange(self.num_nodes)
+
+    def get_num_nodes(self):
+        return self.num_nodes
+        
+    def get_node_states(self):
+        # Build the D different uniformly spaced ranges
+        linspaces = [np.linspace(*gd) for gd in self.grid_desc]
+        # Turn these into a mesh
+        meshes = np.meshgrid(*linspaces)
+        # Flatten each into a vector; concat; transpose
+        node_states = np.array(map(lambda x: x.flatten(),meshes)).T
+        return node_states
   
-def nodemap_to_nodearray(node_map):
+def id_to_coords(node_id,Lens):
     """
-    Simple utility for converting dict of deterministic node distributions into an array of node ids
+    Expands a linear index into a fortran-ordered coordinate 
+    (first dimension changes the most frequently)
+    0 1 2 3
+    4 5 6 7
+    8 9 ...
     """
-    Nodes = -np.ones(max(node_map.keys())+1)
-    for (pos,n_dist) in sorted(node_map.items()):
-        assert(len(n_dist.keys()) == 1) # Needs to be a deterministic mapping
-        Nodes[pos] = n_dist.keys()[0]
-    return Nodes
-    
+    coef = np.prod(Lens[:-1])
+    coords = np.zeros(len(Lens))
+    for i in reversed(xrange(len(Lens))):
+        (coord,node_id) = divmod(node_id, coef)
+        coef /= Lens[i]
+        coords[i] = coord
+    return coords        
+
+def coords_to_id(coords,Lens):
+    """
+    Flattens a multi-dimensional coordinate into a fortran-ordered index
+    """
+    node_id = 0
+    coef = 1
+    for (i,coord) in enumerate(coords):
+        node_id += coef * coord
+        coef *= Lens[i]
+    return node_id

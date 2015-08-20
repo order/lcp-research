@@ -8,13 +8,6 @@ import operator
 import scipy.sparse
 import matplotlib.pyplot as plt
 
-# Utilities; put in another file?
-def product(L):
-    return np.prod(L)
-    
-def partial_product(L):
-    return np.cumprod(L)
-
 def debug_mapprint(level,**kwargs):
     if level:
         for (k,v) in kwargs.items():
