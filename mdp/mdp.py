@@ -3,6 +3,69 @@ import scipy
 import matplotlib.pyplot as plt
 import lcp
 
+class MDP(object):
+    """
+    MDP object
+    """
+    def __init__(self,transitions,costs,actions,**kwargs):
+        self.discount = kwargs.get('discount',0.99)
+        self.transitions = transitions
+        self.costs = costs
+        self.actions = actions
+        self.name = kwargs.get('name','unnamed')
+        
+        A = len(actions)
+        N = costs[0].size
+
+        self.num_actions = A
+        self.num_states = N
+
+        assert(len(transitions) == A)
+        assert(len(costs) == A)
+        
+        for i in xrange(A):
+            assert(costs[i].size == N)
+            assert(transitions[i].shape[0] == N)
+            assert(transitions[i].shape[1] == N)            
+        
+    def get_action_matrix(self,a):
+        """
+        Build the action matrix E_a = I - \gamma * P_a^\top 
+        
+        I guess we're using a sparse matrix here...
+        """
+        return np.eye(self.num_states) - self.discount * self.transitions[a].T
+
+    def tolcp(self):
+        n = self.num_states
+        A = self.num_actions
+        N = (A + 1) * n
+        d = self.discount
+
+        Top = scipy.sparse.coo_matrix((n,n))
+        Bottom = None
+        q = np.zeros(N)
+        q[0:n] = -np.ones(n)
+        for a in xrange(self.num_actions):
+            E = self.get_action_matrix(a)
+            
+            # NewRow = [-E_a 0 ... 0]
+            NewRow = scipy.sparse.hstack((-E,scipy.sparse.coo_matrix((n,A*n))))
+            if Bottom == None:
+                Bottom = NewRow
+            else:
+                Bottom = scipy.sparse.vstack((Bottom,NewRow))
+            # Top = [...E_a^\top]
+            Top = scipy.sparse.hstack((Top,E.T))
+            q[((a+1)*n):((a+2)*n)] = self.costs[a]
+        M = scipy.sparse.vstack((Top,Bottom))
+        return (M,q)
+
+    def __str__(self):
+        return '<{0} MDP with {1} actions and {1} states>'.\
+            format(self.name, self.num_actions,self.num_states)
+        
+        
 class MDPValueIterSplitter(object):
     """
     Builds an LCP based on an MDP, and split it
@@ -60,68 +123,6 @@ class Policy(object):
 class ValueTablePolicy(Policy):
     def __init__(self,cost_to_go):
         self.v = cost_to_go
-        
-
-class MDP(object):
-    """
-    MDP object
-    """
-    def __init__(self,transitions,costs,actions,**kwargs):
-        self.discount = kwargs.get('discount',0.99)
-        self.transitions = transitions
-        self.costs = costs
-        self.actions = actions
-        self.name = kwargs.get('name','unnamed')
-        
-        A = len(actions)
-        N = costs[0].size
-
-        self.num_actions = A
-        self.num_states = N
-
-        assert(len(transitions) == A)
-        assert(len(costs) == A)
-        
-        for i in xrange(A):
-            assert(costs[i].size == N)
-            assert(transitions[i].shape[0] == N)
-            assert(transitions[i].shape[1] == N)            
-        
-    def get_action_matrix(self,a):
-        """
-        Build the action matrix E_a = I - \gamma * P_a^\top 
-        """
-        return scipy.sparse.eye(self.num_states) - self.discount * self.transitions[a].T
-
-    def tolcp(self):
-        n = self.num_states
-        A = self.num_actions
-        N = (A + 1) * n
-        d = self.discount
-
-        Top = scipy.sparse.coo_matrix((n,n))
-        Bottom = None
-        q = np.zeros(N)
-        q[0:n] = -np.ones(n)
-        for a in xrange(self.num_actions):
-            E = self.get_action_matrix(a)
-            
-            # NewRow = [-E_a 0 ... 0]
-            NewRow = scipy.sparse.hstack((-E,scipy.sparse.coo_matrix((n,A*n))))
-            if Bottom == None:
-                Bottom = NewRow
-            else:
-                Bottom = scipy.sparse.vstack((Bottom,NewRow))
-            # Top = [...E_a^\top]
-            Top = scipy.sparse.hstack((Top,E.T))
-            q[((a+1)*n):((a+2)*n)] = self.costs[a]
-        M = scipy.sparse.vstack((Top,Bottom))
-        return (M,q)
-
-    def __str__(self):
-        return '<{0} MDP with {1} actions and {1} states>'.\
-            format(self.name, self.num_actions,self.num_states)
-        
         
 
 def value_iteration(MDP,**kwargs):

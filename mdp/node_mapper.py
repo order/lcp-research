@@ -25,13 +25,13 @@ class NodeMapper(object):
         """
         raise NotImplementedError()        
         
-    def get_nodes(self)
+    def get_nodes(self):
         """
         All node mappers must implement this.
         """
         raise NotImplementedError()
 
-    def get_node_states(self)
+    def get_node_states(self):
         """
         All node mappers must implement this.
         """
@@ -47,7 +47,7 @@ class NodeDist(object):
         """
         self.dist = {}
         if len(vargs) == 2:
-            self.dist[vargs[0]] == vargs[1]
+            self.dist[vargs[0]] = vargs[1]
         else:
             assert(len(vargs) == 0)
         
@@ -58,6 +58,9 @@ class NodeDist(object):
             
     def keys(self):
         return self.dist.keys()
+        
+    def items(self):
+        return self.dist.items()
         
     def normalize(self):
         agg = 0.0
@@ -239,11 +242,18 @@ class InterpolatedGridNodeMapper(NodeMapper):
         different numbers of points because of the vertex / centroid distinction.
         
         vargin be a list of sorted cut points: (c_1,...,c_k) for each dimension
+        NB: this is a "fundemental" discretization, and we assume that node numbering starts from zero
         """
         assert(len(vargs) >= 1)
-        self.grid_desc = vargs       
+        self.grid_desc = vargs # Grid descriptions
         self.num_nodes = np.prod(map(len,self.grid_desc))
-        self.__build_node_id_cache()
+        
+        self.node_states_cache = None
+        self.node_id_cache = None
+        
+        self.__build_node_id_cache() # Cache mapping grid coords to node ids
+        self.__build_node_state_cache() # Caches the states associated with each node
+        
         
     def __one_dim_interp(self,x,L):
         """
@@ -270,16 +280,36 @@ class InterpolatedGridNodeMapper(NodeMapper):
         """
         Flattens an n-tuple representing the grid coordinates to a node-id
         """
-        return self.cache[tuple(gid)]
+        return self.node_id_cache[tuple(gid)]
 
             
     def __build_node_id_cache(self):
+        """
+        Builds a cache of how grid coords like (2,1,0,...) map to the node id
+        
+        The cache is a D-dimensional array, so conversion is just a table lookup
+        Does this in fortran order
+        """
         lengths = map(len, self.grid_desc)
         node_iter = xrange(self.num_nodes)
-        self.cache = np.reshape(np.array(node_iter,dtype=np.uint32),lengths,order='F')
+        self.node_id_cache = np.reshape(np.array(node_iter,dtype=np.uint32),lengths)
         
-    def states_to_node_dists(self,states,ignore):
-    
+    def __build_node_state_cache(self):
+        """
+        Builds a cache of the states associated with each node.
+        
+        Cache is an N x D matrix, so lookup is just 
+        """
+        # Turn grids into meshes
+        meshes = np.meshgrid(*self.grid_desc)
+        # Flatten each into a vector; concat; transpose
+        self.node_states_cache = np.array(map(lambda x: x.flatten(),meshes)).T        
+        
+    def states_to_node_dists(self,states,**kwargs):    
+        """
+        Maps arbitrary states in the interior of the grid to a distribution of nodes
+        defined by the multi-linear weights
+        """
         ignore = kwargs.get('ignore',set())
         (N,D) = states.shape
         
@@ -308,7 +338,7 @@ class InterpolatedGridNodeMapper(NodeMapper):
                 
                 interp_weight = reduce(operator.mul, dim_weights) # Multiply together
                 dist.add(node_id,interp_weight) # Add to the node distribution
-            dist.normalize()    
+            dist.normalize() #
             dist.verify()
             Mapping[state_id] = dist
         return Mapping               
@@ -316,35 +346,22 @@ class InterpolatedGridNodeMapper(NodeMapper):
     def nodes_to_states(self,nodes):
         """
         Map nodes to vertices
-        """
-        N = len(nodes)
-        D = len(self.grid_desc)
-        GridCoord = np.zeros((N,D), dtype=np.uint32)
-
-        lengths = map(len,self.grid_desc)
-            
-        # Divide and mode to get the grid coords
-        for (i,node_id) in enumerate(nodes):
-            coords = id_to_coords(node_id,lengths)
-            GridCoord[i,:] = coords
-            
-        raise NotImplementedError('Still only grid coordinates')
-        return GridCoord
+        
+        Just uses the cache
+        """        
+        return self.node_states_cache[nodes,:]
         
     def get_nodes(self):
+        """
+        Returns the range of nodes
+        """
         return xrange(self.num_nodes)
 
     def get_num_nodes(self):
         return self.num_nodes
         
     def get_node_states(self):
-        # Build the D different uniformly spaced ranges
-        linspaces = [np.linspace(*gd) for gd in self.grid_desc]
-        # Turn these into a mesh
-        meshes = np.meshgrid(*linspaces)
-        # Flatten each into a vector; concat; transpose
-        node_states = np.array(map(lambda x: x.flatten(),meshes)).T
-        return node_states
+        return self.node_states_cache
   
 def id_to_coords(node_id,Lens):
     """

@@ -1,26 +1,31 @@
 import numpy as np
 from math import pi,sqrt
 import matplotlib.pyplot as plt
-from mdp import MDP
+import mdp
+import state_remapper
 
 import grid
 
 import scipy.stats
 
-def physics_step(points,action,**kwargs):
-    """
-    Physics step for a double integrator:
-    dx = Ax + Bu = [0 1; 0 0] [x;v] + [0; 1] u
-    """
-    [N,d] = points.shape
-    assert(d == 2)
-    
-    step = kwargs.get('step',0.01)
-
-    x_next = points[:,0] + step * points[:,1]
-    v_next = points[:,1] + step * u
-    return np.column_stack((x_next,v_next))
-
+class DoubleIntegratorRemapper(state_remapper.StateRemapper):
+    def __init__(self,step=0.01):
+        self.step = step
+    def remap(self,points,**kwargs):
+        """
+        Physics step for a double integrator:
+        dx = Ax + Bu = [0 1; 0 0] [x;v] + [0; 1] u
+        """
+        [N,d] = points.shape
+        assert(d == 2)
+        
+        assert('action' in kwargs)
+        u = kwargs['action']
+        
+        x_next = points[:,0] + self.step * points[:,1]
+        v_next = points[:,1] + self.step * u
+        return np.array((x_next,v_next)).T
+        
 def plot_trajectory(policy_fn,**kwargs):
     x = np.rand(1,2)
     I = 1000
@@ -69,5 +74,5 @@ def generate_mdp(x_disc,v_disc,**kwargs):
         # Use COO; may be using either T or T.T
         Transitions.append(scipy.sparse.coo_matrix(T))
         Costs.append(c)
-    M = MDP(Transitions,Costs,Actions,name='Double Integrator')
+    M = mdp.MDP(Transitions,Costs,Actions,name='Double Integrator')
     return (M,statespace)
