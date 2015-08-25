@@ -1,3 +1,4 @@
+import numpy as np
 import scipy.sparse
 import mdp
 import itertools
@@ -15,21 +16,31 @@ class ContinuousMDPDiscretizer(object):
         self.actions = actions
         
     def get_node_ids(self):
-        node_iters = [self.basic_mapper.get_nodes()]
+        """
+        Return an iterator for all the nodes in the discretization
+        """
+        node_iters = list(self.basic_mapper.get_nodes())
         for mapper in self.exception_node_mappers:
-            node_iters.append(mapper.get_node()
-        return itertools.chain(*node_iters)
+            node_iters.extend(list(mapper.get_nodes()))
+        return node_iters
         
     def get_node_states(self):
-        states = [self.basic_mapper.get_nodes_states()]
+        """
+        Returns a np.array containing all the node states
+        
+        Exception nodes are assumed to be NaN
+        """
+        states = [self.basic_mapper.get_node_states()]
         D = self.basic_mapper.get_dimension()
         for mapper in self.exception_node_mappers:
-            states.append(np.NaN * np.ones((mapper.num_nodes(),D)))
+            states.append(np.NaN * np.ones((mapper.get_num_nodes(),D)))
+            
         return np.vstack(states)
         
         
     def add_state_remapper(self,remapper):
         self.exception_state_remappers.append(remapper)
+        
     def add_node_mapper(self,mapper):
         self.exception_node_mappers.append(mapper)
         
@@ -44,6 +55,8 @@ class ContinuousMDPDiscretizer(object):
         for a in self.actions:
             transitions.append(self.__build_transition_matrix(a))
             costs.append(self.__build_cost_vector(a))
+        if 'name' not in kwargs:
+            kwargs['name'] = 'MDP from Discretizer'
         mdp_obj = mdp.MDP(transitions,costs,self.actions,**kwargs)
         return mdp_obj
         

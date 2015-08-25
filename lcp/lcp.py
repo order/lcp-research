@@ -5,19 +5,20 @@ class LCPObj(object):
     """An object that wraps around the matrix M and vector q
     for an LCP
     """
-    def __init__(self,M,q):
+    def __init__(self,M,q,**kwargs):
         self.M = M
         self.q = q
         self.dim = q.size
-        assert(util.isvector(q))
-        assert(util.issquare(M))
+
+        assert(len(q.shape) == 1)
+        assert(len(M.shape) == 2)
         assert(M.shape[0] == self.dim)
+        assert(M.shape[1] == self.dim)
         
-        self.name = 'Unnamed'
+        self.name = kwargs.get('name','Unnamed')
 
     def __str__(self):
-        return '<{0} LCP in R^{1}'.\
-            format(self.name, self.dim)
+        return '<{0} in R^{1}>'.format(self.name, self.dim)
             
     def write_to_csv(self,filename):
         FH = open(filename,'w')
@@ -53,7 +54,7 @@ class ProjectiveLCPObj(LCPObj):
         self.name = 'Unnamed'
 
     def __str__(self):
-        return '<{0} Projective LCP in R^{1}'.\
+        return '<{0} in R^{1}'.\
             format(self.name, self.dim)
 
     def write_to_csv(self,filename):

@@ -1,78 +1,3 @@
-import numpy as np
-import time
-import os
-import copy
-import math
-import operator
-
-import scipy.sparse
-import matplotlib.pyplot as plt
-
-# Utilities; put in another file?
-def product(L):
-    return reduce(operator.mul, L)
-    
-def partial_product(L):
-    R = [L[0]]
-    for i in xrange(1,len(L)):
-        R.append(R[-1] * L[i])
-    return R
-
-def debug_mapprint(level,**kwargs):
-    if level:
-        for (k,v) in kwargs.items():
-            print k,'=',v
-
-def debug_print(level,str):
-    if level:
-        print str
-
-def shape_str(M):
-    return 'x'.join(map(str,M.shape))
-
-def col_vect(v):
-    """
-    Convert a n-vector into a nx1 np array.
-    This is an annoying distinct in numpy.
-    """
-    assert(len(v.shape) == 1)
-    return v[:,np.newaxis]    
-
-def max_eigen(M):
-    """
-    Find the max eigenvalue; wraps around a simple scipy call
-    """
-    return scipy.sparse.linalg.eigs(M,k=1,return_eigenvectors=False)
-
-def quad(a,b,c):
-    """
-    Solve a simple 1d quadratic formula
-    """
-    d = b**2 - 4*a*c
-    if d < 0:
-        # Only report real solutions
-        return None
-    return ((-b + math.sqrt(d))/2,(-b - math.sqrt(d))/2)
-
-def has_pos_diag(M):
-    """
-    Check if diagonal is positive
-    """
-    [n,m] = M.shape
-    assert(n==m)
-    for i in xrange(n):
-        if M[i,i] <= 0:
-            return False
-    return True
-
-def isvector(x):
-    S = x.shape
-    return len(S) == 1
-    
-def issquare(x):
-    S = x.shape
-    
-    return len(S) == 2 and (S[0] == S[1])
     
 def nonneg_proj(x):
     """
@@ -106,88 +31,33 @@ def fb_residual(x,w):
     fb = np.sqrt(x**2 + w**2) - x - w
     return np.linalg.norm(fb)
     
-###############################
-# State
-    
-class State(object):
-    """An object representing a point in the state-space of an LCP
-    Note that the point may not be feasible or complementary
-    (and so w != Mx+q)
-    We have a separate field Mxq to cache Mx+q
-    """
-    def __init__(self,**kwargs):
-        self.x = None # 
-        self.w = None
-        self.Mxq = None
-        self.iter = 0
-    def set_x(self,x):
-        self.x = x
-        self.Mxq = None
-    def cache_Mxq(self,mxq):
-        self.Mxq = mxq
-    def inc(self):
-        self.iter+=1
-        
-###############
-# Record stuff
-class Record(object):
-    def __init__(self):
-        pass
-    
-
-def null_recorder(record,state):
-    pass
-    
-def residual_recorder(record,state):
-    if not hasattr(record,'residual'):
-        record.residual = []
-    record.residual.append(basic_residual(state.x,state.w))
-
-def dot_records(record,state):
-    if not hasattr(record,'dots'):
-        record.dots = []
-    record.dots.append(state.x.dot(state.w))       
-  
-def state_recorder(record,state):
-    if not hasattr(record,'states'):
-        record.states = []
-    record.states.append(np.array(state.x))
-
-def support_recorder(record,state):
-    if not hasattr(record,'support'):
-        record.support = []
-    support = sum(state.x > 0)
-    record.support.append(support)
-    
-    
 ##########################
 # Termination functions
-    
-def time_term(time_lim,state):
-    if os.name == 'nt':
-        t = time.clock()
-    else:
-        t = time.time()
+class TerminationCondition(object):
+    def isdone(self,iteration):
+        raise NotImplementedError()
 
-    if not hasattr(state,'start_time'):
-        state.start_time = t
-        return False
-    return (t - state.start_time) >= time_lim
-    
-def max_iter_term(max_iter,state):
-    return state.iter >= max_iter
-    
-def res_thresh_term(res_fn,thresh,state):
-    if state.iter == 0:
-        return False
-    return res_fn(state.x,state.w) <= thresh
-    
-##############################
-# Params 
-
-class Params(object):
-    pass
-    
+class MaxIterTerminationCondition(TerminationCondition):
+    def __init__(self,max_iter):
+        self.max_iter = max_iter
+    def isdone(self,iteration):
+        return self.max_iter <= iteration.get_iteration()
+    def __str__(self):
+        return 'MaxIterTerminationCondition {0}'.format(self.max_iter)
+        
+############################
+# Recording functions
+class Recorder(object):
+    def report(self,iteration):
+        raise NotImplementedError()
+        
+class PrimalRecorder(Recorder):
+    def __init__(self):
+        pass
+        
+    def report(self,iteration):
+        return iteration.get_primal_vector()
+   
     
 #############################
 # Plotting for records

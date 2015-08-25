@@ -12,7 +12,7 @@ class MDP(object):
         self.transitions = transitions
         self.costs = costs
         self.actions = actions
-        self.name = kwargs.get('name','unnamed')
+        self.name = kwargs.get('name','Unnamed')
         
         A = len(actions)
         N = costs[0].size
@@ -23,6 +23,7 @@ class MDP(object):
         assert(len(transitions) == A)
         assert(len(costs) == A)
         
+        # Ensure sizes are consistent
         for i in xrange(A):
             assert(costs[i].size == N)
             assert(transitions[i].shape[0] == N)
@@ -59,11 +60,11 @@ class MDP(object):
             Top = scipy.sparse.hstack((Top,E.T))
             q[((a+1)*n):((a+2)*n)] = self.costs[a]
         M = scipy.sparse.vstack((Top,Bottom))
-        return (M,q)
+        return lcp.LCPObj(M,q,name='LCP from {0} MDP'.format(self.name))
 
     def __str__(self):
-        return '<{0} MDP with {1} actions and {1} states>'.\
-            format(self.name, self.num_actions,self.num_states)
+        return '<{0} with {1} actions and {2} states>'.\
+            format(self.name, self.num_actions, self.num_states)
         
         
 class MDPValueIterSplitter(object):

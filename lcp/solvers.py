@@ -18,7 +18,95 @@ Most are phrased as iteration generators. These plug in to the iter_solver class
 the generators and provides a standardized framework for recording per-iteration information (like residuals and state) and termination checking (like maximum iteration count or residual threshold checking.
 """
 
-def projective_ip_iter(proj_lcp_obj,state,**kwargs):
+class IterativeSolver(object):
+
+    """
+    This is the generic framework for iterative solvers.
+    
+    Basically does all the scaffolding stuff for the iteration including
+    mantaining a list of "recorders" and checking a list of termination conditions.
+    """
+
+    def __init__(self,iterator):
+        self.recorders = []
+        self.termination_conditions = []
+        self.iterator = iterator        
+        
+    def solve(self):
+        """
+        Call this to use an iteration object to solve an LCP
+        
+        The iteration solve should have all the LCP information
+        Returns a record object.
+        """
+        assert(len(self.termination_conditions) >= 1)
+        
+        Records = [[] for _ in xrange(len(self.recorders))]
+        
+        while True:       
+            # First record everything pertinent (record initial information first)
+            for (i,recorder) in enumerate(self.recorders):
+                Records[i].append(recorder.report(self.iterator))
+        
+            # Then check for termination conditions
+            for term_cond in self.termination_conditions:
+                if term_cond.isdone(self.iterator):
+                    print 'Termination reason:', term_cond
+                    return Records                   
+                
+            # Finally, advance to the next iteration
+            self.iterator.next_iteration()
+                
+class Iterator(object):
+    """
+    Abstract definition of an iterator
+    """
+    def next_iteration(self):
+        raise NotImplementedError()
+    def get_primal_vector(self):
+        raise NotImplementedError()
+    def get_dual_vector(self):
+        raise NotImplementedError()
+    def get_gradient_vector(self):
+        raise NotImplementedError()
+    def get_iteration(self):
+        raise NotImplementedError()
+        
+class ValueIterator(Iterator):
+
+    def __init__(self,mdp_obj,**kwargs):
+        self.mdp = mdp_obj
+        self.iteration = 0
+        
+        n = mdp_obj.num_states
+        self.v = kwargs.get('x0',np.ones((n,1)))
+        
+    def next_iteration(self): 
+        """
+        Do basic value iteration, but also try to recover the flow variables.
+        This is for comparison to MDP-split lcp_obj solving (see mdp_ip_iter)
+        """
+        
+        gamma = self.mdp.discount
+        A = self.mdp.num_actions
+        
+        Vs = []
+        for a in xrange(A):     
+            P_T = self.mdp.transitions[a].T
+            v_a = self.mdp.costs[a] + gamma*P_T.dot(self.v)
+            Vs.append(v_a)
+        Vs = np.hstack(Vs)
+        self.v = np.amin(Vs,axis=1)            
+        self.iteration += 1
+       
+    def get_value_vector(self):
+        return self.v
+        
+    def get_iteration(self):
+        return self.iteration
+        
+
+def ProjectiveInteriorPointIteration(proj_lcp_obj,state,**kwargs):
     """
     A projective interior point algorithm based on "Fast solutions to projective monotone LCPs" by Geoff Gordon (http://arxiv.org/pdf/1212.6958v1.pdf). If M = \Phi U + \Pi_\bot where Phi is low rank (k << n) and \Pi_\bot is projection onto the nullspace of \Phi^\top, then each iteration only costs O(nk^2), rather than O(n^{2 + \eps}) for a full system solve.
 
@@ -122,56 +210,6 @@ def projective_ip_iter(proj_lcp_obj,state,**kwargs):
         
         yield state
     
-
-def mdp_value_iter(lcp_obj,state,**kwargs): 
-    """
-    Do basic value iteration, but also try to recover the flow variables.
-    This is for comparison to MDP-split lcp_obj solving (see mdp_ip_iter)
-    """
-    assert('MDP' in kwargs)
-    MDP = kwargs['MDP']
-    M = lcp_obj.M
-    q = lcp_obj.q
-    
-    N = lcp_obj.dim
-    n = MDP.num_states
-    A = MDP.num_actions
-    x = np.ones(N)
-    y = np.ones(N)
-    
-    gamma = MDP.discount
-    v = np.ones((n,1))
-    
-    P_T = []
-    for a in xrange(MDP.num_actions):
-        # Transpose, and convert to csr sparse
-        P_T.append(sps.csr_matrix(MDP.transitions[a].T))
-        
-    I = 0
-    while True:
-        # Kind of ver
-        Vs = []
-        for a in xrange(MDP.num_actions):            
-            v_a = col_vect(MDP.costs[a]) + gamma*P_T[a].dot(v)
-            #print 'v_a',v_a.shape
-            Vs.append(v_a.flatten())
-        Vs = np.array(Vs).T
-        #print 'Vs',Vs.shape        
-        #print np.amin(Vs,axis=1).shape
-        v = col_vect(np.amin(Vs,axis=1))
-        
-        # Construct the x vector from v
-        x[:n] = v.flatten()
-        assert(v.size == n) 
-        mask = (Vs == v)
-        ties = np.sum(mask,axis=1) # tie break uniformly?
-        x[n:] = ((mask.T) / ties).flatten() # Dual variables
-        
-        state.x = x
-        state.w = M.dot(x) + q
-        state.iter = I
-        I += 1
-        yield state
         
 def mdp_ip_iter(lcp_obj,state,**kwargs):
     """
@@ -614,39 +652,5 @@ def accelerated_prox_iter(lcp_obj,state,**kwargs):
         state.x = x
         state.w = grad
         yield state
-    
-        
-###################
-# Generic iteration solver   
-
-class iter_solver():
-    def __init__(self):
-        self.step = 1e-3;
-        self.record_fn = None
-        self.term_fn = None
-        self.iter_fn = None
-        self.params = {}
-        
-    def solve(self,lcp_obj,**kwargs):
-        N = lcp_obj.dim
-        
-        # Init
-        record = Record()
-        state = State()
-        state.x = np.zeros(N)
-        state.w = np.zeros(N)
-            
-        args = self.params.copy()
-        args.update(kwargs)
-        iter = self.iter_fn(lcp_obj,state,**args)
-        while True:
-            for tf in self.term_fns:
-                if tf(state):
-                    print 'Termination reason:',tf.func.__name__
-                    return (record,state)
-            state = iter.next()
-            for rf in self.record_fns:
-                rf(record,state)
-        
         
         
