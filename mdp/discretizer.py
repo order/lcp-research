@@ -1,4 +1,6 @@
 import scipy.sparse
+import mdp
+import itertools
 
 class ContinuousMDPDiscretizer(object):
     def __init__(self,physics,basic_mapper,cost_obj,actions):
@@ -11,6 +13,20 @@ class ContinuousMDPDiscretizer(object):
         self.cost_obj = cost_obj
         
         self.actions = actions
+        
+    def get_node_ids(self):
+        node_iters = [self.basic_mapper.get_nodes()]
+        for mapper in self.exception_node_mappers:
+            node_iters.append(mapper.get_node()
+        return itertools.chain(*node_iters)
+        
+    def get_node_states(self):
+        states = [self.basic_mapper.get_nodes_states()]
+        D = self.basic_mapper.get_dimension()
+        for mapper in self.exception_node_mappers:
+            states.append(np.NaN * np.ones((mapper.num_nodes(),D)))
+        return np.vstack(states)
+        
         
     def add_state_remapper(self,remapper):
         self.exception_state_remappers.append(remapper)
@@ -28,11 +44,16 @@ class ContinuousMDPDiscretizer(object):
         for a in self.actions:
             transitions.append(self.__build_transition_matrix(a))
             costs.append(self.__build_cost_vector(a))
-        mdp = MDP(transitions,costs,self.actions,**kwargs)
+        mdp_obj = mdp.MDP(transitions,costs,self.actions,**kwargs)
+        return mdp_obj
         
     def __build_cost_vector(self,action):
-        node_states = self.basic_mapper.get_node_states()
-        return self.cost_obj.cost(node_states,action)        
+        """
+        Build the cost vector
+        """
+        node_ids = self.get_node_ids()
+        node_states = self.get_node_states()
+        return self.cost_obj.cost(node_ids,node_states,action)        
     
     def __build_transition_matrix(self,action,**kwargs):
         """
@@ -46,11 +67,11 @@ class ContinuousMDPDiscretizer(object):
         
         # Get the node states, and then use physics to remap them
         node_states = self.basic_mapper.get_node_states()
-        next_step = self.physics.remap(node_states,action=action)
+        next_states = self.physics.remap(node_states,action=action)
         
         # First remap any states (velocity cap, etc.)
         for remapper in self.exception_state_remappers:
-            next_step = remapper.remap(next_step)
+            next_states = remapper.remap(next_states)
         
         # Then map states to node distributions
         dealt_with = set()
@@ -58,12 +79,12 @@ class ContinuousMDPDiscretizer(object):
         
         # Deal with the exceptions first
         for mapper in self.exception_node_mappers:
-            partial_mapping = mapper.states_to_node_dists(next_step,ignore=dealt_with)
+            partial_mapping = mapper.states_to_node_dists(next_states,ignore=dealt_with)
             node_mapping.update(partial_mapping)
             dealt_with |= set(partial_mapping.keys())
             
         # Then the using the basic remapper
-        essential_mapping = self.basic_mapper.states_to_node_dists(next_step,ignore=dealt_with)
+        essential_mapping = self.basic_mapper.states_to_node_dists(next_states,ignore=dealt_with)
         node_mapping.update(essential_mapping)
         
         # All accounted for; no extras
@@ -76,9 +97,9 @@ class ContinuousMDPDiscretizer(object):
             
         P = scipy.sparse.dok_matrix((total_node_number,total_node_number))
             
-        for (i, nd) in node_mapping:
-            for (j,w) in nd.items():
-                P[j,i] = w
+        for (source_node, next_node_dist) in node_mapping.items():
+            for (next_node,weight) in next_node_dist.items():
+                P[next_node,source_node] = weight
                 
         if sparse:
             P = P.tocsr()

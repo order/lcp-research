@@ -1,6 +1,10 @@
 class QuadraticCost(object):
-    def __init__(self,coeff):
+    def __init__(self,coeff,**kwargs):
         self.coeff = coeff
+        self.override = kwargs
     
-    def cost(self,points,action):
-        return (points**2).dot(self.coeff)
+    def cost(self,ids,points,action):
+        costs = (points**2).dot(self.coeff)
+        for (node_id,cost_override) in self.override.items():
+            costs[node_id] = cost_override
+        return costs

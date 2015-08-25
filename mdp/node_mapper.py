@@ -35,7 +35,11 @@ class NodeMapper(object):
         """
         All node mappers must implement this.
         """
-        raise NotImplementedError()  
+        raise NotImplementedError()
+        
+    def get_dimension(self):
+        raise NotImplementedError()
+        
         
 class NodeDist(object):
     """
@@ -220,6 +224,8 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         node_states = np.array(map(lambda x: x.flatten(),meshes)).T
         return node_states
         
+    def get_dimension(self):
+        return len(self.grid_desc)
         
 class PiecewiseConstGridNodeMapper(NodeMapper):
         """
@@ -362,6 +368,9 @@ class InterpolatedGridNodeMapper(NodeMapper):
         
     def get_node_states(self):
         return self.node_states_cache
+        
+    def get_dimension(self):
+        return len(self.grid_desc)
   
 def id_to_coords(node_id,Lens):
     """
