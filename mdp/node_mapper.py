@@ -278,6 +278,9 @@ class InterpolatedGridNodeMapper(NodeMapper):
             # Right side of the last cell
             assert(x == L[-1])
             return (index-1,0.0,1.0)
+        elif index == -1:
+            assert(x == L[0])
+            return (0,1.0,0.0)
         else:
             assert(x >= L[index])
             assert(x <= L[index+1])
