@@ -83,7 +83,7 @@ class ValueIterator(Iterator):
         self.iteration = 0
         
         n = mdp_obj.num_states
-        self.v = kwargs.get('x0',np.ones((n,1)))
+        self.v = kwargs.get('x0',np.ones(n))
         
     def next_iteration(self): 
         """
@@ -93,15 +93,15 @@ class ValueIterator(Iterator):
         
         gamma = self.mdp.discount
         A = self.mdp.num_actions
+        N = self.mdp.num_states
         
-        Vs = []
+        Vs = np.zeros((N,A))
         for a in xrange(A):     
             P_T = self.mdp.transitions[a].T
-            v_a = self.mdp.costs[a] + gamma*P_T.dot(self.v)
-            assert(not np.any(np.isnan(v_a)))
-            Vs.append(v_a)
-        Vs = np.hstack(Vs)
-        self.v = np.reshape(np.amin(Vs,axis=1),(Vs.shape[0],1))
+            Vs[:,a] = self.mdp.costs[a] + gamma*P_T.dot(self.v)
+            assert(not np.any(np.isnan(Vs[:,a])))
+            
+        self.v = np.amin(Vs,axis=1)
         self.iteration += 1
        
     def get_value_vector(self):

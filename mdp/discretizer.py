@@ -106,7 +106,7 @@ class ContinuousMDPDiscretizer(object):
         # Then the using the basic remapper
         essential_mapping = self.basic_mapper.states_to_node_dists(next_states,ignore=dealt_with)
         node_mapping.update(essential_mapping)
-        
+                
         # Make sink nodes actually sinks
         for mapper in self.exception_node_mappers:
             node_mapping[mapper.sink_node] = node_mapper.NodeDist(mapper.sink_node,1.0)

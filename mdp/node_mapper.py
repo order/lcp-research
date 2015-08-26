@@ -81,7 +81,7 @@ class NodeDist(object):
             raise AssertionError('Node distribution sums to {0}'.format(agg))
             
     def __str__(self):
-        return '{' + ', '.join(map(lambda x: '{0}:{1:.3f}'.format(x[0],x[1]), self.dist.items())) + '}'
+        return '{' + ', '.join(map(lambda x: '{0}:{1:.3f}'.format(x[0],x[1]), sorted(self.dist.items()))) + '}'
         
 class OOBSinkNodeMapper(NodeMapper):
     """
@@ -261,6 +261,14 @@ class InterpolatedGridNodeMapper(NodeMapper):
         self.__build_node_id_cache() # Cache mapping grid coords to node ids
         self.__build_node_state_cache() # Caches the states associated with each node
         
+    def __str__(self):
+        ret = []
+        ret.append('='*20)
+        for (i,state) in enumerate(self.node_states_cache):
+            ret.append('{0}: {1}'.format(i,state))
+        ret.append('-'*20)
+        ret.append(self.node_id_cache)
+        return '\n'.join(ret)
         
     def __one_dim_interp(self,x,L):
         """
@@ -274,22 +282,39 @@ class InterpolatedGridNodeMapper(NodeMapper):
         assert(x <= L[-1])
         
         index = bisect.bisect_left(L,x)-1
+        
+        # Boundary special cases
         if index == len(L)-1:
-            # Right side of the last cell
             assert(x == L[-1])
-            return (index-1,0.0,1.0)
+            index -= 1
         elif index == -1:
             assert(x == L[0])
-            return (0,1.0,0.0)
-        else:
-            assert(x >= L[index])
-            assert(x <= L[index+1])
-            return (index,x - L[index], L[index+1] - x)
+            index = 0            
+        assert(L[index] <= x<= L[index+1]) 
+        
+        
+        gap = L[index+1] - L[index]
+        ret = (index,(L[index+1] - x)/gap,(x - L[index])/gap)
+        # Index in L, weights from vertices
+        
+        # If an endpoint ensure that things make sense
+        if x == L[index]:
+            assert(ret[1] == 1.0)
+            assert(ret[2] == 0.0)
+        if x == L[index+1]:
+            assert(ret[1] == 0.0)
+            assert(ret[2] == 1.0)
+            
+        assert(abs(sum(ret[1:]) - 1.0) < 1e-9)
+            
+        return ret
             
     def __grid_index_to_node_id(self,gid):       
         """
         Flattens an n-tuple representing the grid coordinates to a node-id
         """
+        for (i,g_comp) in enumerate(gid):
+            assert(0<=g_comp<len(self.grid_desc[i]))
         return self.node_id_cache[tuple(gid)]
 
             
@@ -312,8 +337,9 @@ class InterpolatedGridNodeMapper(NodeMapper):
         """
         # Turn grids into meshes
         meshes = np.meshgrid(*self.grid_desc)
+        
         # Flatten each into a vector; concat; transpose
-        self.node_states_cache = np.array(map(lambda x: x.flatten(),meshes)).T        
+        self.node_states_cache = np.array(map(lambda x: x.T.flatten(),meshes)).T        
         
     def states_to_node_dists(self,states,**kwargs):    
         """
@@ -345,10 +371,10 @@ class InterpolatedGridNodeMapper(NodeMapper):
                 curr_gid = map(sum,zip(least_gid,gid_delta)) # Add the delta to the least elem
                 node_id = self.__grid_index_to_node_id(curr_gid) #Convert grid coord to node id
                 dim_weights = map(lambda (i,x): Sandwiches[i][1+x], enumerate(gid_delta)) # Project out distances
-                
-                interp_weight = reduce(operator.mul, dim_weights) # Multiply together
-                dist.add(node_id,interp_weight) # Add to the node distribution
-            dist.normalize() #
+                interp_weight = np.prod(dim_weights) # Multiply together
+                if interp_weight > 0.0:
+                    dist.add(node_id,interp_weight) # Add to the node distribution
+            dist.normalize()
             dist.verify()
             Mapping[state_id] = dist
         return Mapping               

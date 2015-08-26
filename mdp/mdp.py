@@ -10,15 +10,14 @@ class MDP(object):
     def __init__(self,transitions,costs,actions,**kwargs):
         self.discount = kwargs.get('discount',0.99)
         self.transitions = transitions
-        self.costs = costs
+        A = len(actions)
+        N = costs[0].shape[0]
         self.actions = actions
         self.name = kwargs.get('name','Unnamed')
-        
-        A = len(actions)
-        N = costs[0].size
-
         self.num_actions = A
         self.num_states = N
+        
+        self.costs = costs
 
         assert(len(transitions) == A)
         assert(len(costs) == A)

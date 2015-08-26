@@ -4,6 +4,8 @@ from mdp.discretizer import *
 from mdp.costs import *
 from mdp.double_integrator import *
 
+import random
+
 import matplotlib.pyplot as plt
 import time
 
@@ -11,21 +13,90 @@ import lcp.solvers
 
 import numpy as np
 
+
+def map_back_test():
+    """
+    Check to make sure that all nodes map back to themselves when run through the
+    node -> state -> node machinery
+    """
+    
+    np.set_printoptions(precision=3)
+    
+    n = basic_mapper.get_num_nodes()
+    N = mdp_obj.costs[0].shape[0]
+    for _ in xrange(125):
+        node = random.randint(0,n-1)
+        state = basic_mapper.nodes_to_states([node])
+        back_again = basic_mapper.states_to_node_dists(state)[0]
+        if back_again.keys()[0] != node:
+            print 'Problem state',state
+            print 'Node dist',back_again
+            print '{0} != {1}'.format(node,back_again.keys()[0])
+            assert(back_again.keys()[0] == node)
+
+def plot_trajectory():
+    np.set_printoptions(precision=3)
+    
+    n = basic_mapper.get_num_nodes()
+    N = mdp_obj.costs[0].shape[0]
+
+    nodes = [random.randint(0,n-1)]
+    sink_nodes = [left_oob_mapper.sink_node, right_oob_mapper.sink_node]
+    
+    action_index = 0
+    action = actions[action_index]
+    for _ in xrange(5):
+        new_nodes = set()
+        for node in nodes:
+            state = basic_mapper.nodes_to_states([node])
+            elem = np.zeros((N,1))
+            elem[node] = 1.0
+            next_state_physics = physics.remap(state,action=action)
+            node_dist = basic_mapper.states_to_node_dists(next_state_physics)
+            print 'State {0} remaps to {1} via physics'.format(state.flatten(),next_state_physics.flatten())
+            print 'Maps to:',node_dist[0]
+            
+            next_nodes = mdp_obj.transitions[action_index].dot(elem)
+            for (j,val) in enumerate(next_nodes):
+                if val > 1e-2 and j not in sink_nodes:
+                    next_state = basic_mapper.nodes_to_states([j])
+                    print 'Drawing edge from {0}->{1} ({2}->{3}) '\
+                        .format(node,j,state.flatten(),next_state.flatten())
+                    plt.plot([state[0,0],next_state[0,0]],[state[0,1],next_state[0,1]],'.-')
+                    new_nodes.add(j)
+        nodes = new_nodes
+    plt.show()
+    
+
+def plot_value_function(mdp_obj,basic_mapper):
+    MaxIter = 150
+
+    vi = lcp.solvers.ValueIterator(mdp_obj)
+    solver = lcp.solvers.IterativeSolver(vi)
+    solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(MaxIter))
+    print 'Starting solve...'
+    solver.solve()
+    print 'Done.'
+
+    #Img = np.reshape(vi.v[:basic_mapper.get_num_nodes()],(x_n,v_n)).T
+    #Img = np.reshape(mdp_obj.costs[1][:basic_mapper.get_num_nodes()],(v_n,x_n))
+    #plt.imshow(Img)
+    #plt.show()
+
 x_lim = 1
-x_n = 50
+x_n = 51
 xid = 0
 
 v_lim = 3
-v_n = 40
+v_n = 51
 vid = 1
 
 a_lim = 1
 a_n = 5
 
-MaxIter = 250
 OOBCost = 25
 
-cost_coef = np.array([2,1])
+cost_coef = np.array([1,1])
 
 basic_mapper = InterpolatedGridNodeMapper(np.linspace(-x_lim,x_lim,x_n),np.linspace(-v_lim,v_lim,v_n))
 assert(basic_mapper.get_num_nodes() == x_n * v_n)
@@ -48,15 +119,5 @@ discretizer.add_node_mapper(right_oob_mapper)
 
 mdp_obj = discretizer.build_mdp()
 print 'Built...', mdp_obj
-lcp_obj = mdp_obj.tolcp()
-print 'Built...', lcp_obj
-
-vi = lcp.solvers.ValueIterator(mdp_obj)
-solver = lcp.solvers.IterativeSolver(vi)
-solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(MaxIter))
-solver.solve()
-
-Img = np.reshape(vi.v[:basic_mapper.get_num_nodes()],(x_n,v_n),order='F')
-#Img = np.reshape(mdp_obj.costs[1][:basic_mapper.get_num_nodes()],(v_n,x_n))
-plt.imshow(Img)
-plt.show()
+    
+plot_value_function(mdp_obj,basic_mapper)
