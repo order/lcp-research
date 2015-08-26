@@ -72,6 +72,10 @@ class Iterator(object):
     def get_iteration(self):
         raise NotImplementedError()
         
+class MDPIterator(Iterator):
+    def get_value_vector(self):
+        raise NotImplementedError()
+        
 class ValueIterator(Iterator):
 
     def __init__(self,mdp_obj,**kwargs):
@@ -94,9 +98,10 @@ class ValueIterator(Iterator):
         for a in xrange(A):     
             P_T = self.mdp.transitions[a].T
             v_a = self.mdp.costs[a] + gamma*P_T.dot(self.v)
+            assert(not np.any(np.isnan(v_a)))
             Vs.append(v_a)
         Vs = np.hstack(Vs)
-        self.v = np.amin(Vs,axis=1)            
+        self.v = np.reshape(np.amin(Vs,axis=1),(Vs.shape[0],1))
         self.iteration += 1
        
     def get_value_vector(self):
@@ -108,7 +113,8 @@ class ValueIterator(Iterator):
 
 def ProjectiveInteriorPointIteration(proj_lcp_obj,state,**kwargs):
     """
-    A projective interior point algorithm based on "Fast solutions to projective monotone LCPs" by Geoff Gordon (http://arxiv.org/pdf/1212.6958v1.pdf). If M = \Phi U + \Pi_\bot where Phi is low rank (k << n) and \Pi_\bot is projection onto the nullspace of \Phi^\top, then each iteration only costs O(nk^2), rather than O(n^{2 + \eps}) for a full system solve.
+    A projective interior point algorithm based on "Fast solutions to projective monotone LCPs" by Geoff Gordon. 
+    If M = \Phi U + \Pi_\bot where Phi is low rank (k << n) and \Pi_\bot is projection onto the nullspace of \Phi^\top, then each iteration only costs O(nk^2), rather than O(n^{2 + \eps}) for a full system solve.
 
     This is a straight-forward implementation of Figure 2
     """

@@ -11,6 +11,7 @@ import scipy.stats
 class DoubleIntegratorRemapper(state_remapper.StateRemapper):
     def __init__(self,step=0.01):
         self.step = step
+        
     def remap(self,points,**kwargs):
         """
         Physics step for a double integrator:

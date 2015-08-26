@@ -26,8 +26,12 @@ class MDP(object):
         # Ensure sizes are consistent
         for i in xrange(A):
             assert(costs[i].size == N)
+            assert(not np.any(np.isnan(costs[i])))
+            
             assert(transitions[i].shape[0] == N)
-            assert(transitions[i].shape[1] == N)            
+            assert(transitions[i].shape[1] == N)
+            assert(abs(transitions[i].sum() - N) <= 1e-6)
+            
         
     def get_action_matrix(self,a):
         """

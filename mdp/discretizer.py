@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.sparse
 import mdp
+import node_mapper
 import itertools
 
 class ContinuousMDPDiscretizer(object):
@@ -36,6 +37,12 @@ class ContinuousMDPDiscretizer(object):
             states.append(np.NaN * np.ones((mapper.get_num_nodes(),D)))
             
         return np.vstack(states)
+        
+    def get_num_nodes(self):
+        count = self.basic_mapper.get_num_nodes()
+        for mapper in self.exception_node_mappers:
+            count += mapper.get_num_nodes()
+        return count
         
         
     def add_state_remapper(self,remapper):
@@ -100,19 +107,19 @@ class ContinuousMDPDiscretizer(object):
         essential_mapping = self.basic_mapper.states_to_node_dists(next_states,ignore=dealt_with)
         node_mapping.update(essential_mapping)
         
-        # All accounted for; no extras
-        assert(len(node_mapping) == self.basic_mapper.get_num_nodes())
-
-        # TODO: convert map of node dists into matrix
-        total_node_number = self.basic_mapper.get_num_nodes()
+        # Make sink nodes actually sinks
         for mapper in self.exception_node_mappers:
-            total_node_number += mapper.get_num_nodes()
-            
+            node_mapping[mapper.sink_node] = node_mapper.NodeDist(mapper.sink_node,1.0)
+        
+        # All accounted for; no extras
+        total_node_number = self.get_num_nodes()
+        assert(len(node_mapping) == total_node_number)
+          
         P = scipy.sparse.dok_matrix((total_node_number,total_node_number))
             
         for (source_node, next_node_dist) in node_mapping.items():
             for (next_node,weight) in next_node_dist.items():
-                P[next_node,source_node] = weight
+                P[next_node,source_node] = weight       
                 
         if sparse:
             P = P.tocsr()

@@ -91,6 +91,7 @@ class OOBSinkNodeMapper(NodeMapper):
         """
         low <= state[dim] <= high; otherwise map state to sink_node
         """
+        assert(low < high)
         self.dim = dim
         self.low = low 
         self.high = high
@@ -103,7 +104,7 @@ class OOBSinkNodeMapper(NodeMapper):
         """
         Mapping = {}
         for (i,state_comp) in enumerate(states[:,self.dim]):
-            if (i in ignore) or (self.low <= state_comp <= self.high):
+            if (i in ignore) or not (self.low <= state_comp <= self.high):
                 continue
             Mapping[i] = NodeDist(self.sink_node,1.0)
         return Mapping
