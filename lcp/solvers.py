@@ -192,12 +192,20 @@ class ProjectiveIteration(LCPIterator):
         
         self.proj_lcp_obj = proj_lcp_obj
         self.q = proj_lcp_obj.q
-        if hasattr(proj_lcp_obj.Phi,'todense'):
-            self.Phi = np.array(proj_lcp_obj.Phi.todense())
-            self.U = np.array(proj_lcp_obj.U.todense())
+        self.Phi = proj_lcp_obj.Phi
+        self.U = proj_lcp_obj.U
+        
+        # We expect Phi and U to be both either dense, or both sparse (no mixing)
+        # If sparse, we want them to be csr or csc (these can be mixed)
+        # self.linsolve is set based on whether we are in the sparse regime or the dense one.
+        # TODO: also allow mixed sparseness (e.g. Phi dense, U csr)
+        if isinstance(self.Phi,np.ndarray):
+            assert(isinstance(self.U,np.ndarray))
+            self.linsolve = lambda A,b: np.linalg.lstsq(G,h)[0]
         else:
-            self.Phi = proj_lcp_obj.Phi
-            self.U = proj_lcp_obj.U
+            assert(isinstance(self.Phi,sps.csc_matrix) or isinstance(self.Phi,sps.csr_matrix))
+            assert(isinstance(self.U,sps.csc_matrix) or isinstance(self.U,sps.csr_matrix))
+            self.linsolve = lambda A,b: sps.linalg.lsqr(G,h)[0]
          
         # Preprocess
         self.PtP = (Phi.T).dot(Phi) # FTF in Geoff's code
@@ -259,9 +267,8 @@ class ProjectiveIteration(LCPIterator):
         h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
         assert(isvector(h,k))
             
-            # Step 5: Solve for del_w
-
-        del_w = np.linalg.lstsq(G,h)[0]
+        # Step 5: Solve for del_w
+        del_w = self.linsolve(G,h) # Uses either dense or sparse least-squares
         assert(isvector(del_w))
         assert(isvector(del_w,k))
             
@@ -340,10 +347,6 @@ def mdp_ip_iter(lcp_obj,state,**kwargs):
         yield state  
         Outer_I += 1
         
-
-
-    
-
 ##############################
 # Basic infeasible-start interior point (p.159 / pdf 180 Wright)
 def basic_ip_iter(lcp_obj,state,**kwargs):
