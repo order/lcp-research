@@ -1,3 +1,19 @@
+def isvector(x,N=None):    
+    if not len(x.shape) == 1:
+        return False
+        
+def ismatrix(A,N=None,M=None):
+    if not len(A.shape) == 2:
+        return False
+    (n,m) = A.shape
+    if N and not n == N:
+        return False
+    if M and not m == M:
+        return False
+    return True
+    
+def issquare(A,N=None):
+    return ismatrix(A,N,N)
     
 def nonneg_proj(x):
     """

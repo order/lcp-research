@@ -63,14 +63,17 @@ class Iterator(object):
     """
     def next_iteration(self):
         raise NotImplementedError()
+    def get_iteration(self):
+        raise NotImplementedError()
+        
+class LCPIterator(Iterator):
     def get_primal_vector(self):
         raise NotImplementedError()
     def get_dual_vector(self):
         raise NotImplementedError()
     def get_gradient_vector(self):
         raise NotImplementedError()
-    def get_iteration(self):
-        raise NotImplementedError()
+
         
 class MDPIterator(Iterator):
     def get_value_vector(self):
@@ -111,7 +114,7 @@ class ValueIterator(MDPIterator):
         
 ##############################
 # Kojima lcp_obj
-class KojimaIterator(Iterator):
+class KojimaIterator(LCPIterator):
     def __init__(self,lcp_obj,**kwargs):
         self.lcp = lcp_obj
         self.M = lcp_obj.M
@@ -181,111 +184,114 @@ class KojimaIterator(Iterator):
         return self.iteration
         
 
-def ProjectiveInteriorPointIteration(proj_lcp_obj,state,**kwargs):
-    """
-    A projective interior point algorithm based on "Fast solutions to projective monotone LCPs" by Geoff Gordon. 
-    If M = \Phi U + \Pi_\bot where Phi is low rank (k << n) and \Pi_\bot is projection onto the nullspace of \Phi^\top, then each iteration only costs O(nk^2), rather than O(n^{2 + \eps}) for a full system solve.
+class ProjectiveIteration(LCPIterator):
+    def __init__(self,proj_lcp_obj,**kwargs):
+        self.centering_coeff = kwargs.get('centering_coeff',0.99)
+        self.linesearch_backoff = kwargs.get('linesearch_backoff',0.99)
+        self.central_path_backoff = kwargs.get('central_path_backoff',0.9995)
+        
+        self.proj_lcp_obj = proj_lcp_obj
+        self.q = proj_lcp_obj.q
+        if hasattr(proj_lcp_obj.Phi,'todense'):
+            self.Phi = np.array(proj_lcp_obj.Phi.todense())
+            self.U = np.array(proj_lcp_obj.U.todense())
+        else:
+            self.Phi = proj_lcp_obj.Phi
+            self.U = proj_lcp_obj.U
+         
+        # Preprocess
+        self.PtP = (Phi.T).dot(Phi) # FTF in Geoff's code
+        self.PtPUP = (PtP.dot(U)).dot(Phi)
+        self.PtPU_P = (PtP.dot(U) - Phi.T) # FMI in Geoff's code; I sometimes call it Psi in my notes
+        
+        self.x = kwargs.get('x0',np.ones(N))
+        self.y = kwargs.get('y0',np.ones(N))
+        self.w = kwargs.get('w0',np.zeros(k))
 
-    This is a straight-forward implementation of Figure 2
-    """
-    DEBUG = False
+        self.iteration = 0
+        
+    def next_iteration(self):
+        """
+        A projective interior point algorithm based on "Fast solutions to projective monotone LCPs" by Geoff Gordon. 
+        If M = \Phi U + \Pi_\bot where Phi is low rank (k << n) and \Pi_\bot is projection onto the nullspace of \Phi^\top, then each iteration only costs O(nk^2), rather than O(n^{2 + \eps}) for a full system solve.
 
-    """
-    RE-CORE this an all other iterative procedures to deal with matrices
-    rather than arrays. 
-    This leads to better interaction with sparse stuff, and I think is more
-    comprehensible to my matlab sensibilities
-    """
+        This is a straight-forward implementation of Figure 2
+        """
 
-    sigma = kwargs.get('centering_coeff',0.99)
-    beta = kwargs.get('linesearch_backoff',0.99)
-    backoff = kwargs.get('central_path_backoff',0.9995)
- 
-    # Currently: converting everything to a dense matrix
-    if hasattr(proj_lcp_obj,'todense'):
-        Phi = np.array(proj_lcp_obj.Phi.todense())
-        U = np.array(proj_lcp_obj.U.todense())
-        q = np.array(proj_lcp_obj.q.todense())
-    else:
-        Phi = proj_lcp_obj.Phi
-        U = proj_lcp_obj.U
-        q = proj_lcp_obj.q
-    (N,k) = Phi.shape
+        sigma = self.centering_coeff
+        beta = self.linesearch_backoff
+        backoff = self.central_path_backoff
+     
+        Phi = self.Phi
+        U = self.U
+        q = self.q
+        assert(len(Phi.shape) == 2)
+        (N,k) = Phi.shape
+        assert(ismatrix(U,k,N))
+        assert(isvector(q,N))
 
-    # Preprocess
-    PtP = (Phi.T).dot(Phi) # FTF in Geoff's code
-    PtPUP = (PtP.dot(U)).dot(Phi)
-    PtPU_P = (PtP.dot(U) - Phi.T) # FMI in Geoff's code; I sometimes call it Psi in my notes  
+        PtP = self.PtP # FTF in Geoff's code
+        assert(issquare(PtP,k))
+        PtPUP = self.PtPUP
+        assert(issquare(PtPUP,k))
+        PtPU_P = self.PtPU_P 
+        assert(ismatrix(PtPU_P,k,N))
 
-    debug_mapprint(DEBUG,PtP=PtP.shape,PtPU_P=PtPU_P.shape)
-    
-    
-    x = np.ones(N)
-    y = np.ones(N)
-    w = np.zeros(k)
-    
-    I = 0
-    while True:
-        I += 1
-        debug_print(DEBUG, '-'*5+str(I)+'-'*5)
-        debug_mapprint(DEBUG,x=x,y=y,w=w)
+        x = self.x
+        y = self.y
+        w = self.w
+        assert(isvector(x,N))
+        assert(isvector(y,N))
+        assert(isvector(w,k))
 
         # Step 3: form right-hand sides
         g = sigma * x.dot(y) / float(N) * np.ones(N) - x * y
-        #pinv_phi_x = scipy.linalg.lstsq(Phi,x)[0] # TODO: use QR factorization
-        #r = Phi * (U * x - pinv_phi_x) + x + q - y # M*x + q - y
         p = x - y + q - Phi.dot(w)
-        # TODO: Geoff doesn't explicitly form r (rhs2 in his code), figure this out
-        debug_mapprint(DEBUG,g=g,p=p)
-
+        assert(isvector(g,N))
+        assert(isvector(p,N))
+        
         # Step 4: Form the reduced system G dw = h
         inv_XY = 1.0/(x + y)
         A = PtPU_P * inv_XY
+        assert(ismatrix(A,k,N))    
         G = (A * y).dot(Phi) - PtPUP
+        assert(issquare(G,k))
         h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
-        debug_mapprint(DEBUG,h=h,G=G)
-        
-        # Step 5: Solve for del_w
+        assert(isvector(h,k))
+            
+            # Step 5: Solve for del_w
 
         del_w = np.linalg.lstsq(G,h)[0]
-        
-        # Step 6
+        assert(isvector(del_w))
+        assert(isvector(del_w,k))
+            
+            # Step 6
         Phidw= Phi.dot(del_w)
+        assert(isvector(Phidw,N))
         del_y = inv_XY*(g + y*p - y*Phidw)
+        assert(isvector(del_y,N))
         
         # Step 7
         del_x = del_y+Phidw-p
-        
-        debug_mapprint(DEBUG,del_x=del_x,del_y=del_y,del_w=del_w)
-        
-        # Step 8 Step length
+        assert(isvector(del_x,N))      
+            
+            # Step 8 Step length
         steplen = max(np.amax(-del_x/x),np.amax(-del_y/y))
-        debug_mapprint(DEBUG,steplen_pre=steplen,beta=sigma)
         if steplen <= 0:
             steplen = float('inf')
         else:
             steplen = 1.0 / steplen
         steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
-                
+                    
         # Sigma is beta in Geoff's code
         if(steplen > 0.95):
             sigma = 0.05 # Long step
         else:
             sigma = 0.5 # Short step
-        debug_mapprint(DEBUG,steplen=steplen,beta=sigma)
-           
-        
-        
-        x = x + steplen * del_x
-        y = y + steplen * del_y
-        w = w + steplen * del_w
-        
-        state.x = x
-        state.w = y # Yeah, this is confusing. Should use a different name for this like dual
-        state.iter = I
-        
-        yield state
-    
+              
+        self.x = x + steplen * del_x
+        self.y = y + steplen * del_y
+        self.w = w + steplen * del_w    
         
 def mdp_ip_iter(lcp_obj,state,**kwargs):
     """

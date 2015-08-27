@@ -84,6 +84,8 @@ def plot_value_function():
     
 def plot_interior_point():
     MaxIter = 50
+    lcp_obj = mdp_obj.tolcp()
+    print 'Built...', lcp_obj
 
     kip = lcp.solvers.KojimaIterator(lcp_obj)
     solver = lcp.solvers.IterativeSolver(kip)
@@ -96,6 +98,20 @@ def plot_interior_point():
     Img = np.reshape(v[:basic_mapper.get_num_nodes()],(x_n,v_n)).T
     plt.imshow(Img,interpolation = 'bicubic')
     plt.show()
+    
+def plot_projected_interior_point():
+    kip = lcp.solvers.KojimaIterator(lcp_obj)
+    solver = lcp.solvers.IterativeSolver(kip)
+
+    solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(MaxIter))
+    print 'Starting solve...'
+    solver.solve()
+    print 'Done.'
+    v = kip.get_primal_vector()[:basic_mapper.get_num_nodes()]
+    Img = np.reshape(v[:basic_mapper.get_num_nodes()],(x_n,v_n)).T
+    plt.imshow(Img,interpolation = 'bicubic')
+    plt.show()   
+    
     
 x_lim = 1
 x_n = 25
@@ -133,8 +149,6 @@ discretizer.add_node_mapper(right_oob_mapper)
 
 mdp_obj = discretizer.build_mdp()
 print 'Built...', mdp_obj
-lcp_obj = mdp_obj.tolcp()
-print 'Built...', lcp_obj
 
 #plot_interior_point()
 #plot_trajectory()
