@@ -58,17 +58,16 @@ def plot_trajectory():
             
             next_nodes = mdp_obj.transitions[action_index].dot(elem)
             for (j,val) in enumerate(next_nodes):
-                if val > 1e-2 and j not in sink_nodes:
+                if val > 0.05 and j not in sink_nodes:
                     next_state = basic_mapper.nodes_to_states([j])
                     print 'Drawing edge from {0}->{1} ({2}->{3}) '\
                         .format(node,j,state.flatten(),next_state.flatten())
                     plt.plot([state[0,0],next_state[0,0]],[state[0,1],next_state[0,1]],'.-')
                     new_nodes.add(j)
         nodes = new_nodes
-    plt.show()
-    
+    plt.show()    
 
-def plot_value_function(mdp_obj,basic_mapper):
+def plot_value_function():
     MaxIter = 150
 
     vi = lcp.solvers.ValueIterator(mdp_obj)
@@ -78,21 +77,36 @@ def plot_value_function(mdp_obj,basic_mapper):
     solver.solve()
     print 'Done.'
 
-    #Img = np.reshape(vi.v[:basic_mapper.get_num_nodes()],(x_n,v_n)).T
+    Img = np.reshape(vi.v[:basic_mapper.get_num_nodes()],(x_n,v_n)).T
     #Img = np.reshape(mdp_obj.costs[1][:basic_mapper.get_num_nodes()],(v_n,x_n))
-    #plt.imshow(Img)
-    #plt.show()
+    plt.imshow(Img,interpolation = 'bicubic')
+    plt.show()
+    
+def plot_interior_point():
+    MaxIter = 50
 
+    kip = lcp.solvers.KojimaIterator(lcp_obj)
+    solver = lcp.solvers.IterativeSolver(kip)
+
+    solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(MaxIter))
+    print 'Starting solve...'
+    solver.solve()
+    print 'Done.'
+    v = kip.get_primal_vector()[:basic_mapper.get_num_nodes()]
+    Img = np.reshape(v[:basic_mapper.get_num_nodes()],(x_n,v_n)).T
+    plt.imshow(Img,interpolation = 'bicubic')
+    plt.show()
+    
 x_lim = 1
-x_n = 51
+x_n = 25
 xid = 0
 
 v_lim = 3
-v_n = 51
+v_n = 25
 vid = 1
 
 a_lim = 1
-a_n = 5
+a_n = 3
 
 OOBCost = 25
 
@@ -119,5 +133,9 @@ discretizer.add_node_mapper(right_oob_mapper)
 
 mdp_obj = discretizer.build_mdp()
 print 'Built...', mdp_obj
-    
-plot_value_function(mdp_obj,basic_mapper)
+lcp_obj = mdp_obj.tolcp()
+print 'Built...', lcp_obj
+
+#plot_interior_point()
+#plot_trajectory()
+plot_value_function()
