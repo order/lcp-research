@@ -79,12 +79,15 @@ def plot_value_function():
     
     fn_eval = mdp.InterpolatedGridValueFunctionEvaluator(discretizer,vi.v)
     
-    grid = 100
+    grid = 25
     [x_mesh,y_mesh] = np.meshgrid(np.linspace(-x_lim,x_lim,grid), np.linspace(-v_lim,v_lim,grid))
     Pts = np.array([x_mesh.flatten(),y_mesh.flatten()]).T
     
     vals = fn_eval.evaluate(Pts)
-    policy = mdp.ImmediatePolicy(physics,fn_eval,actions)
+    #policy = mdp.OneStepLookaheadPolicy(cost_obj,physics,fn_eval,actions,discount)
+    K = 1
+    policy = mdp.KStepLookaheadPolicy(cost_obj,physics,fn_eval,actions,discount,K)
+    
 
     ValImg = np.reshape(vals,(grid,grid))
     PolicyImg = np.reshape(policy.get_decisions(Pts),x_mesh.shape)
@@ -120,44 +123,39 @@ def plot_projected_interior_point():
     v = kip.get_primal_vector()[:basic_mapper.get_num_nodes()]
     Img = np.reshape(v[:basic_mapper.get_num_nodes()],(x_n,v_n)).T
     plt.imshow(Img,interpolation = 'nearest')
-    plt.show()   
-    
-    
+    plt.show() 
+
 x_lim = 1
-x_n = 20
+x_n = 25
 xid = 0
 
 v_lim = 3
-v_n = 20
+v_n = 25
 vid = 1
 
 a_lim = 1
-a_n = 3
-
-OOBCost = 10
+a_n = 7
 
 cost_coef = np.array([2,1])
+oob_cost = 15
 
 basic_mapper = InterpolatedGridNodeMapper(np.linspace(-x_lim,x_lim,x_n),np.linspace(-v_lim,v_lim,v_n))
 assert(basic_mapper.get_num_nodes() == x_n * v_n)
 physics = DoubleIntegratorRemapper()
-cost_obj = QuadraticCost(cost_coef)
+cost_obj = QuadraticCost(cost_coef,oob_cost)
 actions = np.linspace(-a_lim,a_lim,a_n)
+discount = 0.99
 
 left_oob_mapper = OOBSinkNodeMapper(xid,-float('inf'),-x_lim,basic_mapper.num_nodes)
 right_oob_mapper = OOBSinkNodeMapper(xid,x_lim,float('inf'),basic_mapper.num_nodes+1)
 state_remapper = RangeThreshStateRemapper(vid,-v_lim,v_lim)
-
-# Add oob as exceptions to the cost
-cost_obj.override[left_oob_mapper.sink_node] = OOBCost
-cost_obj.override[right_oob_mapper.sink_node] = OOBCost
 
 discretizer = ContinuousMDPDiscretizer(physics,basic_mapper,cost_obj,actions)
 discretizer.add_state_remapper(state_remapper)
 discretizer.add_node_mapper(left_oob_mapper)
 discretizer.add_node_mapper(right_oob_mapper)
 
-mdp_obj = discretizer.build_mdp()
+mdp_obj = discretizer.build_mdp(discount=discount)
 print 'Built...', mdp_obj
 
 #plot_interior_point()

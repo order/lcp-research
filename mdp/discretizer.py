@@ -114,6 +114,8 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
             costs.append(self.build_cost_vector(a))
         if 'name' not in kwargs:
             kwargs['name'] = 'MDP from Discretizer'
+        if 'discount' not in kwargs:
+            kwargs['discount'] = 0.99
         mdp_obj = mdp.MDP(transitions,costs,self.actions,**kwargs)
         return mdp_obj
         
@@ -121,9 +123,8 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         """
         Build the cost vector for an action
         """
-        node_ids = self.get_node_ids()
         node_states = self.get_node_states()
-        return self.cost_obj.cost(node_ids,node_states,action)        
+        return self.cost_obj.cost(node_states,action)        
     
     def build_transition_matrix(self,action,**kwargs):
     

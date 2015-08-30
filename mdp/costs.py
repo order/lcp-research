@@ -1,12 +1,19 @@
+import numpy as np
+
 class QuadraticCost(object):
-    def __init__(self,coeff,**kwargs):
+    """
+    Quadratic cost for being away from the origin.
+    Has an override cost for any states with NaN
+    """
+    def __init__(self,coeff,override):
         self.coeff = coeff
-        self.override = kwargs
+        self.override = override
     
-    def cost(self,ids,points,action):
-        assert(len(ids) == points.shape[0])
-        
+    def cost(self,points,action):       
         costs = (points**2).dot(self.coeff)
-        for (node_id,cost_override) in self.override.items():
-            costs[node_id] = cost_override
+        mask = np.isnan(costs)
+        costs[mask] = self.override
+        
+        assert(not np.any(np.isnan(costs)))
+        
         return costs
