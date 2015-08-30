@@ -72,6 +72,10 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         """
         Maps states to node distributions using all the node mappers
         """
+        # First remap any states (velocity cap, etc.)
+        for remapper in self.exception_state_remappers:
+            states = remapper.remap(states)
+        
         # Then map states to node distributions
         dealt_with = set() # Handled by an earlier mapper
         node_mapping = {} # Partial mapping so far
@@ -135,10 +139,6 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         # Get the node states, and then use physics to remap them
         node_states = self.basic_mapper.get_node_states()
         next_states = self.physics.remap(node_states,action=action)
-        
-        # First remap any states (velocity cap, etc.)
-        for remapper in self.exception_state_remappers:
-            next_states = remapper.remap(next_states)
         
         # Then get the node mappings for all next states
         node_mapping = self.states_to_node_dists(next_states)

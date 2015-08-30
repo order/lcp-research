@@ -79,16 +79,17 @@ def plot_value_function():
     
     fn_eval = mdp.InterpolatedGridValueFunctionEvaluator(discretizer,vi.v)
     
-    grid = 150
+    grid = 100
     [x_mesh,y_mesh] = np.meshgrid(np.linspace(-x_lim,x_lim,grid), np.linspace(-v_lim,v_lim,grid))
     Pts = np.array([x_mesh.flatten(),y_mesh.flatten()]).T
     
     vals = fn_eval.evaluate(Pts)
-    
+    policy = mdp.ImmediatePolicy(physics,fn_eval,actions)
 
-    Img = np.reshape(vals,(grid,grid))
+    ValImg = np.reshape(vals,(grid,grid))
+    PolicyImg = np.reshape(policy.get_decisions(Pts),x_mesh.shape)
     #Img = np.reshape(mdp_obj.costs[1][:basic_mapper.get_num_nodes()],(v_n,x_n))
-    plt.imshow(Img,interpolation = 'nearest')
+    plt.imshow(PolicyImg,interpolation = 'nearest')
     plt.show()
     
 def plot_interior_point():

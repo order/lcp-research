@@ -300,7 +300,7 @@ class InterpolatedGridNodeMapper(NodeMapper):
         assert(len(L) > 1) # Let's not be silly, here
         assert(x >= L[0]) # Must be in bounds.
         assert(x <= L[-1])
-        
+
         index = bisect.bisect_left(L,x)-1
         
         # Boundary special cases
@@ -379,7 +379,10 @@ class InterpolatedGridNodeMapper(NodeMapper):
             # E.g. greatest cutpoint smaller and least cutpoint larger
             Sandwiches = [] # SANDWEDGES
             for d in xrange(D):
-                (index,w_lo,w_hi) = self.__one_dim_interp(states[state_id,d],self.grid_desc[d])
+                try:
+                    (index,w_lo,w_hi) = self.__one_dim_interp(states[state_id,d],self.grid_desc[d])
+                except:
+                    raise AssertionError('Bad state {0},{1}'.format(state_id,states[state_id,:]))
                 Sandwiches.append((index,w_lo,w_hi))
             # Get the least node; e.g. in 2D:
             #   2 - 3

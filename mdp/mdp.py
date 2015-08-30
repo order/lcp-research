@@ -138,5 +138,48 @@ class InterpolatedGridValueFunctionEvaluator(ValueFunctionEvaluator):
             for (node_id,w) in nd.items():
                 vals[state_id] += self.node_to_cost[node_id] * w                
         return vals
+        
+class Policy(object):
+    """
+    Abstract class for policies
+    """
+    def get_decisions(self,states):
+        raise NotImplementedError()
+        
+class ImmediatePolicy(Policy):
+    """
+    Basic policy based on looking at the value for the next state for each action
+    """
+    def __init__(self, state_remapper, value_fun_eval, actions):
+        self.state_remapper = state_remapper
+        self.value_fun_eval = value_fun_eval
+        self.actions = actions
+        
+    def get_decisions(self,states):
+        (N,d) = states.shape
+        A = len(self.actions)
+        # Get the next states
+        next_states = np.full((N,d,A),np.nan)
+        for (i,a) in enumerate(self.actions):
+            next_states[:,:,i] = self.state_remapper.remap(states,action=a)
+            
+        # Get the values for these states
+        vals = np.full((N,A),np.nan)
+        for i in xrange(A):
+            vals[:,i] = self.value_fun_eval.evaluate(next_states[:,:,i])
+        
+        action_indices = np.argmin(vals,axis=1)
+        assert(action_indices.shape[0] == N)
+        decisions = np.full(N,np.nan)
+        for (i,a) in enumerate(self.actions):
+            mask = (action_indices == i)
+            decisions[mask] = a
+            
+        assert(not np.any(np.isnan(decisions)))
+        
+        return decisions
+        
+        
+        
     
     
