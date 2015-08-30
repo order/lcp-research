@@ -8,36 +8,48 @@ class NodeMapper(object):
     Abstract class defining state-to-node mappings. 
     For example, basic grid mappings or fixing OOB states.
     """
+    def covers(self,state):
+        """
+        Checks if a node mapper is responsible for mapping state
+        """
+        raise NotImplementedError()
     def states_to_node_dists(self,states,**kwargs):
         """
-        All node mappers must implement this.
+        Takes an arbitrary Nxd ndarray and maps it to
+        each of the rows to a distribution over nodes
         """
         raise NotImplementedError()
     def nodes_to_states(self,nodes):
         """
-        All node mappers must implement this.
+        Maps each node to its canonical state. If the node
+        is a abstract one, like "out-of-bounds", then the
+        state should be NaN.
         """
         raise NotImplementedError()  
         
     def get_num_nodes(self):
         """
-        All node mappers must implement this.
+        Get the number of nodes that the node mapper is
+        responsible for
         """
         raise NotImplementedError()        
         
-    def get_nodes(self):
+    def get_node_ids(self):
         """
-        All node mappers must implement this.
+        Get a list/iterator of node ids
         """
         raise NotImplementedError()
 
     def get_node_states(self):
         """
-        All node mappers must implement this.
+        Get the canonical state for every node mapper is responsible for
         """
         raise NotImplementedError()
         
     def get_dimension(self):
+        """
+        Return the dimension of the state-space
+        """
         raise NotImplementedError()
         
         
@@ -80,6 +92,9 @@ class NodeDist(object):
         if abs(agg - 1.0) > 1e-8:
             raise AssertionError('Node distribution sums to {0}'.format(agg))
             
+    def __getitem__(self,index):
+        return self.dist[index]
+            
     def __str__(self):
         return '{' + ', '.join(map(lambda x: '{0}:{1:.3f}'.format(x[0],x[1]), sorted(self.dist.items()))) + '}'
         
@@ -96,6 +111,9 @@ class OOBSinkNodeMapper(NodeMapper):
         self.low = low 
         self.high = high
         self.sink_node = sink_node # this is the node id for the sink state
+        
+    def covers(self,state):
+        return (low <= state[self.dim] <= high)
         
     def states_to_node_dists(self, states, ignore):
         """
@@ -115,7 +133,7 @@ class OOBSinkNodeMapper(NodeMapper):
         """
         return {}
         
-    def get_nodes(self):
+    def get_node_ids(self):
         return [self.sink_node]
         
     def get_num_nodes(self):
@@ -139,6 +157,8 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         self.grid_desc = vargs
         
         self.num_nodes = np.prod(map(lambda x: x[2],vargs))
+        
+        raise NotImplementedError('Need to update this')
         
     def states_to_node_dists(self,states,**kwargs):
         """
@@ -210,7 +230,7 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
             
         return GridCoord
         
-    def get_nodes(self):
+    def get_node_ids(self):
         return xrange(self.num_nodes)
         
     def get_num_nodes(self):
@@ -387,7 +407,7 @@ class InterpolatedGridNodeMapper(NodeMapper):
         """        
         return self.node_states_cache[nodes,:]
         
-    def get_nodes(self):
+    def get_node_ids(self):
         """
         Returns the range of nodes
         """
@@ -401,6 +421,12 @@ class InterpolatedGridNodeMapper(NodeMapper):
         
     def get_dimension(self):
         return len(self.grid_desc)
+        
+    def covers(self,state):
+        for (d,gd) in enumerate(self.grid_desc):
+            if not (gd[0] <= state[d] <= gd[-1]):
+                return False
+        return True
   
 def id_to_coords(node_id,Lens):
     """

@@ -120,63 +120,23 @@ def mdp_skew_assembler(A_list):
         M[np.ix_(J,I)] = -A_list[i]
     return M.tocsr()
     
-class Policy(object):
-    def decision(self,states):
-        pass
+class ValueFunctionEvaluator(object):
+    def evaluate(self,state,action):
+        raise NotImplementedError()
         
-class ValueTablePolicy(Policy):
-    def __init__(self,cost_to_go):
-        self.v = cost_to_go
+class InterpolatedGridValueFunctionEvaluator(ValueFunctionEvaluator):
+    def __init__(self,discretizer,v):
+        self.node_to_cost = v
+        self.discretizer = discretizer
         
-
-def value_iteration(MDP,**kwargs):
-    """
-    Do value iteration directly on the MDP
-    """
-    max_iter = kwargs.get('max_iter',int(1e3))
-    abs_tol = kwargs.get('abs_tol',1e-6)
-
-    v = kwargs.get('x0',np.zeros(MDP.num_points))
-
-    gamma = MDP.discount
-    P_T = []
-    for a in xrange(MDP.num_actions):
-        # Transpose, and convert to csr sparse
-        P_T.append(scipy.sparse.csr_matrix(MDP.transitions[a].T))
-    for i in xrange(max_iter):
-        v_new = np.full(MDP.num_points,np.inf)
-        for a in xrange(MDP.num_actions):
-            v_new = np.minimum(v_new, MDP.costs[a] + gamma*P_T[a]*v)
-        if np.linalg.norm(v_new - v) < abs_tol:
-            return v_new
-        v = v_new
-    return v
-            
-
-            
-def plot_value(G,v):
-    """
-    Plot a 2D value function based on a grid.
-    """
-    x_mesh,y_mesh = np.meshgrid(G.x_grid,G.y_grid)
-    V = np.reshape(v[:-2],x_mesh.shape)
-    #print V.shape
-    #print x_mesh.shape
-    plt.contour(x_mesh,y_mesh,V,25)
-    plt.show()
-
-def plot_trajectory(MDP, record):
-    S = np.array(record.states)
-    Diff = S - record.states[-1]
-    n = MDP.num_states
-    A = MDP.num_actions
-    
-    f, ax = plt.subplots()
-    ax.semilogy(Diff[:n,:],'-b',linewidth=1,alpha=0.15)
-    for a in xrange(A):
-        ax.semilogy(Diff[(a+1)*n:(a+2)*n,:],'-r',alpha=0.15)
-    ax.set_title('Difference between iterations and final value')
-    plt.show()
-    
+    def evaluate(self,states):
+        # Convert state into node dist
+        node_dists = self.discretizer.states_to_node_dists(states)        
+        
+        vals = np.zeros(states.shape[0])
+        for (state_id,nd) in node_dists.items():
+            for (node_id,w) in nd.items():
+                vals[state_id] += self.node_to_cost[node_id] * w                
+        return vals
     
     

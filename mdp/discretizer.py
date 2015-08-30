@@ -4,7 +4,32 @@ import mdp
 import node_mapper
 import itertools
 
-class ContinuousMDPDiscretizer(object):
+class MDPDiscretizer(object):
+    """
+    Abstract class defining how states are mapped to discrete nodes.
+    Usually a collection of StateRemappers and NodeMappers
+    """
+    def states_to_node_dists(self,states,**kwargs):
+        """
+        Takes an arbitrary Nxd ndarray and maps it to
+        each of the rows to a distribution over nodes
+        """
+        raise NotImplementedError()
+        
+    def build_mdp(self,**kwargs):
+        """
+        Construct the MDP
+        """
+        raise NotImplementedError()
+
+
+class ContinuousMDPDiscretizer(MDPDiscretizer):
+    """
+    A MDP discretizer for a continuous state space.
+    Has a distinguished state-remapper responsible for physical evolution
+    and a distinguished node-mapper responsible for discretizing non-abstract
+    aspects of state-space.
+    """
     def __init__(self,physics,basic_mapper,cost_obj,actions):
         self.exception_state_remappers = []
         self.physics = physics
@@ -14,16 +39,16 @@ class ContinuousMDPDiscretizer(object):
         
         self.cost_obj = cost_obj
         
-        self.actions = actions
+        self.actions = actions        
         
     def get_node_ids(self):
         """
-        Return an iterator for all the nodes in the discretization
+        Return an all the node ids in the discretization
         """
-        node_iters = list(self.basic_mapper.get_nodes())
+        node_set = set(self.basic_mapper.get_node_ids())
         for mapper in self.exception_node_mappers:
-            node_iters.extend(list(mapper.get_nodes()))
-        return node_iters
+            node_set |= set(mapper.get_node_ids())
+        return node_set
         
     def get_node_states(self):
         """
@@ -34,8 +59,7 @@ class ContinuousMDPDiscretizer(object):
         states = [self.basic_mapper.get_node_states()]
         D = self.basic_mapper.get_dimension()
         for mapper in self.exception_node_mappers:
-            states.append(np.NaN * np.ones((mapper.get_num_nodes(),D)))
-            
+            states.append(np.NaN * np.ones((mapper.get_num_nodes(),D)))            
         return np.vstack(states)
         
     def get_num_nodes(self):
@@ -43,7 +67,29 @@ class ContinuousMDPDiscretizer(object):
         for mapper in self.exception_node_mappers:
             count += mapper.get_num_nodes()
         return count
+
+    def states_to_node_dists(self,states):
+        """
+        Maps states to node distributions using all the node mappers
+        """
+        # Then map states to node distributions
+        dealt_with = set() # Handled by an earlier mapper
+        node_mapping = {} # Partial mapping so far
         
+        # Deal with the exceptions first
+        for mapper in self.exception_node_mappers:
+            partial_mapping = mapper.states_to_node_dists(states,ignore=dealt_with)
+            node_mapping.update(partial_mapping)
+            dealt_with |= set(partial_mapping.keys())
+            
+        # Then the using the basic remapper
+        essential_mapping = self.basic_mapper.states_to_node_dists(states,ignore=dealt_with)
+        node_mapping.update(essential_mapping)
+        
+        # All nodes are dealt with
+        assert(len(node_mapping) == states.shape[0])
+        
+        return node_mapping        
         
     def add_state_remapper(self,remapper):
         self.exception_state_remappers.append(remapper)
@@ -60,22 +106,23 @@ class ContinuousMDPDiscretizer(object):
         transitions = []
         costs = []
         for a in self.actions:
-            transitions.append(self.__build_transition_matrix(a))
-            costs.append(self.__build_cost_vector(a))
+            transitions.append(self.build_transition_matrix(a))
+            costs.append(self.build_cost_vector(a))
         if 'name' not in kwargs:
             kwargs['name'] = 'MDP from Discretizer'
         mdp_obj = mdp.MDP(transitions,costs,self.actions,**kwargs)
         return mdp_obj
         
-    def __build_cost_vector(self,action):
+    def build_cost_vector(self,action):
         """
-        Build the cost vector
+        Build the cost vector for an action
         """
         node_ids = self.get_node_ids()
         node_states = self.get_node_states()
         return self.cost_obj.cost(node_ids,node_states,action)        
     
-    def __build_transition_matrix(self,action,**kwargs):
+    def build_transition_matrix(self,action,**kwargs):
+    
         """
         Builds a transition matrix based on the physics and exceptions
         """
@@ -93,33 +140,25 @@ class ContinuousMDPDiscretizer(object):
         for remapper in self.exception_state_remappers:
             next_states = remapper.remap(next_states)
         
-        # Then map states to node distributions
-        dealt_with = set()
-        node_mapping = {}
-        
-        # Deal with the exceptions first
-        for mapper in self.exception_node_mappers:
-            partial_mapping = mapper.states_to_node_dists(next_states,ignore=dealt_with)
-            node_mapping.update(partial_mapping)
-            dealt_with |= set(partial_mapping.keys())
-            
-        # Then the using the basic remapper
-        essential_mapping = self.basic_mapper.states_to_node_dists(next_states,ignore=dealt_with)
-        node_mapping.update(essential_mapping)
+        # Then get the node mappings for all next states
+        node_mapping = self.states_to_node_dists(next_states)
                 
-        # Make sink nodes actually sinks
+        # Make sink nodes transition purely to themselves.
         for mapper in self.exception_node_mappers:
+            assert(mapper.sink_node not in node_mapping)
             node_mapping[mapper.sink_node] = node_mapper.NodeDist(mapper.sink_node,1.0)
         
         # All accounted for; no extras
-        total_node_number = self.get_num_nodes()
-        assert(len(node_mapping) == total_node_number)
+        N = self.get_num_nodes()
+        assert(len(node_mapping) == N)
           
-        P = scipy.sparse.dok_matrix((total_node_number,total_node_number))
+        P = scipy.sparse.dok_matrix((N,N))
             
         for (source_node, next_node_dist) in node_mapping.items():
             for (next_node,weight) in next_node_dist.items():
-                P[next_node,source_node] = weight       
+                P[next_node,source_node] = weight
+
+        assert(abs(P.sum() - N) < 1e-9) # Coarse check that its stochastic
                 
         if sparse:
             P = P.tocsr()
