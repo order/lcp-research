@@ -84,15 +84,13 @@ def plot_value_function():
     Pts = np.array([x_mesh.flatten(),y_mesh.flatten()]).T
     
     vals = fn_eval.evaluate(Pts)
-    #policy = mdp.OneStepLookaheadPolicy(cost_obj,physics,fn_eval,actions,discount)
-    K = 1
-    policy = mdp.KStepLookaheadPolicy(cost_obj,physics,fn_eval,actions,discount,K)
-    
+    one_policy = mdp.OneStepLookaheadPolicy(cost_obj,physics,fn_eval,actions,discount)
+    K = 2
+    k_policy = mdp.KStepLookaheadPolicy(cost_obj,physics,fn_eval,actions,discount,K)
 
-    ValImg = np.reshape(vals,(grid,grid))
-    PolicyImg = np.reshape(policy.get_decisions(Pts),x_mesh.shape)
-    #Img = np.reshape(mdp_obj.costs[1][:basic_mapper.get_num_nodes()],(v_n,x_n))
-    plt.imshow(PolicyImg,interpolation = 'nearest')
+    OnePolicyImg = np.reshape(one_policy.get_decisions(Pts),x_mesh.shape)
+    KPolicyImg = np.reshape(k_policy.get_decisions(Pts),x_mesh.shape)
+    plt.imshow(KPolicyImg,interpolation = 'nearest')
     plt.show()
     
 def plot_interior_point():
@@ -120,10 +118,24 @@ def plot_projected_interior_point():
     print 'Starting solve...'
     solver.solve()
     print 'Done.'
+    
     v = kip.get_primal_vector()[:basic_mapper.get_num_nodes()]
     Img = np.reshape(v[:basic_mapper.get_num_nodes()],(x_n,v_n)).T
     plt.imshow(Img,interpolation = 'nearest')
     plt.show() 
+    
+    
+def build_discretizer():
+    left_oob_mapper = OOBSinkNodeMapper(xid,-float('inf'),-x_lim,basic_mapper.num_nodes)
+    right_oob_mapper = OOBSinkNodeMapper(xid,x_lim,float('inf'),basic_mapper.num_nodes+1)
+    state_remapper = RangeThreshStateRemapper(vid,-v_lim,v_lim)
+
+    discretizer = ContinuousMDPDiscretizer(physics,basic_mapper,cost_obj,actions)
+    discretizer.add_state_remapper(state_remapper)
+    discretizer.add_node_mapper(left_oob_mapper)
+    discretizer.add_node_mapper(right_oob_mapper)
+    
+    return discretizer
 
 x_lim = 1
 x_n = 25
@@ -146,14 +158,7 @@ cost_obj = QuadraticCost(cost_coef,oob_cost)
 actions = np.linspace(-a_lim,a_lim,a_n)
 discount = 0.99
 
-left_oob_mapper = OOBSinkNodeMapper(xid,-float('inf'),-x_lim,basic_mapper.num_nodes)
-right_oob_mapper = OOBSinkNodeMapper(xid,x_lim,float('inf'),basic_mapper.num_nodes+1)
-state_remapper = RangeThreshStateRemapper(vid,-v_lim,v_lim)
-
-discretizer = ContinuousMDPDiscretizer(physics,basic_mapper,cost_obj,actions)
-discretizer.add_state_remapper(state_remapper)
-discretizer.add_node_mapper(left_oob_mapper)
-discretizer.add_node_mapper(right_oob_mapper)
+discretizer = build_discretizer()
 
 mdp_obj = discretizer.build_mdp(discount=discount)
 print 'Built...', mdp_obj
