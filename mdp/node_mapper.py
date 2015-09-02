@@ -92,8 +92,15 @@ class NodeDist(object):
         if abs(agg - 1.0) > 1e-8:
             raise AssertionError('Node distribution sums to {0}'.format(agg))
             
+    def get_unique_node_id(self):
+        assert(len(self.dist) == 1)
+        return self.dist.keys()[0]
+            
     def __getitem__(self,index):
         return self.dist[index]
+        
+    def __len__(self):
+        return len(self.dist)
             
     def __str__(self):
         return '{' + ', '.join(map(lambda x: '{0}:{1:.3f}'.format(x[0],x[1]), sorted(self.dist.items()))) + '}'
@@ -153,12 +160,11 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         vargin be a list of triples: (low,high,N)
         This gives the range of discretization [low,high) and the number of cells in that range
         """
+        
         assert(len(vargs) >= 1)
         self.grid_desc = vargs
-        
-        self.num_nodes = np.prod(map(lambda x: x[2],vargs))
-        
-        raise NotImplementedError('Need to update this')
+        self.grid_n = np.array([x[2] for x in vargs])        
+        self.num_nodes = np.prod(self.grid_n)        
         
     def states_to_node_dists(self,states,**kwargs):
         """
@@ -170,30 +176,28 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         
         # Discretize dimensions into grid coordinates
         (N,D) = states.shape
-        GridCoord = np.zeros(states.shape)
+        GridCoord = np.empty(states.shape)
         for (d,(low,high,n)) in enumerate(self.grid_desc):            
             GridCoord[:,d] = np.floor(((states[:,d] - low) * n) / (high - low))
-            
-        # Linearize multi-dimensional grid coordinates
-        coef = np.ones(D)
-        for d in xrange(D):
-            coef[:d] *= self.grid_desc[d][2]
-        Nodes = GridCoord.dot(coef)
+            # Multi-dimensional grid coordinates
+                    
+        coef = grid_coef(self.grid_n)        
+        Nodes = GridCoord.dot(coef)  
         
         # Check if in bound
         InBounds = np.ones(N)
         for d in xrange(D):
-            np.logical_and(InBounds, 0 <= GridCoord[:,d],InBounds)
-            np.logical_and(InBounds, GridCoord[:,d] < self.grid_desc[d][2],InBounds)
+            np.logical_and(InBounds, np.all(0 <= GridCoord,axis=1),InBounds)
+            np.logical_and(InBounds, np.all(GridCoord < self.grid_n,axis=1),InBounds)
         
+        # Create the mapping
         Mapping = {}
         for i in xrange(N):
             if i in ignore:
                 continue
             if not InBounds[i]:
-                # Raise warning here? Should be handled before getting to the gridder
+                # Should be handled before getting to the gridder
                 continue
-                
             Mapping[i] = NodeDist(int(Nodes[i]),1.0)
         return Mapping
             
@@ -203,20 +207,16 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         """
         N = len(nodes)
         D = len(self.grid_desc)
-        GridCoord = np.zeros((N,D))
-        
+        GridCoord = np.empty((N,D))        
         tmp = np.array(nodes)  # Copy nodes
         
         # Figure out the prefix array
-        coef = np.ones(D)
-        for d in xrange(D):
-            coef[:d] *= self.grid_desc[d][2]
-        print coef
+        coef = grid_coef(self.grid_n)
             
         # Divide and mode to get the grid coords
-        for (d,c) in enumerate(coef):
-            GridCoord[:,d] = np.floor(tmp / c)
-            np.mod(tmp,c,tmp)
+        for d in xrange(D):
+            GridCoord[:,d] = np.floor(tmp / coef[d])
+            np.mod(tmp,coef[d],tmp)
                         
         # Convert from GridCoord to states
         for (d,(low,high,n)) in enumerate(self.grid_desc):
@@ -226,7 +226,7 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
             
         # Check if any of the points are out of bounds (NaN over the nonsense)
         OutOfBounds = np.logical_or(nodes < 0, nodes >= self.num_nodes)
-        GridCoord[OutOfBounds,:] = np.NaN            
+        GridCoord[OutOfBounds,:] = np.NaN     
             
         return GridCoord
         
@@ -247,16 +247,6 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         
     def get_dimension(self):
         return len(self.grid_desc)
-        
-class PiecewiseConstGridNodeMapper(NodeMapper):
-        """
-        This is a class that utilizes a non-regular N-dimensional grid. 
-        It assigns everything with a cell to the same point.
-        This representative node is at the center of mass of the cell.
-        Compare this to PiecewiseConstRegularGridNodeMapper that assumes a special form for the grid
-                
-        vargin be a list of sorted cut points: (c_1,...,c_k) for each dimension
-        """
         
 class InterpolatedGridNodeMapper(NodeMapper):
     def __init__(self,*vargs):
@@ -430,30 +420,34 @@ class InterpolatedGridNodeMapper(NodeMapper):
             if not (gd[0] <= state[d] <= gd[-1]):
                 return False
         return True
+        
+def grid_coef(lens):
+    # Linearize multi-dimensional grid coordinates
+    coef = np.cumprod(np.flipud(lens))
+    coef = np.roll(coef,1) # circular shift
+    coef[0] = 1.0
+    return np.flipud(coef) # Reversed order; this is 'C' like order
   
-def id_to_coords(node_id,Lens):
+def id_to_coords(node_id,lens):
     """
-    Expands a linear index into a fortran-ordered coordinate 
-    (first dimension changes the most frequently)
-    0 1 2 3
-    4 5 6 7
-    8 9 ...
+    Expands a linear index into a C-ordered coordinate 
+    (last dimension changes the most frequently)
+    E.g. if the pair is (x,y) where x is row and y is column
+    0 1 2 3 4
+    5 6 7 ...    
+    
     """
-    coef = np.prod(Lens[:-1])
-    coords = np.zeros(len(Lens))
-    for i in reversed(xrange(len(Lens))):
-        (coord,node_id) = divmod(node_id, coef)
-        coef /= Lens[i]
+    N = len(lens)
+    coef = grid_coef(lens)
+    coords = np.empty(N)
+    for i in reversed(xrange(N)):
+        (coord,node_id) = divmod(node_id, coef[i])
         coords[i] = coord
     return coords        
 
-def coords_to_id(coords,Lens):
+def coords_to_id(coords,lens):
     """
-    Flattens a multi-dimensional coordinate into a fortran-ordered index
+    Flattens a multi-dimensional coordinate into a C-ordered index
     """
-    node_id = 0
-    coef = 1
-    for (i,coord) in enumerate(coords):
-        node_id += coef * coord
-        coef *= Lens[i]
-    return node_id
+    coef = grid_coef(lens)    
+    return coef.dot(coords)
