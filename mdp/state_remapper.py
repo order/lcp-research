@@ -1,3 +1,6 @@
+import numpy as np
+import math
+
 class StateRemapper(object):
     """
     Abstract class defining custom state-to-state remapping. 
@@ -32,3 +35,10 @@ class RangeThreshStateRemapper(StateRemapper):
         states[states[:,self.dim] > self.high] = self.high
         states[states[:,self.dim] < self.low] = self.low
         return states
+        
+class AngleWrapStateRemaper(StateRemapper):
+    def __init__(self,dim):
+        self.dim = dim
+        
+    def remap(self,states):
+        states[:,self.dim] = np.mod(states[:,self.dim], 2.0*math.pi)

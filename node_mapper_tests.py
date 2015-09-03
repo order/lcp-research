@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 
 
 def piecewiseconst_regular_test():
+    """
+    Takes random 2D points, maps them to the nearest grid node, and then maps these
+    nodes to their canonical state. Should look regular.
+    """
     x_n = 5
     y_n = 8
     eps = 1e-8
@@ -26,8 +30,12 @@ def piecewiseconst_regular_test():
     plt.show()
     
 def interp_grid_test():
-    x_n = 3
-    y_n = 4
+    """
+    Takes random 2D points, maps them to their node dists, and then maps these
+    nodes to their canonical state. Should look regular.
+    """
+    x_n = 4
+    y_n = 5
     eps = 1e-8
     gridder = InterpolatedGridNodeMapper(np.linspace(0,1,x_n),np.linspace(0,1,y_n))
 
@@ -47,6 +55,6 @@ def interp_grid_test():
             plt.plot([state[0,0],canon_state[0,0]],[state[0,1],canon_state[0,1]],alpha=w)
     plt.show()
 
-interp_grid_test()
+piecewiseconst_regular_test()
 
 

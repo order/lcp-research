@@ -30,7 +30,8 @@ class IterativeSolver(object):
     def __init__(self,iterator):
         self.recorders = []
         self.termination_conditions = []
-        self.iterator = iterator        
+        self.iterator = iterator
+        self.iter_message = None
         
     def solve(self):
         """
@@ -46,6 +47,9 @@ class IterativeSolver(object):
         while True:       
             # First record everything pertinent (record initial information first)
             for (i,recorder) in enumerate(self.recorders):
+                if self.iter_message:
+                    print self.iter_message
+                    
                 Records[i].append(recorder.report(self.iterator))
         
             # Then check for termination conditions
