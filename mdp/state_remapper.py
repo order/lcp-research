@@ -42,3 +42,4 @@ class AngleWrapStateRemaper(StateRemapper):
         
     def remap(self,states):
         states[:,self.dim] = np.mod(states[:,self.dim], 2.0*math.pi)
+        return states

@@ -2,8 +2,8 @@ import numpy as np
 import state_remapper
 
 class DoubleIntegratorRemapper(state_remapper.StateRemapper):
-    def __init__(self,step=0.01):
-        self.step = step
+    def __init__(self,**kwargs):
+        self.step = kwargs.get('step',0.05)
         
     def remap(self,points,**kwargs):
         """
