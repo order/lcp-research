@@ -39,7 +39,18 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         
         self.cost_obj = cost_obj
         
-        self.actions = actions        
+        self.actions = actions   
+
+    def __str__(self):
+        S = []
+        S.append('Physics: {0}'.format(self.physics))
+        for remapper in self.exception_state_remappers:
+            S.append('\tException: {0}'.format(remapper))
+        S.append('Basic Mapper: {0}'.format(self.basic_mapper))
+        for mapper in self.exception_node_mappers:
+            S.append('\tException: {0}'.format(mapper))
+        return '\n'.join(S)
+       
         
     def get_node_ids(self):
         """

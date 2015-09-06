@@ -25,6 +25,7 @@ class RangeThreshStateRemapper(StateRemapper):
         self.dim = dim
         self.low = low
         self.high = high
+        self.eps = 1e-9
         
     def remap(self, states):
         """
@@ -32,14 +33,21 @@ class RangeThreshStateRemapper(StateRemapper):
         
         Assumes states to be an N x d np.array
         """
-        states[states[:,self.dim] > self.high] = self.high
-        states[states[:,self.dim] < self.low] = self.low
+        states[states[:,self.dim] > self.high,self.dim] = self.high - self.eps
+        states[states[:,self.dim] < self.low,self.dim] = self.low + self.eps
         return states
+        
+    def __str__(self):
+        return 'RangeThreshStateRemapper (dim={0},low={1},high={2})'.format(self.dim,self.low,self.high)
         
 class AngleWrapStateRemaper(StateRemapper):
     def __init__(self,dim):
         self.dim = dim
+        self.eps = 1e-9
         
     def remap(self,states):
-        states[:,self.dim] = np.mod(states[:,self.dim], 2.0*math.pi)
+        states[:,self.dim] = np.mod(states[:,self.dim], 2.0*math.pi - 1e-9)
         return states
+        
+    def __str__(self):
+        return 'AngleWrapStateRemaper (dim={0})'.format(self.dim)

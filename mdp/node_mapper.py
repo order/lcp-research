@@ -272,13 +272,9 @@ class InterpolatedGridNodeMapper(NodeMapper):
         self.__build_node_state_cache() # Caches the states associated with each node
         
     def __str__(self):
-        ret = []
-        ret.append('='*20)
-        for (i,state) in enumerate(self.node_states_cache):
-            ret.append('{0}: {1}'.format(i,state))
-        ret.append('-'*20)
-        ret.append(self.node_id_cache)
-        return '\n'.join(ret)
+        S = ['InterpolatedGridNodeMapper']
+        S.extend(['({0}-{1:.2f})'.format(gd[0],gd[-1]) for gd in self.grid_desc])
+        return ' '.join(S)
         
     def __one_dim_interp(self,x,L):
         """
@@ -286,7 +282,6 @@ class InterpolatedGridNodeMapper(NodeMapper):
         Returns a triple with the low index, and the distances from
         x to the two adjacent cut-points
         """
-        
         assert(len(L) > 1) # Let's not be silly, here
         assert(x >= L[0]) # Must be in bounds.
         assert(x <= L[-1])
@@ -372,7 +367,7 @@ class InterpolatedGridNodeMapper(NodeMapper):
                 try:
                     (index,w_lo,w_hi) = self.__one_dim_interp(states[state_id,d],self.grid_desc[d])
                 except:
-                    raise AssertionError('Bad state {0},{1}'.format(state_id,states[state_id,:]))
+                    raise AssertionError('Bad state {0}, (state={1},bad dim={2})'.format(state_id,states[state_id,:],d))
                 Sandwiches.append((index,w_lo,w_hi))
             # Get the least node; e.g. in 2D:
             #   2 - 3

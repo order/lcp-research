@@ -7,6 +7,8 @@ from mdp.node_mapper import InterpolatedGridNodeMapper
 from mdp.discretizer import ContinuousMDPDiscretizer
 from mdp.costs import QuadraticCost
 
+import lcp.solvers
+
 def simulate_test():
     physics = AcrobotRemapper(l1=2)
     init_state = np.array([[math.pi/4.0,0.0,0,0]])
@@ -19,10 +21,10 @@ def simulate_test():
     sim.simulate(init_state,1000)
     
 def mdp_test():
-    theta_n = 15
-    theta_grid = np.linspace(0,2*math.pi,theta_n+1)[:-1]
+    theta_n = 10
+    theta_grid = np.linspace(0,2*math.pi,theta_n+1)
     
-    dtheta_n = 12
+    dtheta_n = 8
     dtheta_lim = 10
     dtheta_grid = np.linspace(-dtheta_lim,dtheta_lim,dtheta_n)
     
@@ -30,12 +32,12 @@ def mdp_test():
     a_n = 3
     actions = np.linspace(-a_lim,a_lim,a_n)
     
-    cost_coef = np.array([1,1])
+    cost_coef = np.ones(4)
     discount = 0.99
    
     physics = AcrobotRemapper()
     basic_mapper = InterpolatedGridNodeMapper(theta_grid,theta_grid,dtheta_grid,dtheta_grid)
-    cost_obj = QuadraticCost(cost_coef,setpoint=np.array([math.pi,0.0,0.0,0.0]))
+    cost_obj = QuadraticCost(cost_coef,np.array([math.pi,0.0,0.0,0.0]))
 
     # Cylindrical boundaries
     q1_angle_wrap = AngleWrapStateRemaper(0)
@@ -49,10 +51,12 @@ def mdp_test():
     discretizer.add_state_remapper(q2_angle_wrap)
     discretizer.add_state_remapper(dq1_thres)
     discretizer.add_state_remapper(dq2_thres)
-
+    
     # Build MDP
+    print 'Starting MDP build...'
     mdp_obj = discretizer.build_mdp(discount=discount)
-
+    print 'Done.'
+    
     # Solve
     MaxIter = 150
     vi = lcp.solvers.ValueIterator(mdp_obj)
