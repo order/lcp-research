@@ -1,5 +1,6 @@
 from state_remapper import StateRemapper
 from math import pi,pow
+import numpy as np
 
 class struct():
     pass
@@ -23,10 +24,12 @@ class BicycleRemapper(StateRemapper):
     """
     
     def __init__(self,**kwargs):
-        self.step = kwargs.get('step',0.01)
-        self.state_indices = dict(zip([theta,dtheta,omega,domega,psi,xf,yf,xb,yb],range(9)))
+        self.step = kwargs.get('step',0.01)       
+        dim_names = ['theta','dtheta','omega','domega','psi','xf','yf','xb','yb']
+        self.dim_ids = dict(zip(dim_names,range(len(dim_names))))
+        
         """
-        A bunch of loose constants. Read from kwargs?
+        Loose constants. Read from kwargs w/ default?
         """  
         params = struct()
         params.dt = self.step # Simulation step
@@ -56,20 +59,39 @@ class BicycleRemapper(StateRemapper):
         First term is probably the inertia of the cycle rotating along the same; but where does
         13/3 come from?
         """
-        params.I_dc = params.Md * pow(r,2) # Tire rotating around dropout
-        params.I_dv = 1.5 * params.Md * pow(params.r,2) # Around contact with road 
-        params.I_dl = 0.5 * params.Md * pow(params.r,2) # Around steering column
+        params.I_dc = params.Md * pow(params.R,2) # Tire rotating around dropout
+        params.I_dv = 1.5 * params.Md * pow(params.R,2) # Around contact with road 
+        params.I_dl = 0.5 * params.Md * pow(params.R,2) # Around steering column
         params.dsigma = params.v / params.R # Tire angular velocity
         
         self.params = params
 
     def remap(self,points,**kwargs):
         (N,d) = points.shape
-        assert(d == len(self.state_indices))
+        S = len(self.dim_ids)
+        assert(d == S)
+        [theta,dtheta,omega,domega,psi,xf,yf,xb,yb] = range(S)
         
-        X = points 
-        locals().update(self.state_indices) # Names dimensions; vector of thetas is X[:,theta]
-        locals().update(self.params.__dict__) # Dumps constants into namespace
+        dt = self.params.dt
+        v = self.params.v
+        g = self.params.g
+        dCM = self.params.dCM
+        c = self.params.c
+        h = self.params.h
+        l = self.params.l
+        R = self.params.R    
+        Mc = self.params.Mc
+        Md = self.params.Md
+        Mp = self.params.Mp
+        M = self.params.M  
+        MaxHandleBar = self.params.MaxHandleBar
+        I_bike = self.params.I_bike
+        I_dc = self.params.I_dc
+        I_dv = self.params.I_dv
+        I_dl = self.params.I_dl
+        dsigma = self.params.dsigma
+        
+        X = points # Shorthand
         
         assert('action' in kwargs)
         u = kwargs['action']
@@ -77,52 +99,53 @@ class BicycleRemapper(StateRemapper):
         (tau,d) = (u[0],u[1]) # Handlebar torque and center of mass 'lean'
         
         # Total tilt of the center of mass; omega + leaning component
-        phi = X[:,omega] + np.atan(d / h)
-        assert(phi.shape = (N,))
+        phi = X[:,omega] + np.arctan(d / h)
+        assert((N,) == phi.shape)
         
         # Turning model. 
         rf = np.empty(N) # Distance of front tire for "instant center"
         rb = np.empty(N) # For back tire
         rCM = np.empty(N) # For center of mass
-
-        mask = np.nonzero(X[:,theta])
-        nmask = np.logical_not(mask)
+        
+        zmask = (0 == X[:,theta])
+        mask = np.logical_not(zmask)
 
         # Radii of circular paths for front tire, back tire, and center of mass
         rf[mask] = l / np.abs(np.sin(X[mask,theta]))
         rb[mask] = l / np.abs(np.tan(X[mask,theta]))        
-        rCM[mask] = np.sqrt(pow(l - c,2) + pow(l,2) / np.pow(np.tan(X[mask,theta]),2))
+        rCM[mask] = np.sqrt(pow(l - c,2) + pow(l,2) / np.power(np.tan(X[mask,theta]),2))
         
         # When handlebars are straight, there is no instance center
-        rCM[nmask] = np.PINF
-        rf[nmask] = np.PINF
-        rb[nmask] = np.PINF
+        rf[zmask] = np.PINF
+        rb[zmask] = np.PINF
+        rCM[zmask] = np.PINF
         
         # Blob of physics governing angular acceleration of tilt
         ddomega = (h*M*g*np.sin(phi)\
             - np.cos(phi) * (I_dc*dsigma*X[:,dtheta] + np.sign(X[:,theta])*pow(v,2)\
             *(Md*R*(1/rf + 1/rb) + M * h / rCM))) / I_bike
-        assert(ddomega.shape = (N,))
+        assert((N,) == ddomega.shape)
         
         # Blob 2 of physics governming angular acceleration of handle bars
         # Torque resisted by a gyroscopic term
-        ddtheta = (tau - I_dv*domega*dsigma) / I_dl
-        assert(ddtheta.shape = (N,))
+        ddtheta = (tau - I_dv*X[:,domega]*dsigma) / I_dl
+        assert((N,) == ddomega.shape)
         
         # Euler to update theta and omega (and velocities)
         X[:,domega] += ddomega * dt
         X[:,omega] += X[:,domega] * dt      
         X[:,dtheta] += ddtheta * dt
         X[:,theta] += X[:,dtheta] * dt
-        X[:,theta] = np.amin(np.amax(X[:,theta],-MaxHandleBar),MaxHandleBar)
+        X[X[:,theta] > MaxHandleBar,theta] = MaxHandleBar
+        X[X[:,theta] < -MaxHandleBar,theta] = -MaxHandleBar
         
         # Update front tire position
         temp = (v*dt) / (2.0*rf)
         mask = temp > 1
         nmask = np.logical_not(mask) 
-        temp[nmask] = np.sign(X[nmask,psi] + X[nmask,theta]) * np.asin(temp)
+        temp[nmask] = np.sign(X[nmask,psi] + X[nmask,theta]) * np.arcsin(temp)
         temp[mask] = np.sign(X[mask,psi] + X[mask,theta]) * np.pi / 2.0
-        assert(temp.shape = (N,))        
+        assert((N,) == temp.shape)        
         X[:,xf] -= v*dt*np.sin(X[:,psi] + X[:,theta] + temp)
         X[:,yf] -= v*dt*np.cos(X[:,psi] + X[:,theta] + temp)
         
@@ -130,9 +153,9 @@ class BicycleRemapper(StateRemapper):
         temp = (v*dt) / (2.0*rb)
         mask = temp > 1
         nmask = np.logical_not(mask) 
-        temp[nmask] = np.sign(X[nmask,psi]) * np.asin(temp)
+        temp[nmask] = np.sign(X[nmask,psi]) * np.arcsin(temp)
         temp[mask] = np.sign(X[mask,psi]) * np.pi / 2.0
-        assert(temp.shape = (N,))
+        assert((N,) == temp.shape)
         
         X[:,xb] -= v*dt*np.sin(X[:,psi] + temp)
         X[:,yb] -= v*dt*np.cos(X[:,psi] + temp)
@@ -149,9 +172,9 @@ class BicycleRemapper(StateRemapper):
         if_mask = np.logical_and(pos_diff[:,x_diff] == 0, pos_diff[:,y_diff] < 0)
         X[if_mask,psi] = np.pi        
         elif_mask = np.logical_and(np.logical_not(if_mask), pos_diff[:,y_diff] > 0)
-        X[elif_mask,psi] = np.atan(pos_diff[:,x_diff] / pos_diff[:,y_diff])
+        X[elif_mask,psi] = np.arctan(pos_diff[:,x_diff] / pos_diff[:,y_diff])
         else_mask = np.logical_and(np.logical_not(if_mask), np.logical_not(elif_mask))
         X[else_mask,psi] = np.sign(pos_diff[:,x_diff]) * (np.pi / 2) \
-            - np.atan(pos[:,y_diff] / pos[:,x_diff])
+            - np.arctan(pos_diff[:,y_diff] / pos_diff[:,x_diff])
         
         return X
