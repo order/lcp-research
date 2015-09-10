@@ -33,10 +33,11 @@ def piecewiseconst_regular_test2():
     """
     Check that 
     """
-    x_n = 5
-    y_n = 6
+    x_n = 2
+    y_n = 3
+    z_n = 4
     eps = 1e-8
-    gridder = PiecewiseConstRegularGridNodeMapper((0,1,x_n),(0,1,y_n))
+    gridder = PiecewiseConstRegularGridNodeMapper((0,1,x_n),(0,1,y_n),(0,1,z_n))
 
     P = gridder.get_node_states()
     Q = gridder.nodes_to_states(gridder.get_node_ids())
@@ -77,8 +78,10 @@ def interp_grid_test2():
     """
     x_n = 2
     y_n = 3
+    z_n = 4
+
     eps = 1e-8
-    gridder = InterpolatedGridNodeMapper(np.linspace(0,1,x_n),np.linspace(0,1,y_n))
+    gridder = InterpolatedGridNodeMapper(np.linspace(0,1,x_n),np.linspace(0,1,y_n),np.linspace(0,1,z_n))
 
     P = gridder.get_node_states()
     Q = gridder.nodes_to_states(gridder.get_node_ids())
@@ -88,5 +91,5 @@ def interp_grid_test2():
     plt.show()
 
 #piecewiseconst_regular_test()
-#piecewiseconst_regular_test2()
-interp_grid_test2()
+piecewiseconst_regular_test2()
+#interp_grid_test2()

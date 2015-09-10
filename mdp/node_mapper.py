@@ -244,9 +244,9 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         # Build the D different uniformly spaced ranges
         linspaces = [np.linspace(low,high,n+1)[:-1] for (low,high,n) in self.grid_desc]
         # Turn these into a mesh
-        meshes = np.meshgrid(*linspaces)
+        meshes = np.meshgrid(*linspaces,indexing='ij')
         # Flatten each into a vector; concat; transpose
-        node_states = np.array(map(lambda x: x.T.flatten(),meshes)).T  
+        node_states = np.array(map(lambda x: x.ravel(),meshes)).T  
         shift = [(high - low) / float(2.0 * (n)) for (low,high,n) in self.grid_desc]
         return node_states + shift
         
@@ -346,10 +346,10 @@ class InterpolatedGridNodeMapper(NodeMapper):
         Cache is an N x D matrix, so lookup is just 
         """
         # Turn grids into meshes
-        meshes = np.meshgrid(*self.grid_desc)
+        meshes = np.meshgrid(*self.grid_desc,indexing='ij')
         
         # Flatten each into a vector; concat; transpose
-        self.node_states_cache = np.array(map(lambda x: x.T.flatten(),meshes)).T        
+        self.node_states_cache = np.array([mesh.ravel() for mesh in meshes]).T        
         
     def states_to_node_dists(self,states,**kwargs):    
         """
