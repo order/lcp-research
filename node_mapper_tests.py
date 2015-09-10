@@ -29,6 +29,22 @@ def piecewiseconst_regular_test():
         plt.plot([state[0,0],canon_state[0,0]],[state[0,1],canon_state[0,1]])
     plt.show()
     
+def piecewiseconst_regular_test2():
+    """
+    Check that 
+    """
+    x_n = 5
+    y_n = 6
+    eps = 1e-8
+    gridder = PiecewiseConstRegularGridNodeMapper((0,1,x_n),(0,1,y_n))
+
+    P = gridder.get_node_states()
+    Q = gridder.nodes_to_states(gridder.get_node_ids())
+    
+    print 'Norm Difference', np.linalg.norm(P - Q) / np.linalg.norm(P)
+    plt.imshow(np.hstack([P,Q]),interpolation='none')
+    plt.show()
+    
 def interp_grid_test():
     """
     Takes random 2D points, maps them to their node dists, and then maps these
@@ -54,7 +70,23 @@ def interp_grid_test():
             canon_state = gridder.nodes_to_states([node_id])
             plt.plot([state[0,0],canon_state[0,0]],[state[0,1],canon_state[0,1]],alpha=w)
     plt.show()
+    
+def interp_grid_test2():
+    """
+    Check that 
+    """
+    x_n = 2
+    y_n = 3
+    eps = 1e-8
+    gridder = InterpolatedGridNodeMapper(np.linspace(0,1,x_n),np.linspace(0,1,y_n))
 
-piecewiseconst_regular_test()
+    P = gridder.get_node_states()
+    Q = gridder.nodes_to_states(gridder.get_node_ids())
+    
+    print np.linalg.norm(P - Q) / np.linalg.norm(P)
+    plt.imshow(np.hstack([P,Q]),interpolation='none')
+    plt.show()
 
-
+#piecewiseconst_regular_test()
+#piecewiseconst_regular_test2()
+interp_grid_test2()

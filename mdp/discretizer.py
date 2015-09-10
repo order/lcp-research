@@ -83,6 +83,8 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         """
         Maps states to node distributions using all the node mappers
         """
+        assert(2 == len(states.shape))
+        (N,d) = states.shape
         # First remap any states (velocity cap, etc.)
         for remapper in self.exception_state_remappers:
             states = remapper.remap(states)
@@ -102,7 +104,10 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         node_mapping.update(essential_mapping)
         
         # All nodes are dealt with
-        assert(len(node_mapping) == states.shape[0])
+        if len(node_mapping) != N:
+            for i in xrange(N):
+                if i not in node_mapping:
+                    print "!! Missing state {0}: {1}".format(i, states[i,:])
         
         return node_mapping        
         

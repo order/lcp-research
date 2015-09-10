@@ -177,8 +177,12 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         # Discretize dimensions into grid coordinates
         (N,D) = states.shape
         GridCoord = np.empty(states.shape)
-        for (d,(low,high,n)) in enumerate(self.grid_desc):            
+        for (d,(low,high,n)) in enumerate(self.grid_desc):
             GridCoord[:,d] = np.floor(((states[:,d] - low) * n) / (high - low))
+            
+            # Fudge to get the top of the final cell...
+            up_mask = np.logical_and(high <= GridCoord[:,d], GridCoord[:,d] <= high + 1e-12)
+            GridCoord[up_mask,d] = n-1
             # Multi-dimensional grid coordinates
                     
         coef = grid_coef(self.grid_n)        
@@ -226,7 +230,7 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
             
         # Check if any of the points are out of bounds (NaN over the nonsense)
         OutOfBounds = np.logical_or(nodes < 0, nodes >= self.num_nodes)
-        GridCoord[OutOfBounds,:] = np.NaN     
+        GridCoord[OutOfBounds,:] = np.NaN
             
         return GridCoord
         
@@ -238,12 +242,13 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         
     def get_node_states(self):
         # Build the D different uniformly spaced ranges
-        linspaces = [np.linspace(*gd) for gd in self.grid_desc]
+        linspaces = [np.linspace(low,high,n+1)[:-1] for (low,high,n) in self.grid_desc]
         # Turn these into a mesh
         meshes = np.meshgrid(*linspaces)
         # Flatten each into a vector; concat; transpose
-        node_states = np.array(map(lambda x: x.flatten(),meshes)).T
-        return node_states
+        node_states = np.array(map(lambda x: x.T.flatten(),meshes)).T  
+        shift = [(high - low) / float(2.0 * (n)) for (low,high,n) in self.grid_desc]
+        return node_states + shift
         
     def get_dimension(self):
         return len(self.grid_desc)

@@ -3,7 +3,7 @@ import math
 from mdp.acrobot import AcrobotRemapper
 from mdp.simulator import ChainSimulator
 from mdp.state_remapper import AngleWrapStateRemaper,RangeThreshStateRemapper
-from mdp.node_mapper import InterpolatedGridNodeMapper
+from mdp.node_mapper import InterpolatedGridNodeMapper,PiecewiseConstRegularGridNodeMapper
 from mdp.discretizer import ContinuousMDPDiscretizer
 from mdp.costs import QuadraticCost
 
@@ -22,11 +22,13 @@ def simulate_test():
     
 def mdp_test():
     theta_n = 10
-    theta_grid = np.linspace(0,2*math.pi,theta_n+1)
+    theta_desc = [0,2*math.pi,theta_n+1]
+    theta_grid = np.linspace(*theta_desc)
     
-    dtheta_n = 8
+    dtheta_n = 10
     dtheta_lim = 10
-    dtheta_grid = np.linspace(-dtheta_lim,dtheta_lim,dtheta_n)
+    dtheta_desc = [-dtheta_lim,dtheta_lim,dtheta_n]
+    dtheta_grid = np.linspace(*dtheta_desc)
     
     a_lim = 1
     a_n = 3
@@ -36,7 +38,8 @@ def mdp_test():
     discount = 0.99
    
     physics = AcrobotRemapper()
-    basic_mapper = InterpolatedGridNodeMapper(theta_grid,theta_grid,dtheta_grid,dtheta_grid)
+    #basic_mapper = InterpolatedGridNodeMapper(theta_grid,theta_grid,dtheta_grid,dtheta_grid)
+    basic_mapper = PiecewiseConstRegularGridNodeMapper(theta_desc,theta_desc,dtheta_desc,dtheta_desc)
     cost_obj = QuadraticCost(cost_coef,np.array([math.pi,0.0,0.0,0.0]))
 
     # Cylindrical boundaries
