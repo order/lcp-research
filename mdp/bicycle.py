@@ -25,9 +25,9 @@ class BicycleRemapper(StateRemapper):
     
     def __init__(self,**kwargs):
         self.step = kwargs.get('step',0.01)       
-        dim_names = ['theta','dtheta','omega','domega','psi','xf','yf','xb','yb']
+        dim_names = ['theta','dtheta','omega','domega','psi','x','y']
         self.dim_ids = dict(zip(dim_names,range(len(dim_names))))
-        
+                
         """
         Loose constants. Read from kwargs w/ default?
         """  
@@ -65,12 +65,22 @@ class BicycleRemapper(StateRemapper):
         params.dsigma = params.v / params.R # Tire angular velocity
         
         self.params = params
+        
+    def get_back_tire_pos(self,points):
+        x = self.dim_ids['x']
+        y = self.dim_ids['y']
+        psi = self.dim_ids['psi']
+        l = self.params.l
+        
+        Xs = points[:,x] + l * np.sin(points[:,psi])
+        Ys = points[:,y] + l * np.cos(points[:,psi])
+        return (Xs,Ys)
 
     def remap(self,points,**kwargs):
         (N,d) = points.shape
         S = len(self.dim_ids)
         assert(d == S)
-        [theta,dtheta,omega,domega,psi,xf,yf,xb,yb] = range(S)
+        [theta,dtheta,omega,domega,psi,x,y] = range(S)
         
         dt = self.params.dt
         v = self.params.v
@@ -139,6 +149,9 @@ class BicycleRemapper(StateRemapper):
         X[X[:,theta] > MaxHandleBar,theta] = MaxHandleBar
         X[X[:,theta] < -MaxHandleBar,theta] = -MaxHandleBar
         
+        # Get the back tire position from psi and front tire position
+        (x_back,y_back) = self.get_back_tire_pos(X)
+            
         # Update front tire position
         temp = (v*dt) / (2.0*rf)
         mask = temp > 1
@@ -146,8 +159,8 @@ class BicycleRemapper(StateRemapper):
         temp[nmask] = np.sign(X[nmask,psi] + X[nmask,theta]) * np.arcsin(temp)
         temp[mask] = np.sign(X[mask,psi] + X[mask,theta]) * np.pi / 2.0
         assert((N,) == temp.shape)        
-        X[:,xf] -= v*dt*np.sin(X[:,psi] + X[:,theta] + temp)
-        X[:,yf] -= v*dt*np.cos(X[:,psi] + X[:,theta] + temp)
+        X[:,x] -= v*dt*np.sin(X[:,psi] + X[:,theta] + temp)
+        X[:,y] -= v*dt*np.cos(X[:,psi] + X[:,theta] + temp)
         
         # Update back tire position
         temp = (v*dt) / (2.0*rb)
@@ -157,16 +170,12 @@ class BicycleRemapper(StateRemapper):
         temp[mask] = np.sign(X[mask,psi]) * np.pi / 2.0
         assert((N,) == temp.shape)
         
-        X[:,xb] -= v*dt*np.sin(X[:,psi] + temp)
-        X[:,yb] -= v*dt*np.cos(X[:,psi] + temp)
+        x_back -= v*dt*np.sin(X[:,psi] + temp)
+        y_back -= v*dt*np.cos(X[:,psi] + temp)
         
-        # Enforce contraint that bike length is l (lowercase L)
-        pos_diff = X[:,(xb,yb)] - X[:,(xf,yf)]
+        pos_diff = np.column_stack([x_back,y_back]) - X[:,(x,y)]
         (x_diff,y_diff) = (0,1)
-        bike_norm = np.linalg.norm(pos_diff,axis=1)
-        X[:,xb] += (X[:,xb] - X[:,xf]) * (l - bike_norm) / bike_norm
-        X[:,yb] += (X[:,yb] - X[:,yf]) * (l - bike_norm) / bike_norm
-        
+            
         # Update psi (heading angle)
         # This a blob trying to vectorize an (if,elif,else) block in the original code
         if_mask = np.logical_and(pos_diff[:,x_diff] == 0, pos_diff[:,y_diff] < 0)
@@ -176,5 +185,5 @@ class BicycleRemapper(StateRemapper):
         else_mask = np.logical_and(np.logical_not(if_mask), np.logical_not(elif_mask))
         X[else_mask,psi] = np.sign(pos_diff[:,x_diff]) * (np.pi / 2) \
             - np.arctan(pos_diff[:,y_diff] / pos_diff[:,x_diff])
-        
+       
         return X

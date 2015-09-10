@@ -73,7 +73,9 @@ class BicycleSimulator(ChainSimulator):
         N = self.state.size
         Idx = self.physics.dim_ids
         assert len(Idx) == N
-        [xf,yf,xb,yb] = [self.state[0,Idx[s]] for s in ['xf','yf','xb','yb']]
+        [xf,yf] = [self.state[0,Idx[s]] for s in ['x','y']]
+        (Xbs,Ybs) = self.physics.get_back_tire_pos(self.state)
+        (xb,yb) = [q[0] for q in [Xbs,Ybs]]
         return [[xf,yf],[xb,yb]]
        
             

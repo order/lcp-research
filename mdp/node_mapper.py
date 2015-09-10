@@ -246,7 +246,7 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         # Turn these into a mesh
         meshes = np.meshgrid(*linspaces,indexing='ij')
         # Flatten each into a vector; concat; transpose
-        node_states = np.array(map(lambda x: x.ravel(),meshes)).T  
+        node_states = np.column_stack(map(lambda x: x.ravel(),meshes))  
         shift = [(high - low) / float(2.0 * (n)) for (low,high,n) in self.grid_desc]
         return node_states + shift
         
@@ -349,7 +349,7 @@ class InterpolatedGridNodeMapper(NodeMapper):
         meshes = np.meshgrid(*self.grid_desc,indexing='ij')
         
         # Flatten each into a vector; concat; transpose
-        self.node_states_cache = np.array([mesh.ravel() for mesh in meshes]).T        
+        self.node_states_cache = np.column_stack([mesh.ravel() for mesh in meshes])      
         
     def states_to_node_dists(self,states,**kwargs):    
         """
