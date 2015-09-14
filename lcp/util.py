@@ -1,3 +1,5 @@
+import numpy as np
+
 def isvector(x,N=None):    
     if not len(x.shape) == 1:
         return False
@@ -50,14 +52,37 @@ def fb_residual(x,w):
 ##########################
 # Termination functions
 class TerminationCondition(object):
-    def isdone(self,iteration):
+    def isdone(self,iterator):
         raise NotImplementedError()
+        
+class ValueChangeTerminationCondition(TerminationCondition):
+    """
+    Checks if the value vector from an MDP iteration has changed 
+    significantly
+    """
+    def __init__(self,thresh):
+        self.thresh = thresh
+        self.old_v = np.NaN # Don't have old iteration
+        self.diff = float('inf')
+        
+    def isdone(self,iterator):
+        v = iterator.get_value_vector()
+        if np.any(self.old_v == np.NaN):
+            self.old_v = v
+            return False
+            
+        self.diff = np.linalg.norm(self.old_v - v)
+        self.old_v = v
+        return self.diff < self.thresh
+        
+    def __str__(self):
+        return 'ValueChangeTerminationCondition {0} ({1})'.format(self.thresh,self.diff)    
 
 class MaxIterTerminationCondition(TerminationCondition):
     def __init__(self,max_iter):
         self.max_iter = max_iter
-    def isdone(self,iteration):
-        return self.max_iter <= iteration.get_iteration()
+    def isdone(self,iterator):
+        return self.max_iter <= iterator.get_iteration()
     def __str__(self):
         return 'MaxIterTerminationCondition {0}'.format(self.max_iter)
         

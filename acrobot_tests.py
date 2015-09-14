@@ -38,8 +38,8 @@ def mdp_test():
     discount = 0.99
    
     physics = AcrobotRemapper()
-    #basic_mapper = InterpolatedGridNodeMapper(theta_grid,theta_grid,dtheta_grid,dtheta_grid)
-    basic_mapper = PiecewiseConstRegularGridNodeMapper(theta_desc,theta_desc,dtheta_desc,dtheta_desc)
+    basic_mapper = InterpolatedGridNodeMapper(theta_grid,theta_grid,dtheta_grid,dtheta_grid)
+    #basic_mapper = PiecewiseConstRegularGridNodeMapper(theta_desc,theta_desc,dtheta_desc,dtheta_desc)
     cost_obj = QuadraticCost(cost_coef,np.array([math.pi,0.0,0.0,0.0]))
 
     # Cylindrical boundaries
@@ -61,10 +61,11 @@ def mdp_test():
     print 'Done.'
     
     # Solve
-    MaxIter = 150
+    MaxIter = 2500
     vi = lcp.solvers.ValueIterator(mdp_obj)
     solver = lcp.solvers.IterativeSolver(vi)
     solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(MaxIter))
+    solver.termination_conditions.append(lcp.util.ValueChangeTerminationCondition(1e-6))
     solver.iter_message = '.'
     print 'Starting solve...'
     solver.solve()

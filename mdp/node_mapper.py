@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.sparse
 import itertools
 import operator
 import bisect
@@ -52,7 +53,16 @@ class NodeMapper(object):
         """
         raise NotImplementedError()
         
+class BasicNodeMapper(NodeMapper):
+    def states_to_transition_matrix(self,states,**kwargs):
+        """
+        Build a transition matrix from the states to nodes.
+        Useful in building MDP transition matrices
         
+        Hopefully will be more efficient than building lists of NodeDists
+        """
+        raise NotImplementedError()
+     
 class NodeDist(object):
     """
     Stores information for a distribution over nodes
@@ -158,13 +168,16 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
         This is equivalent to a nearest-neighbor interpolation given the center of mass points.
         
         vargin be a list of triples: (low,high,N)
-        This gives the range of discretization [low,high) and the number of cells in that range
+        This gives the range of discretization [low,high] and the number of cells in that range. There is a little
+        fuzzing on the upper boundary so that it's not [low,high)
+        
+        NB: not that there are N cells; if one used np.linspace(low,high,N) as cut points, there would be N-1 cells
         """
         
         assert(len(vargs) >= 1)
         self.grid_desc = vargs
         self.grid_n = np.array([x[2] for x in vargs])        
-        self.num_nodes = np.prod(self.grid_n)        
+        self.num_nodes = np.prod(self.grid_n)    
         
     def states_to_node_dists(self,states,**kwargs):
         """
@@ -182,8 +195,7 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
             
             # Fudge to get the top of the final cell...
             up_mask = np.logical_and(high <= GridCoord[:,d], GridCoord[:,d] <= high + 1e-12)
-            GridCoord[up_mask,d] = n-1
-            # Multi-dimensional grid coordinates
+            GridCoord[up_mask,d] = n-1 
                     
         coef = grid_coef(self.grid_n)        
         Nodes = GridCoord.dot(coef)  
@@ -280,44 +292,6 @@ class InterpolatedGridNodeMapper(NodeMapper):
         S = ['InterpolatedGridNodeMapper']
         S.extend(['({0}-{1:.2f})'.format(gd[0],gd[-1]) for gd in self.grid_desc])
         return ' '.join(S)
-        
-    def __one_dim_interp(self,x,L):
-        """
-        Determines the cut points in L that float x falls between
-        Returns a triple with the low index, and the distances from
-        x to the two adjacent cut-points
-        """
-        assert(len(L) > 1) # Let's not be silly, here
-        assert(x >= L[0]) # Must be in bounds.
-        assert(x <= L[-1])
-
-        index = bisect.bisect_left(L,x)-1
-        
-        # Boundary special cases
-        if index == len(L)-1:
-            assert(x == L[-1])
-            index -= 1
-        elif index == -1:
-            assert(x == L[0])
-            index = 0            
-        assert(L[index] <= x<= L[index+1]) 
-        
-        
-        gap = L[index+1] - L[index]
-        ret = (index,(L[index+1] - x)/gap,(x - L[index])/gap)
-        # Index in L, weights from vertices
-        
-        # If an endpoint ensure that things make sense
-        if x == L[index]:
-            assert(ret[1] == 1.0)
-            assert(ret[2] == 0.0)
-        if x == L[index+1]:
-            assert(ret[1] == 0.0)
-            assert(ret[2] == 1.0)
-            
-        assert(abs(sum(ret[1:]) - 1.0) < 1e-9)
-            
-        return ret
             
     def __grid_index_to_node_id(self,gid):       
         """
@@ -348,7 +322,7 @@ class InterpolatedGridNodeMapper(NodeMapper):
         # Turn grids into meshes
         meshes = np.meshgrid(*self.grid_desc,indexing='ij')
         
-        # Flatten each into a vector; concat; transpose
+        # Flatten each into a vector;
         self.node_states_cache = np.column_stack([mesh.ravel() for mesh in meshes])      
         
     def states_to_node_dists(self,states,**kwargs):    
@@ -370,9 +344,11 @@ class InterpolatedGridNodeMapper(NodeMapper):
             Sandwiches = [] # SANDWEDGES
             for d in xrange(D):
                 try:
-                    (index,w_lo,w_hi) = self.__one_dim_interp(states[state_id,d],self.grid_desc[d])
-                except:
-                    raise AssertionError('Bad state {0}, (state={1},bad dim={2})'.format(state_id,states[state_id,:],d))
+                    (index,w_lo,w_hi) = one_dim_interp(states[state_id,d],self.grid_desc[d])
+                except Error as e:
+                    print e.strerror
+                    raise AssertionError('Bad state {0}, (state={1},bad dim={2},grid={3})'\
+                        .format(state_id,states[state_id,:],d,self.grid_desc[d]))
                 Sandwiches.append((index,w_lo,w_hi))
             # Get the least node; e.g. in 2D:
             #   2 - 3
@@ -390,7 +366,14 @@ class InterpolatedGridNodeMapper(NodeMapper):
             dist.normalize()
             dist.verify()
             Mapping[state_id] = dist
-        return Mapping               
+        return Mapping    
+    
+    def states_to_transition_matrix(self,states,**kwargs):
+        (N,D) = states.shape
+        M = self.get_num_nodes()
+        ND = self.states_to_node_dists(states,**kwargs)
+        
+        return build_interp_matrix_from_node_dists(N,M,D,ND)        
                 
     def nodes_to_states(self,nodes):
         """
@@ -421,33 +404,148 @@ class InterpolatedGridNodeMapper(NodeMapper):
                 return False
         return True
         
-def grid_coef(lens):
-    # Linearize multi-dimensional grid coordinates
-    coef = np.cumprod(np.flipud(lens))
+class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
+    """
+    Like InterpolatedGridNodeMapper, but assumes that the grid is regular
+    """
+    def __init__(self,*vargs):        
+        assert(len(vargs) >= 1)
+        self.grid_desc = vargs
+        self.cell_n = np.array([x[2] for x in vargs]) 
+        self.cut_point_n = [x + 1 for x in self.cell_n] # | x | x |
+        self.cell_width = [(high - low) / float(n)  for (low,high,n) in self.grid_desc]
+        self.num_nodes = np.prod(self.cut_point_n)       
+        
+    def states_to_transition_matrix(self,states,**kwargs):
+        """
+        """
+        ignore = kwargs.get('ignore',set())
+        (N,D) = states.shape
+        mask = np.ones(N,dtype=bool)
+        for sid in ignore:
+            mask[sid] = 0
+
+        # This is least smallest grid coord in the dist            
+        LeastGridCoords = np.empty((N,D)) # Lowest index
+        W = np.empty((N,D,2)) # Weights
+        for d in xrange(D):
+            (low,high,n) = self.grid_desc[d]
+            LeastGridCoords[mask,d] = np.floor((states[mask,d] - low) / self.cell_width[d] )
+            LeastState = LeastGridCoords[mask,d] * self.cell_width[d] + low
+            assert(np.all(states[mask,d] >= LeastState))
+            diff = (states[mask,d] - LeastState) / self.cell_width[d]
+            W[mask,d,0] = 1.0 - diff
+            W[mask,d,1] = diff
+            
+            #Top
+            top_mask = np.logical_and(states[mask,d] >= high-1e-12, states[mask,d] <= high + 1e-12)
+            LeastGridCoords[top_mask,d] = n
+            W[top_mask,d,0] = 1.0
+            W[top_mask,d,1] = 0.0
+            
+        M = self.get_num_nodes()
+        return build_interp_matrix_from_lgc_and_w(N,M,D,LeastGridCoords,W,self.cut_point_n)
+        
+        
+def build_interp_matrix_from_node_dists(N,M,D,NodeDistDict):
+    """
+    Takes a dict of NodeDists and converts 
+    """
+    assert(N == len(NodeDistDict))
+    T = scipy.sparse.lil_matrix((M,N))
+    for (sid,nd)in NodeDistDict.items():
+        for (nid,w) in nd.items():
+            T[nid,sid] = w
+    return T.tocsr()
+        
+def build_interp_matrix_from_lgc_and_w(N,M,D,LeastGridCoords,W,Lens):
+    """
+    Build an MxN transition matrix from LeastGridCoord matrix and Weight tensor
+    """
+    assert((N,D) == LeastGridCoords.shape) # 
+    assert((N,D,2) == W.shape) # Weight tensor
+    
+    
+    
+    T = scipy.sparse.coo_matrix((M,N))
+    cols = np.arange(N)
+    for delta in itertools.product([0,1],repeat=D):
+        w = np.ones(N)
+        for d in xrange(D):
+            w *= W[:,d,delta[d]]
+        GridCoords = LeastGridCoords + np.array(delta)
+        rows = coords_to_id(GridCoords,Lens)
+        mask = np.logical_and(np.all(GridCoords >= 0,axis=1),np.all(GridCoords < np.array(Lens),axis=1))
+        if np.any(mask):
+            T += scipy.sparse.coo_matrix((w[mask], (rows[mask],cols[mask])), shape=(M,N))
+    return T.tocsr()
+        
+def grid_coef(Lens):
+    """
+    Builds weights for converting multi-dimensional grid coordinates into an id
+    """
+    coef = np.cumprod(np.flipud(Lens))
     coef = np.roll(coef,1) # circular shift
     coef[0] = 1.0
     return np.flipud(coef) # Reversed order; this is 'C' like order
   
-def id_to_coords(node_id,lens):
+def id_to_coords(node_id,Lens):
     """
-    Expands a linear index into a C-ordered coordinate 
+    Expands a id into a C-ordered coordinate 
     (last dimension changes the most frequently)
     E.g. if the pair is (x,y) where x is row and y is column
     0 1 2 3 4
     5 6 7 ...    
     
     """
-    N = len(lens)
-    coef = grid_coef(lens)
+    N = len(Lens)
+    coef = grid_coef(Lens)
     coords = np.empty(N)
     for i in reversed(xrange(N)):
         (coord,node_id) = divmod(node_id, coef[i])
         coords[i] = coord
     return coords        
 
-def coords_to_id(coords,lens):
+def coords_to_id(coords,Lens):
     """
     Flattens a multi-dimensional coordinate into a C-ordered index
     """
-    coef = grid_coef(lens)    
-    return coef.dot(coords)
+    coef = grid_coef(Lens)    
+    return coords.dot(coef)
+    
+def one_dim_interp(x,grid_desc):
+    """
+    Determines the cut points in grid_desc that float x falls between
+    Returns a triple with the low index, and the distances from
+    x to the two adjacent cut-points
+    """
+    assert(len(grid_desc) > 1) # Let's not be silly, here
+    assert(grid_desc[0] <= x <= grid_desc[-1]) # Must be in bounds.
+
+    index = bisect.bisect_left(grid_desc,x)-1
+    
+    # Boundary special cases
+    if index == len(grid_desc)-1:
+        assert(x == grid_desc[-1])
+        index -= 1
+    elif index == -1:
+        assert(x == grid_desc[0])
+        index = 0            
+    assert(grid_desc[index] <= x<= grid_desc[index+1]) 
+    
+    
+    gap = grid_desc[index+1] - grid_desc[index]
+    ret = (index,(grid_desc[index+1] - x)/gap,(x - grid_desc[index])/gap)
+    # Index in grid_desc, weights from vertices
+    
+    # If an endpoint ensure that things make sense
+    if x == grid_desc[index]:
+        assert(ret[1] == 1.0)
+        assert(ret[2] == 0.0)
+    if x == grid_desc[index+1]:
+        assert(ret[1] == 0.0)
+        assert(ret[2] == 1.0)
+        
+    assert(abs(sum(ret[1:]) - 1.0) < 1e-9)
+        
+    return ret

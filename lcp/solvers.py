@@ -45,11 +45,10 @@ class IterativeSolver(object):
         Records = [[] for _ in xrange(len(self.recorders))]
         
         while True:       
+            if self.iter_message:
+                print self.iter_message
             # First record everything pertinent (record initial information first)
-            for (i,recorder) in enumerate(self.recorders):
-                if self.iter_message:
-                    print self.iter_message
-                    
+            for (i,recorder) in enumerate(self.recorders):                    
                 Records[i].append(recorder.report(self.iterator))
         
             # Then check for termination conditions

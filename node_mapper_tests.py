@@ -1,7 +1,10 @@
-from mdp.node_mapper import PiecewiseConstRegularGridNodeMapper,InterpolatedGridNodeMapper
+from mdp.node_mapper import *
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
+def spnorm(x):
+    return (x.data**2).sum()   
 
 def piecewiseconst_regular_test():
     """
@@ -89,7 +92,44 @@ def interp_grid_test2():
     print np.linalg.norm(P - Q) / np.linalg.norm(P)
     plt.imshow(np.hstack([P,Q]),interpolation='none')
     plt.show()
+    
+def transition_matrix_test():
+
+    N = 75
+    D = 4
+
+    low = 1
+    high = 3
+    
+    eps = 1e-8
+    
+    cells = []
+    grids = []
+    for d in xrange(D):
+        cells.append((low,high,N))
+        grids.append(np.linspace(low,high,N+1))
+
+    states = (high-low)*np.random.rand(100,D) + low
+    
+    print '-'*5,'Gridder','-'*5
+    start = time.time()
+    #gridder = InterpolatedGridNodeMapper(*grids)
+    #P = gridder.states_to_transition_matrix(states)
+    print 'Grid time',time.time() - start
+
+    print '-'*5,'Regular Gridder','-'*5
+    start = time.time()
+    rgridder = InterpolatedRegularGridNodeMapper(*cells)
+    Q = rgridder.states_to_transition_matrix(states)
+    print 'Regular Grid time',time.time() - start
+    
+    #print P.shape
+   
+    #print 'Error Norm', spnorm(P - Q) / spnorm(P)
+    #plt.imshow(np.hstack([P,Q]),interpolation='none')
+    #plt.show()
 
 #piecewiseconst_regular_test()
-piecewiseconst_regular_test2()
+#piecewiseconst_regular_test2()
 #interp_grid_test2()
+transition_matrix_test()
