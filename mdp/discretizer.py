@@ -109,7 +109,40 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
                 if i not in node_mapping:
                     print "!! Missing state {0}: {1}".format(i, states[i,:])
         
-        return node_mapping        
+        return node_mapping 
+
+    def states_to_transition_matrix(self,states):
+        """
+        Maps states to node distributions using all the node mappers
+        """       
+        
+        assert(2 == len(states.shape))
+        (N,d) = states.shape
+        # First remap any states (velocity cap, etc.)
+        for remapper in self.exception_state_remappers:
+            states = remapper.remap(states)
+        
+        # Then map states to node distributions
+        dealt_with = set() # Handled by an earlier mapper
+        node_mapping = {} # Partial mapping so far
+        
+        # Deal with the exceptions first
+        for mapper in self.exception_node_mappers:
+            partial_mapping = mapper.states_to_node_dists(states,ignore=dealt_with)
+            node_mapping.update(partial_mapping)
+            dealt_with |= set(partial_mapping.keys())
+            
+        # Then the using the basic remapper
+        T = self.basic_mapper.states_to_transition_matrix(states,ignore=dealt_with)
+        assert(N == T.shape[1])
+        
+        T = T.tolil() # Make sure in list format
+        for (state_id,nd) in node_mapping:
+            assert(not np.any(T[:,sid]))
+            for (node_id,w) in nd.items():
+                T[node_id,state_id] = w
+        
+        return T
         
     def add_state_remapper(self,remapper):
         self.exception_state_remappers.append(remapper)
@@ -148,6 +181,7 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         Builds a transition matrix based on the physics and exceptions
         """
         
+        N = self.get_num_nodes()
         sparse = kwargs.get('sparse',True)
         
         if not sparse:
@@ -158,27 +192,15 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         next_states = self.physics.remap(node_states,action=action)
         
         # Then get the node mappings for all next states
-        node_mapping = self.states_to_node_dists(next_states)
-                
+        T = self.states_to_transition_matrix(next_states)
+        assert((N,N) == T.shape)
+        
         # Make sink nodes transition purely to themselves.
         for mapper in self.exception_node_mappers:
-            assert(mapper.sink_node not in node_mapping)
-            node_mapping[mapper.sink_node] = node_mapper.NodeDist(mapper.sink_node,1.0)
-        
-        # All accounted for; no extras
-        N = self.get_num_nodes()
-        assert(len(node_mapping) == N)
-          
-        P = scipy.sparse.dok_matrix((N,N))
+            nid = mapper.sink_node
+            T[nid,nid] = 1.0
             
-        for (source_node, next_node_dist) in node_mapping.items():
-            for (next_node,weight) in next_node_dist.items():
-                P[next_node,source_node] = weight
-
-        assert(abs(P.sum() - N) < 1e-9) # Coarse check that its stochastic
-                
-        if sparse:
-            P = P.tocsr()
+        assert(abs(T.sum() - N) < 1e-9) # Coarse check that its stochastic
             
-        return P
+        return T.tocsr()
         

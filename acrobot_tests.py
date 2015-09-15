@@ -1,11 +1,13 @@
 import numpy as np
 import math
-from mdp.acrobot import AcrobotRemapper
-from mdp.simulator import ChainSimulator
-from mdp.state_remapper import AngleWrapStateRemaper,RangeThreshStateRemapper
-from mdp.node_mapper import InterpolatedGridNodeMapper,PiecewiseConstRegularGridNodeMapper
-from mdp.discretizer import ContinuousMDPDiscretizer
-from mdp.costs import QuadraticCost
+from mdp.acrobot import *
+from mdp.costs import *
+from mdp.discretizer import *
+from mdp.node_mapper import *
+from mdp.policy import *
+from mdp.state_remapper import *
+from mdp.value_fun import *
+
 
 import lcp.solvers
 
@@ -38,8 +40,10 @@ def mdp_test():
     discount = 0.99
    
     physics = AcrobotRemapper()
-    basic_mapper = InterpolatedGridNodeMapper(theta_grid,theta_grid,dtheta_grid,dtheta_grid)
+    #basic_mapper = InterpolatedGridNodeMapper(theta_grid,theta_grid,dtheta_grid,dtheta_grid)
     #basic_mapper = PiecewiseConstRegularGridNodeMapper(theta_desc,theta_desc,dtheta_desc,dtheta_desc)
+    basic_mapper = InterpolatedRegularGridNodeMapper(theta_desc,theta_desc,dtheta_desc,dtheta_desc)
+
     cost_obj = QuadraticCost(cost_coef,np.array([math.pi,0.0,0.0,0.0]))
 
     # Cylindrical boundaries
@@ -61,14 +65,16 @@ def mdp_test():
     print 'Done.'
     
     # Solve
-    MaxIter = 2500
+    MaxIter = 100
     vi = lcp.solvers.ValueIterator(mdp_obj)
     solver = lcp.solvers.IterativeSolver(vi)
     solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(MaxIter))
     solver.termination_conditions.append(lcp.util.ValueChangeTerminationCondition(1e-6))
-    solver.iter_message = '.'
     print 'Starting solve...'
     solver.solve()
     print 'Done.'
+    
+    value_fun_eval = BasicValueFunctionEvaluator(discretizer,vi.get_value_vector())
+    policy = OneStepLookaheadPolicy(cost_obj, physics, value_fun_eval, actions,discount)
     
 mdp_test()

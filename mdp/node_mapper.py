@@ -159,7 +159,7 @@ class OOBSinkNodeMapper(NodeMapper):
     def get_node_states(self):
         return None        
         
-class PiecewiseConstRegularGridNodeMapper(NodeMapper):
+class PiecewiseConstRegularGridNodeMapper(BasicNodeMapper):
     def __init__(self,*vargs):
         """
         This is a class that utilizes a REGULAR N-dimensional grid, and assigns everything with a cell to the same point.
@@ -216,6 +216,13 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
                 continue
             Mapping[i] = NodeDist(int(Nodes[i]),1.0)
         return Mapping
+        
+    def states_to_transition_matrix(self,states,**kwargs):
+        (N,D) = states.shape
+        M = self.get_num_nodes()
+        ND = self.states_to_node_dists(states,**kwargs)
+        
+        return build_interp_matrix_from_node_dists(N,M,D,ND)   
             
     def nodes_to_states(self,nodes):
         """
@@ -265,7 +272,7 @@ class PiecewiseConstRegularGridNodeMapper(NodeMapper):
     def get_dimension(self):
         return len(self.grid_desc)
         
-class InterpolatedGridNodeMapper(NodeMapper):
+class InterpolatedGridNodeMapper(BasicNodeMapper):
     def __init__(self,*vargs):
         """
         This is a class that utilizes a non-regular N-dimensional grid. Interstitial
@@ -412,28 +419,60 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
         assert(len(vargs) >= 1)
         self.grid_desc = vargs
         self.cell_n = np.array([x[2] for x in vargs]) 
+        
         self.cut_point_n = [x + 1 for x in self.cell_n] # | x | x |
+        self.cut_points = [np.linspace(low,high,n+1) for (low,high,n) in vargs]
         self.cell_width = [(high - low) / float(n)  for (low,high,n) in self.grid_desc]
-        self.num_nodes = np.prod(self.cut_point_n)       
+        
+        self.num_nodes = np.prod(self.cut_point_n)
+        self.node_states_cache = np.empty(0)
+        
+    def __build_node_state_cache(self):
+        """
+        Builds a cache of the states associated with each node.
+        
+        Cache is an N x D matrix, so lookup is just 
+        """
+        # Turn grids into meshes
+        meshes = np.meshgrid(*self.cut_points,indexing='ij')
+        
+        
+        # Flatten each into a vector;
+        self.node_states_cache = np.column_stack([mesh.ravel() for mesh in meshes]) 
+
+    def get_node_states(self):
+        if not np.any(self.node_states_cache):
+            self.__build_node_state_cache()
+        return self.node_states_cache        
         
     def states_to_transition_matrix(self,states,**kwargs):
         """
+        The assumption here is that either a state is in 'ignored' or it's in bounds.
         """
         ignore = kwargs.get('ignore',set())
         (N,D) = states.shape
         mask = np.ones(N,dtype=bool)
         for sid in ignore:
             mask[sid] = 0
-
+            
+        Lows = np.array([low for (low,high,n) in self.grid_desc])
+        Highs = np.array([high for (low,high,n) in self.grid_desc])
+        
+        assert(np.all(states >= Lows))
+        assert(np.all(states <= Highs))
+        
         # This is least smallest grid coord in the dist            
         LeastGridCoords = np.empty((N,D)) # Lowest index
         W = np.empty((N,D,2)) # Weights
         for d in xrange(D):
             (low,high,n) = self.grid_desc[d]
             LeastGridCoords[mask,d] = np.floor((states[mask,d] - low) / self.cell_width[d] )
-            LeastState = LeastGridCoords[mask,d] * self.cell_width[d] + low
-            assert(np.all(states[mask,d] >= LeastState))
-            diff = (states[mask,d] - LeastState) / self.cell_width[d]
+            LeastStateComp = LeastGridCoords[mask,d] * self.cell_width[d] + low
+            assert(np.all(LeastGridCoords[mask,d] >=0 ))
+            assert(np.all(states[mask,d] >= LeastStateComp - 1e-12))
+            
+            
+            diff = (states[mask,d] - LeastStateComp) / self.cell_width[d]
             W[mask,d,0] = 1.0 - diff
             W[mask,d,1] = diff
             
@@ -446,6 +485,12 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
         M = self.get_num_nodes()
         return build_interp_matrix_from_lgc_and_w(N,M,D,LeastGridCoords,W,self.cut_point_n)
         
+    def states_to_node_dists(self,states,**kwargs):
+        raise NotImplementedError()
+        
+#########################################
+# Some helper routines for node mapping #
+#########################################        
         
 def build_interp_matrix_from_node_dists(N,M,D,NodeDistDict):
     """
@@ -456,7 +501,7 @@ def build_interp_matrix_from_node_dists(N,M,D,NodeDistDict):
     for (sid,nd)in NodeDistDict.items():
         for (nid,w) in nd.items():
             T[nid,sid] = w
-    return T.tocsr()
+    return T.T.tolil()
         
 def build_interp_matrix_from_lgc_and_w(N,M,D,LeastGridCoords,W,Lens):
     """
@@ -478,7 +523,7 @@ def build_interp_matrix_from_lgc_and_w(N,M,D,LeastGridCoords,W,Lens):
         mask = np.logical_and(np.all(GridCoords >= 0,axis=1),np.all(GridCoords < np.array(Lens),axis=1))
         if np.any(mask):
             T += scipy.sparse.coo_matrix((w[mask], (rows[mask],cols[mask])), shape=(M,N))
-    return T.tocsr()
+    return T.tolil()
         
 def grid_coef(Lens):
     """
