@@ -1,3 +1,5 @@
+import numpy as np
+
 class Policy(object):
     """
     Abstract class for policies
@@ -13,6 +15,10 @@ class ConstantPolicy(Policy):
         self.decision = decision
         
     def get_decisions(self,states):
+        m = len(states.shape) # Remap vectors to row vectors
+        if 1 == m:
+            states = states[np.newaxis,:] 
+            
         (N,d) = states.shape
         return self.decision*np.ones(N)
         
@@ -28,6 +34,10 @@ class OneStepLookaheadPolicy(Policy):
         self.discount = discount
         
     def get_decisions(self,states):
+        m = len(states.shape) # Remap vectors to row vectors
+        if 1 == m:
+            states = states[np.newaxis,:] 
+            
         (N,d) = states.shape
         A = len(self.actions)
                     

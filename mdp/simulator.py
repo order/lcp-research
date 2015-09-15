@@ -10,11 +10,14 @@ class Simulator(object):
         raise NotImplementedError()  
         
     def animate(self,frame_num):
+        """
+        This is where the heavy lifting is implemented
+        """
         raise NotImplementedError()
         
-    def simulate(self,state,action,iters):  
+    def simulate(self,state,policy,iters):  
         self.state = state
-        self.action = action
+        self.policy = policy
         figure = plt.figure()
         ax = figure.add_subplot(111, aspect='equal', autoscale_on=False, xlim=(-10, 10), ylim=(-10, 10))
         ax.grid()
@@ -35,6 +38,9 @@ class ChainSimulator(Simulator):
         raise NotImplementedError()
         
     def animate(self,frame_num):
+        # Sanity checking
+        assert(1 == len(self.state.shape)) # Vector
+        
         # Get new positions
         poses = self.get_body_pos()       
         X = np.array([p[0] for p in poses])
@@ -42,7 +48,8 @@ class ChainSimulator(Simulator):
         self.plot_obj.set_data(X,Y)
         
         # Simulate forward one step
-        self.state = self.physics.remap(self.state,action=self.action)
+        action = self.policy.get_decisions(self.state)
+        self.state = self.physics.remap(self.state,action=action).flatten()
         
         return self.plot_obj
 
@@ -57,8 +64,7 @@ class AcrobotSimulator(ChainSimulator):
 
     def get_body_pos(self):
         assert((4,) == self.state.shape)
-        q = self.state[:2] # Joint angles
-        poses = self.physics.forward_kinematics(q)
+        poses = self.physics.forward_kinematics(self.state)
         assert((3,2) == poses.shape)
         return poses    
         

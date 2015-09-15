@@ -62,6 +62,10 @@ class AcrobotRemapper(state_remapper.StateRemapper):
         """
         Physics step for the acrobot
         """
+        m = len(points.shape) # Remap vectors to row vectors
+        if 1 == m:
+            points = points[np.newaxis,:]            
+        
         [N,d] = points.shape
         assert(d == 4)
         
@@ -81,14 +85,15 @@ class AcrobotRemapper(state_remapper.StateRemapper):
             
         return new_points
         
-    def forward_kinematics(self,X):
+    def forward_kinematics(self,state):
         """
         Converts the generalized coordinates into a list of 2D Cartesian positions
         """
-        q = (X.flatten())[:(X.size/2)]
+        assert((4,) == state.shape)
+        q = state[:2]
         assert(q.size == 2)
 
-        x0 = np.array([0,0])
+        x0 = np.array([0,0]) # base always at origin
         
         # Position of middle joint
         x1 = self.l1 * np.array([np.sin(q[0]),-np.cos(q[0])])
@@ -96,4 +101,4 @@ class AcrobotRemapper(state_remapper.StateRemapper):
         
         # Position of end joint
         x2 = x1 + self.l2 * np.array([np.sin(theta_12),-np.cos(theta_12)])
-        return [x0,x1,x2]
+        return np.column_stack([x0,x1,x2]).T

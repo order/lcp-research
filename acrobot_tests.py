@@ -5,6 +5,7 @@ from mdp.costs import *
 from mdp.discretizer import *
 from mdp.node_mapper import *
 from mdp.policy import *
+from mdp.simulator import *
 from mdp.state_remapper import *
 from mdp.value_fun import *
 
@@ -74,7 +75,18 @@ def mdp_test():
     solver.solve()
     print 'Done.'
     
+    # Build policy
     value_fun_eval = BasicValueFunctionEvaluator(discretizer,vi.get_value_vector())
     policy = OneStepLookaheadPolicy(cost_obj, physics, value_fun_eval, actions,discount)
+    
+
+    
+    # Simulate
+    init_state = np.array([math.pi/4.0,0.0,0,0])
+    physics.remap(init_state,action=0) # Pre-animation sanity
+    physics.forward_kinematics(init_state)
+    
+    sim = AcrobotSimulator(physics)
+    sim.simulate(init_state,policy,1000)
     
 mdp_test()
