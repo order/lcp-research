@@ -1,5 +1,5 @@
 import numpy as np
-import scipy.sparse
+import scipy.sparse as sps
 import mdp
 import node_mapper
 import itertools
@@ -115,7 +115,6 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         """
         Maps states to node distributions using all the node mappers
         """       
-        
         assert(2 == len(states.shape))
         (N,d) = states.shape
         # First remap any states (velocity cap, etc.)
@@ -134,15 +133,26 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
             
         # Then the using the basic remapper
         T = self.basic_mapper.states_to_transition_matrix(states,ignore=dealt_with)
-        assert(N == T.shape[1])
+        num_basic_nodes = self.basic_mapper.get_num_nodes()
+        total_nodes = self.get_num_nodes()
+        assert((num_basic_nodes,N) == T.shape)
+        assert(total_nodes >= num_basic_nodes)
         
-        T = T.tolil() # Make sure in list format
-        for (state_id,nd) in node_mapping:
-            assert(not np.any(T[:,sid]))
-            for (node_id,w) in nd.items():
-                T[node_id,state_id] = w
+        # Add zero block to T for sink nodes
+        if total_nodes > num_basic_nodes:
+            T = sps.vstack([T,sps.csr_matrix((total_nodes - num_basic_nodes,N))])
+        assert((total_nodes,N) == T.shape)
         
-        return T
+        A = sps.lil_matrix((total_nodes,N))
+        if node_mapping:
+            for (state_id,nd) in node_mapping.items():
+                # Make sure we didn't write anything to this column
+                assert(0 == T[:,state_id].nonzero()[0].size)
+                
+                # Write the 
+                for (node_id,w) in nd.items():
+                    A[node_id,state_id] = w        
+        return T + A
         
     def add_state_remapper(self,remapper):
         self.exception_state_remappers.append(remapper)
@@ -181,11 +191,9 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         Builds a transition matrix based on the physics and exceptions
         """
         
-        N = self.get_num_nodes()
-        sparse = kwargs.get('sparse',True)
-        
-        if not sparse:
-            raise NotImplementedError('Not doing dense yet')
+        total_nodes = self.get_num_nodes()
+        basic_nodes = self.basic_mapper.get_num_nodes()
+        assert(total_nodes >= basic_nodes)
         
         # Get the node states, and then use physics to remap them
         node_states = self.basic_mapper.get_node_states()
@@ -193,14 +201,19 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         
         # Then get the node mappings for all next states
         T = self.states_to_transition_matrix(next_states)
-        assert((N,N) == T.shape)
+        assert((total_nodes,basic_nodes) == T.shape)
+        if total_nodes > basic_nodes:
+            T = sps.hstack([T,sps.lil_matrix((total_nodes,total_nodes-basic_nodes))])
+        T = T.tocsr()            
         
         # Make sink nodes transition purely to themselves.
+        A = sps.lil_matrix((total_nodes,total_nodes))
         for mapper in self.exception_node_mappers:
             nid = mapper.sink_node
-            T[nid,nid] = 1.0
+            A[nid,nid] = 1.0
+        T = T + A.tocsr()
             
-        assert(abs(T.sum() - N) < 1e-9) # Coarse check that its stochastic
-            
-        return T.tocsr()
+        assert(abs(T.sum() - total_nodes) < 1e-9) # Coarse check that its stochastic
+        
+        return T
         

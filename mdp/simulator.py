@@ -16,14 +16,7 @@ class Simulator(object):
         raise NotImplementedError()
         
     def simulate(self,state,policy,iters):  
-        self.state = state
-        self.policy = policy
-        figure = plt.figure()
-        ax = figure.add_subplot(111, aspect='equal', autoscale_on=False, xlim=(-10, 10), ylim=(-10, 10))
-        ax.grid()
-        self.plot_obj, = ax.plot([],[],'o-',lw=2)
-        anim = animation.FuncAnimation(figure, self.animate, iters, self.set_up, interval=2,repeat=False)
-        plt.show()
+        raise NotImplementedError()
         
 class ChainSimulator(Simulator):
     """
@@ -53,8 +46,18 @@ class ChainSimulator(Simulator):
         self.state = self.physics.remap(self.state,action=actions[0]).flatten()
         
         return self.plot_obj
+        
+    def simulate(self,state,policy,iters):  
+        self.state = state
+        self.policy = policy
+        figure = plt.figure()
+        ax = figure.add_subplot(111, aspect='equal', autoscale_on=False, xlim=(-10, 10), ylim=(-10, 10))
+        ax.grid()
+        self.plot_obj, = ax.plot([],[],'o-',lw=2)
+        anim = animation.FuncAnimation(figure, self.animate, iters, self.set_up, interval=2,repeat=False)
+        plt.show()
 
-class AcrobotSimulator(ChainSimulator):
+class AcrobotSimulator(Simulator):
     """
     Implements a ChainSimulator for the acrobot,
     which is an inverted pendulum with a
@@ -63,6 +66,9 @@ class AcrobotSimulator(ChainSimulator):
     def __init__(self,physics):
         self.physics = physics
 
+    def set_up(self):
+        return
+        
     def get_body_pos(self):
         assert((4,) == self.state.shape)
         poses = self.physics.forward_kinematics(self.state)
@@ -88,9 +94,7 @@ class AcrobotSimulator(ChainSimulator):
         self.past_states = np.vstack([self.past_states,self.state])
         self.phase1_obj.set_data(self.past_states[:,0],self.past_states[:,2])
         self.phase2_obj.set_data(self.past_states[:,1],self.past_states[:,3])        
-        
-        return (self.anim_obj,self.phase1_obj,self.phase2_obj)
-        
+                
     def simulate(self,state,policy,iters):  
         self.state = state
         self.past_states = state[np.newaxis,:]
@@ -100,9 +104,15 @@ class AcrobotSimulator(ChainSimulator):
         axarr[0].set_xlim(-5,5)
         axarr[0].set_ylim(-5,5)
         axarr[0].set_title('Animation')
+        axarr[0].autoscale(False)
+        axarr[0].set_aspect('equal')
+        
         axarr[1].set_xlim(-5,5)
-        axarr[1].set_ylim(-5,5)        
+        axarr[1].set_ylim(-5,5)
+        axarr[1].autoscale(False)
+        axarr[1].set_aspect('equal')
         axarr[1].set_title('Phase Plot')
+        
         self.anim_obj, = axarr[0].plot([],[],'o-',lw=2)
         self.phase1_obj,self.phase2_obj = axarr[1].plot([],[],'b-',[],[],'r-',lw=2,alpha=0.25)
         anim = animation.FuncAnimation(figure, self.animate, iters, self.set_up, interval=2,repeat=False)

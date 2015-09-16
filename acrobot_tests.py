@@ -83,7 +83,7 @@ def mdp_test():
     # Simulate
     init_state = np.array([math.pi/4.0,0.0,0,0])
     physics.remap(init_state,action=0) # Pre-animation sanity
-    physics.forward_kinematics(init_state)
+    physics.forward_kinematics(init_state)    
     
     sim = AcrobotSimulator(physics)
     sim.simulate(init_state,policy,1000)

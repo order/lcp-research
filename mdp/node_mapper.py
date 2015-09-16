@@ -435,8 +435,7 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
         Cache is an N x D matrix, so lookup is just 
         """
         # Turn grids into meshes
-        meshes = np.meshgrid(*self.cut_points,indexing='ij')
-        
+        meshes = np.meshgrid(*self.cut_points,indexing='ij')        
         
         # Flatten each into a vector;
         self.node_states_cache = np.column_stack([mesh.ravel() for mesh in meshes]) 
@@ -457,8 +456,7 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
         for state_id in xrange(N):
             dist = NodeDist()
             # ...
-        raise NotImplementedError()
-            
+        raise NotImplementedError() # This is probably dumb           
             
         
     def states_to_transition_matrix(self,states,**kwargs):
@@ -474,8 +472,9 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
         Lows = np.array([low for (low,high,n) in self.grid_desc])
         Highs = np.array([high for (low,high,n) in self.grid_desc])
         
-        assert(np.all(states >= Lows))
-        assert(np.all(states <= Highs))
+        
+        assert(np.all(states[mask,:] >= Lows - 1e-12))
+        assert(np.all(states[mask,:] <= Highs + 1e-12))
         
         # This is least smallest grid coord in the dist            
         LeastGridCoords = np.empty((N,D)) # Lowest index
@@ -485,13 +484,11 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
             LeastGridCoords[mask,d] = np.floor((states[mask,d] - low) / self.cell_width[d] )
             LeastStateComp = LeastGridCoords[mask,d] * self.cell_width[d] + low
             assert(np.all(LeastGridCoords[mask,d] >=0 ))
-            assert(np.all(states[mask,d] >= LeastStateComp - 1e-12))
-            
+            assert(np.all(states[mask,d] >= LeastStateComp - 1e-12))            
             
             diff = (states[mask,d] - LeastStateComp) / self.cell_width[d]
             W[mask,d,0] = 1.0 - diff
-            W[mask,d,1] = diff
-            
+            W[mask,d,1] = diff            
             #Top
             top_mask = np.logical_and(states[mask,d] >= high-1e-12, states[mask,d] <= high + 1e-12)
             LeastGridCoords[top_mask,d] = n
@@ -499,7 +496,7 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
             W[top_mask,d,1] = 0.0
             
         M = self.get_num_nodes()
-        return build_interp_matrix_from_lgc_and_w(N,M,D,LeastGridCoords,W,self.cut_point_n)
+        return build_interp_matrix_from_lgc_and_w(N,M,D,LeastGridCoords,W,self.cut_point_n,mask)
         
     def states_to_node_dists(self,states,**kwargs):
         raise NotImplementedError()
@@ -517,29 +514,60 @@ def build_interp_matrix_from_node_dists(N,M,D,NodeDistDict):
     for (sid,nd)in NodeDistDict.items():
         for (nid,w) in nd.items():
             T[nid,sid] = w
-    return T.T.tolil()
+    return T
         
-def build_interp_matrix_from_lgc_and_w(N,M,D,LeastGridCoords,W,Lens):
+def build_interp_matrix_from_lgc_and_w(NumStates,NumNodes,NumDims,LeastGridCoords,Weights,Lens,mask):
     """
     Build an MxN transition matrix from LeastGridCoord matrix and Weight tensor
     """
-    assert((N,D) == LeastGridCoords.shape) # 
-    assert((N,D,2) == W.shape) # Weight tensor
+    assert((NumStates,NumDims) == LeastGridCoords.shape) # 
+    assert((NumStates,NumDims,2) == Weights.shape) # Weight tensor
+    assert((NumStates,) == mask.shape)
     
+    V = mask.sum()
+    valid_state_indices = np.arange(NumStates)[mask]
     
+    assert((V,) == valid_state_indices.shape)
+    Pow = 2**NumDims
     
-    T = scipy.sparse.coo_matrix((M,N))
-    cols = np.arange(N)
-    for delta in itertools.product([0,1],repeat=D):
-        w = np.ones(N)
-        for d in xrange(D):
-            w *= W[:,d,delta[d]]
-        GridCoords = LeastGridCoords + np.array(delta)
-        rows = coords_to_id(GridCoords,Lens)
-        mask = np.logical_and(np.all(GridCoords >= 0,axis=1),np.all(GridCoords < np.array(Lens),axis=1))
-        if np.any(mask):
-            T += scipy.sparse.coo_matrix((w[mask], (rows[mask],cols[mask])), shape=(M,N))
-    return T.tolil()
+    IJ = np.empty((2,0)) # Array indices
+    Data = np.empty(0) # Data at those locations
+    
+    for (batch,delta) in enumerate(itertools.product([0,1],repeat=NumDims)):
+        # Add the delta to the least grid coordinate
+        GridCoords = LeastGridCoords[mask,:] + np.array(delta)
+        assert((V,NumDims) == GridCoords.shape)
+        
+        # Get all the weights for these values
+        # TODO: minor optimization; don't calculate for out-of-bound grid coords
+        w = np.ones(V)
+        for d in xrange(NumDims):
+            w *= Weights[mask,d,delta[d]]
+        
+        # Some of these GridCoords will be out of the correct range
+        # Mask these out (oob_mask assumes we've already filtered with mask)
+        oob_mask = np.ones(V,dtype=bool)
+        for d in xrange(NumDims):
+            oob_mask[GridCoords[:,d] >= Lens[d]] = False
+        
+        # Convert the GridCoords to node ids
+        node_ids = coords_to_id(GridCoords[oob_mask,:],Lens)
+        assert((oob_mask.sum(),) == node_ids.shape)
+        assert(np.amax(node_ids) < NumNodes)
+        assert(np.amin(node_ids) >= 0)
+        
+        # Update the index and data structures
+        ij = np.array([node_ids,valid_state_indices[oob_mask]])        
+        IJ = np.hstack([IJ,ij])
+        Data = np.hstack([Data,w[oob_mask]])
+        
+        # Check sizes
+        assert(1 == len(Data.shape))
+        assert((2,Data.size) == IJ.shape)
+        
+    # Create a csr matrix from these elements
+    T = scipy.sparse.csr_matrix((Data,IJ),shape=(NumNodes,NumStates))
+    return T
         
 def grid_coef(Lens):
     """

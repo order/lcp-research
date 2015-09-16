@@ -1,17 +1,17 @@
-from mdp.node_mapper import *
-from mdp.state_remapper import *
-from mdp.discretizer import *
-from mdp.costs import *
 from mdp.double_integrator import *
-
-import random
-
-import matplotlib.pyplot as plt
-import time
-
+from mdp.costs import *
+from mdp.discretizer import *
+from mdp.node_mapper import *
+from mdp.policy import *
+from mdp.simulator import *
+from mdp.state_remapper import *
+from mdp.value_fun import *
 import lcp.solvers
 
+import random
 import numpy as np
+import matplotlib.pyplot as plt
+import time
 
 
 def map_back_test():
@@ -68,7 +68,7 @@ def plot_trajectory():
     plt.show()    
 
 def plot_value_function():
-    MaxIter = 150
+    MaxIter = 100
 
     vi = lcp.solvers.ValueIterator(mdp_obj)
     solver = lcp.solvers.IterativeSolver(vi)
@@ -77,20 +77,22 @@ def plot_value_function():
     solver.solve()
     print 'Done.'
     
-    fn_eval = mdp.InterpolatedGridValueFunctionEvaluator(discretizer,vi.v)
+    fn_eval = BasicValueFunctionEvaluator(discretizer,vi.v)
     
-    grid = 25
+    grid = 150
     [x_mesh,y_mesh] = np.meshgrid(np.linspace(-x_lim,x_lim,grid), np.linspace(-v_lim,v_lim,grid))
     Pts = np.array([x_mesh.flatten(),y_mesh.flatten()]).T
     
     vals = fn_eval.evaluate(Pts)
-    one_policy = mdp.OneStepLookaheadPolicy(cost_obj,physics,fn_eval,actions,discount)
+    one_policy = OneStepLookaheadPolicy(cost_obj,physics,fn_eval,actions,discount)
     K = 2
-    k_policy = mdp.KStepLookaheadPolicy(cost_obj,physics,fn_eval,actions,discount,K)
+    #k_policy = KStepLookaheadPolicy(cost_obj,physics,fn_eval,actions,discount,K)
 
-    OnePolicyImg = np.reshape(one_policy.get_decisions(Pts),x_mesh.shape)
-    KPolicyImg = np.reshape(k_policy.get_decisions(Pts),x_mesh.shape)
-    plt.imshow(KPolicyImg,interpolation = 'nearest')
+    #OnePolicyImg = np.reshape(one_policy.get_decisions(Pts),x_mesh.shape)
+    #KPolicyImg = np.reshape(k_policy.get_decisions(Pts),x_mesh.shape)
+    #plt.imshow(OnePolicyImg,interpolation = 'nearest')
+    ValueImg = np.reshape(vi.v[:basic_mapper.get_num_nodes()],(x_n+1,v_n+1)).T
+    plt.imshow(ValueImg,interpolation = 'nearest')
     plt.show()
     
 def plot_interior_point():
@@ -138,23 +140,23 @@ def build_discretizer():
     return discretizer
 
 x_lim = 1
-x_n = 25
+x_n = 50
 xid = 0
 
 v_lim = 3
-v_n = 25
+v_n = 50
 vid = 1
 
 a_lim = 1
-a_n = 7
+a_n = 3
 
 cost_coef = np.array([2,1])
 oob_cost = 15
 
-basic_mapper = InterpolatedGridNodeMapper(np.linspace(-x_lim,x_lim,x_n),np.linspace(-v_lim,v_lim,v_n))
-assert(basic_mapper.get_num_nodes() == x_n * v_n)
+basic_mapper = InterpolatedRegularGridNodeMapper((-x_lim,x_lim,x_n),(-v_lim,v_lim,v_n))
+assert(basic_mapper.get_num_nodes() == (x_n+1) * (v_n+1))
 physics = DoubleIntegratorRemapper()
-cost_obj = QuadraticCost(cost_coef,oob_cost)
+cost_obj = QuadraticCost(cost_coef,np.zeros(2),override=oob_cost)
 actions = np.linspace(-a_lim,a_lim,a_n)
 discount = 0.99
 
