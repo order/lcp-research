@@ -22,7 +22,7 @@ class Simulator(object):
         ax = figure.add_subplot(111, aspect='equal', autoscale_on=False, xlim=(-10, 10), ylim=(-10, 10))
         ax.grid()
         self.plot_obj, = ax.plot([],[],'o-',lw=2)
-        anim = animation.FuncAnimation(figure, self.animate, iters, self.set_up, interval=2)
+        anim = animation.FuncAnimation(figure, self.animate, iters, self.set_up, interval=2,repeat=False)
         plt.show()
         
 class ChainSimulator(Simulator):
@@ -48,8 +48,9 @@ class ChainSimulator(Simulator):
         self.plot_obj.set_data(X,Y)
         
         # Simulate forward one step
-        action = self.policy.get_decisions(self.state)
-        self.state = self.physics.remap(self.state,action=action).flatten()
+        actions = self.policy.get_decisions(self.state)
+        assert((1,) == actions.shape)
+        self.state = self.physics.remap(self.state,action=actions[0]).flatten()
         
         return self.plot_obj
 
@@ -66,7 +67,46 @@ class AcrobotSimulator(ChainSimulator):
         assert((4,) == self.state.shape)
         poses = self.physics.forward_kinematics(self.state)
         assert((3,2) == poses.shape)
-        return poses    
+        return poses  
+
+    def animate(self,frame_num):
+        # Sanity checking
+        assert(1 == len(self.state.shape)) # Vector
+        
+        # Get new positions
+        poses = self.get_body_pos()       
+        X = np.array([p[0] for p in poses])
+        Y = np.array([p[1] for p in poses])
+        self.anim_obj.set_data(X,Y)        
+        
+        # Simulate forward one step
+        actions = self.policy.get_decisions(self.state)
+        assert((1,) == actions.shape)
+        self.state = self.physics.remap(self.state,action=actions[0]).flatten()
+        
+        # Add new data
+        self.past_states = np.vstack([self.past_states,self.state])
+        self.phase1_obj.set_data(self.past_states[:,0],self.past_states[:,2])
+        self.phase2_obj.set_data(self.past_states[:,1],self.past_states[:,3])        
+        
+        return (self.anim_obj,self.phase1_obj,self.phase2_obj)
+        
+    def simulate(self,state,policy,iters):  
+        self.state = state
+        self.past_states = state[np.newaxis,:]
+        self.policy = policy
+        
+        figure, axarr = plt.subplots(2, sharey=True)
+        axarr[0].set_xlim(-5,5)
+        axarr[0].set_ylim(-5,5)
+        axarr[0].set_title('Animation')
+        axarr[1].set_xlim(-5,5)
+        axarr[1].set_ylim(-5,5)        
+        axarr[1].set_title('Phase Plot')
+        self.anim_obj, = axarr[0].plot([],[],'o-',lw=2)
+        self.phase1_obj,self.phase2_obj = axarr[1].plot([],[],'b-',[],[],'r-',lw=2,alpha=0.25)
+        anim = animation.FuncAnimation(figure, self.animate, iters, self.set_up, interval=2,repeat=False)
+        plt.show()
         
 class BicycleSimulator(ChainSimulator):
     """

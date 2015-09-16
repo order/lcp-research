@@ -304,6 +304,7 @@ class InterpolatedGridNodeMapper(BasicNodeMapper):
         """
         Flattens an n-tuple representing the grid coordinates to a node-id
         """
+        
         for (i,g_comp) in enumerate(gid):
             assert(0<=g_comp<len(self.grid_desc[i]))
         return self.node_id_cache[tuple(gid)]
@@ -443,7 +444,22 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
     def get_node_states(self):
         if not np.any(self.node_states_cache):
             self.__build_node_state_cache()
-        return self.node_states_cache        
+        return self.node_states_cache    
+        
+    def states_to_node_dists(self,states,**kwargs):
+        if 1 == len(states.shape):
+            states = states[np.newaxis,:]
+        (N,d) = states.shape
+        
+        T = self.states_to_transition_matrix(states,**kwargs)
+        
+        mapping = {}
+        for state_id in xrange(N):
+            dist = NodeDist()
+            # ...
+        raise NotImplementedError()
+            
+            
         
     def states_to_transition_matrix(self,states,**kwargs):
         """

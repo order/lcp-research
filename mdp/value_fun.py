@@ -10,11 +10,15 @@ class BasicValueFunctionEvaluator(ValueFunctionEvaluator):
         self.discretizer = discretizer
         
     def evaluate(self,states):
-        # Convert state into node dist
-        node_dists = self.discretizer.states_to_node_dists(states)        
+        if 1 == len(states.shape):
+            states = states[np.newaxis,:]
+            
+        M = len(self.node_to_cost)
+        (N,d) = states.shape
         
-        vals = np.zeros(states.shape[0])
-        for (state_id,nd) in node_dists.items():
-            for (node_id,w) in nd.items():
-                vals[state_id] += self.node_to_cost[node_id] * w                
+        # Convert state into node dist
+        T = self.discretizer.states_to_transition_matrix(states)
+        assert((M,N) == T.shape)
+        vals = T.T.dot(self.node_to_cost)
+        assert((N,) == vals.shape)
         return vals

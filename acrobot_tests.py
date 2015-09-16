@@ -13,22 +13,22 @@ from mdp.value_fun import *
 import lcp.solvers
 
 def simulate_test():
-    physics = AcrobotRemapper(l1=2)
-    init_state = np.array([[math.pi/4.0,0.0,0,0]])
+    physics = AcrobotRemapper()
+    init_state = np.array([math.pi/4.0,0.0,0,0])
 
     physics.remap(init_state,action=0)
     physics.forward_kinematics(init_state)
+    policy = ConstantPolicy(1)
 
-    dim = 2
-    sim = ChainSimulator(dim,physics)
-    sim.simulate(init_state,1000)
+    sim = AcrobotSimulator(physics)
+    sim.simulate(init_state,policy,10)
     
 def mdp_test():
-    theta_n = 10
+    theta_n = 25
     theta_desc = [0,2*math.pi,theta_n+1]
     theta_grid = np.linspace(*theta_desc)
     
-    dtheta_n = 10
+    dtheta_n = 25
     dtheta_lim = 10
     dtheta_desc = [-dtheta_lim,dtheta_lim,dtheta_n]
     dtheta_grid = np.linspace(*dtheta_desc)
@@ -66,11 +66,11 @@ def mdp_test():
     print 'Done.'
     
     # Solve
-    MaxIter = 100
+    MaxIter = 2500
     vi = lcp.solvers.ValueIterator(mdp_obj)
     solver = lcp.solvers.IterativeSolver(vi)
     solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(MaxIter))
-    solver.termination_conditions.append(lcp.util.ValueChangeTerminationCondition(1e-6))
+    solver.termination_conditions.append(lcp.util.ValueChangeTerminationCondition(1e-12))
     print 'Starting solve...'
     solver.solve()
     print 'Done.'
@@ -78,8 +78,7 @@ def mdp_test():
     # Build policy
     value_fun_eval = BasicValueFunctionEvaluator(discretizer,vi.get_value_vector())
     policy = OneStepLookaheadPolicy(cost_obj, physics, value_fun_eval, actions,discount)
-    
-
+    #policy = ConstantPolicy(1)
     
     # Simulate
     init_state = np.array([math.pi/4.0,0.0,0,0])

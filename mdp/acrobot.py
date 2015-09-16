@@ -26,6 +26,9 @@ class AcrobotRemapper(state_remapper.StateRemapper):
         self.g = 9.80665
         
     def get_acc(self,q,dq,u):
+        assert((2,) == q.shape)
+        assert((2,) == dq.shape)
+        
         l1 = self.l1
         l2 = self.l2
         lc1 = self.lc1
@@ -56,14 +59,15 @@ class AcrobotRemapper(state_remapper.StateRemapper):
         ddq_2 = (h_11 * (u - c_2 - g_2) + h_12*(c_1 + g_1)) / (h_11 * h_22 - h_12*h_21)
         ddq_1 = -(h_12*ddq_2 + c_1 + g_1) / h_11
         
-        return np.array([ddq_1,ddq_2])
+        ret = np.array([ddq_1,ddq_2])
+        assert((2,) == ret.shape)        
+        return ret
         
     def remap(self,points,**kwargs):
         """
         Physics step for the acrobot
         """
-        m = len(points.shape) # Remap vectors to row vectors
-        if 1 == m:
+        if 1 == len(points.shape):
             points = points[np.newaxis,:]            
         
         [N,d] = points.shape
@@ -71,6 +75,7 @@ class AcrobotRemapper(state_remapper.StateRemapper):
         
         assert('action' in kwargs)
         u = kwargs['action'] # Torque for the middle joint
+        assert(type(u) in [int,float,np.float,np.float64])
         
         new_points = np.empty((N,d))
         for state_id in xrange(N):
@@ -78,8 +83,11 @@ class AcrobotRemapper(state_remapper.StateRemapper):
             dq = points[state_id,2:].flatten() # Angular velocities
         
             ddq = self.get_acc(q,dq,u)
+            assert((2,) == ddq.shape)
             dq += self.step*ddq
+            assert((2,) == dq.shape)
             q += self.step*dq
+            assert((2,) == q.shape)
             new_points[state_id,:2] = q
             new_points[state_id,2:] = dq
             
