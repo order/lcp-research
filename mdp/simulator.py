@@ -56,6 +56,53 @@ class ChainSimulator(Simulator):
         self.plot_obj, = ax.plot([],[],'o-',lw=2)
         anim = animation.FuncAnimation(figure, self.animate, iters, self.set_up, interval=2,repeat=False)
         plt.show()
+        
+class DoubleIntegratorSimulator(Simulator):
+    def __init__(self,discretizer):
+        self.discretizer = discretizer
+        self.physics = discretizer.physics
+
+    def set_up(self):
+        return        
+
+    def animate(self,frame_num):
+        # Simulate forward one step
+        actions = self.policy.get_decisions(self.state)
+        assert((1,) == actions.shape)
+        self.state = self.physics.remap(self.state,action=actions[0])
+        
+        # Add new data
+        self.past_states = np.vstack([self.past_states,self.state])
+        self.anim_obj.set_data(self.past_states[:,0],self.past_states[:,1])
+        if actions[0] < 0:
+            self.anim_obj.set_color('r')
+        elif actions[0] > 0:
+            self.anim_obj.set_color('b')
+        else:
+            self.anim_obj.set_color('g')
+                
+    def simulate(self,state,policy,iters): 
+        if 1 == len(state.shape):
+            state = state[np.newaxis,:]
+        assert((1,2) == state.shape)
+            
+        self.state = state
+        self.past_states = state
+        self.policy = policy
+        
+        figure = plt.figure()
+        ax = figure.add_subplot(111, aspect='equal', autoscale_on=False, xlim=(-10, 10), ylim=(-10, 10))
+        ax.set_title('Double Integrator Animation')
+        # Boundary
+        [(x_lo,x_hi),(v_lo,v_hi)] = self.discretizer.get_basic_boundary()
+        ax.plot([x_lo, x_hi, x_hi, x_lo,x_lo],[v_lo,v_lo,v_hi,v_hi,v_lo],'--k')
+        
+        # Animation line
+        self.anim_obj, = ax.plot([x_lo, x_hi, x_hi, x_lo],[v_lo,v_lo,v_hi,v_hi],'-b',lw=2)
+        
+        # Fire off
+        anim = animation.FuncAnimation(figure, self.animate, iters, self.set_up, interval=2,repeat=False)
+        plt.show()
 
 class AcrobotSimulator(Simulator):
     """
@@ -77,7 +124,7 @@ class AcrobotSimulator(Simulator):
 
     def animate(self,frame_num):
         # Sanity checking
-        assert(1 == len(self.state.shape)) # Vector
+        assert((1,4) == self.state.shape)
         
         # Get new positions
         poses = self.get_body_pos()       
@@ -88,7 +135,7 @@ class AcrobotSimulator(Simulator):
         # Simulate forward one step
         actions = self.policy.get_decisions(self.state)
         assert((1,) == actions.shape)
-        self.state = self.physics.remap(self.state,action=actions[0]).flatten()
+        self.state = self.physics.remap(self.state,action=actions[0])
         
         # Add new data
         self.past_states = np.vstack([self.past_states,self.state])
@@ -96,8 +143,11 @@ class AcrobotSimulator(Simulator):
         self.phase2_obj.set_data(self.past_states[:,1],self.past_states[:,3])        
                 
     def simulate(self,state,policy,iters):  
+        if 1 == len(state.shape):
+            state = state[np.newaxis,:]
+        assert((1,4) == state.shape)
         self.state = state
-        self.past_states = state[np.newaxis,:]
+        self.past_states = state
         self.policy = policy
         
         figure, axarr = plt.subplots(2, sharey=True)

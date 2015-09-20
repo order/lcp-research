@@ -21,7 +21,12 @@ class MDPDiscretizer(object):
         Construct the MDP
         """
         raise NotImplementedError()
+        
+    def get_basic_boundary(self):
+        raise NotImplementedError()
 
+    def get_basic_len(self):
+        raise NotImplementedError()
 
 class ContinuousMDPDiscretizer(MDPDiscretizer):
     """
@@ -39,7 +44,14 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         
         self.cost_obj = cost_obj
         
-        self.actions = actions   
+        self.actions = actions
+
+    def get_basic_boundary(self):
+        return self.basic_mapper.get_boundary()
+        
+    def get_basic_len(self):
+        return self.basic_mapper.get_len()
+
 
     def __str__(self):
         S = []
@@ -131,28 +143,31 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
             node_mapping.update(partial_mapping)
             dealt_with |= set(partial_mapping.keys())
             
-        # Then the using the basic remapper
-        T = self.basic_mapper.states_to_transition_matrix(states,ignore=dealt_with)
-        num_basic_nodes = self.basic_mapper.get_num_nodes()
+        # Then use the basic remapper
         total_nodes = self.get_num_nodes()
-        assert((num_basic_nodes,N) == T.shape)
+        num_basic_nodes = self.basic_mapper.get_num_nodes()
         assert(total_nodes >= num_basic_nodes)
         
-        # Add zero block to T for sink nodes
-        if total_nodes > num_basic_nodes:
-            T = sps.vstack([T,sps.csr_matrix((total_nodes - num_basic_nodes,N))])
-        assert((total_nodes,N) == T.shape)
+        T = self.basic_mapper.states_to_transition_matrix(states,shape=(total_nodes,N),ignore=dealt_with)
+        assert((total_nodes,N) == T.shape)        
+        T = T.tocsr()
         
-        A = sps.lil_matrix((total_nodes,N))
+        IJ = []
+        Data = []
         if node_mapping:
-            for (state_id,nd) in node_mapping.items():
-                # Make sure we didn't write anything to this column
-                assert(0 == T[:,state_id].nonzero()[0].size)
-                
+            I = 0
+            for (state_id,nd) in node_mapping.items():                
                 # Write the 
                 for (node_id,w) in nd.items():
-                    A[node_id,state_id] = w        
-        return T + A
+                    IJ.append([node_id,state_id])
+                    Data.append(w)
+            Data = np.array(Data)
+            IJ = np.array(IJ).T
+            E = Data.size
+            assert((E,) == Data.shape)
+            assert((2,E) == IJ.shape)
+            T = T + sps.csr_matrix((Data,IJ),shape=(total_nodes,N))
+        return T
         
     def add_state_remapper(self,remapper):
         self.exception_state_remappers.append(remapper)
@@ -197,7 +212,9 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         
         # Get the node states, and then use physics to remap them
         node_states = self.basic_mapper.get_node_states()
+        assert(2 == len(node_states.shape))
         next_states = self.physics.remap(node_states,action=action)
+        assert(node_states.shape == next_states.shape)
         
         # Then get the node mappings for all next states
         T = self.states_to_transition_matrix(next_states)

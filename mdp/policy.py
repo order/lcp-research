@@ -26,16 +26,16 @@ class OneStepLookaheadPolicy(Policy):
     """
     Basic policy based on looking at the value for the next state for each action
     """
-    def __init__(self, cost_obj, state_remapper, value_fun_eval, actions,discount):
-        self.state_remapper = state_remapper
+    def __init__(self, discretizer, value_fun_eval,discount):
+    
+        self.state_remapper = discretizer.physics
         self.value_fun_eval = value_fun_eval
-        self.cost_obj = cost_obj
-        self.actions = actions
+        self.cost_obj = discretizer.cost_obj
+        self.actions = discretizer.actions
         self.discount = discount
         
     def get_decisions(self,states):
-        m = len(states.shape) # Remap vectors to row vectors
-        if 1 == m:
+        if 1 == len(states.shape):
             states = states[np.newaxis,:] 
             
         (N,d) = states.shape
@@ -64,14 +64,14 @@ class KStepLookaheadPolicy(Policy):
     """
     Basic policy based on looking at the value for the next state for each action
     """
-    def __init__(self, cost_obj, state_remapper, value_fun_eval, actions, discount, k):
-        self.state_remapper = state_remapper
+    def __init__(self, discretizer, value_fun_eval, discount, k):
+        self.state_remapper = discretizer.physics
         self.value_fun_eval = value_fun_eval
-        self.cost_obj = cost_obj
-        self.actions = actions
+        self.cost_obj = discretizer.cost_obj
+        self.actions = discretizer.actions
+        self.discount = discount
         self.k = k
         assert(type(k) == int)
-        self.discount = discount
 
         
     def __get_vals(self,states,k):

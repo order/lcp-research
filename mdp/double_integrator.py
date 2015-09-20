@@ -10,6 +10,9 @@ class DoubleIntegratorRemapper(state_remapper.StateRemapper):
         Physics step for a double integrator:
         dx = Ax + Bu = [0 1; 0 0] [x;v] + [0; 1] u
         """
+        if 1 == len(points.shape):
+            points = points[np.newaxis,:]
+            
         [N,d] = points.shape
         assert(d == 2)
         
@@ -18,4 +21,10 @@ class DoubleIntegratorRemapper(state_remapper.StateRemapper):
         
         x_next = points[:,0] + self.step * points[:,1]
         v_next = points[:,1] + self.step * u
-        return np.array((x_next,v_next)).T
+        assert((N,) == x_next.shape)
+        assert((N,) == v_next.shape)
+        
+        ret = np.column_stack([x_next,v_next])        
+        assert((N,d) == ret.shape)
+        
+        return ret

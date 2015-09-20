@@ -22,6 +22,11 @@ def map_back_test():
     
     np.set_printoptions(precision=3)
     
+    disc = generate_discretizer((-2,2,4),(-3,3,5),(0,1,2))
+    basic_mapper = disc.basic_mapper
+    
+    mdp_obj = disc.build_mdp()
+    
     n = basic_mapper.get_num_nodes()
     N = mdp_obj.costs[0].shape[0]
     for _ in xrange(125):
@@ -33,138 +38,173 @@ def map_back_test():
             print 'Node dist',back_again
             print '{0} != {1}'.format(node,back_again.keys()[0])
             assert(back_again.keys()[0] == node)
-
-def plot_trajectory():
-    np.set_printoptions(precision=3)
-    
-    n = basic_mapper.get_num_nodes()
-    N = mdp_obj.costs[0].shape[0]
-
-    nodes = [random.randint(0,n-1)]
-    sink_nodes = [left_oob_mapper.sink_node, right_oob_mapper.sink_node]
-    
-    action_index = 0
-    action = actions[action_index]
-    for _ in xrange(5):
-        new_nodes = set()
-        for node in nodes:
-            state = basic_mapper.nodes_to_states([node])
-            elem = np.zeros((N,1))
-            elem[node] = 1.0
-            next_state_physics = physics.remap(state,action=action)
-            node_dist = basic_mapper.states_to_node_dists(next_state_physics)
-            print 'State {0} remaps to {1} via physics'.format(state.flatten(),next_state_physics.flatten())
-            print 'Maps to:',node_dist[0]
             
-            next_nodes = mdp_obj.transitions[action_index].dot(elem)
-            for (j,val) in enumerate(next_nodes):
-                if val > 0.05 and j not in sink_nodes:
-                    next_state = basic_mapper.nodes_to_states([j])
-                    print 'Drawing edge from {0}->{1} ({2}->{3}) '\
-                        .format(node,j,state.flatten(),next_state.flatten())
-                    plt.plot([state[0,0],next_state[0,0]],[state[0,1],next_state[0,1]],'.-')
-                    new_nodes.add(j)
-        nodes = new_nodes
-    plt.show()    
+def plot_remap(discretizer,action,sink_states):
+    states = discretizer.basic_mapper.get_node_states()
+    next_states = discretizer.physics.remap(states,action=action)
 
-def plot_value_function():
-    MaxIter = 100
+    N = states.shape[0]
+    for i in xrange(N):
+        plt.plot([states[i,0],next_states[i,0]],[states[i,1],next_states[i,1]],'-b',lw=2)
+    
+    T = discretizer.states_to_transition_matrix(next_states)
+    (Nodes,States) = T.nonzero()
+    M = Nodes.size
+    for i in xrange(M):
+        node_id = Nodes[i]
+        state_id = States[i]
+        
+        if node_id < N:
+            x = states[node_id,0]
+            y = states[node_id,1]
+        else:
+            x = sink_states[node_id - N,0]
+            y = sink_states[node_id - N,1]    
+        
+        plt.plot([x,next_states[state_id,0]],[y,next_states[state_id,1]],'-r',alpha=T[node_id,state_id])
+    plt.show()
+    
+def plot_costs(discretizer,action):
+    (x_n,v_n) = discretizer.get_basic_len()
+  
+    states = discretizer.basic_mapper.get_node_states()
+    costs = discretizer.cost_obj.cost(states,action)
+    CostImg = np.reshape(costs,(x_n,v_n))
+    plt.imshow(CostImg,interpolation = 'nearest')
+    plt.title('Cost function')
 
-    vi = lcp.solvers.ValueIterator(mdp_obj)
-    solver = lcp.solvers.IterativeSolver(vi)
-    solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(MaxIter))
-    print 'Starting solve...'
-    solver.solve()
-    print 'Done.'
-    
-    fn_eval = BasicValueFunctionEvaluator(discretizer,vi.v)
-    
-    grid = 150
-    [x_mesh,y_mesh] = np.meshgrid(np.linspace(-x_lim,x_lim,grid), np.linspace(-v_lim,v_lim,grid))
-    Pts = np.array([x_mesh.flatten(),y_mesh.flatten()]).T
-    
-    vals = fn_eval.evaluate(Pts)
-    one_policy = OneStepLookaheadPolicy(cost_obj,physics,fn_eval,actions,discount)
-    K = 2
-    #k_policy = KStepLookaheadPolicy(cost_obj,physics,fn_eval,actions,discount,K)
+    plt.show()       
 
-    #OnePolicyImg = np.reshape(one_policy.get_decisions(Pts),x_mesh.shape)
-    #KPolicyImg = np.reshape(k_policy.get_decisions(Pts),x_mesh.shape)
-    #plt.imshow(OnePolicyImg,interpolation = 'nearest')
-    ValueImg = np.reshape(vi.v[:basic_mapper.get_num_nodes()],(x_n+1,v_n+1)).T
+def plot_trajectory(discretizer,policy):
+    boundary = discretizer.get_basic_boundary()
+    (x_lo,x_hi) = boundary[0]
+    (v_lo,v_hi) = boundary[1]
+
+    shade = 0.5
+    x_rand = shade*random.uniform(x_lo,x_hi)
+    v_rand = shade*random.uniform(v_lo,v_hi)
+    init_state = np.array([[x_rand,v_rand]])
+    assert((1,2) == init_state.shape)
+    
+    # Basic sanity
+    discretizer.physics.remap(init_state,action=0) # Pre-animation sanity
+    
+    sim = DoubleIntegratorSimulator(discretizer)
+    sim.simulate(init_state,policy,1000)    
+    
+    
+def plot_value_function(discretizer,value_fun_eval,**kwargs):
+    boundary = discretizer.get_basic_boundary()    
+    (x_lo,x_hi) = boundary[0]
+    (v_lo,v_hi) = boundary[1]
+    
+    grid = kwargs.get('grid_size',101)
+    [x_mesh,y_mesh] = np.meshgrid(np.linspace(x_lo,x_hi,grid), np.linspace(v_lo,v_hi,grid),indexing='ij')
+    Pts = np.column_stack([x_mesh.flatten(),y_mesh.flatten()])
+    
+    vals = value_fun_eval.evaluate(Pts)
+    ValueImg = np.reshape(vals,(grid,grid))
+
     plt.imshow(ValueImg,interpolation = 'nearest')
-    plt.show()
-    
-def plot_interior_point():
-    MaxIter = 50
-    lcp_obj = mdp_obj.tolcp()
-    print 'Built...', lcp_obj
+    plt.title('Cost-to-go function')
 
-    kip = lcp.solvers.KojimaIterator(lcp_obj)
-    solver = lcp.solvers.IterativeSolver(kip)
-
-    solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(MaxIter))
-    print 'Starting solve...'
-    solver.solve()
-    print 'Done.'
-    v = kip.get_primal_vector()[:basic_mapper.get_num_nodes()]
-    Img = np.reshape(v[:basic_mapper.get_num_nodes()],(x_n,v_n)).T
-    plt.imshow(Img,interpolation = 'nearest')
-    plt.show()
+    plt.show()   
     
-def plot_projected_interior_point():
-    kip = lcp.solvers.KojimaIterator(lcp_obj)
-    solver = lcp.solvers.IterativeSolver(kip)
-
-    solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(MaxIter))
-    print 'Starting solve...'
-    solver.solve()
-    print 'Done.'
+def plot_policy(discretizer,policy,**kwargs):
+    boundary = discretizer.get_basic_boundary()
+    (x_lo,x_hi) = boundary[0]
+    (v_lo,v_hi) = boundary[1]
     
-    v = kip.get_primal_vector()[:basic_mapper.get_num_nodes()]
-    Img = np.reshape(v[:basic_mapper.get_num_nodes()],(x_n,v_n)).T
-    plt.imshow(Img,interpolation = 'nearest')
+    grid = kwargs.get('grid_size',101)
+    [x_mesh,y_mesh] = np.meshgrid(np.linspace(x_lo,x_hi,grid), np.linspace(v_lo,v_hi,grid),indexing='ij')
+    Pts = np.column_stack([x_mesh.flatten(),y_mesh.flatten()])
+    
+    
+    PolicyImg = np.reshape(policy.get_decisions(Pts),(grid,grid))
+
+    plt.imshow(PolicyImg,interpolation = 'nearest')
+    plt.title('Policy map')
+
+    plt.show()   
+    
+def plot_advantage(discretizer,value_fun_eval,action1,action2):
+    (x_n,v_n) = discretizer.get_basic_len()
+
+    states = discretizer.basic_mapper.get_node_states()
+    next_states1 = discretizer.physics.remap(states,action=action1)
+    next_states2 = discretizer.physics.remap(states,action=action2)
+
+    adv = value_fun_eval.evaluate(next_states1) - value_fun_eval.evaluate(next_states2)
+    AdvImg = np.reshape(adv, (x_n,v_n))
+    plt.imshow(AdvImg,interpolation = 'nearest')
+    plt.title('Advantage function')
     plt.show() 
     
     
-def build_discretizer():
-    left_oob_mapper = OOBSinkNodeMapper(xid,-float('inf'),-x_lim,basic_mapper.num_nodes)
-    right_oob_mapper = OOBSinkNodeMapper(xid,x_lim,float('inf'),basic_mapper.num_nodes+1)
-    state_remapper = RangeThreshStateRemapper(vid,-v_lim,v_lim)
+def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
+    xid,vid = 0,1 
+
+    cost_coef = kwargs.get('cost_coef',np.ones(2))
+    set_point = kwargs.get('set_point',np.zeros(2))
+    oob_cost = kwargs.get('oob_costs',25.0)
+    discount = kwargs.get('discount',0.99)
+    assert(0 < discount < 1)
+
+    basic_mapper = InterpolatedRegularGridNodeMapper(x_desc,v_desc)
+    physics = DoubleIntegratorRemapper()
+    cost_obj = QuadraticCost(cost_coef,set_point,override=oob_cost)
+    #cost_obj = BallCost(np.array([0,0]),0.25,0.0,1.0)
+    actions = np.linspace(*action_desc)
+
+    (x_lo,x_hi,x_n) = x_desc
+    (v_lo,v_hi,v_n) = v_desc
+    
+    left_oob_mapper = OOBSinkNodeMapper(xid,-float('inf'),x_lo,basic_mapper.num_nodes)
+    right_oob_mapper = OOBSinkNodeMapper(xid,x_hi,float('inf'),basic_mapper.num_nodes+1)
+    state_remapper = RangeThreshStateRemapper(vid,v_lo,v_hi)
 
     discretizer = ContinuousMDPDiscretizer(physics,basic_mapper,cost_obj,actions)
     discretizer.add_state_remapper(state_remapper)
     discretizer.add_node_mapper(left_oob_mapper)
     discretizer.add_node_mapper(right_oob_mapper)
     
+    mdp_obj = discretizer.build_mdp(discount=discount)
+
     return discretizer
+    
+def generate_value_function(discretizer,**kwargs):
 
-x_lim = 1
-x_n = 50
-xid = 0
+    discount = kwargs.get('discount',0.99)
+    max_iter = kwargs.get('max_iter',500)
+    thresh = kwargs.get('thresh',1e-12)
+    
+    mdp_obj = discretizer.build_mdp(discount=discount)
 
-v_lim = 3
-v_n = 50
-vid = 1
+    vi = lcp.solvers.ValueIterator(mdp_obj)
+    solver = lcp.solvers.IterativeSolver(vi)
+    solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(max_iter))
+    solver.termination_conditions.append(lcp.util.ValueChangeTerminationCondition(thresh))
 
-a_lim = 1
-a_n = 3
+    print 'Starting ValueIterator solve...'
+    solver.solve()
+    print 'Done.'
+    
+    value_fun_eval = BasicValueFunctionEvaluator(discretizer,vi.get_value_vector())
+    
+    return value_fun_eval
 
-cost_coef = np.array([2,1])
-oob_cost = 15
+if __name__ == '__main__':
+    map_back_test() # Sanity test
 
-basic_mapper = InterpolatedRegularGridNodeMapper((-x_lim,x_lim,x_n),(-v_lim,v_lim,v_n))
-assert(basic_mapper.get_num_nodes() == (x_n+1) * (v_n+1))
-physics = DoubleIntegratorRemapper()
-cost_obj = QuadraticCost(cost_coef,np.zeros(2),override=oob_cost)
-actions = np.linspace(-a_lim,a_lim,a_n)
-discount = 0.99
+    discount = 1.0-1e-4
+    discretizer = generate_discretizer((-5,5,100),(-6,6,100),(-1,1,3),cost_coef=np.array([1,0.5]))
+    #plot_remap(discretizer,-1,np.array([[-6,-3],[6,3]]))
 
-discretizer = build_discretizer()
-
-mdp_obj = discretizer.build_mdp(discount=discount)
-print 'Built...', mdp_obj
-
-#plot_interior_point()
-#plot_trajectory()
-plot_value_function()
+    value_fun_eval = generate_value_function(discretizer,discount=discount)
+    #plot_costs(discretizer,-1)
+    #plot_value_function(discretizer,value_fun_eval)
+    #plot_advantage(discretizer,value_fun_eval,-1,1)
+    K = 3
+    policy = KStepLookaheadPolicy(discretizer, value_fun_eval, discount,K)
+    plot_policy(discretizer,policy)
+    plot_trajectory(discretizer,policy)

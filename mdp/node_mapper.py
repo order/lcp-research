@@ -4,6 +4,8 @@ import itertools
 import operator
 import bisect
 
+from collections import defaultdict
+
 class NodeMapper(object):
     """
     Abstract class defining state-to-node mappings. 
@@ -14,6 +16,7 @@ class NodeMapper(object):
         Checks if a node mapper is responsible for mapping state
         """
         raise NotImplementedError()
+        
     def states_to_node_dists(self,states,**kwargs):
         """
         Takes an arbitrary Nxd ndarray and maps it to
@@ -62,6 +65,18 @@ class BasicNodeMapper(NodeMapper):
         Hopefully will be more efficient than building lists of NodeDists
         """
         raise NotImplementedError()
+        
+    def get_boundary(self):
+        """
+        Returns a description of the boundary NodeMapper is responsible for.
+        
+        Currently assumes its a box, and returns a list of [(low,high),...] tuples
+        """
+        raise NotImplementedError()
+        
+    def get_lens(self):
+        raise NotImplementedError()
+
      
 class NodeDist(object):
     """
@@ -177,7 +192,16 @@ class PiecewiseConstRegularGridNodeMapper(BasicNodeMapper):
         assert(len(vargs) >= 1)
         self.grid_desc = vargs
         self.grid_n = np.array([x[2] for x in vargs])        
-        self.num_nodes = np.prod(self.grid_n)    
+        self.num_nodes = np.prod(self.grid_n) 
+
+    def get_len(self):
+        return self.grid_n
+        
+    def get_boundary(self):
+        lows = [x[0] for x in self.grid_desc]
+        highs = [x[1] for x in self.grid_desc]
+        
+        return zip(lows,highs)
         
     def states_to_node_dists(self,states,**kwargs):
         """
@@ -287,13 +311,23 @@ class InterpolatedGridNodeMapper(BasicNodeMapper):
         """
         assert(len(vargs) >= 1)
         self.grid_desc = vargs # Grid descriptions
-        self.num_nodes = np.prod(map(len,self.grid_desc))
+        self.grid_n = map(len,self.grid_desc)
+        self.num_nodes = np.prod(self.grid_n)
         
         self.node_states_cache = None
         self.node_id_cache = None
         
         self.__build_node_id_cache() # Cache mapping grid coords to node ids
         self.__build_node_state_cache() # Caches the states associated with each node
+
+    def get_len(self):
+        return self.grid_n
+        
+    def get_boundary(self):
+        lows = [x[0] for x in self.grid_desc]
+        highs = [x[1] for x in self.grid_desc]
+        
+        return zip(lows,highs)
         
     def __str__(self):
         S = ['InterpolatedGridNodeMapper']
@@ -428,6 +462,15 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
         self.num_nodes = np.prod(self.cut_point_n)
         self.node_states_cache = np.empty(0)
         
+    def get_len(self):
+        return self.cut_point_n
+        
+    def get_boundary(self):
+        lows = [x[0] for x in self.grid_desc]
+        highs = [x[1] for x in self.grid_desc]
+        
+        return zip(lows,highs)
+        
     def __build_node_state_cache(self):
         """
         Builds a cache of the states associated with each node.
@@ -446,25 +489,30 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
         return self.node_states_cache    
         
     def states_to_node_dists(self,states,**kwargs):
-        if 1 == len(states.shape):
-            states = states[np.newaxis,:]
-        (N,d) = states.shape
-        
+        N = states.shape[0]
         T = self.states_to_transition_matrix(states,**kwargs)
+        (Rows,Columns) = T.nonzero()
+        assert(N == Rows.size)
+        assert(Rows.shape == Columns.shape)
         
-        mapping = {}
-        for state_id in xrange(N):
-            dist = NodeDist()
-            # ...
-        raise NotImplementedError() # This is probably dumb           
-            
+        Mapping = defaultdict(NodeDist)
+        for i in xrange(N):
+            state_id = Columns[i]
+            node_id = Rows[i]
+            Mapping[state_id].add(node_id,T[node_id,state_id])
+        return Mapping            
         
     def states_to_transition_matrix(self,states,**kwargs):
         """
         The assumption here is that either a state is in 'ignored' or it's in bounds.
         """
-        ignore = kwargs.get('ignore',set())
         (N,D) = states.shape
+        M = self.get_num_nodes()
+        Shape = kwargs.get('shape',(M,N)) # Necessary
+        ignore = kwargs.get('ignore',set())
+        assert(Shape[1] == N) # Number of states
+        assert(Shape[0] >= M)
+        
         mask = np.ones(N,dtype=bool)
         for sid in ignore:
             mask[sid] = 0
@@ -496,33 +544,32 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
             W[top_mask,d,1] = 0.0
             
         M = self.get_num_nodes()
-        return build_interp_matrix_from_lgc_and_w(N,M,D,LeastGridCoords,W,self.cut_point_n,mask)
-        
-    def states_to_node_dists(self,states,**kwargs):
-        raise NotImplementedError()
+        return build_interp_matrix_from_lgc_and_w(N,M,D,LeastGridCoords,W,self.cut_point_n,mask,Shape)
         
 #########################################
 # Some helper routines for node mapping #
 #########################################        
         
-def build_interp_matrix_from_node_dists(N,M,D,NodeDistDict):
+def build_interp_matrix_from_node_dists(NumStates,NumNodes,NumDims,NodeDistDict,Shape):
     """
     Takes a dict of NodeDists and converts 
     """
     assert(N == len(NodeDistDict))
-    T = scipy.sparse.lil_matrix((M,N))
+    assert(Shape[0] >= NumNodes and Shape[1] == NumStates)
+    T = scipy.sparse.lil_matrix(Shape)
     for (sid,nd)in NodeDistDict.items():
         for (nid,w) in nd.items():
             T[nid,sid] = w
-    return T
+    return T.tocsr()
         
-def build_interp_matrix_from_lgc_and_w(NumStates,NumNodes,NumDims,LeastGridCoords,Weights,Lens,mask):
+def build_interp_matrix_from_lgc_and_w(NumStates,NumNodes,NumDims,LeastGridCoords,Weights,Lens,mask,Shape):
     """
     Build an MxN transition matrix from LeastGridCoord matrix and Weight tensor
     """
     assert((NumStates,NumDims) == LeastGridCoords.shape) # 
     assert((NumStates,NumDims,2) == Weights.shape) # Weight tensor
     assert((NumStates,) == mask.shape)
+    assert(Shape[0] >= NumNodes and Shape[1] == NumStates)
     
     V = mask.sum()
     valid_state_indices = np.arange(NumStates)[mask]
@@ -549,6 +596,9 @@ def build_interp_matrix_from_lgc_and_w(NumStates,NumNodes,NumDims,LeastGridCoord
         oob_mask = np.ones(V,dtype=bool)
         for d in xrange(NumDims):
             oob_mask[GridCoords[:,d] >= Lens[d]] = False
+            
+        if 0 == oob_mask.sum():
+            continue
         
         # Convert the GridCoords to node ids
         node_ids = coords_to_id(GridCoords[oob_mask,:],Lens)
@@ -566,7 +616,7 @@ def build_interp_matrix_from_lgc_and_w(NumStates,NumNodes,NumDims,LeastGridCoord
         assert((2,Data.size) == IJ.shape)
         
     # Create a csr matrix from these elements
-    T = scipy.sparse.csr_matrix((Data,IJ),shape=(NumNodes,NumStates))
+    T = scipy.sparse.csr_matrix((Data,IJ),shape=Shape)
     return T
         
 def grid_coef(Lens):
