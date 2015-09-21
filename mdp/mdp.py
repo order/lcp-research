@@ -1,36 +1,70 @@
 import numpy as np
 import scipy
+import scipy.sparse as sps
 import matplotlib.pyplot as plt
 import lcp
+import scipy
+import pickles
 
 class MDP(object):
     """
     MDP object
     """
-    def __init__(self,transitions,costs,actions,**kwargs):
-        self.discount = kwargs.get('discount',0.99)
+    def __init__(self,*vargs,**kwargs):
+        if (1 == len(vargs)):
+            # Load from file
+            filename = vargs[0]
+            loader = scipy.load(filename)
+            transitions = pickles.pickle_array_to_multi_matrix(loader['transitions'])
+            long_costs = loader['costs']
+            actions = loader['actions']
+            
+            # Split up the costs from one long array to A small ones
+            N = transitions[0].shape[0]
+            A = len(actions)
+            assert(long_costs.size == N*A)
+            costs = [long_costs[(N*i):(N*(i+1))] for i in xrange(A)]
+            
+            self.name = kwargs.get('name',loader['name'])
+            self.discount = kwargs.get('discount',loader['discount'])
+            
+        elif (3 == len(vargs)):
+            # Get directly from command line
+            (transitions,costs,actions) = vargs
+            self.discount = kwargs.get('discount',0.99)
+            self.name = kwargs.get('name','Unnamed')
+        else:
+            assert(len(vargs) in [1,3])            
+            
         self.transitions = transitions
-        A = len(actions)
-        N = costs[0].shape[0]
-        self.actions = actions
-        self.name = kwargs.get('name','Unnamed')
-        self.num_actions = A
-        self.num_states = N
-        
         self.costs = costs
+        self.actions = actions
+        
+        A = len(actions)
+        N = costs[0].size
+        self.num_actions = A
+        self.num_states = N        
 
         assert(len(transitions) == A)
         assert(len(costs) == A)
         
         # Ensure sizes are consistent
         for i in xrange(A):
-            assert(costs[i].size == N)
+            assert((N,) == costs[i].shape)
             assert(not np.any(np.isnan(costs[i])))
             
-            assert(transitions[i].shape[0] == N)
-            assert(transitions[i].shape[1] == N)
-            assert(abs(transitions[i].sum() - N) <= 1e-6)
+            assert((N,N) == transitions[i].shape)
+            assert(abs(transitions[i].sum() - N) <= 1e-12)
             
+    def write(self,filename):
+        transition_array = pickles.multi_matrix_to_pickle_array(self.transitions)
+        long_costs = np.concatenate(self.costs)
+        scipy.savez(filename,\
+            transitions=transition_array,\
+            costs=long_costs,\
+            actions=self.actions,\
+            name=self.name,\
+            discount=self.discount)
         
     def get_action_matrix(self,a):
         """
@@ -46,7 +80,7 @@ class MDP(object):
         N = (A + 1) * n
         d = self.discount
 
-        Top = scipy.sparse.coo_matrix((n,n))
+        Top = sps.coo_matrix((n,n))
         Bottom = None
         q = np.zeros(N)
         q[0:n] = -np.ones(n)
@@ -54,15 +88,15 @@ class MDP(object):
             E = self.get_action_matrix(a)
             
             # NewRow = [-E_a 0 ... 0]
-            NewRow = scipy.sparse.hstack((-E,scipy.sparse.coo_matrix((n,A*n))))
+            NewRow = sps.hstack((-E,sps.coo_matrix((n,A*n))))
             if Bottom == None:
                 Bottom = NewRow
             else:
-                Bottom = scipy.sparse.vstack((Bottom,NewRow))
+                Bottom = sps.vstack((Bottom,NewRow))
             # Top = [...E_a^\top]
-            Top = scipy.sparse.hstack((Top,E.T))
+            Top = sps.hstack((Top,E.T))
             q[((a+1)*n):((a+2)*n)] = self.costs[a]
-        M = scipy.sparse.vstack((Top,Bottom))
+        M = sps.vstack((Top,Bottom))
         return lcp.LCPObj(M,q,name='LCP from {0} MDP'.format(self.name))
 
     def __str__(self):
@@ -100,7 +134,7 @@ class MDPValueIterSplitter(object):
         P_list = []
         # Build the B matrix
         for i in xrange(self.num_actions):
-            I_list.append(scipy.sparse.eye(self.num_states))
+            I_list.append(sps.eye(self.num_states))
         self.B = mdp_skew_assembler(I_list)
         self.C = self.LCP.M - self.B
 
@@ -112,7 +146,7 @@ def mdp_skew_assembler(A_list):
     (n,m) = A_list[0].shape
     assert(n == m) # Square
     N = (A+1)*n
-    M = scipy.sparse.lil_matrix((N,N))
+    M = sps.lil_matrix((N,N))
     for i in xrange(A):
         I = xrange(n)
         J = xrange((i+1)*n,(i+2)*n)
