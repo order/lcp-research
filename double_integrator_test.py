@@ -11,6 +11,10 @@ import lcp.solvers
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+
+
 import time
 
 
@@ -98,16 +102,24 @@ def plot_value_function(discretizer,value_fun_eval,**kwargs):
     (x_lo,x_hi) = boundary[0]
     (v_lo,v_hi) = boundary[1]
     
-    grid = kwargs.get('grid_size',101)
-    [x_mesh,y_mesh] = np.meshgrid(np.linspace(x_lo,x_hi,grid), np.linspace(v_lo,v_hi,grid),indexing='ij')
-    Pts = np.column_stack([x_mesh.flatten(),y_mesh.flatten()])
+    grid = kwargs.get('grid_size',51)
+    [x_mesh,v_mesh] = np.meshgrid(np.linspace(x_lo,x_hi,grid), np.linspace(v_lo,v_hi,grid),indexing='ij')
+    Pts = np.column_stack([x_mesh.flatten(),v_mesh.flatten()])
     
     vals = value_fun_eval.evaluate(Pts)
     ValueImg = np.reshape(vals,(grid,grid))
-
-    plt.imshow(ValueImg,interpolation = 'nearest')
+    
+    three_d = False
+    if three_d:
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        ax.plot_surface(x_mesh,v_mesh,ValueImg,rstride=1, cstride=1, cmap=cm.jet, linewidth=0, antialiased=False)
+    else:
+        plt.pcolor(x_mesh,v_mesh,ValueImg)
+        
+    plt.xlabel('Position')
+    plt.ylabel('Velocity')
     plt.title('Cost-to-go function')
-
     plt.show()   
     
 def plot_policy(discretizer,policy,**kwargs):
@@ -136,7 +148,19 @@ def plot_advantage(discretizer,value_fun_eval,action1,action2):
 
     adv = value_fun_eval.evaluate(next_states1) - value_fun_eval.evaluate(next_states2)
     AdvImg = np.reshape(adv, (x_n,v_n))
-    plt.imshow(AdvImg,interpolation = 'nearest')
+    x_mesh = np.reshape(states[:,0], (x_n,v_n))
+    v_mesh = np.reshape(states[:,1], (x_n,v_n))
+
+    three_d = False
+    if three_d:
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        ax.plot_surface(x_mesh,v_mesh,AdvImg,rstride=1, cstride=1, cmap=cm.jet, linewidth=0, antialiased=False)
+    else:
+        plt.pcolor(x_mesh,v_mesh,AdvImg)
+        
+    plt.xlabel('Position')
+    plt.ylabel('Velocity')
     plt.title('Advantage function')
     plt.show() 
     
@@ -152,8 +176,8 @@ def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
 
     basic_mapper = InterpolatedRegularGridNodeMapper(x_desc,v_desc)
     physics = DoubleIntegratorRemapper()
-    cost_obj = QuadraticCost(cost_coef,set_point,override=oob_cost)
-    #cost_obj = BallCost(np.array([0,0]),0.25,0.0,1.0)
+    #cost_obj = QuadraticCost(cost_coef,set_point,override=oob_cost)
+    cost_obj = BallCost(np.array([0,0]),0.25,0.0,1.0)
     actions = np.linspace(*action_desc)
 
     (x_lo,x_hi,x_n) = x_desc
@@ -197,14 +221,14 @@ if __name__ == '__main__':
     map_back_test() # Sanity test
 
     discount = 1.0-1e-4
-    discretizer = generate_discretizer((-5,5,100),(-6,6,100),(-1,1,3),cost_coef=np.array([1,0.5]))
+    discretizer = generate_discretizer((-4,4,100),(-6,6,100),(-1,1,3),cost_coef=np.array([1,0.5]))
     #plot_remap(discretizer,-1,np.array([[-6,-3],[6,3]]))
 
     value_fun_eval = generate_value_function(discretizer,discount=discount)
     #plot_costs(discretizer,-1)
-    #plot_value_function(discretizer,value_fun_eval)
-    #plot_advantage(discretizer,value_fun_eval,-1,1)
-    K = 3
-    policy = KStepLookaheadPolicy(discretizer, value_fun_eval, discount,K)
-    plot_policy(discretizer,policy)
-    plot_trajectory(discretizer,policy)
+    plot_value_function(discretizer,value_fun_eval)
+    plot_advantage(discretizer,value_fun_eval,-1,1)
+    #K = 3
+    #policy = KStepLookaheadPolicy(discretizer, value_fun_eval, discount,K)
+    #plot_policy(discretizer,policy)
+    #plot_trajectory(discretizer,policy)

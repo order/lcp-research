@@ -110,15 +110,16 @@ class AcrobotSimulator(Simulator):
     which is an inverted pendulum with a
     motor in the middle joint
     """
-    def __init__(self,physics):
-        self.physics = physics
+    def __init__(self,discretizer):
+        self.physics = discretizer.physics
+        self.discretizer = discretizer
 
     def set_up(self):
         return
         
     def get_body_pos(self):
-        assert((4,) == self.state.shape)
-        poses = self.physics.forward_kinematics(self.state)
+        assert((1,4) == self.state.shape)
+        poses = self.physics.forward_kinematics(self.state.flatten())
         assert((3,2) == poses.shape)
         return poses  
 
@@ -136,7 +137,13 @@ class AcrobotSimulator(Simulator):
         actions = self.policy.get_decisions(self.state)
         assert((1,) == actions.shape)
         self.state = self.physics.remap(self.state,action=actions[0])
-        
+        if actions[0] < 0:
+            self.anim_obj.set_color('r')
+        elif actions[0] > 0:
+            self.anim_obj.set_color('b')
+        else:
+            self.anim_obj.set_color('g')
+            
         # Add new data
         self.past_states = np.vstack([self.past_states,self.state])
         self.phase1_obj.set_data(self.past_states[:,0],self.past_states[:,2])
