@@ -76,6 +76,9 @@ class BasicNodeMapper(NodeMapper):
         
     def get_lens(self):
         raise NotImplementedError()
+        
+    def get_dimension(self):
+        raise NotImplementedError()
 
      
 class NodeDist(object):
@@ -470,6 +473,9 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
         highs = [x[1] for x in self.grid_desc]
         
         return zip(lows,highs)
+        
+    def get_dimension(self):
+        return len(self.grid_desc)
         
     def __build_node_state_cache(self):
         """

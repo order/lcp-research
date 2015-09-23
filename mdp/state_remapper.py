@@ -47,6 +47,25 @@ class AngleWrapStateRemaper(StateRemapper):
         
     def remap(self,states):
         states[:,self.dim] = np.mod(states[:,self.dim], 2.0*math.pi - 1e-9)
+        assert(not np.any(states[:,self.dim] > 2.0*math.pi))
+        assert(not np.any(states[:,self.dim] < 0.0))
+        return states
+        
+    def __str__(self):
+        return 'AngleWrapStateRemaper (dim={0})'.format(self.dim)
+        
+class WrapperStateRemaper(StateRemapper):
+    def __init__(self,dim,low,high):
+        self.dim = dim
+        self.eps = 1e-9
+        self.low = low
+        self.high = high
+        
+    def remap(self,states):
+        mask = np.logical_or(states[:,self.dim] > self.high,states[:,self.dim] < self.low)
+        states[mask,self.dim] = np.mod(states[mask,self.dim] - self.low, self.high - self.low) + self.low
+        assert(not np.any(states[mask,self.dim] > self.high))
+        assert(not np.any(states[mask,self.dim] < self.low))
         return states
         
     def __str__(self):

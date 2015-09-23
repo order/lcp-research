@@ -44,7 +44,13 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         
         self.cost_obj = cost_obj
         
+        if (1 == len(actions)):
+            actions = actions[:,np.newaxis] # convert to column vector
+        assert(actions.shape[1] == self.basic_mapper.get_dimension())
+            
         self.actions = actions
+        self.num_actions = actions.shape[0]
+        
 
     def get_basic_boundary(self):
         return self.basic_mapper.get_boundary()
@@ -79,11 +85,11 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         
         Exception nodes are assumed to be NaN
         """
-        states = [self.basic_mapper.get_node_states()]
+        states = self.basic_mapper.get_node_states()
         D = self.basic_mapper.get_dimension()
-        for mapper in self.exception_node_mappers:
-            states.append(np.NaN * np.ones((mapper.get_num_nodes(),D)))            
-        return np.vstack(states)
+        num_nan_states = self.get_num_nodes() - self.basic_mapper.get_num_nodes()
+        nans = np.NaN * np.ones((num_nan_states,D))        
+        return np.vstack([states,nans])
         
     def get_num_nodes(self):
         count = self.basic_mapper.get_num_nodes()
@@ -122,6 +128,14 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
                     print "!! Missing state {0}: {1}".format(i, states[i,:])
         
         return node_mapping 
+        
+    def remap_states(self,states,action):
+        assert(2 == len(states.shape))
+        (N,d) = states.shape
+        next_states = self.physics.remap(states,action=action)
+        for remapper in self.exception_state_remappers:
+            next_states = remapper.remap(next_states)
+        return next_states
 
     def states_to_transition_matrix(self,states):
         """
@@ -148,10 +162,12 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         num_basic_nodes = self.basic_mapper.get_num_nodes()
         assert(total_nodes >= num_basic_nodes)
         
+        # Convert the basic states to a transition matrix
         T = self.basic_mapper.states_to_transition_matrix(states,shape=(total_nodes,N),ignore=dealt_with)
         assert((total_nodes,N) == T.shape)        
         T = T.tocsr()
         
+        # Add any exceptions
         IJ = []
         Data = []
         if node_mapping:
@@ -167,6 +183,7 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
             assert((E,) == Data.shape)
             assert((2,E) == IJ.shape)
             T = T + sps.csr_matrix((Data,IJ),shape=(total_nodes,N))
+            
         return T
         
     def add_state_remapper(self,remapper):
@@ -183,9 +200,10 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         """
         transitions = []
         costs = []
-        for a in self.actions:
-            transitions.append(self.build_transition_matrix(a))
-            costs.append(self.build_cost_vector(a))
+        for a in xrange(self.num_actions):
+            action = self.actions[a,:]
+            transitions.append(self.build_transition_matrix(action))
+            costs.append(self.build_cost_vector(action))
         if 'name' not in kwargs:
             kwargs['name'] = 'MDP from Discretizer'
         if 'discount' not in kwargs:
@@ -197,14 +215,18 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         """
         Build the cost vector for an action
         """
+        assert(1 == len(action.shape))
+        assert(action.size == self.basic_mapper.get_dimension())
+        
         node_states = self.get_node_states()
         return self.cost_obj.cost(node_states,action)        
     
-    def build_transition_matrix(self,action,**kwargs):
-    
+    def build_transition_matrix(self,action,**kwargs):    
         """
         Builds a transition matrix based on the physics and exceptions
         """
+        assert(1 == len(action.shape))
+        assert(action.size == self.basic_mapper.get_dimension())
         
         total_nodes = self.get_num_nodes()
         basic_nodes = self.basic_mapper.get_num_nodes()
@@ -230,7 +252,7 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
             A[nid,nid] = 1.0
         T = T + A.tocsr()
             
-        assert(abs(T.sum() - total_nodes) < 1e-9) # Coarse check that its stochastic
+        assert(abs(T.sum() - total_nodes)/float(total_nodes) < 1e-9) # Coarse check that its stochastic
         
         return T
         

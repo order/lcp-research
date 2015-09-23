@@ -26,43 +26,19 @@ def simulate_test():
     
     sim = BicycleSimulator(physics)
     sim.simulate(state,action,25)
-    
-def balance_mdp_test():
-    """
-    MDP for the balancing problem
-    """
-    
-    # Acceptable ranges for 4 major parameters
-    theta_lim = math.pi / 2.0
-    theta_n = 10
-    theta_desc = (-theta_lim,theta_lim,theta_n)
-    
-    dtheta_lim = 5
-    dtheta_n = 10
-    dtheta_desc = [-dtheta_lim,dtheta_lim,dtheta_n]
-    
-    omega_lim = math.pi / 15.0
-    omega_n = 10
-    omega_desc = (-omega_lim,omega_lim,omega_n)
-    
-    domega_lim = 0.5
-    domega_n = 10
-    domega_desc = (-domega_lim,domega_lim,domega_n)
-    
-    tau_lim = 2
-    tau_n = 3
-    tau_desc = (-tau_lim,tau_lim,tau_n)
-    
-    d_lim = 0.02
-    d_n = 3
-    d_desc = (-d_lim,d_lim,d_n)
-    
+  
+def generate_discretizer(theta_desc,dtheta_desc,omega_desc,domega_desc,tau_desc,d_desc)
     cost_coef = np.ones(4)
     discount = 0.99
+    
+    raw_actions = util.grid_points(tau_desc,d_desc)
+    single_actions = np.any(0 == raw_actions,axis=1)
+    actions = raw_actions[single_actions,:]
+    A = tau_desc[-1] + d_desc[-1] - 1
+    assert((A,2) == actions.shape)
    
     physics = BicycleRemapper()
     basic_mapper = PiecewiseConstRegularGridNodeMapper(theta_desc,dtheta_desc,omega_desc,domega_desc)
-    cost_obj = QuadraticCost(cost_coef,np.zeros(4))
     sink_node = basic_mapper.get_num_nodes() 
 
     # All oob -> sink node (Maybe threshold the velocities?)
@@ -71,6 +47,17 @@ def balance_mdp_test():
     omega_oob = OOBSinkNodeMapper(2,-omega_lim,omega_lim,sink_node)
     domega_oob = OOBSinkNodeMapper(3,-domega_lim,domega_lim,sink_node)
 
+    set_point = np.zeros(4)
+    cost_type = 'target'
+    if cost_type == 'quad':
+        cost_obj = QuadraticCost(cost_coef,set_point)
+    elif cost_type == 'ball':
+        cost_obj = BallCost(set_point,0.1)
+    elif cost_type == 'target':
+        nudge = np.array([np.pi / 16.0,1.0,np.pi / 16.0,1.0])
+        cost_obj = TargetZoneCost(np.array([set_point - nudge, set_point + nudge]))
+    else:
+        assert(False)
     
     # Build discretizer
     discretizer = ContinuousMDPDiscretizer(physics,basic_mapper,cost_obj,actions)
@@ -79,19 +66,35 @@ def balance_mdp_test():
     discretizer.add_node_mapper(omega_oob)
     discretizer.add_node_mapper(domega_oob)
     
-    # Build MDP
-    print 'Starting MDP build...'
-    mdp_obj = discretizer.build_mdp(discount=discount)
-    print 'Done.'
+if __name__ == '__main__':
+    tN = 21
+    vN = 21
+    discretizer = generate_discretizer((-np.pi/2,np.pi/2,tN),\
+        (-10,10,vN),\
+        (-np.pi/16,np.pi/16,tN),\
+        (-10,10,vN),\
+        (-2,2,3),\
+        (-2,2,3))
+    simulate_only = False
+    regen=True
+    max_iter = 50000
+    thresh = 1e-12
+    discount = 0.95
     
-    # Solve
-    MaxIter = 150
-    vi = lcp.solvers.ValueIterator(mdp_obj)
-    solver = lcp.solvers.IterativeSolver(vi)
-    solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(MaxIter))
-    solver.iter_message = '.'
-    print 'Starting solve...'
-    solver.solve()
-    print 'Done.'
-    
-simulate_test()
+    if simulate_only:
+        policy = ConstantPolicy(np.zeros(2))
+        init_state = np.array([[0.01,0.0,0.0,0.0]])
+        plot_trajectory(discretizer,policy,init_state)
+        quit()
+        
+    if regen:
+        value_fun_eval = generate_value_function(discretizer,discount=discount,outfile='test_mdp.npz',max_iter=max_iter)
+    else:
+        value_fun_eval = generate_value_function(discretizer,discount=discount,filename='test_mdp.npz',outfile='test_mdp.npz',max_iter=max_iter,thresh=thresh)        
+
+    plot_value_slice(discretizer,value_fun_eval,{2:0,3:0})
+    K = 2
+    policy = KStepLookaheadPolicy(discretizer, value_fun_eval, discount,K)
+    #plot_policy_slice(discretizer,policy,{2:0,3:0})
+    init_state = np.array([[0.01,0.0,0.0,0.0]])
+    plot_trajectory(discretizer,policy,init_state)

@@ -54,7 +54,7 @@ class MDP(object):
             assert(not np.any(np.isnan(costs[i])))
             
             assert((N,N) == transitions[i].shape)
-            assert(abs(transitions[i].sum() - N) <= 1e-12)
+            assert(abs(transitions[i].sum() - N)/N <= 1e-12)
             
     def write(self,filename):
         transition_array = pickles.multi_matrix_to_pickle_array(self.transitions)

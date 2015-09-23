@@ -8,6 +8,14 @@ import operator
 import scipy.sparse
 import matplotlib.pyplot as plt
 
+def grid_points(*descs):
+    D = len(descs)
+    meshes = np.meshgrid(*descs,order='ij')
+    pts = np.column_stack([m.flatten() for m in meshes])
+    assert (D == pts.shape[1])
+    assert(2 == len(pts.shape))
+    return pts
+
 def debug_mapprint(level,**kwargs):
     if level:
         for (k,v) in kwargs.items():

@@ -1,4 +1,5 @@
 import numpy as np
+import math
 
 def isvector(x,N=None):    
     if not len(x.shape) == 1:
@@ -99,7 +100,36 @@ class PrimalRecorder(Recorder):
     def report(self,iteration):
         return iteration.get_primal_vector()
    
-    
+   
+#############################
+# Notifications
+
+class Notification(object):
+    def announce(self,iterator):
+        raise NotImplementedError()
+
+class ValueChangeAnnounce(Notification):
+    """
+    Checks if the value vector from an MDP iteration has changed 
+    significantly
+    """
+    def __init__(self):
+        self.old_v = np.NaN # Don't have old iteration
+        self.diff = float('inf')
+        
+    def announce(self,iterator):
+        v = iterator.get_value_vector()
+        if np.any(self.old_v == np.NaN):
+            self.old_v = v
+            return False
+            
+        new_diff = np.linalg.norm(self.old_v - v)
+        self.old_v = v
+        
+        if math.log(new_diff) <= math.log(self.diff) - 1:
+            print 'Value iteration diff {0:.3g} at iteration {1}'.format(new_diff,iterator.get_iteration())
+            self.diff = new_diff
+         
 #############################
 # Plotting for records
 
