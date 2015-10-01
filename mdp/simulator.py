@@ -42,8 +42,8 @@ class ChainSimulator(Simulator):
         
         # Simulate forward one step
         actions = self.policy.get_decisions(self.state)
-        assert((1,) == actions.shape)
-        self.state = self.physics.remap(self.state,action=actions[0])
+        assert((1,1) == actions.shape)
+        self.state = self.physics.remap(self.state,action=actions[0,0])
         
         return self.plot_obj
         
@@ -222,8 +222,8 @@ class PendulumSimulator(Simulator):
         
         # Simulate forward one step
         actions = self.policy.get_decisions(self.state)
-        assert((1,) == actions.shape)
-        self.state = self.discretizer.remap_states(self.state,actions[0])
+        assert((1,1) == actions.shape)
+        self.state = self.discretizer.remap_states(self.state,actions[0,0])
         if actions[0] < 0:
             self.anim_obj.set_color('r')
         elif actions[0] > 0:
@@ -256,7 +256,7 @@ class PendulumSimulator(Simulator):
         axarr[1].set_aspect('equal')
         axarr[1].set_title('Phase Plot')
         
-        self.anim_obj, = axarr[0].plot([],[],'o-',lw=2)
+        self.anim_obj,_ = axarr[0].plot([],[],'o-',[0],[0],'bs',lw=2)
         self.phase1_obj,self.phase2_obj = axarr[1].plot([],[],'b-',[],[],'r-',lw=2,alpha=0.25)
         anim = animation.FuncAnimation(figure, self.animate, iters, self.set_up, interval=2,repeat=False)
         plt.show()

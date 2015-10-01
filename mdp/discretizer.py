@@ -44,9 +44,8 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         
         self.cost_obj = cost_obj
         
-        if (1 == len(actions)):
+        if (1 == len(actions.shape)):
             actions = actions[:,np.newaxis] # convert to column vector
-        assert(actions.shape[1] == self.basic_mapper.get_dimension())
             
         self.actions = actions
         self.num_actions = actions.shape[0]

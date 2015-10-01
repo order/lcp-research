@@ -1,13 +1,14 @@
 import numpy as np
 import state_remapper
+import lqr
 
 class PendulumRemapper(state_remapper.StateRemapper):
     def __init__(self,**kwargs):
         self.step = kwargs.get('step',0.05)
-        self.mass = 1.0
+        self.mass = kwargs.get('mass',1.0)
         self.gravity = 9.80665
-        self.dampening = 1.1
-        self.length = 2.0
+        self.dampening = kwargs.get('dampening',0.1)
+        self.length = kwargs.get('length',1.0)
         
     def remap(self,points,**kwargs):
         """
@@ -51,3 +52,32 @@ class PendulumRemapper(state_remapper.StateRemapper):
         x1 = self.length * np.array([np.sin(state[0]),-np.cos(state[0])])
         
         return np.column_stack([x0,x1]).T
+        
+def generate_lqr(pendulum,**kwargs):
+    """
+    Linearizes the pendulum dynamics at the top (pi,0) position
+    
+    Then generate the LQR controller
+    """
+    m = pendulum.mass
+    L = pendulum.length
+    g = pendulum.gravity
+    b = pendulum.dampening
+    
+    I = m*(L**2) # Moment of inertia    
+    
+    A = np.array([[0,1],[m*g*L / I, -b / I]])
+    B = np.array([[0,1]]).T
+    x = np.array([np.pi,0]) # The set-point we're linearizing around
+
+    assert((2,2) == A.shape)
+    assert((2,1) == B.shape)
+
+    Q = kwargs.get('Q',np.eye(2)) # State weights
+    assert((2,2) == Q.shape)
+    R = kwargs.get('R',np.array([[1e-3]])) # Control weights; must be matrix
+    assert((1,1) == R.shape)
+    
+    K,S,E = lqr.lqr(A,B,Q,R)
+    return (K,x)
+  

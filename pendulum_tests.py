@@ -93,12 +93,11 @@ def plot_advantage(discretizer,value_fun_eval,action1,action2):
     plt.title('Advantage function')
     plt.show()
     
-def plot_trajectory(discretizer,policy):
+def plot_trajectory(discretizer,policy,**kwargs):
     boundary = discretizer.get_basic_boundary()    
     q_rand = [random.uniform(x[0],x[1]) for x in boundary]
 
-    #init_state = 0.5*np.array([q_rand])
-    init_state = np.array([[0.01,0.0]])
+    init_state = kwargs.get('init_state',np.array([[0.01,0.0]]))
     assert((1,2) == init_state.shape)
     
     # Basic sanity
@@ -117,7 +116,7 @@ def generate_discretizer(theta_n,dtheta_desc,a_desc,**kwargs):
     cost_coef = np.ones(4)
     discount = 0.99
    
-    physics = PendulumRemapper(l2=2.0)
+    physics = PendulumRemapper(length=2.0)
     basic_mapper = InterpolatedRegularGridNodeMapper(theta_desc,dtheta_desc)
 
     set_point = np.array([np.pi,0.0])
@@ -128,9 +127,9 @@ def generate_discretizer(theta_n,dtheta_desc,a_desc,**kwargs):
         cost_obj = BallCost(set_point,0.1,0.0,1.0)
     elif cost_type == 'target':
         nudge = np.pi/16.0
-        cost_obj = TargetZoneCost([\
+        cost_obj = TargetZoneCost(np.array([\
             [np.pi-nudge,np.pi+nudge],\
-            [-np.pi/16.0,np.pi/16.0]], 0.0,1.0)
+            [-np.pi/16.0,np.pi/16.0]]))
     else:
         assert(False)
     
@@ -187,17 +186,22 @@ if __name__ == '__main__':
     N = 50
     discretizer = generate_discretizer(N,(-10,10,N),(-3,3,5))
 
+    simulate_only = True
     regen=True
     max_iter = 50000
-    if regen:
-        value_fun_eval = generate_value_function(discretizer,discount=discount,outfile='test_mdp.npz',max_iter=max_iter)
-    else:
-        value_fun_eval = generate_value_function(discretizer,discount=discount,filename='test_mdp.npz',outfile='test_mdp.npz',max_iter=max_iter)        
+    if not simulate_only:
+        if regen:
+            value_fun_eval = generate_value_function(discretizer,discount=discount,outfile='test_mdp.npz',max_iter=max_iter)
+        else:
+            value_fun_eval = generate_value_function(discretizer,discount=discount,filename='test_mdp.npz',outfile='test_mdp.npz',max_iter=max_iter)        
 
     #plot_value_function(discretizer,value_fun_eval)
     #plot_advantage(discretizer,value_fun_eval,-1,1)
-    K = 1
-    policy = KStepLookaheadPolicy(discretizer, value_fun_eval, discount,K)
+    #K = 1
+    #policy = KStepLookaheadPolicy(discretizer, value_fun_eval, discount,K)
     #policy = ConstantPolicy(0)
-    plot_policy(discretizer,policy)
-    plot_trajectory(discretizer,policy)
+    (K,x) = generate_lqr(discretizer.physics,R = np.array([[1e-4]]))
+    policy = LinearFeedbackPolicy(K,x)
+    
+    #plot_policy(discretizer,policy)
+    plot_trajectory(discretizer,policy,init_state = np.array([[np.pi + 0.99*np.pi,0.0]]))
