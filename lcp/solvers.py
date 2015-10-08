@@ -315,6 +315,21 @@ class ProjectiveIteration(LCPIterator):
         self.y = y + steplen * del_y
         self.w = w + steplen * del_w    
         
+class ProjectiveMDPSplitIteration(MDPIterator):
+    def __init__(self,proj_lcp_iterator):
+    def get_primal_vector(self):
+        raise NotImplementedError()
+    def get_dual_vector(self):
+        raise NotImplementedError()
+    def get_gradient_vector(self):
+        raise NotImplementedError()
+    def next_iteration(self):
+        raise NotImplementedError()
+    def get_iteration(self):
+        raise NotImplementedError()
+    def get_value_vector(self):
+        raise NotImplementedError()
+
 def mdp_ip_iter(lcp_obj,state,**kwargs):
     """
     Splits an lcp_obj based on an MDP into (B,C) blocks that correspond to

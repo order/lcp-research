@@ -24,7 +24,7 @@ def random_fourier(Points, k):
     return B
 
 def random_fourier_test():
-    N = 100;
+    N = 50
     grid = np.linspace(0,2*np.pi,N)
     Meshes = np.meshgrid(grid,grid,order='ij')
     Points = np.column_stack([x.flatten() for x in Meshes])
@@ -33,7 +33,33 @@ def random_fourier_test():
     Img = B.reshape((N,N))
     plt.imshow(Img,interpolation=None)
     plt.show()
-    
+
+def projection_test():
+    n = 25
+    N = n**2
+    k = n
+
+    grid = np.linspace(0,2*np.pi,n)
+    Meshes = np.meshgrid(grid,grid,order='ij')
+    Points = np.column_stack([x.flatten() for x in Meshes])
+
+    B = random_fourier(Points,k)
+    Z = np.zeros(B.shape)
+    BB = np.vstack([np.hstack([B,Z]),np.hstack([Z,B])])
+    B_pinv = np.linalg.pinv(B)
+    print B.shape,B_pinv.shape
+    BB_pinv = np.linalg.pinv(BB)
+    BB_pinv2 = np.vstack([np.hstack([B_pinv,Z.T]),np.hstack([Z.T,B_pinv])])
+   
+    print 'rank(B)', np.linalg.matrix_rank(B)
+    print 'norm(BB_pinv - BB_pinv2)', np.linalg.norm(BB_pinv - BB_pinv2)
+
+    Pi = B.dot(B_pinv)
+    print 'norm(Pi):', np.linalg.norm(Pi,ord=2)
+    print 'norm(Pi**2 - Pi)', np.linalg.norm(Pi.dot(Pi) - Pi)
+
+    #plt.imshow(Pi,interpolation=None)
+    #plt.show()   
 
 def fourier(N,k):
     """
@@ -136,3 +162,5 @@ def fourier_test():
     w = np.linalg.lstsq(F,f)[0]
     plt.plot(x,f,x,F.dot(w))
     plt.show()
+
+#projection_test()
