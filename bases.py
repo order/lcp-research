@@ -13,6 +13,28 @@ from collections import defaultdict
 
 import time
 
+def random_fourier(Points, k):
+    (N,D) = Points.shape
+
+    W = np.random.randn(D,k)
+    Phi = 2.0 * np.pi * np.random.rand(k)
+
+    B = np.sin(Points.dot(W) + Phi)
+    assert((N,k) == B.shape)
+    return B
+
+def random_fourier_test():
+    N = 100;
+    grid = np.linspace(0,2*np.pi,N)
+    Meshes = np.meshgrid(grid,grid,order='ij')
+    Points = np.column_stack([x.flatten() for x in Meshes])
+
+    B = random_fourier(Points,1)
+    Img = B.reshape((N,N))
+    plt.imshow(Img,interpolation=None)
+    plt.show()
+    
+
 def fourier(N,k):
     """
     Creates a real DFT-style matrix of size N x (2k-1)

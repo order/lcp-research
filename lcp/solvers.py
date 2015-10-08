@@ -170,11 +170,8 @@ class KojimaIterator(LCPIterator):
             [-M,sps.eye(n)]],format='csc')          
         b = np.concatenate([sigma * dot / float(n) * np.ones(n) - x*y, r])
                 
-        lin_solver_method = 'spsolve'
-        if lin_solver_method == 'spsolve':
-            dir = sps.linalg.spsolve(A,b)
-        elif lin_solver_method == 'lgmres':
-            dir = sps.linalg.lgmres(A,b)[0]
+        dir = sps.linalg.spsolve(A,b,use_umfpack=True)
+
         dir_x = dir[:n]
         dir_y = dir[n:]
             
