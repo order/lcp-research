@@ -48,11 +48,7 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
             actions = actions[:,np.newaxis] # convert to column vector
             
         self.actions = actions
-        
         self.num_actions = actions.shape[0]
-        self.action_dim = actions.shape[1]
-
-        self.state_dim = self.basic_mapper.get_dimension()
         
 
     def get_basic_boundary(self):
@@ -60,6 +56,7 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         
     def get_basic_len(self):
         return self.basic_mapper.get_len()
+
 
     def __str__(self):
         S = []
@@ -88,12 +85,8 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         Exception nodes are assumed to be NaN
         """
         states = self.basic_mapper.get_node_states()
-
-        # Pad with NaN for any non-physical states
         D = self.basic_mapper.get_dimension()
-        N = self.basic_mapper.get_num_nodes()
-        
-        num_nan_states = self.get_num_nodes() - N
+        num_nan_states = self.get_num_nodes() - self.basic_mapper.get_num_nodes()
         nans = np.NaN * np.ones((num_nan_states,D))        
         return np.vstack([states,nans])
         
@@ -109,7 +102,6 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         """
         assert(2 == len(states.shape))
         (N,d) = states.shape
-        assert(d == self.basic_mapper.get_dimension())
         # First remap any states (velocity cap, etc.)
         for remapper in self.exception_state_remappers:
             states = remapper.remap(states)
@@ -139,8 +131,6 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
     def remap_states(self,states,action):
         assert(2 == len(states.shape))
         (N,d) = states.shape
-        assert(d == self.basic_mapper.get_dimension())
-
         next_states = self.physics.remap(states,action=action)
         for remapper in self.exception_state_remappers:
             next_states = remapper.remap(next_states)
@@ -152,8 +142,6 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         """       
         assert(2 == len(states.shape))
         (N,d) = states.shape
-        assert(d == self.basic_mapper.get_dimension())
-
         # First remap any states (velocity cap, etc.)
         for remapper in self.exception_state_remappers:
             states = remapper.remap(states)
@@ -215,7 +203,6 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
             action = self.actions[a,:]
             transitions.append(self.build_transition_matrix(action))
             costs.append(self.build_cost_vector(action))
-            
         if 'name' not in kwargs:
             kwargs['name'] = 'MDP from Discretizer'
         if 'discount' not in kwargs:
@@ -227,8 +214,9 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         """
         Build the cost vector for an action
         """
-        assert(1 == len(action.shape)) # Should be a vector
-        assert(self.action_dim == action.size)
+        assert(1 == len(action.shape))
+        assert(action.size == self.basic_mapper.get_dimension())
+        
         node_states = self.get_node_states()
         return self.cost_obj.cost(node_states,action)        
     
@@ -236,8 +224,8 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         """
         Builds a transition matrix based on the physics and exceptions
         """
-        assert(1 == len(action.shape)) # Should be a vector
-        assert(self.action_dim == action.size)
+        assert(1 == len(action.shape))
+        assert(action.size == self.basic_mapper.get_dimension())
         
         total_nodes = self.get_num_nodes()
         basic_nodes = self.basic_mapper.get_num_nodes()

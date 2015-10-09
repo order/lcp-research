@@ -77,7 +77,26 @@ class ValueChangeTerminationCondition(TerminationCondition):
         return self.diff < self.thresh
         
     def __str__(self):
-        return 'ValueChangeTerminationCondition {0} ({1})'.format(self.thresh,self.diff)    
+        return 'ValueChangeTerminationCondition {0} ({1})'.format(self.thresh,self.diff)
+        
+class ResidualTerminationCondition(TerminationCondition):
+    """
+    Checks if the value vector from an MDP iteration has changed 
+    significantly
+    """
+    def __init__(self,thresh):
+        self.thresh = thresh
+        self.residual = None
+        
+    def isdone(self,iterator):
+        x = iterator.get_primal_vector()
+        w = iterator.get_dual_vector()
+            
+        self.residual = np.linalg.norm(np.minimum(x,w))
+        return self.residual < self.thresh
+        
+    def __str__(self):
+        return 'ResidualTerminationCondition {0} ({1})'.format(self.thresh,self.residual)   
 
 class MaxIterTerminationCondition(TerminationCondition):
     def __init__(self,max_iter):

@@ -22,12 +22,49 @@ class ConstantPolicy(Policy):
         (N,d) = states.shape
         return self.decision*np.ones(N)
         
+class OneStepLookaheadPolicy(Policy):
+    """
+    Basic policy based on looking at the value for the next state for each action
+    """
+    def __init__(self, discretizer, value_fun_eval,discount):
+    
+        self.state_remapper = discretizer.physics
+        self.value_fun_eval = value_fun_eval
+        self.cost_obj = discretizer.cost_obj
+        self.actions = discretizer.actions
+        self.discount = discount
+        
+    def get_decisions(self,states):
+        if 1 == len(states.shape):
+            states = states[np.newaxis,:] 
+            
+        (N,d) = states.shape
+        A = len(self.actions)
+                    
+        # Get the values for these states
+        vals = np.full((N,A),np.nan)
+        for (i,a) in enumerate(self.actions):
+            next_states = self.state_remapper.remap(states,action=a)
+            vals[:,i] = self.cost_obj.cost(states,a) \
+                + self.discount*self.value_fun_eval.evaluate(next_states)
+        
+        # Take the arg min, convert indices to actions.
+        action_indices = np.argmin(vals,axis=1)
+        assert(action_indices.shape[0] == N)
+        decisions = np.full(N,np.nan)
+        for (i,a) in enumerate(self.actions):
+            mask = (action_indices == i)
+            decisions[mask] = a
+            
+        assert(not np.any(np.isnan(decisions)))
+        
+        return decisions
+        
 class KStepLookaheadPolicy(Policy):
     """
     Basic policy based on looking at the value for the next state for each action
     """
     def __init__(self, discretizer, value_fun_eval, discount, k):
-        self.discretizer = discretizer
         self.state_remapper = discretizer.physics
         self.value_fun_eval = value_fun_eval
         self.cost_obj = discretizer.cost_obj
@@ -39,9 +76,7 @@ class KStepLookaheadPolicy(Policy):
         
     def __get_vals(self,states,k):
         (N,d) = states.shape
-        assert(d == self.discretizer.basic_mapper.get_dimension())
-        (A,ad) = self.actions.shape
-        
+        A = len(self.actions)        
         # Base case; vals are just the value function
         if k <= 0:
             # Kludge: don't bother acutally duplicating
@@ -59,8 +94,6 @@ class KStepLookaheadPolicy(Policy):
         
     def get_decisions(self,states):
         (N,d) = states.shape
-        (A,ad) = self.actions.shape
-        assert(d == self.discretizer.basic_mapper.get_dimension())
     
         # Recursively get the values
         vals = self.__get_vals(states,self.k) 
@@ -70,10 +103,10 @@ class KStepLookaheadPolicy(Policy):
         assert(action_indices.shape[0] == N)
         
         # Convert indices to actions.
-        decisions = np.empty((N,ad))
-        for i in xrange(A):
+        decisions = np.empty(N)
+        for (i,a) in enumerate(self.actions):
             mask = (action_indices == i)
-            decisions[mask,:] = self.actions[i,:]         
+            decisions[mask] = a           
         assert(not np.any(np.isnan(decisions)))
         
         return decisions

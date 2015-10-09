@@ -78,10 +78,10 @@ def generate_discretizer(theta1_desc,theta2_desc,dtheta1_desc,dtheta2_desc,a_des
     cost_coef = np.ones(4)
     discount = kwargs.get('discount',0.93)
    
-    physics = AcrobotRemapper(l2=1.0)
+    physics = AcrobotRemapper(l2=1.5)
     basic_mapper = InterpolatedRegularGridNodeMapper(theta1_desc,theta2_desc,dtheta1_desc,dtheta2_desc)
 
-    set_point = np.array([np.pi,0.0,0.0,0.0])
+    set_point = np.array([np.pi / 2.0,0.0,0.0,0.0])
     #set_point = np.array([0.0,0.0,0.0,0.0])
     cost_type = 'target'
     if cost_type == 'quad':
@@ -147,14 +147,13 @@ def generate_value_function(discretizer,**kwargs):
     return value_fun_eval
     
 if __name__ == '__main__':
-    tN = 18
-    vN = 18
-    theta1 = (0.0,2.0*np.pi,tN)
-    theta2 = (-np.pi,np.pi,tN)
-    velo = (-10,10,vN)
-    actions = (-10,10,5)
-    discretizer = generate_discretizer(theta1,theta2,velo,velo,actions)
-    
+    tN = 21
+    vN = 21
+    discretizer = generate_discretizer((-3.0*np.pi / 2.0, np.pi / 2.0,tN),\
+        (-np.pi,np.pi,tN),\
+        (-10,10,vN),\
+        (-10,10,vN),\
+        (-10,10,5))
     simulate_only = False
     regen=True
     max_iter = 50000
@@ -162,8 +161,8 @@ if __name__ == '__main__':
     discount = 0.95
     
     if simulate_only:
-        policy = ConstantPolicy(0)        
-        init_state = np.array([[np.pi+0.1,0.0,0.0,0.0]])
+        policy = ConstantPolicy(0)
+        init_state = np.array([[-np.pi / 2.0 + 0.1,0.0,0.0,0.0]])
         plot_trajectory(discretizer,policy,init_state)
         quit()
         
@@ -176,5 +175,5 @@ if __name__ == '__main__':
     K = 2
     policy = KStepLookaheadPolicy(discretizer, value_fun_eval, discount,K)
     #plot_policy_slice(discretizer,policy,{2:0,3:0})
-    init_state = np.array([[0.0,0.0,0.0,0.0]])
+    init_state = np.array([[-np.pi / 2.0 + 0.1,0.0,0.0,0.0]])
     plot_trajectory(discretizer,policy,init_state)

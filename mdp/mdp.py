@@ -72,7 +72,7 @@ class MDP(object):
         
         I guess we're using a sparse matrix here...
         """
-        return np.eye(self.num_states) - self.discount * self.transitions[a].T
+        return sps.eye(self.num_states,format='lil') - self.discount * self.transitions[a].T
 
     def tolcp(self):
         n = self.num_states
@@ -80,7 +80,8 @@ class MDP(object):
         N = (A + 1) * n
         d = self.discount
 
-        Top = sps.coo_matrix((n,n))
+        #Build the LCP
+        Top = sps.lil_matrix((n,n))
         Bottom = None
         q = np.zeros(N)
         q[0:n] = -np.ones(n)
@@ -97,6 +98,7 @@ class MDP(object):
             Top = sps.hstack((Top,E.T))
             q[((a+1)*n):((a+2)*n)] = self.costs[a]
         M = sps.vstack((Top,Bottom))
+        
         return lcp.LCPObj(M,q,name='LCP from {0} MDP'.format(self.name))
 
     def __str__(self):

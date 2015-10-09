@@ -68,8 +68,8 @@ class DoubleIntegratorSimulator(Simulator):
     def animate(self,frame_num):
         # Simulate forward one step
         actions = self.policy.get_decisions(self.state)
-        assert((1,1) == actions.shape)
-        self.state = self.physics.remap(self.state,action=actions[0,0])
+        assert((1,) == actions.shape)
+        self.state = self.physics.remap(self.state,action=actions[0])
         
         # Add new data
         self.past_states = np.vstack([self.past_states,self.state])
@@ -135,8 +135,8 @@ class AcrobotSimulator(Simulator):
         
         # Simulate forward one step
         actions = self.policy.get_decisions(self.state)
-        assert((1,1) == actions.shape)
-        self.state = self.discretizer.remap_states(self.state,actions[0,:])
+        assert((1,) == actions.shape)
+        self.state = self.discretizer.remap_states(self.state,actions[0])
         if actions[0] < 0:
             self.anim_obj.set_color('r')
         elif actions[0] > 0:

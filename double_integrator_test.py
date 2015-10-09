@@ -177,7 +177,7 @@ def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
     basic_mapper = InterpolatedRegularGridNodeMapper(x_desc,v_desc)
     physics = DoubleIntegratorRemapper()
     #cost_obj = QuadraticCost(cost_coef,set_point,override=oob_cost)
-    cost_obj = BallCost(np.array([0,0]),0.25,0.0,1.0)
+    cost_obj = BallCost(np.array([0,0]),0.25)
     actions = np.linspace(*action_desc)
 
     (x_lo,x_hi,x_n) = x_desc
@@ -199,36 +199,58 @@ def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
 def generate_value_function(discretizer,**kwargs):
 
     discount = kwargs.get('discount',0.99)
-    max_iter = kwargs.get('max_iter',500)
+    max_iter = kwargs.get('max_iter',15)
     thresh = kwargs.get('thresh',1e-12)
     
     mdp_obj = discretizer.build_mdp(discount=discount)
-
-    vi = lcp.solvers.ValueIterator(mdp_obj)
-    solver = lcp.solvers.IterativeSolver(vi)
-    solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(max_iter))
-    solver.termination_conditions.append(lcp.util.ValueChangeTerminationCondition(thresh))
-
-    print 'Starting ValueIterator solve...'
-    solver.solve()
-    print 'Done.'
     
-    value_fun_eval = BasicValueFunctionEvaluator(discretizer,vi.get_value_vector())
+    method = 'kojima'
+    
+    if method in ['kojima']:
+        print 'Building LCP object...'
+        start = time.time()
+        lcp_obj = mdp_obj.tolcp()
+        print 'Done. ({0:.2f}s)'.format(time.time() - start)        
+    
+    if method == 'value':
+        iter = lcp.solvers.ValueIterator(mdp_obj)
+    elif method == 'kojima':
+        iter = lcp.solvers.KojimaIterator(lcp_obj)
+    
+    solver = lcp.solvers.IterativeSolver(iter)
+    solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(max_iter))
+    if method in ['value']:
+        solver.termination_conditions.append(lcp.util.ValueChangeTerminationCondition(thresh))
+    elif method in ['kojima']:
+        solver.termination_conditions.append(lcp.util.ResidualTerminationCondition(thresh))
+
+    print 'Starting {0} solve...'.format(type(iter))
+    start = time.time()
+    solver.solve()
+    print 'Done. ({0:.2f}s)'.format(time.time() - start)
+
+    if method == 'value':
+        J = iter.get_value_vector()
+    elif method == 'kojima':
+        N = mdp_obj.num_states
+        J = iter.get_primal_vector()[:N]
+        
+    value_fun_eval = BasicValueFunctionEvaluator(discretizer,J)
     
     return value_fun_eval
 
 if __name__ == '__main__':
     map_back_test() # Sanity test
 
-    discount = 1.0-1e-4
+    discount = 0.99
     discretizer = generate_discretizer((-4,4,100),(-6,6,100),(-1,1,3),cost_coef=np.array([1,0.5]))
     #plot_remap(discretizer,-1,np.array([[-6,-3],[6,3]]))
 
     value_fun_eval = generate_value_function(discretizer,discount=discount)
     #plot_costs(discretizer,-1)
-    plot_value_function(discretizer,value_fun_eval)
-    plot_advantage(discretizer,value_fun_eval,-1,1)
-    #K = 3
+    #plot_value_function(discretizer,value_fun_eval)
+    #plot_advantage(discretizer,value_fun_eval,-1,1)
+    #K = 1
     #policy = KStepLookaheadPolicy(discretizer, value_fun_eval, discount,K)
     #plot_policy(discretizer,policy)
     #plot_trajectory(discretizer,policy)

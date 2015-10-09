@@ -5,6 +5,7 @@ import copy
 import math
 
 import scipy.sparse as sps
+import scipy.sparse.linalg
 import scipy
 import matplotlib.pyplot as plt
 import math
@@ -166,10 +167,14 @@ class KojimaIterator(LCPIterator):
             
             # Set up Newton direction equations
         A = sps.bmat([[sps.spdiags(y,0,n,n),sps.spdiags(x,0,n,n)],\
-            [-sps.coo_matrix(M),sps.eye(n)]],format='csr')          
+            [-M,sps.eye(n)]],format='csc')          
         b = np.concatenate([sigma * dot / float(n) * np.ones(n) - x*y, r])
                 
-        dir = sps.linalg.spsolve(A,b)
+        lin_solver_method = 'spsolve'
+        if lin_solver_method == 'spsolve':
+            dir = sps.linalg.spsolve(A,b)
+        elif lin_solver_method == 'lgmres':
+            dir = sps.linalg.lgmres(A,b)[0]
         dir_x = dir[:n]
         dir_y = dir[n:]
             
