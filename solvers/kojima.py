@@ -4,7 +4,7 @@ import scipy.sparse as sps
 
 ##############################
 # Kojima lcp_obj
-class KojimaIterator(LCPIterator):
+class KojimaIPIterator(LCPIterator):
     def __init__(self,lcp_obj,**kwargs):
         self.lcp = lcp_obj
         self.M = lcp_obj.M

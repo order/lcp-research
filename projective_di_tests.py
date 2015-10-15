@@ -219,6 +219,9 @@ def generate_value_function(discretizer,**kwargs):
     thresh = kwargs.get('thresh',1e-6)
     
     mdp_obj = discretizer.build_mdp(discount=discount)
+
+    NumBases = 25
+    B = bases.random_fourier(discretizer.get_node_states(),NumBases)
     
     method = 'kojima'
     
@@ -282,10 +285,9 @@ if __name__ == '__main__':
                                              discount=discount,\
                                              max_iter=max_iter,\
                                              thresh=thresh)
-    #plot_costs(discretizer,-1)
-    #plot_value_function(discretizer,value_fun_eval)
+    plot_value_function(discretizer,value_fun_eval)
     #plot_advantage(discretizer,value_fun_eval,-1,1)
-    lookahead = 3
-    policy = KStepLookaheadPolicy(discretizer, value_fun_eval, discount,lookahead)
-    plot_policy(discretizer,policy)
+    #lookahead = 3
+    #policy = KStepLookaheadPolicy(discretizer, value_fun_eval, discount,lookahead)
+    #plot_policy(discretizer,policy)
     #plot_trajectory(discretizer,policy)

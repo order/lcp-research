@@ -13,13 +13,82 @@ from collections import defaultdict
 
 import time
 
-def random_fourier(Points, k):
+class BasisGenerator(object):
+    def __init__(self,gen_function):
+        self.generator_function = gen_function
+        self.remappers = [] # i.e. mdp.state_remappers
+
+    def generate(self, points,K,**kwargs):
+        """
+        Generates K basis columns based on the provided points.
+        
+        Note that any special points (e.g. non-physical points) will be given an elementary
+        column vector. 
+        
+        If you don't want this, add a rewriter to the bases generator
+        """
+
+
+        (N,D) = Points.shape
+
+        # Special points are things like OOB nodes    
+        special_points = kwargs.get('special_points',[])
+        sp_set = set(special_points)
+        S = len(sp_set)
+
+        for remapper in self.remapper:
+            Points = remapper.remap(Points)            
+
+        # Make sure any NaN row that wasn't remapped is a special state.
+        nan_mask = np.any(np.isnan(Points),axis=1)
+        assert((N,) == nan_mask.shape)
+        nan_set = set(nan_mask.nonzero()[0])            
+        assert(nan_set <= special_set) # All non-phyiscal states should be special
+           
+        assert(K >= S) # Should have at least this many bases
+
+        # Generate all the bases, reserving bases for the special 
+        B = self.generator_function.generate(points,K - S)
+        
+
+class BasicBasisGenerator(object):
+    """
+    The BasisGenerator uses these for actually doing to mapping of rows to basis values.
+    It handles some of the higher-level concerns like cleaning and special point handling
+    """
+    def __init__(self):
+        pass
+    def generate(self,points,K,**kwargs):
+        raise NotImplementedError()
+
+def random_fourier(Points, k, special_points):
+    """
+    Generates a 
+    """
     (N,D) = Points.shape
 
-    W = np.random.randn(D,k)
-    Phi = 2.0 * np.pi * np.random.rand(k)
+ # Special points are things like OOB nodes
+    special_points
+    special_set = set(special_points)
+    S
 
-    B = np.sin(Points.dot(W) + Phi)
+    nan_mask = np.any(np.isnan(Points),axis=1)
+    assert((N,) == nan_mask.shape)
+    nan_set = set(nan_mask.nonzero()[0])
+    assert(nan_set <= special_set) # All non-phyiscal states should be special
+
+    assert(k >= NumNan + 1)
+
+    W = np.random.randn(D,k-1-) # Weights
+    Phi = 2.0 * np.pi * np.random.rand(k) # Phases shift
+
+    # format: B = [1 | fourier columns| columns for special states ]
+    B = np.hstack([np.ones(N,1),np.sin(Points.dot(W) + Phi)])
+
+    # Zero out any non-physical states
+    B[nan_mask,:] = 0
+    B[nan_mask,nan_mask] = np.eye(
+    
     assert((N,k) == B.shape)
     return B
 
@@ -162,5 +231,3 @@ def fourier_test():
     w = np.linalg.lstsq(F,f)[0]
     plt.plot(x,f,x,F.dot(w))
     plt.show()
-
-#projection_test()

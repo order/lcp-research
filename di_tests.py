@@ -11,7 +11,8 @@ from mdp.value_fun import *
 
 import solvers
 from solvers.value_iter import ValueIterator
-from solvers.kojima import KojimaIterator
+from solvers.kojima import KojimaIPIterator
+from solver.projective import ProjectiveIPIterator
 
 import lcp
 import lcp.util
