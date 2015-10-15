@@ -1,3 +1,5 @@
+
+import mdp
 from mdp.double_integrator import *
 from mdp.costs import *
 from mdp.discretizer import *
@@ -6,7 +8,13 @@ from mdp.policy import *
 from mdp.simulator import *
 from mdp.state_remapper import *
 from mdp.value_fun import *
-import lcp.solvers
+
+import solvers
+from solvers.value_iter import ValueIterator
+from solvers.kojima import KojimaIterator
+
+import lcp
+import lcp.util
 
 import random
 import numpy as np
@@ -42,6 +50,9 @@ def map_back_test():
             print 'Node dist',back_again
             print '{0} != {1}'.format(node,back_again.keys()[0])
             assert(back_again.keys()[0] == node)
+
+##########################################3
+# Plotting functions
             
 def plot_remap(discretizer,action,sink_states):
     states = discretizer.basic_mapper.get_node_states()
@@ -164,6 +175,8 @@ def plot_advantage(discretizer,value_fun_eval,action1,action2):
     plt.title('Advantage function')
     plt.show() 
     
+#################################################
+# Generate the DISCRETIZER object
     
 def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
     xid,vid = 0,1 
@@ -195,6 +208,9 @@ def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
     mdp_obj = discretizer.build_mdp(discount=discount)
 
     return discretizer
+
+###########################################
+# Generate VALUE FUNCTION
     
 def generate_value_function(discretizer,**kwargs):
 
@@ -213,11 +229,11 @@ def generate_value_function(discretizer,**kwargs):
         print 'Done. ({0:.2f}s)'.format(time.time() - start)        
     
     if method == 'value':
-        iter = lcp.solvers.ValueIterator(mdp_obj)
+        iter = ValueIterator(mdp_obj)
     elif method == 'kojima':
-        iter = lcp.solvers.KojimaIterator(lcp_obj)
+        iter = KojimaIterator(lcp_obj)
     
-    solver = lcp.solvers.IterativeSolver(iter)
+    solver = solvers.IterativeSolver(iter)
     solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(max_iter))
     if method in ['value']:
         solver.termination_conditions.append(lcp.util.ValueChangeTerminationCondition(thresh))
@@ -243,15 +259,23 @@ def generate_value_function(discretizer,**kwargs):
     
     return value_fun_eval
 
+
+#########################################
+# Main function
+
 if __name__ == '__main__':
-    map_back_test() # Sanity test
 
     discount = 0.997
     max_iter = 1e3
     thresh = 1e-9
-    
-    discretizer = generate_discretizer((-4,4,75),(-6,6,75),(-1,1,3),\
-                                       cost_coef=np.array([1,0.5]))
+
+    x_desc = (-4,4,50)
+    v_desc = (-6,6,50)
+    a_desc = (-1,1,3)
+    cost_coef = np.array([1,0.5])
+
+    discretizer = generate_discretizer(x_desc,v_desc,a_desc,\
+                                       cost_coef=cost_coef)
     #plot_remap(discretizer,-1,np.array([[-6,-3],[6,3]]))
 
     value_fun_eval = generate_value_function(discretizer,\
@@ -261,7 +285,7 @@ if __name__ == '__main__':
     #plot_costs(discretizer,-1)
     #plot_value_function(discretizer,value_fun_eval)
     #plot_advantage(discretizer,value_fun_eval,-1,1)
-    K = 3
-    policy = KStepLookaheadPolicy(discretizer, value_fun_eval, discount,K)
+    lookahead = 3
+    policy = KStepLookaheadPolicy(discretizer, value_fun_eval, discount,lookahead)
     plot_policy(discretizer,policy)
     #plot_trajectory(discretizer,policy)

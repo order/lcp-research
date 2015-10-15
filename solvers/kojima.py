@@ -1,4 +1,6 @@
-import solvers
+from solvers import LCPIterator
+import numpy as np
+import scipy.sparse as sps
 
 ##############################
 # Kojima lcp_obj

@@ -1,4 +1,4 @@
-import solver
+from lcp import LCPIterator
 
 class ProjectiveIteration(LCPIterator):
     def __init__(self,proj_lcp_obj,**kwargs):
