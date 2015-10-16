@@ -1,6 +1,6 @@
-from lcp import LCPIterator
+from solvers import LCPIterator
 
-class ProjectiveIPIteration(LCPIterator):
+class ProjectiveIPIterator(LCPIterator):
     def __init__(self,proj_lcp_obj,**kwargs):
         self.centering_coeff = kwargs.get('centering_coeff',0.99)
         self.linesearch_backoff = kwargs.get('linesearch_backoff',0.99)

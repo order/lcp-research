@@ -12,7 +12,7 @@ from mdp.value_fun import *
 import solvers
 from solvers.value_iter import ValueIterator
 from solvers.kojima import KojimaIPIterator
-from solver.projective import ProjectiveIPIterator
+from solvers.projective import ProjectiveIPIterator
 
 import lcp
 import lcp.util
@@ -232,7 +232,7 @@ def generate_value_function(discretizer,**kwargs):
     if method == 'value':
         iter = ValueIterator(mdp_obj)
     elif method == 'kojima':
-        iter = KojimaIterator(lcp_obj)
+        iter = KojimaIPIterator(lcp_obj)
     
     solver = solvers.IterativeSolver(iter)
     solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(max_iter))
@@ -268,7 +268,7 @@ if __name__ == '__main__':
 
     discount = 0.997
     max_iter = 1e3
-    thresh = 1e-9
+    thresh = 1e-6
 
     x_desc = (-4,4,50)
     v_desc = (-6,6,50)
