@@ -1,2 +1,7 @@
-__all__ = ['acrobot', 'bicycle', 'costs', 'discretizer', 'double_integrator',\
-    'hallway', 'hillcar', 'mdp', 'node_mapper', 'policy', 'simulator', 'state_remapper', 'value_fun']
+from mdp import *
+from costs import *
+from discretizer import *
+from node_mapper import *
+from policy import *
+from state_remapper import *
+from value_fun import *

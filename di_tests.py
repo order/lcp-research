@@ -1,13 +1,7 @@
 
 import mdp
-from mdp.double_integrator import *
-from mdp.costs import *
-from mdp.discretizer import *
-from mdp.node_mapper import *
-from mdp.policy import *
-from mdp.simulator import *
-from mdp.state_remapper import *
-from mdp.value_fun import *
+import mdp.double_integrator as di
+import mdp.simulator as simulator
 
 import solvers
 from solvers.value_iter import ValueIterator
