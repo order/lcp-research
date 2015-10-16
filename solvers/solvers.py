@@ -1,15 +1,15 @@
-import numpy as np
 import time
 import os
 import copy
 import math
 
+import numpy as np
 import scipy.sparse as sps
 import scipy.sparse.linalg
 import scipy
+
 import matplotlib.pyplot as plt
-import math
-from util import *
+
 import mdp
 import lcp
 

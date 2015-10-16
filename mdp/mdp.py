@@ -1,10 +1,11 @@
 import numpy as np
 import scipy
 import scipy.sparse as sps
+
 import matplotlib.pyplot as plt
+
 import lcp
-import scipy
-import pickles
+import utils.pickles
 
 class MDP(object):
     """

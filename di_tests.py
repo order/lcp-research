@@ -13,9 +13,10 @@ import solvers
 from solvers.value_iter import ValueIterator
 from solvers.kojima import KojimaIPIterator
 from solvers.projective import ProjectiveIPIterator
+from solvers.termination import *
+from solvers.notification import *
 
 import lcp
-import lcp.util
 
 import random
 import numpy as np
@@ -235,14 +236,14 @@ def generate_value_function(discretizer,**kwargs):
         iter = KojimaIPIterator(lcp_obj)
     
     solver = solvers.IterativeSolver(iter)
-    solver.termination_conditions.append(lcp.util.MaxIterTerminationCondition(max_iter))
+    solver.termination_conditions.append(MaxIterTerminationCondition(max_iter))
     if method in ['value']:
-        solver.termination_conditions.append(lcp.util.ValueChangeTerminationCondition(thresh))
-        solver.notifications.append(lcp.util.ValueChangeAnnounce())
+        solver.termination_conditions.append(ValueChangeTerminationCondition(thresh))
+        solver.notifications.append(ValueChangeAnnounce())
         
     elif method in ['kojima']:
-        solver.termination_conditions.append(lcp.util.ResidualTerminationCondition(thresh))
-        solver.notifications.append(lcp.util.ResidualChangeAnnounce())
+        solver.termination_conditions.append(ResidualTerminationCondition(thresh))
+        solver.notifications.append(ResidualChangeAnnounce())
 
 
     print 'Starting {0} solve...'.format(type(iter))
