@@ -200,7 +200,13 @@ def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
     return discretizer
 
 ###########################################
-# Generate VALUE FUNCTION
+# Build a PROJECTIVE LCP
+
+def build_projective_lcp(mdp):
+    
+
+###########################################
+# Find the VALUE FUNCTION
     
 def find_value_function(discretizer,**kwargs):
 
@@ -222,7 +228,7 @@ def find_value_function(discretizer,**kwargs):
     if method in ['projective']:
         print 'Building projected LCP object...'
         start = time.time()
-        lcp_obj = mdp_obj.tolcp()
+        proj_lcp_obj = build_projective_lcp(mdp_obj)
         print 'Done. ({0:.2f}s)'.format(time.time() - start)        
 
     # Select the iterator

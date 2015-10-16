@@ -14,42 +14,55 @@ from collections import defaultdict
 import time
 
 class BasisGenerator(object):
-    def __init__(self,gen_function):
-        self.generator_function = gen_function
-        self.remappers = [] # i.e. mdp.state_remappers
+    """
+    This is an object that wraps around a "basic" basis generator and
+    deals with special nodes like out of bounds nodes.
+
+    The assumption is that a special node requires a distinct elementary
+    vector associated with it because it is sufficiently different
+    """
+    def __init__(self,gen_obj):
+        self.generator_function = gen_obj
+        self.remappers = None
+        """
+        TODO: implement "remapper" logic so that special nodes can be mapped
+        to real physical locations that behave like we'd expect the special 
+        node to be similar to
+        """        
 
     def generate(self, points,K,**kwargs):
         """
         Generates K basis columns based on the provided points.
         
-        Note that any special points (e.g. non-physical points) will be given an elementary
-        column vector. 
-        
-        If you don't want this, add a rewriter to the bases generator
+        Note that any special points (e.g. non-physical points) will 
+        be given an elementary column vector. 
         """
 
-
-        (N,D) = Points.shape
+        (N,D) = points.shape
 
         # Special points are things like OOB nodes    
-        special_points = kwargs.get('special_points',[])
+        special_points = sorted(kwargs.get('special_points',[]))
         sp_set = set(special_points)
-        S = len(sp_set)
-
-        for remapper in self.remapper:
-            Points = remapper.remap(Points)            
+        S = len(sp_set)         
 
         # Make sure any NaN row that wasn't remapped is a special state.
-        nan_mask = np.any(np.isnan(Points),axis=1)
+        nan_mask = np.any(np.isnan(points),axis=1)
         assert((N,) == nan_mask.shape)
         nan_set = set(nan_mask.nonzero()[0])            
-        assert(nan_set <= special_set) # All non-phyiscal states should be special
+        assert(nan_set <= sp_set)
+        # All non-phyiscal states should be special
            
         assert(K >= S) # Should have at least this many bases
 
         # Generate all the bases, reserving bases for the special 
         B = self.generator_function.generate(points,K - S)
-        
+
+        # 
+        B[special_points,:] = 0 # Blot all special points out
+        B = np.hstack([B,np.zeros((N,S))])
+        B[(K-S):,special_points] = np.eye(S)
+
+        return B
 
 class BasicBasisGenerator(object):
     """
@@ -61,36 +74,19 @@ class BasicBasisGenerator(object):
     def generate(self,points,K,**kwargs):
         raise NotImplementedError()
 
-def random_fourier(Points, k, special_points):
-    """
-    Generates a 
-    """
-    (N,D) = Points.shape
+class RandomFourierBasis(BasicBasisGenerator):
+    def __init__(self,**kwargs):
+        pass
+    def generate(self,points,K,**kwargs):
+        (N,D) = points.shape
 
- # Special points are things like OOB nodes
-    special_points
-    special_set = set(special_points)
-    S
-
-    nan_mask = np.any(np.isnan(Points),axis=1)
-    assert((N,) == nan_mask.shape)
-    nan_set = set(nan_mask.nonzero()[0])
-    assert(nan_set <= special_set) # All non-phyiscal states should be special
-
-    assert(k >= NumNan + 1)
-
-    W = np.random.randn(D,k-1-) # Weights
-    Phi = 2.0 * np.pi * np.random.rand(k) # Phases shift
-
-    # format: B = [1 | fourier columns| columns for special states ]
-    B = np.hstack([np.ones(N,1),np.sin(Points.dot(W) + Phi)])
-
-    # Zero out any non-physical states
-    B[nan_mask,:] = 0
-    B[nan_mask,nan_mask] = np.eye(
-    
-    assert((N,k) == B.shape)
-    return B
+        # Format: B = [1 | fourier columns]
+        W = np.random.randn(D,K-1) # Weights
+        Phi = 2.0 * np.pi * np.random.rand(K-1) # Phases shift
+        B = np.hstack([np.ones(N,1),np.sin(points.dot(W) + Phi)])
+        
+        assert((N,K) == B.shape)
+        return B
 
 def random_fourier_test():
     N = 50

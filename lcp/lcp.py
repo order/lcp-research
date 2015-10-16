@@ -19,13 +19,6 @@ class LCPObj(object):
 
     def __str__(self):
         return '<{0} in R^{1}>'.format(self.name, self.dim)
-            
-    def write_to_csv(self,filename):
-        FH = open(filename,'w')
-        D = np.array(self.M.todense())
-        for row in D:
-            FH.write(','.join(map(str,row.flatten())) + '\n')
-        FH.write(','.join(map(str,self.q)))
                 
                 
             
@@ -41,7 +34,7 @@ class ProjectiveLCPObj(LCPObj):
     """An object for a projective LCP where M = Phi U + Pi_bot
     LCPs of this class can be rapidly solved using fast interior point algorithms like the one in "Fast solutions to projective monotone linear complementarity problems" (http://arxiv.org/pdf/1212.6958v1.pdf)  
     """
-    def __init__(self,Phi,U,q):
+    def __init__(self,Phi,U,q,**kwargs):
         self.Phi = Phi
         self.U = U
         self.q = q
@@ -51,26 +44,11 @@ class ProjectiveLCPObj(LCPObj):
         assert(Phi.shape[0] == self.dim)
         assert(U.shape[1] == self.dim)
         
-        self.name = 'Unnamed'
+        self.name = kwargs.get('name','Unnamed')
 
     def __str__(self):
         return '<{0} in R^{1}'.\
             format(self.name, self.dim)
-
-    def write_to_csv(self,filename):
-        FH = open(filename,'w')
-        if hasattr(self.Phi,'todense'):
-            DP = np.array(self.Phi.todense())
-            DU = np.array(self.U.todense())
-        else:
-            DP = self.Phi
-            DU = self.U
-
-        for row in DP:
-            FH.write(','.join(map(str,row.flatten())) + '\n')
-        for row in DU:
-            FH.write(','.join(map(str,row.flatten())) + '\n')
-        FH.write(','.join(map(str,self.q)))
     
     
     

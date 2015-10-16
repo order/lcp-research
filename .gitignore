@@ -5,3 +5,5 @@ test.lcp
 *.npz
 *.prof
 *.py~
+*.py#
+.#di_tests.py
