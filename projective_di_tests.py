@@ -25,32 +25,6 @@ from matplotlib import cm
 
 import time
 
-
-def map_back_test():
-    """
-    Check to make sure that all nodes map back to themselves when run through the
-    node -> state -> node machinery
-    """
-    
-    np.set_printoptions(precision=3)
-    
-    disc = generate_discretizer((-2,2,4),(-3,3,5),(0,1,2))
-    basic_mapper = disc.basic_mapper
-    
-    mdp_obj = disc.build_mdp()
-    
-    n = basic_mapper.get_num_nodes()
-    N = mdp_obj.costs[0].shape[0]
-    for _ in xrange(125):
-        node = random.randint(0,n-1)
-        state = basic_mapper.nodes_to_states([node])
-        back_again = basic_mapper.states_to_node_dists(state)[0]
-        if back_again.keys()[0] != node:
-            print 'Problem state',state
-            print 'Node dist',back_again
-            print '{0} != {1}'.format(node,back_again.keys()[0])
-            assert(back_again.keys()[0] == node)
-
 ##########################################3
 # Plotting functions
             
