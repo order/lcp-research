@@ -202,7 +202,22 @@ def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
 ###########################################
 # Build a PROJECTIVE LCP
 
-def build_projective_lcp(mdp):
+def build_projective_lcp(mdp_obj,discretizer,**kwargs):
+
+    K = kwargs.get('K',10)
+    
+    lcp_obj = mdp_obj.tolcp()
+    points = discretizer.get_node_states()
+    nan_idx = np.where(np.any(np.isnan(points),axis=1))
+
+    fourier = bases.RandomFourierBasis()
+    basis_gen = bases.BasisGenerator(fourier)
+    Phi = basis_gen.generate(P,K,special_points=nan_idx)
+    
+    U =
+    q = 
+    
+    proj_lcp_obj = ProjectiveLCPObj(Phi,U,q)
     
 
 ###########################################
@@ -290,7 +305,7 @@ if __name__ == '__main__':
                                        cost_coef=cost_coef)
     #plot_remap(discretizer,-1,np.array([[-6,-3],[6,3]]))
 
-    value_fun_eval = generate_value_function(discretizer,\
+    value_fun_eval = find_value_function(discretizer,\
                                              discount=discount,\
                                              max_iter=max_iter,\
                                              thresh=thresh)

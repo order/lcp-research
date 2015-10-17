@@ -78,12 +78,15 @@ class RandomFourierBasis(BasicBasisGenerator):
     def __init__(self,**kwargs):
         pass
     def generate(self,points,K,**kwargs):
+        assert(K >= 1)
         (N,D) = points.shape
 
         # Format: B = [1 | fourier columns]
         W = np.random.randn(D,K-1) # Weights
         Phi = 2.0 * np.pi * np.random.rand(K-1) # Phases shift
-        B = np.hstack([np.ones(N,1),np.sin(points.dot(W) + Phi)])
+        F = np.sin(points.dot(W) + Phi) # Non-constant columns
+        assert((N,K-1) == F.shape)
+        B = np.hstack([np.ones((N,1)),F])
         
         assert((N,K) == B.shape)
         return B
