@@ -2,8 +2,9 @@ import numpy as np
 import math
 
 def isvector(x,N=None):    
-    if not len(x.shape) == 1:
-        return False
+    if len(x.shape) == 1:
+        return True
+    return False
         
 def ismatrix(A,N=None,M=None):
     if not len(A.shape) == 2:

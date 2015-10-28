@@ -10,10 +10,15 @@ from solvers.projective import ProjectiveIPIterator
 from solvers.termination import *
 from solvers.notification import *
 
+import bases
+
 import lcp
 
 import random
 import numpy as np
+import scipy as sp
+import scipy.sparse as sps
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
@@ -169,6 +174,8 @@ def plot_advantage(discretizer,value_fun_eval,action1,action2):
 # Generate the DISCRETIZER object
     
 def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
+    print "Generating discretizer..."
+    start = time.time()
     xid,vid = 0,1 
 
     cost_coef = kwargs.get('cost_coef',np.ones(2))
@@ -179,78 +186,132 @@ def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
 
     basic_mapper = mdp.InterpolatedRegularGridNodeMapper(x_desc,v_desc)
     physics = di.DoubleIntegratorRemapper()
-    #cost_obj = mdp.QuadraticCost(cost_coef,set_point,override=oob_cost)
-    cost_obj = mdp.BallCost(np.array([0,0]),0.25)
+    cost_obj = mdp.QuadraticCost(cost_coef,set_point,override=oob_cost)
+    #cost_obj = mdp.BallCost(np.array([0,0]),0.25)
     actions = np.linspace(*action_desc)
 
     (x_lo,x_hi,x_n) = x_desc
     (v_lo,v_hi,v_n) = v_desc
     
-    left_oob_mapper = mdp.OOBSinkNodeMapper(xid,-float('inf'),x_lo,basic_mapper.num_nodes)
-    right_oob_mapper = mdp.OOBSinkNodeMapper(xid,x_hi,float('inf'),basic_mapper.num_nodes+1)
+    left_oob_mapper = mdp.OOBSinkNodeMapper(xid,-float('inf'),
+                                            x_lo,basic_mapper.num_nodes)
+    right_oob_mapper = mdp.OOBSinkNodeMapper(xid,x_hi,float('inf'),
+                                             basic_mapper.num_nodes+1)
     state_remapper = mdp.RangeThreshStateRemapper(vid,v_lo,v_hi)
 
-    discretizer = mdp.ContinuousMDPDiscretizer(physics,basic_mapper,cost_obj,actions)
+    discretizer = mdp.ContinuousMDPDiscretizer(physics,
+                                               basic_mapper,
+                                               cost_obj,actions)
     discretizer.add_state_remapper(state_remapper)
     discretizer.add_node_mapper(left_oob_mapper)
     discretizer.add_node_mapper(right_oob_mapper)
-    
-    mdp_obj = discretizer.build_mdp(discount=discount)
+
+    print "Built discretizer {0}s.".format(time.time() - start)
 
     return discretizer
+
+###########################################
+# Build the MDP object
+
+def build_mdp_obj(discretizer,**kwargs):
+    print "Generating MDP object..."
+    start = time.time()
+    
+    mdp_obj = discretizer.build_mdp(**kwargs)
+    print "Built MDP {0}s.".format(time.time() - start)
+    print "\tMDP stats: {0} states, {1} actions"\
+        .format(mdp_obj.num_states,mdp_obj.num_actions)
+    return mdp_obj
+
 
 ###########################################
 # Build a PROJECTIVE LCP
 
 def build_projective_lcp(mdp_obj,discretizer,**kwargs):
+    print 'Building projected LCP object...'
+    start = time.time()
 
-    K = kwargs.get('K',10)
+    # Get sizes
+    A = mdp_obj.num_actions
+    n = mdp_obj.num_states
+    N = (A+1)*n
+
+    basis = kwargs.get('basis','fourier')
+    if basis == 'identity':
+        K = n
+        assert((A+1)*K == N)
+    else:
+        K = kwargs.get('K',100)    
+    print '\tUsing {0} {1} vectors as basis'.format(
+        K, basis)
     
+    # Generate the LCP
     lcp_obj = mdp_obj.tolcp()
-    points = discretizer.get_node_states()
-    nan_idx = np.where(np.any(np.isnan(points),axis=1))
+    M = lcp_obj.M.todense()
 
-    fourier = bases.RandomFourierBasis()
-    basis_gen = bases.BasisGenerator(fourier)
-    Phi = basis_gen.generate(P,K,special_points=nan_idx)
+    print '\tLCP {0}x{0}'.format(N)
+    assert((N,N) == M.shape)
     
-    U =
-    q = 
-    
-    proj_lcp_obj = ProjectiveLCPObj(Phi,U,q)
-    
+    # Get the points in the state-space
+    points = discretizer.get_node_states()
+    (P,_) = points.shape
+    assert(P == n)
+
+    # Generate the basis
+    if basis == 'fourier':
+        nan_idx = np.where(np.any(np.isnan(points),axis=1))[0]
+        fourier = bases.RandomFourierBasis()
+        basis_gen = bases.BasisGenerator(fourier)
+        Phi = basis_gen.generate_block_diag(points,K,(A+1),special_points=nan_idx)
+    elif basis == 'identity':
+        # Identity basis; mostly for testing
+        Phi = np.eye(N)
+    else:
+        raise NotImplmentedError()        
+    assert((N,(A+1)*K) == Phi.shape)
+
+    U = np.linalg.lstsq(Phi,M)[0]
+    Mhat = Phi.dot(U)
+    assert((N,N) == Mhat.shape)
+
+    proj_lcp_obj = lcp.ProjectiveLCPObj(sps.csr_matrix(Phi),\
+                                        sps.csr_matrix(U),lcp_obj.q)
+    print 'Build projected LCP object. ({0:.2f}s)'\
+        .format(time.time() - start)  
+
+    return proj_lcp_obj
 
 ###########################################
 # Find the VALUE FUNCTION
     
-def find_value_function(discretizer,**kwargs):
+def solve_for_value_function(discretizer,mdp_obj,**kwargs):
 
     discount = kwargs.get('discount',0.99)
     max_iter = kwargs.get('max_iter',1000)
     thresh = kwargs.get('thresh',1e-6)
-    method = kwargs.get('method','value')
+    method = kwargs.get('method','projective')
     
-    mdp_obj = discretizer.build_mdp(discount=discount)
-
     # Build the LCP object
     if method in ['kojima']:
         print 'Building LCP object...'
         start = time.time()
         lcp_obj = mdp_obj.tolcp()
-        print 'Done. ({0:.2f}s)'.format(time.time() - start)
+        print 'Built LCP object. ({0:.2f}s)'.format(time.time() - start)
 
     # Build the Projective LCP object
     if method in ['projective']:
-        print 'Building projected LCP object...'
-        start = time.time()
-        proj_lcp_obj = build_projective_lcp(mdp_obj)
-        print 'Done. ({0:.2f}s)'.format(time.time() - start)        
+        proj_lcp_obj = build_projective_lcp(mdp_obj,discretizer,**kwargs)      
 
     # Select the iterator
     if method == 'value':
         iter = ValueIterator(mdp_obj)
     elif method == 'kojima':
         iter = KojimaIPIterator(lcp_obj)
+    elif method == 'projective':
+        print "Initializing Projected interior point iterator..."
+        start = time.time()
+        iter = ProjectiveIPIterator(proj_lcp_obj)
+        print "Finished initialization {0}s".format(time.time() - start)
     else:
         raise NotImplmentedError()
 
@@ -262,11 +323,10 @@ def find_value_function(discretizer,**kwargs):
         val_change_term = ValueChangeTerminationCondition(thresh)
         solver.termination_conditions.append(val_change_term)
         solver.notifications.append(ValueChangeAnnounce())        
-    elif method in ['kojima']:
+    elif method in ['kojima','projective']:
         res_change_term = ResidualTerminationCondition(thresh)
         solver.termination_conditions.append(res_change_term)
-        solver.notifications.append(ResidualChangeAnnounce())
-
+        solver.notifications.append(ResidualAnnounce())
 
     # Actually do the solve
     print 'Starting {0} solve...'.format(type(iter))
@@ -296,8 +356,8 @@ if __name__ == '__main__':
     max_iter = 1e3
     thresh = 1e-6
 
-    x_desc = (-4,4,50)
-    v_desc = (-6,6,50)
+    x_desc = (-4,4,10)
+    v_desc = (-6,6,10)
     a_desc = (-1,1,3)
     cost_coef = np.array([1,0.5])
 
@@ -305,14 +365,18 @@ if __name__ == '__main__':
                                        cost_coef=cost_coef)
     #plot_remap(discretizer,-1,np.array([[-6,-3],[6,3]]))
 
-    value_fun_eval = find_value_function(discretizer,\
-                                             discount=discount,\
-                                             max_iter=max_iter,\
-                                             thresh=thresh)
+    mdp_obj = build_mdp_obj(discretizer,discount=discount) 
+
+    value_fun_eval = solve_for_value_function(discretizer,\
+                                              mdp_obj,
+                                              discount=discount,\
+                                              max_iter=max_iter,\
+                                              thresh=thresh,
+                                              basis='fourier')
     #plot_costs(discretizer,-1)
     #plot_value_function(discretizer,value_fun_eval)
     #plot_advantage(discretizer,value_fun_eval,-1,1)
-    lookahead = 3
-    policy = mdp.KStepLookaheadPolicy(discretizer, value_fun_eval, discount,lookahead)
-    plot_policy(discretizer,policy)
+    #lookahead = 3
+    #policy = mdp.KStepLookaheadPolicy(discretizer, value_fun_eval, discount,lookahead)
+    #plot_policy(discretizer,policy)
     #plot_trajectory(discretizer,policy)

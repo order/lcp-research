@@ -1,5 +1,9 @@
 from solvers import LCPIterator
 
+import numpy as np
+import scipy as sp
+import scipy.sparse as sps
+
 class ProjectiveIPIterator(LCPIterator):
     def __init__(self,proj_lcp_obj,**kwargs):
         self.centering_coeff = kwargs.get('centering_coeff',0.99)
@@ -8,26 +12,34 @@ class ProjectiveIPIterator(LCPIterator):
         
         self.proj_lcp_obj = proj_lcp_obj
         self.q = proj_lcp_obj.q
-        self.Phi = proj_lcp_obj.Phi
-        self.U = proj_lcp_obj.U
+        Phi = proj_lcp_obj.Phi
+        U = proj_lcp_obj.U
+        self.Phi = Phi
+        self.U = U
+        (N,k) = Phi.shape
+        
         
         # We expect Phi and U to be both either dense, or both sparse (no mixing)
         # If sparse, we want them to be csr or csc (these can be mixed)
         # self.linsolve is set based on whether we are in the sparse regime or the dense one.
         # TODO: also allow mixed sparseness (e.g. Phi dense, U csr)
-        if isinstance(self.Phi,np.ndarray):
-            assert(isinstance(self.U,np.ndarray))
-            self.linsolve = lambda A,b: np.linalg.lstsq(G,h)[0]
+        if isinstance(Phi,np.ndarray):
+            assert(isinstance(U,np.ndarray))
+            self.linsolve = lambda A,b: np.linalg.lstsq(A,b)[0]
         else:
-            assert(isinstance(self.Phi,sps.csc_matrix) or isinstance(self.Phi,sps.csr_matrix))
-            assert(isinstance(self.U,sps.csc_matrix) or isinstance(self.U,sps.csr_matrix))
-            self.linsolve = lambda A,b: sps.linalg.lsqr(G,h)[0]
+            assert(isinstance(Phi,sps.csc_matrix) or isinstance(Phi,sps.csr_matrix))
+            assert(isinstance(U,sps.csc_matrix) or isinstance(U,sps.csr_matrix))
+            self.linsolve = lambda A,b: sps.linalg.lsqr(A,b)[0]
          
         # Preprocess
-        self.PtP = (Phi.T).dot(Phi) # FTF in Geoff's code
+        PtP = (Phi.T).dot(Phi) # FTF in Geoff's code
+        assert((k,k) == PtP.shape)
         self.PtPUP = (PtP.dot(U)).dot(Phi)
+        assert((k,k) == self.PtPUP.shape)        
         self.PtPU_P = (PtP.dot(U) - Phi.T) # FMI in Geoff's code; I sometimes call it Psi in my notes
-        
+        assert((k,N) == self.PtPU_P.shape)            
+        self.PtP = PtP
+
         self.x = kwargs.get('x0',np.ones(N))
         self.y = kwargs.get('y0',np.ones(N))
         self.w = kwargs.get('w0',np.zeros(k))
@@ -49,54 +61,56 @@ class ProjectiveIPIterator(LCPIterator):
         Phi = self.Phi
         U = self.U
         q = self.q
+        
         assert(len(Phi.shape) == 2)
         (N,k) = Phi.shape
-        assert(ismatrix(U,k,N))
-        assert(isvector(q,N))
+        assert((k,N) == U.shape)
+        assert((N,) == q.shape)
 
         PtP = self.PtP # FTF in Geoff's code
-        assert(issquare(PtP,k))
         PtPUP = self.PtPUP
-        assert(issquare(PtPUP,k))
         PtPU_P = self.PtPU_P 
-        assert(ismatrix(PtPU_P,k,N))
 
         x = self.x
         y = self.y
         w = self.w
-        assert(isvector(x,N))
-        assert(isvector(y,N))
-        assert(isvector(w,k))
+        assert((N,) == x.shape)
+        assert((N,) == y.shape)
+        assert((k,) == w.shape)
 
         # Step 3: form right-hand sides
         g = sigma * x.dot(y) / float(N) * np.ones(N) - x * y
         p = x - y + q - Phi.dot(w)
-        assert(isvector(g,N))
-        assert(isvector(p,N))
+        assert((N,) == g.shape)
+        assert((N,) == p.shape)
+
         
         # Step 4: Form the reduced system G dw = h
-        inv_XY = 1.0/(x + y)
-        A = PtPU_P * inv_XY
-        assert(ismatrix(A,k,N))    
-        G = (A * y).dot(Phi) - PtPUP
-        assert(issquare(G,k))
+        X = sps.diags(x,0)
+        Y = sps.diags(y,0)
+        inv_XY = sps.diags(1.0/(x + y),0)
+        A = PtPU_P.dot(inv_XY)
+        assert((k,N) == A.shape)
+        
+        G = (A.dot(Y)).dot(Phi) - PtPUP
+        assert((k,k) == G.shape)
         h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
-        assert(isvector(h,k))
+        assert((k,) == h.shape)
             
         # Step 5: Solve for del_w
         del_w = self.linsolve(G,h) # Uses either dense or sparse least-squares
-        assert(isvector(del_w))
-        assert(isvector(del_w,k))
+        assert((k,) == del_w.shape)
             
             # Step 6
         Phidw= Phi.dot(del_w)
-        assert(isvector(Phidw,N))
-        del_y = inv_XY*(g + y*p - y*Phidw)
-        assert(isvector(del_y,N))
+        assert((N,) == Phidw.shape)
+        del_y = inv_XY.dot(g + y*p - y*Phidw)
+        assert((N,) == del_y.shape)
         
         # Step 7
         del_x = del_y+Phidw-p
-        assert(isvector(del_x,N))      
+        assert((N,) == del_x.shape)
+        
             
             # Step 8 Step length
         steplen = max(np.amax(-del_x/x),np.amax(-del_y/y))
@@ -108,10 +122,18 @@ class ProjectiveIPIterator(LCPIterator):
                     
         # Sigma is beta in Geoff's code
         if(steplen > 0.95):
-            sigma = 0.05 # Long step
+            sigma = 0.05 # Long stpe
         else:
             sigma = 0.5 # Short step
               
         self.x = x + steplen * del_x
         self.y = y + steplen * del_y
-        self.w = w + steplen * del_w   
+        self.w = w + steplen * del_w
+        self.iteration += 1
+
+    def get_primal_vector(self):
+        return self.x
+    def get_dual_vector(self):
+        return self.y
+    def get_iteration(self):
+        return self.iteration

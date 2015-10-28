@@ -69,3 +69,18 @@ class ResidualChangeAnnounce(Notification):
             print 'Residual {0:.3g} at iteration {1}'\
                 .format(new_r,iterator.get_iteration())
             self.residual_log = int_log_r
+
+class ResidualAnnounce(Notification):
+    """
+    Broadcast residual every iteration
+    """
+    def __init__(self):
+        self.residual_log = float('inf')
+        
+    def announce(self,iterator):
+        x = iterator.get_primal_vector()
+        w = iterator.get_dual_vector()
+        r = np.linalg.norm(np.minimum(x,w))
+        print 'Residual {0:.3g} at iteration {1}'\
+            .format(r,iterator.get_iteration())
+

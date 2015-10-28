@@ -3,6 +3,7 @@ import numpy as np
 import scipy
 import scipy.sparse
 import scipy.sparse.linalg
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
@@ -41,7 +42,7 @@ class BasisGenerator(object):
         (N,D) = points.shape
 
         # Special points are things like OOB nodes    
-        special_points = sorted(kwargs.get('special_points',[]))
+        special_points = np.array(sorted(kwargs.get('special_points',[])))
         sp_set = set(special_points)
         S = len(sp_set)         
 
@@ -60,9 +61,24 @@ class BasisGenerator(object):
         # 
         B[special_points,:] = 0 # Blot all special points out
         B = np.hstack([B,np.zeros((N,S))])
-        B[(K-S):,special_points] = np.eye(S)
+        
+        B[special_points,(K-S):] = np.eye(S)
 
         return B
+
+    def generate_block_diag(self,points,K,R,**kwargs):
+        """
+        Builds a block diagonal matrix where each block is one of R identical copies of
+        a K-column basis matrix defined by the (N,d) point array, and the generator function.
+        """
+        (N,d) = points.shape
+        B = self.generate(points,K,**kwargs)
+        RepB = [B]*R
+        BDB = scipy.linalg.block_diag(*RepB)
+        assert((N*R,K*R) == BDB.shape)
+        return BDB
+
+
 
 class BasicBasisGenerator(object):
     """
