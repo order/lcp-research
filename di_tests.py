@@ -371,8 +371,9 @@ if __name__ == '__main__':
                                               mdp_obj,
                                               discount=discount,\
                                               max_iter=max_iter,\
-                                              thresh=thresh,
-                                              basis='fourier')
+                                              thresh=thresh,\
+                                              basis='fourier',\
+                                              method='projective')
     #plot_costs(discretizer,-1)
     #plot_value_function(discretizer,value_fun_eval)
     #plot_advantage(discretizer,value_fun_eval,-1,1)

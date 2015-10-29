@@ -17,19 +17,6 @@ class ProjectiveIPIterator(LCPIterator):
         self.Phi = Phi
         self.U = U
         (N,k) = Phi.shape
-        
-        
-        # We expect Phi and U to be both either dense, or both sparse (no mixing)
-        # If sparse, we want them to be csr or csc (these can be mixed)
-        # self.linsolve is set based on whether we are in the sparse regime or the dense one.
-        # TODO: also allow mixed sparseness (e.g. Phi dense, U csr)
-        if isinstance(Phi,np.ndarray):
-            assert(isinstance(U,np.ndarray))
-            self.linsolve = lambda A,b: np.linalg.lstsq(A,b)[0]
-        else:
-            assert(isinstance(Phi,sps.csc_matrix) or isinstance(Phi,sps.csr_matrix))
-            assert(isinstance(U,sps.csc_matrix) or isinstance(U,sps.csr_matrix))
-            self.linsolve = lambda A,b: sps.linalg.lsqr(A,b)[0]
          
         # Preprocess
         PtP = (Phi.T).dot(Phi) # FTF in Geoff's code
@@ -98,7 +85,8 @@ class ProjectiveIPIterator(LCPIterator):
         assert((k,) == h.shape)
             
         # Step 5: Solve for del_w
-        del_w = self.linsolve(G,h) # Uses either dense or sparse least-squares
+        # G is essentially dense
+        del_w = np.linalg.lstsq(G.todense(),h)[0]
         assert((k,) == del_w.shape)
             
             # Step 6
@@ -113,18 +101,27 @@ class ProjectiveIPIterator(LCPIterator):
         
             
             # Step 8 Step length
-        steplen = max(np.amax(-del_x/x),np.amax(-del_y/y))
-        if steplen <= 0:
-            steplen = float('inf')
-        else:
-            steplen = 1.0 / steplen
-        steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
+        #steplen = max(np.amax(-del_x/x),np.amax(-del_y/y))
+        #if steplen <= 0:
+        #    steplen = float('inf')
+        #else:
+        #    steplen = 1.0 / steplen
+        #steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
+
+        steplen = 1
+        x_cand = x + steplen*del_x
+        y_cand = y + steplen*del_y    
+        while np.any(x_cand < 0) or np.any(y_cand < 0):
+            steplen *= 0.99
+            x_cand = x + steplen*del_x
+            y_cand = y + steplen*del_y
                     
         # Sigma is beta in Geoff's code
         if(steplen > 0.95):
-            sigma = 0.05 # Long stpe
+            sigma = 0.05 # Long step
         else:
-            sigma = 0.5 # Short step
+            sigma = 0.99 # Short step
+        print "Steplen: {0:.3f}".format(steplen)
               
         self.x = x + steplen * del_x
         self.y = y + steplen * del_y
