@@ -13,7 +13,7 @@ class ValueChangeAnnounce(Notification):
     Checks if the value vector from an MDP iteration has changed 
     significantly
     """
-    def __init__(self):
+    def __init__(self,**kwargs):
         self.old_v = np.NaN # Don't have old iteration
         self.diff = float('inf')
         
@@ -35,12 +35,19 @@ class PrimalChangeAnnounce(Notification):
     Checks if the value vector from an MDP iteration has changed 
     significantly
     """
-    def __init__(self):
+    def __init__(self,**kwargs):
         self.old_x = np.NaN # Don't have old iteration
         self.diff = float('inf')
+
+        # Only use a slice of the primal vector
+        self.indices = kwargs.get('indices',np.empty(0))
         
     def announce(self,iterator):
         x = iterator.get_primal_vector()
+        if not self.indices:
+            self.indices = slice(0,x.size)
+        x = x[self.indices]
+            
         if np.any(self.old_x == np.NaN):
             self.old_x = x
             
@@ -50,6 +57,32 @@ class PrimalChangeAnnounce(Notification):
         if math.log(new_diff) <= math.log(self.diff) - 1:
             print 'Primal iteration diff {0:.3g} at iteration {1}'.format(new_diff,iterator.get_iteration())
             self.diff = new_diff
+
+class PrimalDiffAnnounce(Notification):
+    """
+    Reports iteration to iteration difference
+    """
+    def __init__(self,**kwargs):
+        self.old_x = np.NaN # Don't have old iteration
+
+        # Only use a slice of the primal vector
+        self.indices = kwargs.get('indices',np.empty(0))
+        
+    def announce(self,iterator):
+        x = iterator.get_primal_vector()
+        if not self.indices:
+            self.indices = slice(0,x.size)
+        x = x[self.indices]
+            
+        if np.any(self.old_x == np.NaN):
+            self.old_x = x
+            return
+            
+        diff = np.linalg.norm(self.old_x - x)
+        self.old_x = x
+        
+        print 'Primal iteration diff {0:.3g} at iteration {1}'\
+            .format(diff,iterator.get_iteration())
 
 class ResidualChangeAnnounce(Notification):
     """

@@ -120,8 +120,10 @@ class ProjectiveIPIterator(LCPIterator):
         if(steplen > 0.95):
             sigma = 0.05 # Long step
         else:
-            sigma = 0.99 # Short step
-        print "Steplen: {0:.3f}".format(steplen)
+            sigma = 0.5 # Short step
+
+        self.steplen = steplen
+        self.centering_coeff = sigma
               
         self.x = x + steplen * del_x
         self.y = y + steplen * del_y

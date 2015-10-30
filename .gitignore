@@ -7,3 +7,4 @@ test.lcp
 *.py~
 *.py#
 .#di_tests.py
+*.csv

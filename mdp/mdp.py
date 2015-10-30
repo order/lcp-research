@@ -73,7 +73,8 @@ class MDP(object):
         
         I guess we're using a sparse matrix here...
         """
-        return sps.eye(self.num_states,format='lil') - self.discount * self.transitions[a].T
+        return sps.eye(self.num_states,format='lil')\
+            - self.discount * self.transitions[a].T
 
     def tolcp(self):
         n = self.num_states
@@ -99,6 +100,9 @@ class MDP(object):
             Top = sps.hstack((Top,E.T))
             q[((a+1)*n):((a+2)*n)] = self.costs[a]
         M = sps.vstack((Top,Bottom))
+
+        assert((N,N) == M.shape)
+        assert((N,) == q.shape)
         
         return lcp.LCPObj(M,q,name='LCP from {0} MDP'.format(self.name))
 

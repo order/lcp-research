@@ -28,7 +28,30 @@ class ValueChangeTerminationCondition(TerminationCondition):
         
     def __str__(self):
         return 'ValueChangeTerminationCondition {0} ({1})'.format(self.thresh,self.diff)
+
+class PrimalChangeTerminationCondition(TerminationCondition):
+    """
+    Checks if the value vector from an MDP iteration has changed 
+    significantly
+    """
+    def __init__(self,thresh):
+        self.thresh = thresh
+        self.old_x = np.NaN # Don't have old iteration
+        self.diff = float('inf')
         
+    def isdone(self,iterator):
+        x = iterator.get_primal_vector()
+        if np.any(self.old_x == np.NaN):
+            self.old_x = x
+            return False
+            
+        self.diff = np.linalg.norm(self.old_x - x)
+        self.old_x = x
+        return self.diff < self.thresh
+        
+    def __str__(self):
+        return 'ValueChangeTerminationCondition {0} ({1})'.format(self.thresh,self.diff)
+    
 class ResidualTerminationCondition(TerminationCondition):
     """
     Checks if the value vector from an MDP iteration has changed 

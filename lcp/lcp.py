@@ -17,6 +17,14 @@ class LCPObj(object):
         
         self.name = kwargs.get('name','Unnamed')
 
+    def to_csv(self,filename):
+        FH = open(filename,'w')
+        for r in self.M.todense():
+            FH.write(','.join(map(str,r.tolist()[0])) + '\n')
+        FH.write(','.join(map(str,self.q.tolist()[0])) + '\n')
+        FH.close()
+        
+
     def __str__(self):
         return '<{0} in R^{1}>'.format(self.name, self.dim)
                 
@@ -46,6 +54,20 @@ class ProjectiveLCPObj(LCPObj):
         
         self.name = kwargs.get('name','Unnamed')
 
+    def to_csv(self,fileroot):
+        FH = open(fileroot + '_phi.csv','w')
+        for r in self.Phi.todense():
+            FH.write(','.join(map(str,r.tolist()[0])) + '\n')
+        FH.close()
+        FH = open(fileroot + '_u.csv','w')        
+        for r in self.U.todense():
+            FH.write(','.join(map(str,r.tolist()[0])) + '\n')           
+        FH.close()
+        FH = open(fileroot + '_q.csv','w')
+        FH.write(','.join(map(str,self.q)) + '\n')
+        FH.close()
+ 
+        
     def __str__(self):
         return '<{0} in R^{1}'.\
             format(self.name, self.dim)
