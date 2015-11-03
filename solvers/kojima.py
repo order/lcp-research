@@ -45,7 +45,7 @@ class KojimaIPIterator(LCPIterator):
         A = sps.bmat([[sps.spdiags(y,0,n,n),sps.spdiags(x,0,n,n)],\
             [-M,sps.eye(n)]],format='csc')          
         b = np.concatenate([sigma * dot / float(n) * np.ones(n) - x*y, r])
-                
+
         dir = sps.linalg.spsolve(A,b)
         dir_x = dir[:n]
         dir_y = dir[n:]

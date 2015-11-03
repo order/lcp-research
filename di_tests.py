@@ -258,18 +258,33 @@ def build_projective_lcp(mdp_obj,discretizer,**kwargs):
     assert(P == n)
 
     # Generate the basis
-    if basis == 'fourier':
-        nan_idx = np.where(np.any(np.isnan(points),axis=1))[0]
-        fourier = bases.RandomFourierBasis()
+    nan_idx = np.where(np.any(np.isnan(points),axis=1))[0]
+    if basis == 'random_fourier':
+        fourier = bases.RandomFourierBasis(num_basis=K,
+            scale=5.0)
         basis_gen = bases.BasisGenerator(fourier)
-        Phi = basis_gen.generate_block_diag(points,K,(A+1),\
+        Phi = basis_gen.generate_block_diag(points,(A+1),\
                                             special_points=nan_idx)
+    elif basis == 'regular_rbf':
+        # Generate grid of frequencies
+        x_grid = np.linspace(-4,4,12)
+        v_grid = np.linspace(-6,6,12)        
+        [X,Y] = np.meshgrid(x_grid,v_grid)
+        centers = np.column_stack([X.flatten(),Y.flatten()])
+        
+        RBF = bases.RegularRadialBasis(centers=centers,
+            bandwidth=0.75)
+        basis_gen = bases.BasisGenerator(RBF)
+        Phi = basis_gen.generate_block_diag(points,(A+1),\
+                                            special_points=nan_idx)        
     elif basis == 'identity':
         # Identity basis; mostly for testing
         Phi = np.eye(N)
     else:
-        raise NotImplmentedError()        
-    assert((N,(A+1)*K) == Phi.shape)
+        raise NotImplmentedError()
+
+    plt.imshow(Phi)
+    plt.show()
 
     U = np.linalg.lstsq(Phi,M)[0]
     Mhat = Phi.dot(U)
@@ -337,8 +352,8 @@ def solve_for_value_function(discretizer,mdp_obj,**kwargs):
         solver.notifications.append(ResidualAnnounce())
         num_states = mdp_obj.num_states
         solver.notifications.append(PrimalDiffAnnounce())
-        sl = slice(0,num_states)
-        solver.notifications.append(PrimalDiffAnnounce(indices=sl))
+        #sl = slice(0,num_states)
+        #solver.notifications.append(PrimalDiffAnnounce(indices=sl))
 
     # Actually do the solve
     print 'Starting {0} solve...'.format(type(iter))
@@ -368,8 +383,8 @@ if __name__ == '__main__':
     max_iter = 500
     thresh = 1e-6
 
-    x_desc = (-4,4,30)
-    v_desc = (-6,6,30)
+    x_desc = (-4,4,12)
+    v_desc = (-6,6,12)
     a_desc = (-1,1,3)
     cost_coef = np.array([1,0.5])
 
@@ -385,7 +400,7 @@ if __name__ == '__main__':
                                               discount=discount,\
                                               max_iter=max_iter,\
                                               thresh=thresh,\
-                                              basis='fourier',\
+                                              basis='regular_rbf',\
                                               K=100,\
                                               method='projective')
     #plot_costs(discretizer,-1)

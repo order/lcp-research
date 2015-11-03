@@ -79,14 +79,17 @@ class ProjectiveIPIterator(LCPIterator):
         A = PtPU_P.dot(inv_XY)
         assert((k,N) == A.shape)
         
-        G = (A.dot(Y)).dot(Phi) - PtPUP
+        G = ((A.dot(Y)).dot(Phi) - PtPUP).todense()
         assert((k,k) == G.shape)
+        print 'G is ({0},{0}), has rank {1}, and cond {2}'\
+            .format(k,np.linalg.matrix_rank(G),np.linalg.cond(G))
         h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
         assert((k,) == h.shape)
             
         # Step 5: Solve for del_w
         # G is essentially dense
-        del_w = np.linalg.lstsq(G.todense(),h)[0]
+        #del_w = np.linalg.lstsq(G,h)[0]
+        del_w = np.linalg.solve(G,h)
         assert((k,) == del_w.shape)
             
             # Step 6
