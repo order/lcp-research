@@ -95,3 +95,10 @@ def basic_residual(x,w):
 def fb_residual(x,w):
     fb = np.sqrt(x**2 + w**2) - x - w
     return np.linalg.norm(fb)
+    
+    
+#
+def build_projection_matrix(Phi):
+    [Q,R] = scipy.linalg.qr(Phi,mode'economic',pivoting=False)
+    return Q.dot(Q.T)
+    

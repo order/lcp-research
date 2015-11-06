@@ -82,8 +82,6 @@ class BasisGenerator(object):
         assert((N*R,K*R) == BDB.shape)
         return BDB
 
-
-
 class BasicBasisGenerator(object):
     """
     The BasisGenerator uses these for actually doing to mapping of rows to basis values.

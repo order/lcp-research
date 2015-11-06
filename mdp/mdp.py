@@ -151,13 +151,22 @@ def mdp_skew_assembler(A_list):
     """
     A = len(A_list)
     (n,m) = A_list[0].shape
-    assert(n == m) # Square
-    N = (A+1)*n
-    M = sps.lil_matrix((N,N))
-    for i in xrange(A):
-        I = xrange(n)
-        J = xrange((i+1)*n,(i+2)*n)
-        M[np.ix_(I,J)] = A_list[i]
-        M[np.ix_(J,I)] = -A_list[i]
+    M = m * A
+    
+    Block = sps.hstack(A_list)
+    assert((n,M) == Block.shape)
+    Top = sps.hstack([sps.lil_matrix(n,n), Block])
+    assert((n,M+n) == Top.shape)
+    Bottom = sps.hstack([-Block.T,sps.lil_matrix(M,M)])
+    assert((M,M+n) == Bottom.shape)
+    SS = sps.vstack([Top,Bottom])
+    assert((M,M+n) == Z.shape)
+    
+    
+
     return M.tocsr()
+    
+def build_proj_value_iter_matrix(self,N,A):
+    return mdp_skew_assembler([sp.eye(N)]*(A+1))
+
         
