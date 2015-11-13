@@ -160,7 +160,7 @@ def mdp_skew_assembler(A_list):
     Bottom = sps.hstack([-Block.T,sps.lil_matrix(M,M)])
     assert((M,M+n) == Bottom.shape)
     SS = sps.vstack([Top,Bottom])
-    assert((M,M+n) == Z.shape)
+    assert((M,M+n) == SS.shape)
     
     
 

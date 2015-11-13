@@ -261,7 +261,7 @@ def build_projective_lcp(mdp_obj,discretizer,**kwargs):
     nan_idx = np.where(np.any(np.isnan(points),axis=1))[0]
     if basis == 'random_fourier':
         fourier = bases.RandomFourierBasis(num_basis=K,
-            scale=5.0)
+            scale=1.0)
         basis_gen = bases.BasisGenerator(fourier)
         Phi = basis_gen.generate_block_diag(points,(A+1),\
                                             special_points=nan_idx)
@@ -282,9 +282,12 @@ def build_projective_lcp(mdp_obj,discretizer,**kwargs):
         Phi = np.eye(N)
     else:
         raise NotImplmentedError()
-
-    plt.imshow(Phi)
-    plt.show()
+        
+    ortho = True
+    if ortho:
+        [Q,R] = sp.linalg.qr(Phi,mode='economic')
+        assert(Q.shape == Phi.shape)
+        Phi = Q
 
     U = np.linalg.lstsq(Phi,M)[0]
     Mhat = Phi.dot(U)
@@ -350,6 +353,7 @@ def solve_for_value_function(discretizer,mdp_obj,**kwargs):
         res_change_term = ResidualTerminationCondition(thresh)
         solver.termination_conditions.append(res_change_term)
         solver.notifications.append(ResidualAnnounce())
+        solver.notifications.append(PotentialAnnounce())
         num_states = mdp_obj.num_states
         solver.notifications.append(PrimalDiffAnnounce())
         #sl = slice(0,num_states)
@@ -400,7 +404,7 @@ if __name__ == '__main__':
                                               discount=discount,\
                                               max_iter=max_iter,\
                                               thresh=thresh,\
-                                              basis='regular_rbf',\
+                                              basis='random_fourier',\
                                               K=100,\
                                               method='projective')
     #plot_costs(discretizer,-1)

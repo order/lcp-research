@@ -70,21 +70,46 @@ class ProjectiveIPIterator(LCPIterator):
         p = x - y + q - Phi.dot(w)
         assert((N,) == g.shape)
         assert((N,) == p.shape)
-
         
         # Step 4: Form the reduced system G dw = h
         X = sps.diags(x,0)
         Y = sps.diags(y,0)
+        Z = sps.lil_matrix((N,k))
+        I = sps.eye(N)
+        M = Phi.dot(U)
+        
+        if False:
+            # Un-reduced system
+            NewtonSystem = sps.bmat([[Y, X ,Z],\
+                [-M,I,Z],\
+                [-I,I,Phi]])
+            print 'NewtonSystem: '
+            print '\tShape:',NewtonSystem.shape 
+            print '\tCond: {0:.3g}'.format(np.linalg.cond(NewtonSystem.todense()))           
+            # Eliminate the x block
+            ReductedNewtonSystem = sps.bmat([[X+Y,Y.dot(Phi)],\
+                [I - M, -M.dot(Phi)]])
+                
+            print 'ReductedNewtonSystem: '
+            print '\tShape:',ReductedNewtonSystem.shape 
+            print '\tCond: {0:.3g}'.format(np.linalg.cond(ReductedNewtonSystem.todense()))      
+            
+        # Eliminate both the x and y blocks
         inv_XY = sps.diags(1.0/(x + y),0)
         A = PtPU_P.dot(inv_XY)
-        assert((k,N) == A.shape)
-        
+        assert((k,N) == A.shape)        
         G = ((A.dot(Y)).dot(Phi) - PtPUP).todense()
+        
+        #print 'Reduced Newton system: '
+        #print '\tShape:',G.shape 
+        #print '\tCond:', np.linalg.cond(G)            
+        #print '\tCond: {0:.3g}'.format(np.linalg.cond(G))
+        
         assert((k,k) == G.shape)
-        print 'G is ({0},{0}), has rank {1}, and cond {2}'\
-            .format(k,np.linalg.matrix_rank(G),np.linalg.cond(G))
         h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
         assert((k,) == h.shape)
+        
+        
             
         # Step 5: Solve for del_w
         # G is essentially dense
