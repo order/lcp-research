@@ -61,9 +61,10 @@ class BasisGenerator(object):
         assert(N == M)
 
         # Give any special points their own column
-        B[special_points,:] = 0 # Blot all special points out
-        B = np.hstack([B,np.zeros((N,S))])        
-        B[special_points,K:] = np.eye(S)
+        if len(special_points) > 0:
+            B[special_points,:] = 0 # Blot all special points out
+            B = np.hstack([B,np.zeros((N,S))])        
+            B[special_points,K:] = np.eye(S)
 
         return B
 
@@ -111,7 +112,8 @@ class RandomFourierBasis(BasicBasisGenerator):
         assert((N,K) == B.shape)
 
         # Mask out any special points
-        B[special_points,:] = 0
+        if len(special_points) > 0:
+            B[special_points,:] = 0
         
         # Normalize        
         normalize_cols(B)
