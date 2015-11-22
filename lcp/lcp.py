@@ -37,7 +37,18 @@ class MDPLCPObj(LCPObj):
         self.MDP = MDP
         (M,q) = MDP.tolcp()
         super(MDPLCPObj,self).__init__(M,q)
-            
+        
+    def split_vector(self,x):        
+        N = self.dim # M is N-by-N
+        n = self.MDP.num_states
+        A = self.MDP.num_actions
+        assert(N == n*(A+1)) # Basic sanity
+        
+        assert((N,) == x.shape) # x is N-by-1
+        
+        blocks = [x[(i*n):((i+1)*n)] for i in xrange(A+1)] # break in chucks 
+        return [blocks[0],blocks[1:]] # first block is value, rest is flow
+           
 class ProjectiveLCPObj(LCPObj):
     """An object for a projective LCP where M = Phi U + Pi_bot
     LCPs of this class can be rapidly solved using fast interior point algorithms like the one in "Fast solutions to projective monotone linear complementarity problems" (http://arxiv.org/pdf/1212.6958v1.pdf)  

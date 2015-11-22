@@ -23,65 +23,26 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 
-
 import time
 
 
-def map_back_test():
-    """
-    Check to make sure that all nodes map back to themselves when 
-    run through the
-    node -> state -> node machinery
-    """
-    
-    np.set_printoptions(precision=3)
-    
-    disc = generate_discretizer((-2,2,4),(-3,3,5),(0,1,2))
-    basic_mapper = disc.basic_mapper
-    
-    mdp_obj = disc.build_mdp()
-    
-    n = basic_mapper.get_num_nodes()
-    N = mdp_obj.costs[0].shape[0]
-    for _ in xrange(125):
-        node = random.randint(0,n-1)
-        state = basic_mapper.nodes_to_states([node])
-        back_again = basic_mapper.states_to_node_dists(state)[0]
-        if back_again.keys()[0] != node:
-            print 'Problem state',state
-            print 'Node dist',back_again
-            print '{0} != {1}'.format(node,back_again.keys()[0])
-            assert(back_again.keys()[0] == node)
 
-##########################################3
-# Plotting functions
-            
-def plot_remap(discretizer,action,sink_states):
-    states = discretizer.basic_mapper.get_node_states()
-    next_states = discretizer.physics.remap(states,action=action)
+class DIImages(Notification):
+    def __init__(self,discretizer):
+        self.lens = discretizer.get_basic_len()[0]
+        self.actions = discretizer.num_actions
+        
+    def announce(self,iterator):
+        (x_n,v_n) = self.lens
+        A = self.actions
+        
+        J = iterator
+        
+        plt.figure(1)
+        plt.subplot(211)
+        
+        
 
-    N = states.shape[0]
-    for i in xrange(N):
-        plt.plot([states[i,0],next_states[i,0]],\
-                 [states[i,1],next_states[i,1]],'-b',lw=2)
-    
-    T = discretizer.states_to_transition_matrix(next_states)
-    (Nodes,States) = T.nonzero()
-    M = Nodes.size
-    for i in xrange(M):
-        node_id = Nodes[i]
-        state_id = States[i]
-        
-        if node_id < N:
-            x = states[node_id,0]
-            y = states[node_id,1]
-        else:
-            x = sink_states[node_id - N,0]
-            y = sink_states[node_id - N,1]    
-        
-        plt.plot([x,next_states[state_id,0]],\
-                 [y,next_states[state_id,1]],'-r',alpha=T[node_id,state_id])
-    plt.show()
     
 def plot_costs(discretizer,action):
     (x_n,v_n) = discretizer.get_basic_len()
@@ -130,14 +91,46 @@ def plot_value_function(discretizer,value_fun_eval,**kwargs):
     plt.xlabel('Position')
     plt.ylabel('Velocity')
     plt.title('Cost-to-go function')
+    plt.show()
+
+def plot_value_vector(discretizer,value_fun_eval,**kwargs):
+    (x_n,v_n) = discretizer.get_basic_len()
+  
+    J = value_fun_eval.node_to_cost[:(x_n*v_n)]
+    print J.shape
+    print x_n,v_n
+    J = np.reshape(J,(x_n,v_n))
+    plt.pcolor(J.T)
+    plt.title('Cost-to-go function')
+
     plt.show()   
+    
+def plot_flow(discretizer,value_fun_eval,**kwargs):
+    boundary = discretizer.get_basic_boundary()    
+    (x_lo,x_hi) = boundary[0]
+    (v_lo,v_hi) = boundary[1]
+    
+    grid = kwargs.get('grid_size',51)
+    [x_mesh,v_mesh] = np.meshgrid(np.linspace(x_lo,x_hi,grid),\
+                                  np.linspace(v_lo,v_hi,grid),indexing='ij')
+    Pts = np.column_stack([x_mesh.flatten(),v_mesh.flatten()])
+    
+    vals = value_fun_eval.evaluate(Pts)
+    ValueImg = np.reshape(vals,(grid,grid))
+    
+    plt.pcolor(x_mesh,v_mesh,ValueImg)
+        
+    plt.xlabel('Position')
+    plt.ylabel('Velocity')
+    plt.title('Cost-to-go function')
+    plt.show()       
     
 def plot_policy(discretizer,policy,**kwargs):
     boundary = discretizer.get_basic_boundary()
     (x_lo,x_hi) = boundary[0]
     (v_lo,v_hi) = boundary[1]
     
-    grid = kwargs.get('grid_size',101)
+    grid = kwargs.get('grid_size',50)
     [x_mesh,y_mesh] = np.meshgrid(np.linspace(x_lo,x_hi,grid),\
                                   np.linspace(v_lo,v_hi,grid),indexing='ij')
     Pts = np.column_stack([x_mesh.flatten(),y_mesh.flatten()])
@@ -145,7 +138,7 @@ def plot_policy(discretizer,policy,**kwargs):
     
     PolicyImg = np.reshape(policy.get_decisions(Pts),(grid,grid))
 
-    plt.imshow(PolicyImg,interpolation = 'nearest')
+    plt.pcolor(PolicyImg.T)
     plt.title('Policy map')
 
     plt.show()   
@@ -384,11 +377,11 @@ def solve_for_value_function(discretizer,mdp_obj,**kwargs):
 if __name__ == '__main__':
 
     discount = 0.997
-    max_iter = 500
+    max_iter = 100
     thresh = 1e-6
 
-    x_desc = (-4,4,12)
-    v_desc = (-6,6,12)
+    x_desc = (-4,4,20)
+    v_desc = (-6,6,24)
     a_desc = (-1,1,3)
     cost_coef = np.array([1,0.5])
 
@@ -404,13 +397,15 @@ if __name__ == '__main__':
                                               discount=discount,\
                                               max_iter=max_iter,\
                                               thresh=thresh,\
-                                              basis='random_fourier',\
+                                              #basis='random_fourier',\
+                                              basis='identity',\
                                               K=100,\
-                                              method='projective')
+                                              method='kojima')
     #plot_costs(discretizer,-1)
-    plot_value_function(discretizer,value_fun_eval)
+    plot_value_vector(discretizer,value_fun_eval)
     #plot_advantage(discretizer,value_fun_eval,-1,1)
     lookahead = 2
     policy = mdp.KStepLookaheadPolicy(discretizer, value_fun_eval, discount,lookahead)
     plot_policy(discretizer,policy)
+    plot_flow(discretizer,value_fun_eval)
     #plot_trajectory(discretizer,policy)

@@ -65,7 +65,7 @@ class BasisGenerator(object):
             B[special_points,:] = 0 # Blot all special points out
             B = np.hstack([B,np.zeros((N,S))])        
             B[special_points,K:] = np.eye(S)
-
+        #B = normalize_cols(B)
         return B
 
     def generate_block_diag(self,points,R,**kwargs):
@@ -108,16 +108,13 @@ class RandomFourierBasis(BasicBasisGenerator):
         Phi = 2.0 * np.pi * np.random.rand(K-1) # Phases shift
         F = np.sin(points.dot(W) + Phi) # Non-constant columns
         assert((N,K-1) == F.shape)
-        B = np.hstack([np.ones((N,1)),F])
+        B = np.hstack([1/np.sqrt(N)*np.ones((N,1)), np.sqrt(2.0 / float(N)) * F])
         assert((N,K) == B.shape)
 
         # Mask out any special points
         if len(special_points) > 0:
             B[special_points,:] = 0
-        
-        # Normalize        
-        normalize_cols(B)
-        
+                
         return B
         
         
@@ -140,10 +137,7 @@ class RegularRadialBasis(BasicBasisGenerator):
         B = np.column_stack(B)
         assert((N,K) == B.shape)
         B[special_points,:] = 0
-        
-        # Normalize        
-        normalize_cols(B)
-        
+                
         return B
         
 def normalize_cols(M):

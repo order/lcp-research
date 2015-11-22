@@ -8,3 +8,7 @@ test.lcp
 *.py#
 .#di_tests.py
 *.csv
+*.png
+approx_qr_experiment/approx_qr_experiment.aux
+*.pdf
+approx_qr_experiment/approx_qr_experiment.synctex.gz

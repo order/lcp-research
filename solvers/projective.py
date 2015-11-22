@@ -100,10 +100,9 @@ class ProjectiveIPIterator(LCPIterator):
         assert((k,N) == A.shape)        
         G = ((A.dot(Y)).dot(Phi) - PtPUP).todense()
         
-        #print 'Reduced Newton system: '
-        #print '\tShape:',G.shape 
-        #print '\tCond:', np.linalg.cond(G)            
-        #print '\tCond: {0:.3g}'.format(np.linalg.cond(G))
+        print 'Reduced Newton system: '
+        print '\tShape:',G.shape 
+        print '\tCond: {0:.3g}'.format(np.linalg.cond(G))
         
         assert((k,k) == G.shape)
         h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
@@ -129,20 +128,22 @@ class ProjectiveIPIterator(LCPIterator):
         
             
             # Step 8 Step length
-        #steplen = max(np.amax(-del_x/x),np.amax(-del_y/y))
-        #if steplen <= 0:
-        #    steplen = float('inf')
-        #else:
-        #    steplen = 1.0 / steplen
-        #steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
+        steplen = max(np.amax(-del_x/x),np.amax(-del_y/y))
+        if steplen <= 0:
+            steplen = float('inf')
+        else:
+            steplen = 1.0 / steplen
+        steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
 
-        steplen = 1
-        x_cand = x + steplen*del_x
-        y_cand = y + steplen*del_y    
-        while np.any(x_cand < 0) or np.any(y_cand < 0):
-            steplen *= 0.99
-            x_cand = x + steplen*del_x
-            y_cand = y + steplen*del_y
+        #steplen = 1
+        #x_cand = x + steplen*del_x
+        #y_cand = y + steplen*del_y    
+        #while np.any(x_cand < 0) or np.any(y_cand < 0):
+        #    steplen *= 0.99
+        #    x_cand = x + steplen*del_x
+        #    y_cand = y + steplen*del_y
+            
+        print 'Steplen {0:.3g}'.format(steplen)
                     
         # Sigma is beta in Geoff's code
         if(steplen > 0.95):

@@ -166,7 +166,7 @@ def mdp_skew_assembler(A_list):
 
     return M.tocsr()
     
-def build_proj_value_iter_matrix(self,N,A):
-    return mdp_skew_assembler([sp.eye(N)]*(A+1))
+    
+def 
 
         

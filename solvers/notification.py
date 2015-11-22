@@ -137,7 +137,7 @@ class PotentialAnnounce(Notification):
         w = iterator.get_dual_vector()
         
         N = x.size
-        P = N * np.log(x.dot(w)) - np.sum(np.log(x)) - np.sum(np.log(w))
+        P = (N + np.sqrt(N)) * np.log(x.dot(w)) - np.sum(np.log(x)) - np.sum(np.log(w))
         
         print 'Potential {0:.3g} at iteration {1}'\
             .format(P,iterator.get_iteration())
