@@ -42,13 +42,15 @@ class IterativeSolver(object):
         Returns a record object.
         """
         assert(len(self.termination_conditions) >= 1)
-        
-        Records = [[] for _ in xrange(len(self.recorders))]
-        
+
+        # Clean out any state from recorders
+        for recorder in self.recorders:
+            recorder.reset()
+                
         while True:       
             # First record everything pertinent (record initial information first)
-            for (i,recorder) in enumerate(self.recorders):                    
-                Records[i].append(recorder.report(self.iterator))
+            for recorder in self.recorders:                    
+                recorder.report(self.iterator)
                 
             # Make any announcements
             for note in self.notifications:
@@ -58,7 +60,7 @@ class IterativeSolver(object):
             for term_cond in self.termination_conditions:
                 if term_cond.isdone(self.iterator):
                     print 'Termination reason:', term_cond
-                    return Records                   
+                    return                   
                 
             # Finally, advance to the next iteration
             self.iterator.next_iteration()

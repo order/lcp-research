@@ -165,8 +165,4 @@ def mdp_skew_assembler(A_list):
     
 
     return M.tocsr()
-    
-    
-def 
-
         

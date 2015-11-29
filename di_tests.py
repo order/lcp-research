@@ -9,6 +9,7 @@ from solvers.kojima import KojimaIPIterator
 from solvers.projective import ProjectiveIPIterator
 from solvers.termination import *
 from solvers.notification import *
+from solvers.recording import *
 
 import bases
 
@@ -25,25 +26,6 @@ from matplotlib import cm
 
 import time
 
-
-
-class DIImages(Notification):
-    def __init__(self,discretizer):
-        self.lens = discretizer.get_basic_len()[0]
-        self.actions = discretizer.num_actions
-        
-    def announce(self,iterator):
-        (x_n,v_n) = self.lens
-        A = self.actions
-        
-        J = iterator
-        
-        plt.figure(1)
-        plt.subplot(211)
-        
-        
-
-    
 def plot_costs(discretizer,action):
     (x_n,v_n) = discretizer.get_basic_len()
   
@@ -54,6 +36,11 @@ def plot_costs(discretizer,action):
     plt.title('Cost function')
 
     plt.show()       
+
+def plot_soln_evol(A):
+    plt.semilogy(A)
+    plt.title('Solution component evolution')
+    plt.show()
 
 def plot_trajectory(discretizer,policy):
     boundary = discretizer.get_basic_boundary()
@@ -173,14 +160,14 @@ def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
 
     cost_coef = kwargs.get('cost_coef',np.ones(2))
     set_point = kwargs.get('set_point',np.zeros(2))
-    oob_cost = kwargs.get('oob_costs',25.0)
+    oob_cost = kwargs.get('oob_costs',1.0)
     discount = kwargs.get('discount',0.99)
     assert(0 < discount < 1)
 
     basic_mapper = mdp.InterpolatedRegularGridNodeMapper(x_desc,v_desc)
     physics = di.DoubleIntegratorRemapper()
-    cost_obj = mdp.QuadraticCost(cost_coef,set_point,override=oob_cost)
-    #cost_obj = mdp.BallCost(np.array([0,0]),0.25)
+    #cost_obj = mdp.QuadraticCost(cost_coef,set_point,override=oob_cost)
+    cost_obj = mdp.BallCost(np.array([0,0]),0.25)
     actions = np.linspace(*action_desc)
 
     (x_lo,x_hi,x_n) = x_desc
@@ -294,10 +281,9 @@ def build_projective_lcp(mdp_obj,discretizer,**kwargs):
     return proj_lcp_obj
 
 ###########################################
-# Find the VALUE FUNCTION
+# Solve for the VALUE FUNCTION
     
-def solve_for_value_function(discretizer,mdp_obj,**kwargs):
-
+def solve(discretizer,mdp_obj,**kwargs):
     discount = kwargs.get('discount',0.99)
     max_iter = kwargs.get('max_iter',1000)
     thresh = kwargs.get('thresh',1e-6)
@@ -352,12 +338,15 @@ def solve_for_value_function(discretizer,mdp_obj,**kwargs):
         #sl = slice(0,num_states)
         #solver.notifications.append(PrimalDiffAnnounce(indices=sl))
 
+        solver.recorders.append(PrimalRecorder())
+
     # Actually do the solve
     print 'Starting {0} solve...'.format(type(iter))
     start = time.time()
     solver.solve()
     print 'Done. ({0:.2f}s)'.format(time.time() - start)
 
+    
     # Extract the cost-to-go function
     if method == 'value':
         J = iter.get_value_vector()
@@ -368,7 +357,11 @@ def solve_for_value_function(discretizer,mdp_obj,**kwargs):
     # Place in an interpolating evaluator
     value_fun_eval = mdp.BasicValueFunctionEvaluator(discretizer,J)
     # TODO: use the low-dimension weights and basis if projective
-    return value_fun_eval
+
+    trajectory = np.array(solver.recorders[0].data)
+    print trajectory.shape
+
+    return [value_fun_eval,trajectory]
 
 
 #########################################
@@ -377,8 +370,8 @@ def solve_for_value_function(discretizer,mdp_obj,**kwargs):
 if __name__ == '__main__':
 
     discount = 0.997
-    max_iter = 100
-    thresh = 1e-6
+    max_iter = 500
+    thresh = 1e-12
 
     x_desc = (-4,4,20)
     v_desc = (-6,6,24)
@@ -392,16 +385,21 @@ if __name__ == '__main__':
 
     mdp_obj = build_mdp_obj(discretizer,discount=discount)
 
-    value_fun_eval = solve_for_value_function(discretizer,\
-                                              mdp_obj,
-                                              discount=discount,\
-                                              max_iter=max_iter,\
-                                              thresh=thresh,\
-                                              #basis='random_fourier',\
-                                              basis='identity',\
-                                              K=100,\
-                                              method='kojima')
+    [value_fun_eval,evol] = solve(discretizer,\
+                           mdp_obj,
+                           discount=discount,\
+                           max_iter=max_iter,\
+                           thresh=thresh,\
+                           #basis='random_fourier',\
+                           basis='identity',\
+                           K=100,\
+                           method='kojima')
     #plot_costs(discretizer,-1)
+
+    plot_soln_evol(evol)
+
+    quit()
+
     plot_value_vector(discretizer,value_fun_eval)
     #plot_advantage(discretizer,value_fun_eval,-1,1)
     lookahead = 2
