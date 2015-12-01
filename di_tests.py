@@ -1,7 +1,8 @@
-
 import mdp
-import mdp.double_integrator as di
+import mdp.double_integrator
 import mdp.simulator as simulator
+
+from di.di_discretizer import generate_discretizer
 
 import solvers
 from solvers.value_iter import ValueIterator
@@ -20,180 +21,15 @@ import numpy as np
 import scipy as sp
 import scipy.sparse as sps
 
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import cm
-
 import time
-
-def plot_costs(discretizer,action):
-    (x_n,v_n) = discretizer.get_basic_len()
-  
-    states = discretizer.basic_mapper.get_node_states()
-    costs = discretizer.cost_obj.cost(states,action)
-    CostImg = np.reshape(costs,(x_n,v_n))
-    plt.imshow(CostImg,interpolation = 'nearest')
-    plt.title('Cost function')
-
-    plt.show()       
-
-def plot_soln_evol(A):
-    plt.semilogy(A)
-    plt.title('Solution component evolution')
-    plt.show()
-
-def plot_trajectory(discretizer,policy):
-    boundary = discretizer.get_basic_boundary()
-    (x_lo,x_hi) = boundary[0]
-    (v_lo,v_hi) = boundary[1]
-
-    shade = 0.5
-    x_rand = shade*random.uniform(x_lo,x_hi)
-    v_rand = shade*random.uniform(v_lo,v_hi)
-    init_state = np.array([[x_rand,v_rand]])
-    assert((1,2) == init_state.shape)
-    
-    # Basic sanity
-    discretizer.physics.remap(init_state,action=0) # Pre-animation sanity
-    
-    sim = DoubleIntegratorSimulator(discretizer)
-    sim.simulate(init_state,policy,1000)    
-    
-    
-def plot_value_function(discretizer,value_fun_eval,**kwargs):
-    boundary = discretizer.get_basic_boundary()    
-    (x_lo,x_hi) = boundary[0]
-    (v_lo,v_hi) = boundary[1]
-    
-    grid = kwargs.get('grid_size',51)
-    [x_mesh,v_mesh] = np.meshgrid(np.linspace(x_lo,x_hi,grid),\
-                                  np.linspace(v_lo,v_hi,grid),indexing='ij')
-    Pts = np.column_stack([x_mesh.flatten(),v_mesh.flatten()])
-    
-    vals = value_fun_eval.evaluate(Pts)
-    ValueImg = np.reshape(vals,(grid,grid))
-    
-    plt.pcolor(x_mesh,v_mesh,ValueImg)
-        
-    plt.xlabel('Position')
-    plt.ylabel('Velocity')
-    plt.title('Cost-to-go function')
-    plt.show()
-
-def plot_value_vector(discretizer,value_fun_eval,**kwargs):
-    (x_n,v_n) = discretizer.get_basic_len()
-  
-    J = value_fun_eval.node_to_cost[:(x_n*v_n)]
-    print J.shape
-    print x_n,v_n
-    J = np.reshape(J,(x_n,v_n))
-    plt.pcolor(J.T)
-    plt.title('Cost-to-go function')
-
-    plt.show()   
-    
-def plot_flow(discretizer,value_fun_eval,**kwargs):
-    boundary = discretizer.get_basic_boundary()    
-    (x_lo,x_hi) = boundary[0]
-    (v_lo,v_hi) = boundary[1]
-    
-    grid = kwargs.get('grid_size',51)
-    [x_mesh,v_mesh] = np.meshgrid(np.linspace(x_lo,x_hi,grid),\
-                                  np.linspace(v_lo,v_hi,grid),indexing='ij')
-    Pts = np.column_stack([x_mesh.flatten(),v_mesh.flatten()])
-    
-    vals = value_fun_eval.evaluate(Pts)
-    ValueImg = np.reshape(vals,(grid,grid))
-    
-    plt.pcolor(x_mesh,v_mesh,ValueImg)
-        
-    plt.xlabel('Position')
-    plt.ylabel('Velocity')
-    plt.title('Cost-to-go function')
-    plt.show()       
-    
-def plot_policy(discretizer,policy,**kwargs):
-    boundary = discretizer.get_basic_boundary()
-    (x_lo,x_hi) = boundary[0]
-    (v_lo,v_hi) = boundary[1]
-    
-    grid = kwargs.get('grid_size',50)
-    [x_mesh,y_mesh] = np.meshgrid(np.linspace(x_lo,x_hi,grid),\
-                                  np.linspace(v_lo,v_hi,grid),indexing='ij')
-    Pts = np.column_stack([x_mesh.flatten(),y_mesh.flatten()])
-    
-    
-    PolicyImg = np.reshape(policy.get_decisions(Pts),(grid,grid))
-
-    plt.pcolor(PolicyImg.T)
-    plt.title('Policy map')
-
-    plt.show()   
-    
-def plot_advantage(discretizer,value_fun_eval,action1,action2):
-    (x_n,v_n) = discretizer.get_basic_len()
-
-    states = discretizer.basic_mapper.get_node_states()
-    next_states1 = discretizer.physics.remap(states,action=action1)
-    next_states2 = discretizer.physics.remap(states,action=action2)
-
-    adv = value_fun_eval.evaluate(next_states1)\
-          - value_fun_eval.evaluate(next_states2)
-    AdvImg = np.reshape(adv, (x_n,v_n))
-    x_mesh = np.reshape(states[:,0], (x_n,v_n))
-    v_mesh = np.reshape(states[:,1], (x_n,v_n))
-
-    plt.pcolor(x_mesh,v_mesh,AdvImg)
-        
-    plt.xlabel('Position')
-    plt.ylabel('Velocity')
-    plt.title('Advantage function')
-    plt.show() 
-    
-#################################################
-# Generate the DISCRETIZER object
-    
-def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
-    print "Generating discretizer..."
-    start = time.time()
-    xid,vid = 0,1 
-
-    cost_coef = kwargs.get('cost_coef',np.ones(2))
-    set_point = kwargs.get('set_point',np.zeros(2))
-    oob_cost = kwargs.get('oob_costs',1.0)
-    discount = kwargs.get('discount',0.99)
-    assert(0 < discount < 1)
-
-    basic_mapper = mdp.InterpolatedRegularGridNodeMapper(x_desc,v_desc)
-    physics = di.DoubleIntegratorRemapper()
-    #cost_obj = mdp.QuadraticCost(cost_coef,set_point,override=oob_cost)
-    cost_obj = mdp.BallCost(np.array([0,0]),0.25)
-    actions = np.linspace(*action_desc)
-
-    (x_lo,x_hi,x_n) = x_desc
-    (v_lo,v_hi,v_n) = v_desc
-    
-    left_oob_mapper = mdp.OOBSinkNodeMapper(xid,-float('inf'),
-                                            x_lo,basic_mapper.num_nodes)
-    right_oob_mapper = mdp.OOBSinkNodeMapper(xid,x_hi,float('inf'),
-                                             basic_mapper.num_nodes+1)
-    state_remapper = mdp.RangeThreshStateRemapper(vid,v_lo,v_hi)
-
-    discretizer = mdp.ContinuousMDPDiscretizer(physics,
-                                               basic_mapper,
-                                               cost_obj,actions)
-    discretizer.add_state_remapper(state_remapper)
-    discretizer.add_node_mapper(left_oob_mapper)
-    discretizer.add_node_mapper(right_oob_mapper)
-
-    print "Built discretizer {0}s.".format(time.time() - start)
-
-    return discretizer
 
 ###########################################
 # Build the MDP object
 
 def build_mdp_obj(discretizer,**kwargs):
+    """
+    Generic MDP build from 
+    """
     print "Generating MDP object..."
     start = time.time()
     
@@ -358,52 +194,35 @@ def solve(discretizer,mdp_obj,**kwargs):
     value_fun_eval = mdp.BasicValueFunctionEvaluator(discretizer,J)
     # TODO: use the low-dimension weights and basis if projective
 
-    trajectory = np.array(solver.recorders[0].data)
-    print trajectory.shape
+    primals = np.array(solver.recorders[0].data)
 
-    return [value_fun_eval,trajectory]
+    return [value_fun_eval,primals]
 
 
 #########################################
 # Main function
 
 if __name__ == '__main__':
+    xn = 20
+    vn = 24
+    an = 3
+    x_desc = (-4,4,xn)
+    v_desc = (-6,6,vn)
+    a_desc = (-1,1,an)
 
-    discount = 0.997
-    max_iter = 500
-    thresh = 1e-12
+    save_file='di_traj.npz'
 
-    x_desc = (-4,4,20)
-    v_desc = (-6,6,24)
-    a_desc = (-1,1,3)
-    cost_coef = np.array([1,0.5])
+    # Build the discretizer
+    discretizer = generate_discretizer(x_desc,v_desc,a_desc)
+    assert(type(discretizer) is mdp.MDPDiscretizer)
 
-    discretizer = generate_discretizer(x_desc,v_desc,a_desc,\
-                                       cost_coef=cost_coef)
+    # Build the solver
+    # May build intermediate objects (MDP, LCP, projective LCP)
+    [solver,objs] = build_solver(discretizer)
+    assert(type(solver) is solver.IterativeSolver)
+    
+    # Solve; return primal and dual trajectories
+    [primal,dual] = solver.solve()
 
-    #plot_remap(discretizer,-1,np.array([[-6,-3],[6,3]]))
-
-    mdp_obj = build_mdp_obj(discretizer,discount=discount)
-
-    [value_fun_eval,evol] = solve(discretizer,\
-                           mdp_obj,
-                           discount=discount,\
-                           max_iter=max_iter,\
-                           thresh=thresh,\
-                           #basis='random_fourier',\
-                           basis='identity',\
-                           K=100,\
-                           method='kojima')
-    #plot_costs(discretizer,-1)
-
-    plot_soln_evol(evol)
-
-    quit()
-
-    plot_value_vector(discretizer,value_fun_eval)
-    #plot_advantage(discretizer,value_fun_eval,-1,1)
-    lookahead = 2
-    policy = mdp.KStepLookaheadPolicy(discretizer, value_fun_eval, discount,lookahead)
-    plot_policy(discretizer,policy)
-    plot_flow(discretizer,value_fun_eval)
-    #plot_trajectory(discretizer,policy)
+    # Save the trajectories for analysis
+    np.save(save_file,primal=primal,dual=dual)

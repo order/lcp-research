@@ -6,7 +6,7 @@ import math
 import operator
 
 import scipy.sparse
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt       
 
 def debug_mapprint(level,**kwargs):
     if level:
