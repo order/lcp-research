@@ -1,5 +1,10 @@
 import numpy as np
+
+import mdp
+from mdp.double_integrator import DoubleIntegratorRemapper
 from utils.kwargparser import KwargParser
+
+import time
 
 #################################################
 # Generate the DISCRETIZER object
@@ -14,18 +19,16 @@ def generate_discretizer(x_desc,v_desc,action_desc,**kwargs):
     parser.add('set_point',np.zeros(2))
     parser.add('oob_costs',1.0)
     parser.add('discount',0.99)
-    parser.add('cost_type','BallCost')
     args = parser.parse(kwargs)
 
-    cost_coef = args['cost_coef']
     radius = args['radius']
     set_point = args['set_point']
-    oob_cost = args['oob_cost']
+    oob_cost = args['oob_costs']
     discount = args['discount']
     assert(0 < discount < 1)
 
     basic_mapper = mdp.InterpolatedRegularGridNodeMapper(x_desc,v_desc)
-    physics = di.DoubleIntegratorRemapper()    
+    physics = DoubleIntegratorRemapper()    
     cost_obj = mdp.BallCost(set_point,radius)
     actions = np.linspace(*action_desc)
 

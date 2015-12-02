@@ -19,4 +19,14 @@ class PrimalRecorder(Recorder):
 
     def reset(self):
         self.data = []
+
+class ValueRecorder(Recorder):
+    def __init__(self):
+        self.reset()
+        
+    def report(self,iteration):
+        self.data.append(iteration.get_value_vector())
+
+    def reset(self):
+        self.data = []   
    

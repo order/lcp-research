@@ -120,12 +120,16 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         
         # Deal with the exceptions first
         for mapper in self.exception_node_mappers:
-            partial_mapping = mapper.states_to_node_dists(states,ignore=dealt_with)
+            partial_mapping = mapper.\
+                              states_to_node_dists(states,\
+                                                   ignore=dealt_with)
             node_mapping.update(partial_mapping)
             dealt_with |= set(partial_mapping.keys())
             
         # Then the using the basic remapper
-        essential_mapping = self.basic_mapper.states_to_node_dists(states,ignore=dealt_with)
+        essential_mapping = self.basic_mapper.\
+                            states_to_node_dists(states,\
+                                                 ignore=dealt_with)
         node_mapping.update(essential_mapping)
         
         # All nodes are dealt with
@@ -164,7 +168,9 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         
         # Deal with the exceptions first
         for mapper in self.exception_node_mappers:
-            partial_mapping = mapper.states_to_node_dists(states,ignore=dealt_with)
+            partial_mapping = mapper.\
+                              states_to_node_dists(states,\
+                                                   ignore=dealt_with)
             node_mapping.update(partial_mapping)
             dealt_with |= set(partial_mapping.keys())
             
@@ -174,7 +180,10 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         assert(total_nodes >= num_basic_nodes)
         
         # Convert the basic states to a transition matrix
-        T = self.basic_mapper.states_to_transition_matrix(states,shape=(total_nodes,N),ignore=dealt_with)
+        T = self.basic_mapper.\
+            states_to_transition_matrix(states,\
+                                        shape=(total_nodes,N),\
+                                        ignore=dealt_with)
         assert((total_nodes,N) == T.shape)        
         T = T.tocsr()
         

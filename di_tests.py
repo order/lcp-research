@@ -2,7 +2,8 @@ import mdp
 import mdp.double_integrator
 import mdp.simulator as simulator
 
-from di.di_discretizer import generate_discretizer
+from di.discretizer import generate_discretizer
+from di.value_iter import build_solver,extract_data
 
 import solvers
 from solvers.value_iter import ValueIterator
@@ -198,7 +199,6 @@ def solve(discretizer,mdp_obj,**kwargs):
 
     return [value_fun_eval,primals]
 
-
 #########################################
 # Main function
 
@@ -214,15 +214,16 @@ if __name__ == '__main__':
 
     # Build the discretizer
     discretizer = generate_discretizer(x_desc,v_desc,a_desc)
-    assert(type(discretizer) is mdp.MDPDiscretizer)
+    assert(issubclass(type(discretizer), mdp.MDPDiscretizer))
 
     # Build the solver
     # May build intermediate objects (MDP, LCP, projective LCP)
     [solver,objs] = build_solver(discretizer)
-    assert(type(solver) is solver.IterativeSolver)
+    assert(issubclass(type(solver), solvers.IterativeSolver))
     
     # Solve; return primal and dual trajectories
-    [primal,dual] = solver.solve()
+    solver.solve()
+    [primal,dual] = extract_data(solver)    
 
     # Save the trajectories for analysis
-    np.save(save_file,primal=primal,dual=dual)
+    np.savez(save_file,primal=primal,dual=dual)
