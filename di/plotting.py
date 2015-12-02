@@ -1,3 +1,78 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+
+"""
+A function that splits a I x N numpy array
+of MDP primal or dual information into 2D frames
+First block is the value information,
+Rest is flow
+"""
+def split_into_frames(Data,A,n,x,y):
+    # Data is a single vector
+    if 1 == len(Data.shape):
+        Data = Data[np.newaxis,:]
+
+    # Size & sanity
+    (I,N) = Data.shape
+    assert(N == (A+1)*n)
+    assert(x*y <= n)
+    
+    Frames = []
+    for i in xrange(I):
+        Imgs = []
+        Comps = mdp_vector_into_components(Data[i,:],A,n)
+        for a in xrange(A+1):
+            Img = vector_to_2d_image(Comps[:(x*y),a],x,y)
+            Imgs.append(Img)
+        Frames.append(Imgs)
+    return np.array(Frames)
+
+def mdp_vector_into_components(V,A,n):
+    assert(1 == len(V.shape))
+    assert((A+1)*n == V.size)
+
+    return np.reshape(V,(n,A+1),order='F')
+
+def vector_to_2d_image(V,x,y):
+    assert(1 == len(V.shape))
+    N = V.size
+    assert(x*y <= N)
+
+    return np.reshape(V[:(x*y)],(y,x),order='f')
+
+def split_into_frames_tensor(Data,A,n,x,y):
+    """
+    Kind of opaque tensor way of doing the above
+    """
+    (I,N) = Data.shape
+    assert(N == (A+1)*n)
+    assert(x*y <= n )
+
+    Frames = np.reshape(Data,(I,n,(A+1)),order='F')
+    Frames = Frames[:,:(x*y),:]
+    print Frames.shape
+    Frames = np.reshape(Frames,(I,x,y,(A+1)),order='C')
+    Frames = np.swapaxes(Frames,1,3)
+    return Frames
+
+def animate_frames(Frames):
+    assert(3 == len(Frames.shape)) # Frame index, x, y
+    (I,X,Y) = Frames.shape
+    
+    fig = plt.figure()
+    
+    Plotters = []
+    for i in xrange(I):
+        Plotters.append([plt.pcolor(Frames[i,:,:])])
+    
+    im_ani = animation.ArtistAnimation(fig,Plotters,\
+                                       interval=50,\
+                                       repeat_delay=3000,
+                                   blit=True)
+    #im_ani.save('im.mp4')
+    plt.show()    
+
 def plot_costs(discretizer,action):
     (x_n,v_n) = discretizer.get_basic_len()
   
