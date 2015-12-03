@@ -33,6 +33,9 @@ class IterativeSolver(object):
         self.termination_conditions = []
         self.iterator = iterator
         self.notifications = []
+
+    def get_iteration(self):
+        return self.iterator.iteration
         
     def solve(self):
         """
@@ -82,6 +85,11 @@ class LCPIterator(Iterator):
     def get_gradient_vector(self):
         raise NotImplementedError()
 
+class IPIterator(LCPIterator):
+    def get_step_len():
+        raise NotImplementedError()
+    def get_dir():
+        raise NotImplementedError()
         
 class MDPIterator(Iterator):
     def get_value_vector(self):

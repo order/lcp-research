@@ -5,28 +5,35 @@ import numpy as np
 
 
 class Recorder(object):
+    def __init__(self):
+        self.reset()
     def report(self,iteration):
         raise NotImplementedError()
     def reset(self):
-        raise NotImplementedError()
+        self.data = []
         
 class PrimalRecorder(Recorder):
-    def __init__(self):
-        self.reset()
-        
     def report(self,iteration):
         self.data.append(iteration.get_primal_vector())
 
-    def reset(self):
-        self.data = []
+class DualRecorder(Recorder):
+    def report(self,iteration):
+        self.data.append(iteration.get_dual_vector())
+
+class PrimalDirRecorder(Recorder):
+    def report(self,iteration):
+        self.data.append(iteration.get_primal_dir())
+
+class DualDirRecorder(Recorder):
+    def report(self,iteration):
+        self.data.append(iteration.get_dual_dir())
 
 class ValueRecorder(Recorder):
-    def __init__(self):
-        self.reset()
-        
     def report(self,iteration):
         self.data.append(iteration.get_value_vector())
 
-    def reset(self):
-        self.data = []   
-   
+class StepLenRecorder(Recorder):
+    def report(self,iteration):
+        self.data.append(iteration.get_step_len())
+
+

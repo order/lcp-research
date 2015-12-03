@@ -1,10 +1,10 @@
-from solvers import LCPIterator
+from solvers import IPIterator
 import numpy as np
 import scipy.sparse as sps
 
 ##############################
 # Kojima lcp_obj
-class KojimaIPIterator(LCPIterator):
+class KojimaIPIterator(IPIterator):
     def __init__(self,lcp_obj,**kwargs):
         self.lcp = lcp_obj
         self.M = lcp_obj.M
@@ -19,6 +19,10 @@ class KojimaIPIterator(LCPIterator):
         
         self.x = kwargs.get('x0',np.ones(n))
         self.y = kwargs.get('y0',np.ones(n))
+        self.step = np.nan
+        self.dir_x = np.full(n,np.nan)
+        self.dir_y = np.full(n,np.nan)
+        
         assert(not np.any(self.x < 0))
         assert(not np.any(self.y < 0))
         
@@ -65,6 +69,9 @@ class KojimaIPIterator(LCPIterator):
         self.x = x
         self.y = y
         self.iteration += 1
+        self.step = step
+        self.dir_x = dir_x
+        self.dir_y = dir_y
         
     def get_primal_vector(self):
         return self.x
@@ -72,3 +79,9 @@ class KojimaIPIterator(LCPIterator):
         return self.y
     def get_iteration(self):
         return self.iteration
+    def get_step_len(self):
+        return self.step
+    def get_primal_dir(self):
+        return self.dir_x
+    def get_dual_dir(self):
+        return self.dir_y

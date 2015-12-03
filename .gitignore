@@ -12,3 +12,4 @@ test.lcp
 approx_qr_experiment/approx_qr_experiment.aux
 *.pdf
 approx_qr_experiment/approx_qr_experiment.synctex.gz
+*.pickle
