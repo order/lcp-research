@@ -19,6 +19,12 @@ Most are phrased as iteration generators. These plug in to the iter_solver class
 the generators and provides a standardized framework for recording per-iteration information (like residuals and state) and termination checking (like maximum iteration count or residual threshold checking.
 """
 
+class SolverGenerator(object):
+    def build(self,**kwargs):
+        raise NotImplementedError()
+    def extract(self,solver,**kwargs):
+        raise NotImplmentedError()
+
 class IterativeSolver(object):
 
     """
