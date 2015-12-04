@@ -13,6 +13,10 @@ def animate_frames(Frames,**kwargs):
     # Parse input
     parser = KwargParser()
     parser.add_optional('save_file',str)
+    parser.add('title','No title',str)
+    parser.add('xlabel','x',str)
+    parser.add('ylabel','y',str)
+    parser.add('cmap','jet',str)
     args = parser.parse(kwargs)
     
     assert(3 == len(Frames.shape)) # Frame index, x, y
@@ -22,18 +26,38 @@ def animate_frames(Frames,**kwargs):
 
     print 'Starting animation...'        
     Plotters = []
+    cmap = plt.get_cmap(args['cmap'])
     for i in xrange(I):
-        Plotters.append([plt.pcolor(Frames[i,:,:])])
-
+        img = plt.pcolor(Frames[i,:,:],\
+                         cmap=cmap)
+        Plotters.append([img])
     im_ani = animation.ArtistAnimation(fig,Plotters,\
                                        interval=50,\
-                                       repeat_delay=3000,
-                                   blit=True)
+                                       repeat_delay=3000,\
+                                       blit=True)
+    plt.xlabel(args['xlabel'])
+    plt.ylabel(args['ylabel'])
+    plt.title(args['title'])
+    
     if 'save_file' in args:
         save_file = args['save_file']
         im_ani.save(save_file)
     else:
         plt.show()
+
+def plot(fn,**kwargs):
+    parser = KwargParser()
+    parser.add('title','No title',str)
+    parser.add('xlabel','x',str)
+    parser.add('ylabel','y',str)
+    args = parser.parse(kwargs)
+    
+    plt.plot(fn)
+    plt.xlabel(args['xlabel'])
+    plt.ylabel(args['ylabel'])
+    plt.title(args['title'])
+    
+    plt.show()
 
 
 def split_into_frames(Data,A,n,x,y):

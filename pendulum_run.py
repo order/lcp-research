@@ -8,7 +8,7 @@ import time
 import pickle
 
 # Choices
-from gens.di_discretizer import DIGenerator as InstanceGenerator
+from gens.pendulum_discretizer import PendulumGenerator as InstanceGenerator
 #from di.value_iter import build_solver,extract_data
 from gens.kojima import KojimaGenerator as SolverGenerator
 
@@ -16,17 +16,17 @@ from gens.kojima import KojimaGenerator as SolverGenerator
 # Main function
 
 if __name__ == '__main__':
-    xn = 30
-    vn = 30
+    qn = 70
+    dqn = 50
     an = 3
 
     #time_str = datetime.datetime.now().isoformat()
-    save_file = 'data/di_traj' #.format(time_str) # no extension
+    save_file = 'data/pendulum_kojima_traj' #.format(time_str) # no extension
     param_save_file = save_file + '.pickle'
 
     # Build the discretizer
-    params = {'x_desc':(-4,4,xn),\
-              'v_desc':(-6,6,vn),\
+    params = {'q_n':qn,\
+              'dq_desc':(-5,5,dqn),\
               'a_desc':(-1,1,an)}
     inst_gen = InstanceGenerator()
     discretizer = inst_gen.generate(**params)
@@ -47,8 +47,8 @@ if __name__ == '__main__':
     np.savez(save_file,**data) # Extension auto-added
 
     #Save experiment parameters
-    params = {'x_nodes':xn+1,\
-              'v_nodes':vn+1,\
+    params = {'x_nodes':qn+1,\
+              'y_nodes':dqn+1,\
               'actions':an,\
               'size':int(discretizer.get_num_nodes())}
     pickle.dump(params,open(param_save_file,'wb'))

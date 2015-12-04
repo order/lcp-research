@@ -25,7 +25,7 @@ class RangeThreshStateRemapper(StateRemapper):
         self.dim = dim
         self.low = low
         self.high = high
-        self.eps = 1e-9
+        self.eps = 1e-6
         
     def remap(self, states):
         """

@@ -1,6 +1,6 @@
 import numpy as np
 import state_remapper
-import lqr
+import solvers.lqr as lqr
 
 class PendulumRemapper(state_remapper.StateRemapper):
     def __init__(self,**kwargs):
