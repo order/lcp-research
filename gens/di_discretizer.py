@@ -1,7 +1,7 @@
 import numpy as np
 
 import mdp
-from mdp.discretizer import DiscretizerGenerator
+from generator import Generator
 from mdp.double_integrator import DoubleIntegratorRemapper
 from utils.kwargparser import KwargParser
 
@@ -10,7 +10,7 @@ import time
 #################################################
 # Generate the DISCRETIZER object
 
-class DIGenerator(DiscretizerGenerator):
+class DIGenerator(Generator):
     def generate(self,**kwargs):
         print "Generating discretizer..."
         start = time.time()

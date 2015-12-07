@@ -4,10 +4,6 @@ import mdp
 import node_mapper
 import itertools
 
-class DiscretizerGenerator(object):
-    def generate(self,**kwargs):
-        raise NotImplementedError()
-
 class MDPDiscretizer(object):
     """
     Abstract class defining how states are mapped to discrete nodes.

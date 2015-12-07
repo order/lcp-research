@@ -1,16 +1,16 @@
 from utils.kwargparser import KwargParser
 
 import solvers
-from solvers import SolverGenerator
 from solvers.kojima import KojimaIPIterator
 from solvers.termination import *
 from solvers.notification import *
 from solvers.recording import *
 
+from generator import SolverGenerator
 import time
 
 class KojimaGenerator(SolverGenerator):
-    def build(self,**kwargs):
+    def generate(self,**kwargs):
         parser = KwargParser()
         parser.add('discretizer')
         parser.add('discount',0.99)

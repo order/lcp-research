@@ -1,11 +1,26 @@
 import sys
 import importlib
+import pickle
 
 import numpy as np
+
+import mdp,gens,solvers
 from utils.parsers import ConfigParser
 from utils import load_class
+
+
 #################
 # Main function
+
+def build_generator(conf_file):
+    parser = ConfigParser(conf_file)
+    parser.add_handler('gen_fn',load_class)
+    args = parser.parse()
+
+    # "gen_fn" is a special keyword
+    gen = args['gen_fn']() # Instantiate
+    del args['gen_fn']
+    return (gen,args)  
 
 if __name__ == '__main__':
 
@@ -16,24 +31,19 @@ if __name__ == '__main__':
         quit()
     (_,inst_conf_file,solver_conf_file,save_file) = sys.argv
     param_save_file = save_file + '.pickle'
-    print 'Saving temp info to', param_save_file
+    print 'Note: saving internal info to', param_save_file
 
-    # Build the discretizer
-    print 'Building discretizer'
-    parser = ConfigParser(inst_conf_file)
-    parser.add_handler('gen_fn',load_class)
-    args = parser.parse()
-    
-    print args
-    quit()
-    inst_gen = load_class(inst_gen_str)()
-    discretizer = inst_gen.generate()
+    (inst_gen,inst_args) = build_generator(inst_conf_file)
+    assert(issubclass(type(inst_gen), gens.Generator))
+    discretizer = inst_gen.generate(**inst_args)
     assert(issubclass(type(discretizer), mdp.MDPDiscretizer))
-
+    
     # Build the solver
     # May build intermediate objects (MDP, LCP, projective LCP)
-    sol_gen = importlib_import_module(solver_gen_file)
-    [solver,objs] = sol_gen.build(discretizer=discretizer)
+    (sol_gen,sol_args) = build_generator(solver_conf_file)
+    assert(issubclass(type(sol_gen), gens.SolverGenerator))    
+    [solver,objs] = sol_gen.generate(discretizer=discretizer,\
+                                  **sol_args)
     assert(issubclass(type(solver), solvers.IterativeSolver))
     
     # Solve; return primal and dual trajectories
@@ -47,5 +57,5 @@ if __name__ == '__main__':
     #Save experiment parameters
     params = {'discretizer':discretizer,\
               'solver':solver,\
-              'objects':objects}
+              'objects':objs}
     pickle.dump(params,open(param_save_file,'wb'))
