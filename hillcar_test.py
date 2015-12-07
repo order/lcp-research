@@ -1,11 +1,15 @@
-from hillcar import *
-import mdp
+import numpy as np
+from mdp.hillcar import basic_slope
 import matplotlib.pyplot as plt
-(MDP,G) = generate_hillcar_mdp(5,5)
-(M,q) = MDP.tolcp()
 
-plt.spy(M)
+R = 15
+N = 1000
+
+x = np.linspace(-R,R,N)
+
+dh = basic_slope(x,bowl=3,hill=3)
+h = np.cumsum(dh) / N * (2*R)
+
+plt.plot(x,h,x,dh,'--')
 plt.show()
 
-#v = mdp.value_iteration(MDP)
-#mdp.plot_value(G,v)

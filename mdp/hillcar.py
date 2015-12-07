@@ -1,15 +1,14 @@
 import numpy as np
 from math import pi,sqrt
 import matplotlib.pyplot as plt
-from mdp import MDP
+from state_remapper import StateRemapper
 
-import grid
+import types
 
 import scipy.stats
+from utils.kwargparser import KwargParser
 
 def normpdf(x,mu,sigma):
-    """Norm pdf and derivative; move to another file?
-    """
     return scipy.stats.norm.pdf(x,loc=mu,scale=sigma)
 
 def derv_normpdf(x,mu,sigma):
@@ -19,24 +18,69 @@ def derv_normpdf(x,mu,sigma):
     return (mu - x) / (sqrt(2*pi) * sigma**3) \
         * np.exp(-(x - mu)**2 / (2*sigma**2))
 
-def physics_step(points,action,slope,**kwargs):
+def basic_slope(x,**kwargs):
     """
-    Physics step for hill car based on slope.
+    Basic slope; looks like a big 'W' with smoothed transitions
     """
-    [N,d] = points.shape
-    assert(d == 2)
-    
-    Mass = kwargs.get('mass',1)
-    G = kwargs.get('gravity',9.806)
-    step = kwargs.get('step',0.01)
-    
-    theta = np.arctan(slope(points[:,0]))
-    F_grav = -Mass*G*np.sin(theta)
-    F_cont = action*np.cos(theta)
+    parser = KwargParser()
+    parser.add('grade',0.15,[int,float])
+    parser.add('bowl',1.0,[int,float])
+    parser.add('hill',5.0,[int,float])
+    args = parser.parse(kwargs)
 
-    x_next = points[:,0] + step * points[:,1]
-    v_next = points[:,1] + step * (F_grav + F_cont)
-    return np.column_stack((x_next,v_next))
+    grade = args['grade']
+    bowl = args['bowl']
+    hill = args['hill']
+    
+    assert(1 == len(x.shape))
+    theta = np.zeros(x.shape)
+
+    mask = np.abs(x) <= bowl
+    theta[mask] = -grade/bowl*x[mask]
+
+    mask = np.logical_and(np.abs(x) > bowl,np.abs(x) <= bowl+hill)
+    theta[mask] = -grade * np.sign(x[mask])
+
+    mask = np.logical_and(np.abs(x) > bowl+hill,np.abs(x) <= 3*bowl+hill)
+    theta[mask] = np.sign(x[mask])*\
+                  (grade/bowl*(np.abs(x[mask]) - bowl - hill) - grade)
+
+    mask = np.abs(x) > 3*bowl+hill
+    theta[mask] = grade *np.sign(x[mask])
+    
+    return theta
+
+class HillcarRemapper(StateRemapper):
+    def __init__(self,**kwargs):
+        parser = KwargParser()
+        parser.add('mass',1.0,[int,float])
+        parser.add('step',0.01,float)
+        parser.add('slope_fn',basic_slope,types.FunctionType)
+        args = parser.parse(kwargs)
+        
+        self.g = 9.806
+        self.mass = args['mass']
+        self.step = args['step']
+        self.slope = args['slope_fn']
+        
+        def remap(points,action,slope,**kwargs):
+            """
+            Physics step for hill car based on slope.
+            """
+            [N,d] = points.shape
+            assert(d == 2)
+            
+            Mass = kwargs.get('mass',1)
+            G = kwargs.get('gravity',9.806)
+            step = kwargs.get('step',0.01)
+    
+            theta = np.arctan(slope(points[:,0]))
+            F_grav = -Mass*G*np.sin(theta)
+            F_cont = action*np.cos(theta)
+
+            x_next = points[:,0] + step * points[:,1]
+            v_next = points[:,1] + step * (F_grav + F_cont)
+            return np.column_stack((x_next,v_next))
     
 # Simple two hill terrain
 def sample_hill_height(x):

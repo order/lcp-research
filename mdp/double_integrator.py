@@ -1,7 +1,7 @@
 import numpy as np
-import state_remapper
+from state_remapper import StateRemapper
 
-class DoubleIntegratorRemapper(state_remapper.StateRemapper):
+class DoubleIntegratorRemapper(StateRemapper):
     def __init__(self,**kwargs):
         self.step = kwargs.get('step',0.05)
         
