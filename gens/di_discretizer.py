@@ -17,9 +17,10 @@ class DIGenerator(DiscretizerGenerator):
         xid,vid = 0,1
 
         parser = KwargParser()
-        parser.add('x_desc')
+        parser.add('x_desc') # Mandatory
         parser.add('v_desc')
         parser.add('a_desc')
+        
         parser.add('radius',0.25)
         parser.add('set_point',np.zeros(2))
         parser.add('oob_costs',1.0)

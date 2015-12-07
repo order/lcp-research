@@ -6,7 +6,18 @@ import math
 import operator
 
 import scipy.sparse
-import matplotlib.pyplot as plt       
+import matplotlib.pyplot as plt
+
+import importlib
+
+def load_class(mod_str):
+    if '.' not in mod_str:
+        return eval(mod_str)
+
+    splits = mod_str.split('.')
+    mod = importlib.import_module('.'.join(splits[:-1]))
+    return eval('mod.{0}'.format(splits[-1]))
+    
 
 def debug_mapprint(level,**kwargs):
     if level:
@@ -95,10 +106,4 @@ def basic_residual(x,w):
 def fb_residual(x,w):
     fb = np.sqrt(x**2 + w**2) - x - w
     return np.linalg.norm(fb)
-    
-    
-#
-def build_projection_matrix(Phi):
-    [Q,R] = scipy.linalg.qr(Phi,mode'economic',pivoting=False)
-    return Q.dot(Q.T)
     
