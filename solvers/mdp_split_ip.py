@@ -1,14 +1,11 @@
-import solver
-
-from solvers import LCPIterator
-from solvers import ProjectiveIPIterator
+from solvers import MDPIterator
 import mdp
 
 import numpy as np
 import scipy as sp
 import scipy.sparse as sps
 
-class MDPSplitIPIterator(LCPIterator):
+class MDPSplitIPIterator(MDPIterator):
     def __init__(self,mdp_obj,Phi,**kwargs):
     
         ortho = kwargs.get('is_orthogonal',False)
@@ -16,7 +13,7 @@ class MDPSplitIPIterator(LCPIterator):
         # Store mdp
         self.mdp_obj = mdp_obj
         N = mdp_obj.num_states
-        A = mdp_obj.numactions
+        A = mdp_obj.num_actions
         self.num_states = N
         self.num_actions = A
         
@@ -93,7 +90,7 @@ class MDPSplitIPIterator(LCPIterator):
         
     def get_projection_function(self):
         Q = self.Q
-        return lambda x: Q.dot((Q.T).dot(x)
+        return lambda x: Q.dot((Q.T).dot(x))
         
     def get_slice(self,i):
         N = self.num_states
