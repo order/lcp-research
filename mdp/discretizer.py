@@ -25,7 +25,13 @@ class MDPDiscretizer(object):
     def get_basic_boundary(self):
         raise NotImplementedError()
 
+    def get_actions(self):
+        raise NotImplementedError()
+
     def get_basic_len(self):
+        raise NotImplementedError()
+
+    def get_dimension(self):
         raise NotImplementedError()
 
 class ContinuousMDPDiscretizer(MDPDiscretizer):
@@ -53,13 +59,12 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         self.action_dim = actions.shape[1]
 
         self.state_dim = self.basic_mapper.get_dimension()
-        
 
     def get_basic_boundary(self):
         return self.basic_mapper.get_boundary()
         
-    def get_basic_len(self):
-        return self.basic_mapper.get_len()
+    def get_basic_lengths(self):
+        return self.basic_mapper.get_lengths()
 
     def __str__(self):
         S = []
@@ -70,7 +75,12 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         for mapper in self.exception_node_mappers:
             S.append('\tException: {0}'.format(mapper))
         return '\n'.join(S)
-       
+
+    def get_num_actions(self):
+        return self.num_actions
+
+    def get_dimension(self):
+        return self.state_dim
         
     def get_node_ids(self):
         """

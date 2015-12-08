@@ -1,16 +1,16 @@
 import numpy as np
 
 import mdp
-from mdp.discretizer import DiscretizerGenerator
-from mdp.double_integrator import DoubleIntegratorRemapper
-from utils.kwargparser import KwargParser
+from generator import Generator
+from mdp.hillcar import HillcarRemapper,basic_slope
+from utils.parsers import KwargParser
 
 import time
 
 #################################################
 # Generate the DISCRETIZER object
 
-class DIGenerator(DiscretizerGenerator):
+class HillcarGenerator(Generator):
     def generate(self,**kwargs):
         print "Generating discretizer..."
         start = time.time()
@@ -36,7 +36,7 @@ class DIGenerator(DiscretizerGenerator):
         assert(0 < discount < 1)
 
         basic_mapper = mdp.InterpolatedRegularGridNodeMapper(x_desc,v_desc)
-        physics = DoubleIntegratorRemapper()    
+        physics = HillcarRemapper(slope=basic_slope) 
         cost_obj = mdp.BallCost(set_point,radius)
         actions = np.linspace(*a_desc)
 

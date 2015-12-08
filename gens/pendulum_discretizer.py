@@ -1,18 +1,18 @@
 import numpy as np
 
 import mdp
-from mdp.discretizer import DiscretizerGenerator
+from generator import Generator
 from mdp.pendulum import PendulumRemapper
 from mdp.costs import TargetZoneCost
 from mdp.state_remapper import AngleWrapStateRemaper,RangeThreshStateRemapper
-from utils.kwargparser import KwargParser
+from utils.parsers import KwargParser
 
 import time
 
 #################################################
 # Generate the DISCRETIZER object
 
-class PendulumGenerator(DiscretizerGenerator):
+class PendulumGenerator(Generator):
     def generate(self,**kwargs):
         print "Generating discretizer..."
         start = time.time()

@@ -3,7 +3,7 @@ import numpy as np
 import mdp
 from generator import Generator
 from mdp.double_integrator import DoubleIntegratorRemapper
-from utils.kwargparser import KwargParser
+from utils.parsers import KwargParser
 
 import time
 

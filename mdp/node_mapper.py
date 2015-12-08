@@ -70,16 +70,19 @@ class BasicNodeMapper(NodeMapper):
         """
         Returns a description of the boundary NodeMapper is responsible for.
         
-        Currently assumes its a box, and returns a list of [(low,high),...] tuples
+        Currently assumes its a box, and returns a list of [(low,high),...]
+        tuples
         """
         raise NotImplementedError()
         
-    def get_lens(self):
+    def get_lengths(self):
+        """
+        Returns the number of discrete points along each dimension
+        """
         raise NotImplementedError()
         
     def get_dimension(self):
         raise NotImplementedError()
-
      
 class NodeDist(object):
     """
@@ -197,7 +200,7 @@ class PiecewiseConstRegularGridNodeMapper(BasicNodeMapper):
         self.grid_n = np.array([x[2] for x in vargs])        
         self.num_nodes = np.prod(self.grid_n) 
 
-    def get_len(self):
+    def get_lengths(self):
         return self.grid_n
         
     def get_boundary(self):
@@ -323,7 +326,7 @@ class InterpolatedGridNodeMapper(BasicNodeMapper):
         self.__build_node_id_cache() # Cache mapping grid coords to node ids
         self.__build_node_state_cache() # Caches the states associated with each node
 
-    def get_len(self):
+    def get_lengths(self):
         return self.grid_n
         
     def get_boundary(self):
@@ -465,8 +468,11 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
         self.num_nodes = np.prod(self.cut_point_n)
         self.node_states_cache = np.empty(0)
         
-    def get_len(self):
+    def get_lengths(self):
         return self.cut_point_n
+
+    def get_num_nodes(self):
+        return self.num_nodes
         
     def get_boundary(self):
         lows = [x[0] for x in self.grid_desc]

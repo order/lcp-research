@@ -3,7 +3,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 import matplotlib.animation as animation
 
-from kwargparser import KwargParser
+from parsers import KwargParser
 
 import numpy as np
 

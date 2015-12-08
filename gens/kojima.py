@@ -1,4 +1,4 @@
-from utils.kwargparser import KwargParser
+from utils.parsers import KwargParser
 
 import solvers
 from solvers.kojima import KojimaIPIterator

@@ -1,6 +1,6 @@
 import numpy as np
 import utils.plotting as plotting
-from utils.kwargparser import KwargParser
+from utils.parsers import KwargParser
 
 import matplotlib.pyplot as plt
 import time
@@ -12,17 +12,18 @@ import sys
 def read_in_args(filename):
     params = pickle.load(open(param_filename,'rb'))
     parser = KwargParser()
-    parser.add('x_nodes',None,int)
-    parser.add('y_nodes',None,int)
-    parser.add('actions',None,int)
-    parser.add('size',None,int)
+    parser.add('discretizer',None)
+    parser.add_optional('solver')
+    parser.add_optional('objects')
     params = parser.parse(params)
 
-    A = params['actions']
-    n = params['size']
-    x = params['x_nodes']
-    y = params['y_nodes']
-
+    discretizer = params['discretizer']
+    assert(2 == discretizer.get_dimension())
+    
+    A = discretizer.get_num_actions()
+    n = discretizer.get_num_nodes()
+    (x,y) = discretizer.get_basic_lengths()
+    
     return (A,n,x,y)
 
 def plot_value(Frames,**kwargs):
@@ -67,7 +68,7 @@ if __name__ == '__main__':
     DualDirFrames = plotting.split_into_frames(data['dual_dir'],*params)
 
     # Animate
-    plot_log_advantage(PrimalFrames)
-    #plot_value(PrimalDirFrames,cmap='rainbow')
+    #plot_log_advantage(PrimalFrames)
+    plot_value(PrimalDirFrames,cmap='rainbow')
     #plot_value_complement(PrimalFrames,DualFrames)
     #plot(np.log(Steplen))
