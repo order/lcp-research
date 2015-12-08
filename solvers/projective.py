@@ -23,13 +23,19 @@ class ProjectiveIPIterator(LCPIterator):
         assert((k,k) == PtP.shape)
         self.PtPUP = (PtP.dot(U)).dot(Phi)
         assert((k,k) == self.PtPUP.shape)        
-        self.PtPU_P = (PtP.dot(U) - Phi.T) # FMI in Geoff's code; I sometimes call it Psi in my notes
+        self.PtPU_P = (PtP.dot(U) - Phi.T)
+        # FMI in Geoff's code; I sometimes call it Psi in my notes
         assert((k,N) == self.PtPU_P.shape)            
         self.PtP = PtP
 
         self.x = kwargs.get('x0',np.ones(N))
         self.y = kwargs.get('y0',np.ones(N))
         self.w = kwargs.get('w0',np.zeros(k))
+        print self.x.shape, self.y.shape,self.w.shape
+        print (N,k)
+        assert((N,) == self.x.shape)
+        assert((N,) == self.y.shape)
+        assert((k,) == self.w.shape)
 
         self.iteration = 0
         

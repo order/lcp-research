@@ -149,20 +149,33 @@ def mdp_skew_assembler(A_list):
     """
     Builds a skew-symmetric block matrix from a list of squares
     """
-    A = len(A_list)
+    k = len(A_list)
     (n,m) = A_list[0].shape
-    M = m * A
+    for i in xrange(k):
+        assert((n,m) == A_list[i].shape)
     
-    Block = sps.hstack(A_list)
+    M = k * m
+    # Block = [A_1 ... A_k]    
+    Block = sps.hstack(A_list,format='lil')
     assert((n,M) == Block.shape)
-    Top = sps.hstack([sps.lil_matrix(n,n), Block])
+    print type(Block)
+    
+    # Top = [0 A_1 ... A_k]
+    Z_n = sps.lil_matrix((n,n))
+    assert(Block.shape[0] == Z_n.shape[0])
+    
+    Top = sps.hstack([Z_n, Block],format='lil')
     assert((n,M+n) == Top.shape)
-    Bottom = sps.hstack([-Block.T,sps.lil_matrix(M,M)])
-    assert((M,M+n) == Bottom.shape)
-    SS = sps.vstack([Top,Bottom])
-    assert((M,M+n) == SS.shape)
-    
-    
 
-    return M.tocsr()
+    # Bottom = [-Top.T 0]
+    Z_M = sps.lil_matrix((M,M))
+    assert(Block.shape[1] == Z_M.shape[0])
+    Bottom = sps.hstack([-Block.T,Z_M],format='lil')
+    assert((M,M+n) == Bottom.shape)
+
+    # Full thing: [[0 Top], [-Top.T 0]]
+    SS = sps.vstack([Top,Bottom],format='csr')
+    assert((M+n,M+n) == SS.shape)    
+
+    return SS
         

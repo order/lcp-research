@@ -31,7 +31,7 @@ class MDPSplitIPGenerator(SolverGenerator):
         N = mdp_obj.num_states
         Phi = sps.eye(N)
         
-        iter = MDPSplitIPIterator(mdp_obj,Phi)
+        iter = MDPSplitIPIterator(mdp_obj,Phi,orthogonal=True)
         objects = {'mdp':mdp_obj,\
                    'basis':Phi,\
                    'proj_lcp':iter.proj_lcp_obj}
@@ -48,9 +48,6 @@ class MDPSplitIPGenerator(SolverGenerator):
         # Set up recorders
         solver.recorders.append(PrimalRecorder())
         solver.recorders.append(DualRecorder())
-        solver.recorders.append(StepLenRecorder())
-        solver.recorders.append(PrimalDirRecorder())
-        solver.recorders.append(DualDirRecorder())
     
         return [solver,objects]
 

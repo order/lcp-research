@@ -1,14 +1,19 @@
+from termination import MaxIterTerminationCondition
 from solvers import MDPIterator
+from projective import ProjectiveIPIterator
 import mdp
+import lcp
 
 import numpy as np
 import scipy as sp
 import scipy.sparse as sps
 
+import matplotlib.pyplot as plt
+
 class MDPSplitIPIterator(MDPIterator):
     def __init__(self,mdp_obj,Phi,**kwargs):
     
-        ortho = kwargs.get('is_orthogonal',False)
+        ortho = kwargs.get('orthogonal',False)
     
         # Store mdp
         self.mdp_obj = mdp_obj
@@ -19,6 +24,8 @@ class MDPSplitIPIterator(MDPIterator):
         
         # Store basis
         assert(N == Phi.shape[0])
+        assert(2 == len(Phi.shape))
+
         K = Phi.shape[1]
         self.num_bases = K
         self.Phi = Phi
@@ -27,6 +34,12 @@ class MDPSplitIPIterator(MDPIterator):
         if ortho:
             self.Q = Phi
         else:
+            assert(isinstance(Phi,np.ndarray)) # Cannot be sparse
+            """
+            There isn't a sparse QR decomposer.
+            Fill-in would probably make this pointless anyhow.
+            """
+            
             [Q,R] = sp.linalg.qr(Phi,mode='economic')
             assert(Q.shape == Phi.shape)
             self.Q = Q
@@ -36,11 +49,10 @@ class MDPSplitIPIterator(MDPIterator):
         
         # Build the projective iterator
         self.proj_iter = ProjectiveIPIterator(self.proj_lcp_obj)
-        self.term_cond = PrimalChangeTerminationCondition(1e-5)
 
         self.x = kwargs.get('x0',np.ones(N))
         self.y = kwargs.get('y0',np.ones(N))
-        self.w = kwargs.get('w0',np.zeros(k))
+        self.w = kwargs.get('w0',np.zeros(K))
 
         self.iteration = 0
 
@@ -51,21 +63,29 @@ class MDPSplitIPIterator(MDPIterator):
         """
         
         Q = self.Q
+        A = self.num_actions
+        N = self.num_states
+        
         # Block diagonal basis
         RepQ = [Q]*(A+1)
-        BigQ = scipy.linalg.block_diag(*RepQ)
+        if isinstance(Q, np.ndarray):
+            BigQ = sp.linalg.block_diag(*RepQ)
+        else:
+            BigQ = sps.block_diag(RepQ)
+        assert((A+1)*N == BigQ.shape[0])
         self.BigQ = BigQ
         
         # Build the U part of the matrix
         BigN = N * (A+1)
-        U = mdp.mdp_skew_assembler([Q.T]*(A+1))
+        U = mdp.mdp_skew_assembler([Q.T]*A)
+        
         assert((BigN,BigN) == U.shape)
         self.U = U
         
         proj_q = self.build_original_q()
         assert((BigN,) == proj_q.shape)        
         
-        self.proj_lcp_obj = ProjectiveLCPObj(BigQ,U,proj_q)
+        self.proj_lcp_obj = lcp.ProjectiveLCPObj(BigQ,U,proj_q)
         return self.proj_lcp_obj
         
     
@@ -142,7 +162,7 @@ class MDPSplitIPIterator(MDPIterator):
     def next_iteration(self):
         N,A,K = self.num_states,self.num_actions,self.num_bases
         
-        # Don't create every time.
+        # Don't create every time?
         inner_solver = ProjectiveIPIterator(self.proj_lcp_obj,
             x0=self.x,
             y0=self.y,
@@ -152,12 +172,14 @@ class MDPSplitIPIterator(MDPIterator):
         while True:    
             print 'Inner iteration:',inner_solver.iteration
             # Then check for termination conditions
-            if inner_term_cond.isdone(self.iterator):
+            if inner_term_cond.isdone(inner_solver):
                 print 'Inner term condition:', term_cond
+                self.x = inner_solver.x
+                self.y = inner_solver.y
+                self.w = inner_solver.w
                 return 
             # Finally, advance to the next iteration
-            inner_solver.next_iteration()
-            
+            inner_solver.next_iteration()            
         self.iteration += 1
 
     def get_primal_vector(self):
