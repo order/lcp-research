@@ -1,6 +1,7 @@
 import numpy as np
 import utils.plotting as plotting
 from utils.parsers import KwargParser
+from optparse import OptionParser
 
 import matplotlib.pyplot as plt
 import time
@@ -44,12 +45,33 @@ def plot_value_complement(PrimalFrames,DualFrames,**kwargs):
     
 
 if __name__ == '__main__':
-    filename = sys.argv[1]
-    assert('.npz' == filename[-4:])
-    param_filename = filename[:-4] + '.pickle'
+
+    parser = OptionParser()
+    parser.add_option('-c','--command', dest='command',
+                      help='run given command', metavar='COM')
+    parser.add_option('-f','--file',dest='filename',
+                      help='data file in .npz format',
+                      metavar='FILE',
+                      default='data/test.npz')
+    parser.add_option('-p','--params',dest='param_filename',
+                      help='param file in .pickle format',
+                      metavar='PARAM',
+                      default='data/test.pickle')
+    parser.add_option('-d','--data',dest='data',
+                      help='name of data to analyze',metavar='DATA')    
+    (options,args) = parser.parse_args()
+
+    # Dump options into the namespace
+    for (k,v) in options.items():
+        exec_command = '{0}={1}'.format(k,v)
+        exec(exec_command)
+    
+    assert('.npz' == filename[-len('.npz'):])
+    assert('.pickle' == param_filename[-('.pickle'):])
 
     # Load primal and dual data
     data = np.load(filename)
+
 
     # Load parameters
     print 'Loading params from', param_filename
@@ -57,18 +79,19 @@ if __name__ == '__main__':
 
     Primal = data['primal']
     Dual = data['dual']
-    PrimalDir = data['primal_dir']
-    DualDir = data['dual_dir']
-    Steplen = data['steplen']
+    #PrimalDir = data['primal_dir']
+    #DualDir = data['dual_dir']
+    #Steplen = data['steplen']
     
     # Split    
     PrimalFrames = plotting.split_into_frames(data['primal'],*params)
     DualFrames = plotting.split_into_frames(data['dual'],*params)
-    PrimalDirFrames = plotting.split_into_frames(data['primal_dir'],*params)
-    DualDirFrames = plotting.split_into_frames(data['dual_dir'],*params)
+    #PrimalDirFrames = plotting.split_into_frames(data['primal_dir'],*params)
+    #DualDirFrames = plotting.split_into_frames(data['dual_dir'],*params)
 
     # Animate
     #plot_log_advantage(PrimalFrames)
-    plot_value(PrimalDirFrames,cmap='rainbow')
+    plot_value(PrimalFrames)
+    #plot_flow(DualFrames)
     #plot_value_complement(PrimalFrames,DualFrames)
     #plot(np.log(Steplen))

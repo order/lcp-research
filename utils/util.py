@@ -9,7 +9,7 @@ import scipy.sparse
 import matplotlib.pyplot as plt
 
 import importlib
-
+        
 def load_class(mod_str):
     if '.' not in mod_str:
         return eval(mod_str)

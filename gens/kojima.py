@@ -36,6 +36,7 @@ class KojimaGenerator(SolverGenerator):
         max_iter_cond = MaxIterTerminationCondition(max_iter)
         val_change_term = ResidualTerminationCondition(thresh)
         solver.termination_conditions.append(val_change_term)
+        solver.termination_conditions.append(max_iter_cond)
 
         # Set up recorders
         solver.recorders.append(PrimalRecorder())

@@ -43,6 +43,7 @@ class MDPSplitIPGenerator(SolverGenerator):
         # Add termination conditions
         max_iter_cond = MaxIterTerminationCondition(max_iter)
         val_change_term = ResidualTerminationCondition(thresh)
+        solver.termination_conditions.append(max_iter_cond)
         solver.termination_conditions.append(val_change_term)
 
         # Set up recorders
@@ -57,7 +58,7 @@ class MDPSplitIPGenerator(SolverGenerator):
                
         # Extract the value information
         # TODO: generalize
-        names = ['primal','dual','steplen','primal_dir','dual_dir']
+        names = ['primal','dual']
         assert(len(names) == len(solver.recorders))
         
         data = {}

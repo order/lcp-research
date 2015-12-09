@@ -65,6 +65,9 @@ class ProjectiveLCPObj(LCPObj):
         
         self.name = kwargs.get('name','Unnamed')
 
+    def update_q(self,new_q):
+        self.q = new_q
+
     def to_csv(self,fileroot):
         FH = open(fileroot + '_phi.csv','w')
         for r in self.Phi.todense():

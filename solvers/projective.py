@@ -31,8 +31,7 @@ class ProjectiveIPIterator(LCPIterator):
         self.x = kwargs.get('x0',np.ones(N))
         self.y = kwargs.get('y0',np.ones(N))
         self.w = kwargs.get('w0',np.zeros(k))
-        print self.x.shape, self.y.shape,self.w.shape
-        print (N,k)
+        
         assert((N,) == self.x.shape)
         assert((N,) == self.y.shape)
         assert((k,) == self.w.shape)
@@ -106,9 +105,9 @@ class ProjectiveIPIterator(LCPIterator):
         assert((k,N) == A.shape)        
         G = ((A.dot(Y)).dot(Phi) - PtPUP).todense()
         
-        print 'Reduced Newton system: '
-        print '\tShape:',G.shape 
-        print '\tCond: {0:.3g}'.format(np.linalg.cond(G))
+        #print 'Reduced Newton system: '
+        #print '\tShape:',G.shape 
+        #print '\tCond: {0:.3g}'.format(np.linalg.cond(G))
         
         assert((k,k) == G.shape)
         h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
@@ -149,8 +148,6 @@ class ProjectiveIPIterator(LCPIterator):
         #    x_cand = x + steplen*del_x
         #    y_cand = y + steplen*del_y
             
-        print 'Steplen {0:.3g}'.format(steplen)
-                    
         # Sigma is beta in Geoff's code
         if(steplen > 0.95):
             sigma = 0.05 # Long step

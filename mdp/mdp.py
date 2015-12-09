@@ -158,7 +158,6 @@ def mdp_skew_assembler(A_list):
     # Block = [A_1 ... A_k]    
     Block = sps.hstack(A_list,format='lil')
     assert((n,M) == Block.shape)
-    print type(Block)
     
     # Top = [0 A_1 ... A_k]
     Z_n = sps.lil_matrix((n,n))
