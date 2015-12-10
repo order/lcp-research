@@ -23,12 +23,16 @@ def animate_frames(Frames,**kwargs):
     (I,X,Y) = Frames.shape
     
     fig = plt.figure()
+    low = np.min(Frames)
+    hi = np.max(Frames)
 
     print 'Starting animation...'        
     Plotters = []
     cmap = plt.get_cmap(args['cmap'])
     for i in xrange(I):
-        img = plt.pcolor(Frames[i,:,:],\
+        img = plt.pcolor(Frames[i,:,:],
+                         vmin = low,
+                         vmax = hi,
                          cmap=cmap)
         Plotters.append([img])
     im_ani = animation.ArtistAnimation(fig,Plotters,\
@@ -42,7 +46,6 @@ def animate_frames(Frames,**kwargs):
     if 'save_file' in args:
         im_ani.save(args['save_file'])
     plt.show()
-
 
 def plot(fn,**kwargs):
     parser = KwargParser()

@@ -42,6 +42,8 @@ class MDPSplitIPIterator(MDPIterator):
         self.y = kwargs.get('y0',np.ones(N))
         self.w = kwargs.get('w0',np.zeros(K))
 
+        self.ref_v = np.empty(n)
+
         self.iteration = 0
         
         # Orthogonalize the basis if not already orthogonal
@@ -113,6 +115,8 @@ class MDPSplitIPIterator(MDPIterator):
         v_slice = self.get_slice(0)
         q[v_slice] = -Pi(p)
         v = self.x[v_slice]
+
+        ref_v = np.full(n, np.inf)
         
         for a in xrange(A):
             f_slice = self.get_slice(a+1)
@@ -121,10 +125,15 @@ class MDPSplitIPIterator(MDPIterator):
             c = self.mdp_obj.costs[a]
             P = self.mdp_obj.transitions[a]
 
+            bellman = c + gamma * (P.T).dot(v)
+
+            ref_v = np.minimum(ref_v,bellman)
+
             q[v_slice] -= Pi(gamma * P.dot(f))
 
-            q[f_slice] = Pi(c + gamma * (P.T).dot(v))
-            
+            q[f_slice] = Pi(bellman)
+
+        self.ref_v = ref_v
         return q
         
     def get_projection_function(self):
@@ -152,25 +161,29 @@ class MDPSplitIPIterator(MDPIterator):
             x0=self.x,
             y0=self.y,
             w0=self.w)
-        term_conds = [MaxIterTerminationCondition(500),
-                      ResidualTerminationCondition(1e-4)]
+        term_conds = [MaxIterTerminationCondition(15)]
 
         done_flag = False
         while not done_flag:    
-            inner_solver.next_iteration()            
+            inner_solver.next_iteration()
 
-            for cond in term_conds:
-                if cond.isdone(inner_solver):
-                    print 'Inner term condition:', cond
-                    self.x = inner_solver.x
-                    self.y = inner_solver.y
-                    self.w = inner_solver.w
-                    assert((N,) == self.x.shape)
-                    assert((N,) == self.y.shape)
-                    assert((K,) == self.w.shape)
+            v = inner_solver.x[self.get_slice(0)]
+            print self.iteration,'Value iteration residual:',\
+                np.linalg.norm(v - self.ref_v)
 
-                    done_flag = True
-                    break
+            #for cond in term_conds:
+            #    if cond.isdone(inner_solver):
+            if np.linalg.norm(v - self.ref_v) < 1e-4:
+                #print 'Inner term condition:', cond
+                self.x = inner_solver.x
+                self.y = inner_solver.y
+                self.w = inner_solver.w
+                assert((N,) == self.x.shape)
+                assert((N,) == self.y.shape)
+                assert((K,) == self.w.shape)
+
+                done_flag = True
+                break
                 
         self.iteration += 1
         q = self.proj_lcp_obj.q
