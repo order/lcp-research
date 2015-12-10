@@ -14,12 +14,13 @@ class MDPSplitIPIterator(MDPIterator):
     def __init__(self,mdp_obj,Phi,**kwargs):
     
         ortho = kwargs.get('orthogonal',False)
-
         
         # Store mdp
         self.mdp_obj = mdp_obj
         n = mdp_obj.num_states
         A = mdp_obj.num_actions
+        self.discount = mdp_obj.discount
+        self.state_weight_vector = np.ones(n) # `p'
 
         # Store basis
         assert(n == Phi.shape[0])
@@ -37,6 +38,11 @@ class MDPSplitIPIterator(MDPIterator):
         self.num_nodes = N
         self.num_bases = K
 
+        self.x = kwargs.get('x0',np.ones(N))
+        self.y = kwargs.get('y0',np.ones(N))
+        self.w = kwargs.get('w0',np.zeros(K))
+
+        self.iteration = 0
         
         # Orthogonalize the basis if not already orthogonal
         if ortho:
@@ -58,12 +64,6 @@ class MDPSplitIPIterator(MDPIterator):
         # Build the projective iterator
         self.proj_iter = ProjectiveIPIterator(self.proj_lcp_obj)
 
-        self.x = kwargs.get('x0',np.ones(N))
-        self.y = kwargs.get('y0',np.ones(N))
-        self.w = kwargs.get('w0',np.zeros(K))
-
-        self.iteration = 0
-
         
     def build_projective_lcp(self):
         """
@@ -83,25 +83,21 @@ class MDPSplitIPIterator(MDPIterator):
             BigQ = sps.block_diag(RepQ)
         assert((N,K) == BigQ.shape)
         self.BigQ = BigQ
-        
+
+
         # Build the U part of the matrix
         U = mdp.mdp_skew_assembler([Q.T]*A)
-        
+                
         assert((N,N) == U.shape)
         self.U = U
         
-        proj_q = self.build_original_q()
-        assert((N,) == proj_q.shape)        
+        q = self.build_q()
+        assert((N,) == q.shape)
         
-        self.proj_lcp_obj = lcp.ProjectiveLCPObj(BigQ,U,proj_q)
+        self.proj_lcp_obj = lcp.ProjectiveLCPObj(BigQ,U,q)
         return self.proj_lcp_obj
-        
-    
-    def build_original_q(self):
-        """
-        Build the original projected q
-        Under the assumption that v,f = 0
-        """
+
+    def build_q(self):
         Q = self.Q
         N = self.num_nodes
         K = self.num_bases
@@ -109,15 +105,27 @@ class MDPSplitIPIterator(MDPIterator):
         A = self.num_actions
         
         Pi = self.get_projection_function()
-        q_comps = [-Pi(np.ones(n))] # State-action weights
+        p = self.state_weight_vector
+        q = np.empty(N)
+
+        gamma = self.discount
+
+        v_slice = self.get_slice(0)
+        q[v_slice] = -Pi(p)
+        v = self.x[v_slice]
+        
         for a in xrange(A):
-            # Cost components
-            q_comps.append(Pi(self.mdp_obj.costs[a]))
+            f_slice = self.get_slice(a+1)
+            f = self.x[f_slice]
             
-        proj_q = np.hstack(q_comps)
-        assert((N,) == proj_q.shape)
-        self.original_proj_q = proj_q
-        return proj_q
+            c = self.mdp_obj.costs[a]
+            P = self.mdp_obj.transitions[a]
+
+            q[v_slice] -= Pi(gamma * P.dot(f))
+
+            q[f_slice] = Pi(c + gamma * (P.T).dot(v))
+            
+        return q
         
     def get_projection_function(self):
         Q = self.Q
@@ -127,48 +135,7 @@ class MDPSplitIPIterator(MDPIterator):
         n = self.num_states
         A = self.num_actions
         assert(0 <= i < (A + 1))
-        return slice(n*i,n*(i+1))
-        
-    def update_q(self):
-        n = self.num_states
-        A = self.num_actions
-        Q = self.Q
-        
-        Pi = self.get_projection_function()
-        
-        # Build difference vector
-        delta = []
-        v_block = np.zeros(n)
-        v_slice = self.get_slice(0)
-        v = self.x[v_slice]
-        assert((n,) == v.shape)
-        for a in xrange(A):
-            P = self.mdp_obj.transitions[a]
-            
-            # Aggregate the changes to v block
-            f_slice = self.get_slice(a+1)
-            f = self.x[f_slice]
-            v_block += Pi(P.dot(f))
-
-            # Append the f_a block to the list
-            delta.append(Pi((P.T).dot(v)))
-            
-        # Prepend the v_block
-        delta.insert(0,v_block)
-        assert(A+1 == len(delta))
-        
-        # Convert to vector
-        delta = np.hstack(delta)
-        assert((n*(A+1),) == delta.shape)
-        
-        # Update the projective LCP
-        gamma = self.mdp_obj.discount
-        new_q = self.original_proj_q + gamma*delta
-        self.proj_lcp_obj.update_q(new_q)
-        
-        # Return the new vector
-        return self.proj_lcp_obj
-        
+        return slice(n*i,n*(i+1))        
         
     def next_iteration(self):
         N = self.num_nodes
@@ -207,8 +174,9 @@ class MDPSplitIPIterator(MDPIterator):
                 
         self.iteration += 1
         q = self.proj_lcp_obj.q
-        self.update_q()
-        print 'q vector change:', np.linalg.norm(q -self.proj_lcp_obj.q)
+        q_new = self.build_q()
+        print 'q vector change:', np.linalg.norm(q_new - q)
+        self.proj_lcp_obj.q = q_new
 
     def get_primal_vector(self):
         return self.x

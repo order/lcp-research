@@ -19,8 +19,10 @@ def build_generator(conf_file):
 
     # "gen_fn" is a special keyword
     gen = args['gen_fn']() # Instantiate
+    name = args.get('name',conf_file)
     del args['gen_fn']
-    return (gen,args)  
+    del args['name']
+    return (gen,name,args)  
 
 if __name__ == '__main__':
 
@@ -33,14 +35,14 @@ if __name__ == '__main__':
     param_save_file = save_file + '.pickle'
     print 'Note: saving internal info to', param_save_file
 
-    (inst_gen,inst_args) = build_generator(inst_conf_file)
+    (inst_gen,inst_name,inst_args) = build_generator(inst_conf_file)
     assert(issubclass(type(inst_gen), gens.Generator))
     discretizer = inst_gen.generate(**inst_args)
     assert(issubclass(type(discretizer), mdp.MDPDiscretizer))
     
     # Build the solver
     # May build intermediate objects (MDP, LCP, projective LCP)
-    (sol_gen,sol_args) = build_generator(solver_conf_file)
+    (sol_gen,sol_name,sol_args) = build_generator(solver_conf_file)
     assert(issubclass(type(sol_gen), gens.SolverGenerator))    
     [solver,objs] = sol_gen.generate(discretizer=discretizer,\
                                   **sol_args)
@@ -55,7 +57,9 @@ if __name__ == '__main__':
     np.savez(save_file,**data) # Extension auto-added
 
     #Save experiment parameters
-    params = {'discretizer':discretizer,\
-              'solver':solver,\
+    params = {'discretizer':discretizer,
+              'inst_name':inst_name,
+              'solver':solver,
+              'solver_name':sol_name,
               'objects':objs}
     pickle.dump(params,open(param_save_file,'wb'))

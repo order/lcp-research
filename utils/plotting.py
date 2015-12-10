@@ -38,12 +38,11 @@ def animate_frames(Frames,**kwargs):
     plt.xlabel(args['xlabel'])
     plt.ylabel(args['ylabel'])
     plt.title(args['title'])
-    
+
     if 'save_file' in args:
-        save_file = args['save_file']
-        im_ani.save(save_file)
-    else:
-        plt.show()
+        im_ani.save(args['save_file'])
+    plt.show()
+
 
 def plot(fn,**kwargs):
     parser = KwargParser()
@@ -56,33 +55,6 @@ def plot(fn,**kwargs):
     plt.xlabel(args['xlabel'])
     plt.ylabel(args['ylabel'])
     plt.title(args['title'])
-    
-    plt.show()
 
+    plot.show()
 
-def split_into_frames(Data,A,n,x,y):
-    """
-    Take a I x N matrix where the columns are either
-    primal or dual block-structured vectors from an 
-    LCP'd MDP. The MDP should be based on 2 continuous
-    dimensions (e.g. the double integrator)
-
-    Convert into an I x (A+1) x X x Y rank-4 tensor where
-    T[i,a,:,:] is a 2D image.
-    """
-    (I,N) = Data.shape
-    assert(N == (A+1)*n)
-    assert(x*y <= n )
-
-    # Reshape into I x n x (A+1)
-    Frames = np.reshape(Data,(I,n,(A+1)),order='F')
-
-    # Crop out non-physical states
-    Frames = Frames[:,:(x*y),:]
-
-    # Reshape into  I x X x Y x (A+1)
-    Frames = np.reshape(Frames,(I,x,y,(A+1)),order='C')
-
-    # Swap axes to be I x (A+1) x Y x X
-    Frames = np.swapaxes(Frames,1,3)
-    return Frames
