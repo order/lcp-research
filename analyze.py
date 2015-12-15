@@ -23,58 +23,54 @@ def read_pickle(filename):
     
 if __name__ == '__main__':
     ## Parser command line
-    parser = OptionParser()
-    parser.add_option('-d','--datafile',dest='data_filename',
-                      help='data file in .npz format',
-                      metavar='FILE')
-    parser.add_option('-p','--process',dest='process_fn_str',
-                      help='processing function (fn in util.processing)',
-                      metavar='FN')
-    parser.add_option('-f','--field',dest='data_field',
-                      help='data field name (primal,dual,...)',
-                      metavar='NAME')
-    parser.add_option('-o','--out',dest='save_file',
-                      help='save file', metavar = 'FILE')
-    (options,_) = parser.parse_args()
 
-    # Command line overrides file settings
-    raw_args = {} # TODO read stuff from file
-    for (k,v) in options.__dict__.items():
-        if v:
-            raw_args[k] = v
-    print raw_args
-
-    arg_parser = KwargParser()
-    arg_parser.add('data_filename','data/test.npz')
-    arg_parser.add_optional('pickle_filename')
-    arg_parser.add('process_fn_str','val')
-    arg_parser.add('data_field','primal')
-    arg_parser.add_optional('save_file')
-    args = arg_parser.parse(raw_args)
+    if 4 != len(sys.argv):
+        print 'Usage: python {0} <data file> <plot config file> <save_file>'\
+            .format(sys.argv[0])
+        quit()
+    (_,data_file, plot_conf_file,save_file) = sys.argv
 
     # Open files
     data_ext = '.npz'
     pickle_ext = '.pickle'
-    data_filename = args['data_filename']
-    assert(data_filename.endswith(data_ext))
-    root_filename = data_filename[:-len(data_ext)]
-
+    assert(data_file.endswith(data_ext))
     
-    pickle_filename = args.get('pickle_filename',
-                               root_filename + pickle_ext)    
-    assert(pickle_filename.endswith(pickle_ext))
-
+    root_filename = data_file[:-len(data_ext)]    
+    pickle_filename = root_filename + pickle_ext
+    
     print 'Source data file:',data_filename
     print 'Source pickle file:',pickle_filename
+
+    # Load configuration
+    parser = ConfigParser(plot_conf_file)
+    parser.add_handler('data_process_fn',load_class)
+    parser.add_handler('plotting_fn',load_class)
+    args = parser.parse()
+
+    # filter out data processing args
+
+    hier_args = util.parsers.hier_key_dict(args,'.')
+    data_opts = hier_args.get('data',{})
+    plot_opts = hier_args.get('plot',{})
+    hier_args.pop('data',None)
+    hier_args.pop('plot',None)
+    assert(0 == len(hier_args)) # only top-level options
+
+    # FROM HERE....
     
     # Load data
     data = np.load(data_filename)
     params = read_pickle(pickle_filename)
 
     # Set funcs (Hardcoded for now)
-    process_fn = utils.processing.frame_processor
-    plot_fn = utils.plotting.animate_frames
+    #process_fn = utils.processing.frame_processor
+    #plot_fn = utils.plotting.animate_frames
+    
+    plot_command = eval(args['command_fn_str'])
+    plot_fn = utils.plotting.animate_cdf
 
+    command_fn = 
+    
     # Filter out other options (Hardcoded for now)
 
     title = '{0} with {1}, {2} {3}'.format(params['inst_name'],

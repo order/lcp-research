@@ -9,6 +9,43 @@ import numpy as np
 
 ##########################
 # Animate a rank 3 tensor along the first dimension
+
+def animate_cdf(X,**kwargs):
+    # Parse input
+    parser = KwargParser()
+    parser.add_optional('save_file',str)
+    parser.add('title','No title',str)
+    parser.add('xlabel','x',str)
+    parser.add('ylabel','y',str)
+    args = parser.parse(kwargs)
+
+    assert(2 == len(X.shape)) # Frame index, index
+    (I,J) = X.shape
+    
+    fig = plt.figure()
+    low = np.min(X)
+    hi = np.max(X)
+
+    print 'Starting animation...'        
+    Plotters = []
+    
+    for i in xrange(I):
+        S = np.sort(X[i,:])
+        cdf = plt.plot(S,np.linspace(0,1,J),'-b',lw=2.0)
+        plt.ylim([0,1])
+        plt.xlim([low,hi])
+        Plotters.append(cdf)
+    im_ani = animation.ArtistAnimation(fig,Plotters,\
+                                       interval=50,\
+                                       repeat_delay=3000)
+    plt.xlabel(args['xlabel'])
+    plt.ylabel(args['ylabel'])
+    plt.title(args['title'])
+
+    if 'save_file' in args:
+        im_ani.save(args['save_file'])
+    plt.show()
+
 def animate_frames(Frames,**kwargs):
     # Parse input
     parser = KwargParser()

@@ -25,7 +25,23 @@ def split_into_frames(Data,A,n,x,y):
     Frames = np.swapaxes(Frames,1,3)
     return Frames
 
-def frame_processor(data,params,**kwargs):
+def img_movie(data,params,**kwargs):
+    """
+    Turns data into movie frames based on provided inputs
+    """
+    def val(F):
+        return F[:,0,:,:]
+
+    def flow(F):
+        return np.argmax(F[:,1:,:,:],axis=1)
+
+    def adv(F):
+        SF = np.sort(F[:,1:,:,:],axis=1)
+    return np.log(SF[:,-1,:,:] - SF[:,-2,:,:] + 1e-22)
+
+    def complement(P,D):
+        return P * D
+    
     data_field = data[kwargs['field']] # Hardcoded
     fn = eval(kwargs['fn']) # Hardcoded
     
@@ -37,15 +53,22 @@ def frame_processor(data,params,**kwargs):
 
     return fn(frames)
 
-def val(F):
-    return F[:,0,:,:]
+def cdf_movie(data,params,**kwargs):
+    """
+    Returns a subset of the data based on provided inputs
+    """
+    def val(F,n):
+        return F[:,:n]
 
-def flow(F):
-    return np.argmax(F[:,1:,:,:],axis=1)
+    def flow(F,n):
+        return F[:,n:]
+    
+    data_field = data[kwargs['field']]
+    fn = eval(kwargs['fn'])
+    
+    discretizer = params['discretizer']
 
-def adv(F):
-    SF = np.sort(F[:,1:,:,:],axis=1)
-    return np.log(SF[:,-1,:,:] - SF[:,-2,:,:] + 1e-22)
+    A = discretizer.get_num_actions()
+    n = discretizer.get_num_nodes()
 
-def complement(P,D):
-    return P * D
+    return fn(data_field,n)

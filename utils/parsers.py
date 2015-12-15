@@ -11,6 +11,7 @@ class KwargParser(object):
         self.types = {}
         self.mandatory = set()
         self.optional = set()
+        self.permissive = False
         
     def add(self,key,*default):
         """
@@ -51,10 +52,12 @@ class KwargParser(object):
     def parse(self,D):
         # Check if there are unexpected options
         keys = set(self.defaults.keys()) | self.mandatory | self.optional
+
         weird = set(D.keys()) - keys
         if len(weird) > 0:
             for k in weird:
                 warnings.warn('Unknown option: {0}'.format(k))
+        if not self.permissive:
             assert(0 == len(weird))
             
         # Check if there are missing options
@@ -124,3 +127,23 @@ class ConfigParser(object):
                 val = self.default_handler(val_str)
             args[key] = val
         return args
+
+
+def hier_key_dict(D,sep):
+    """
+    Takes a dictionary with keys like "key1.key2.key3 = val" and
+    breaks into a nested dictionary like:
+    key1 = {key2 = {key3 = val}}
+    """
+    NewD = {}
+    for key in D:
+        split_key = map(lambda x: x.strip() for x in key.split(sep)]
+        CurrD = NewD
+        for subkey in split_key[:-1]:
+            if subkey not in CurrD:
+                CurrD[subkey] = {}
+            CurrD = CurrD[subkey]
+        CurrD[split_key[-1]] = D[key]
+
+    return NewD
+            
