@@ -69,10 +69,19 @@ def vector_processing(data,params,**kwargs):
 
     def flow(F,n):
         return F[:,n:]
-    
-    data_field = data[kwargs['field']]
-    fn = eval(kwargs['fn'])
-    
+
+    parser = KwargParser()
+    parser.add('field','primal') #primal/dual
+    parser.add('component','val')
+    args = parser.parse(kwargs)
+
+    if 'comp' == args['field']:
+        data_field = data['primal'] * data['dual']
+    else:
+        data_field = data[args['field']]
+        
+    fn = eval(args['component'])
+        
     discretizer = params['discretizer']
 
     A = discretizer.get_num_actions()

@@ -10,50 +10,48 @@ from generator import SolverGenerator
 import time
 
 class KojimaGenerator(SolverGenerator):
-    def generate(self,**kwargs):
+    def __init__(self,**kwargs):
+        # Parsing
         parser = KwargParser()
         parser.add('discretizer')
         parser.add('discount',0.99)
-        parser.add('max_iter',1000)
-        parser.add('thresh',1e-6)
+        
+        parser.add('termination_conditions')
+        parser.add('recorders')
+        parser.add_optional('notification')
+        
         args = parser.parse(kwargs)
 
-        discretizer = args['discretizer']
-        discount = args['discount']
-        max_iter = args['max_iter']
-        thresh = args['thresh']
-
+        # Dump into self namespace
+        self.__dict__.update(args)
+            
+    def generate(self,**kwargs):
+        # Build objects
         mdp_obj = discretizer.build_mdp(discount=discount)
         lcp_obj = mdp_obj.tolcp()
         iter = KojimaIPIterator(lcp_obj)
         objects = {'mdp':mdp_obj,'lcp':lcp_obj}
 
-
         # Set up the solver object
         solver = solvers.IterativeSolver(iter)
 
         # Add termination conditions
-        max_iter_cond = MaxIterTerminationCondition(max_iter)
-        val_change_term = ResidualTerminationCondition(thresh)
-        solver.termination_conditions.append(val_change_term)
-        solver.termination_conditions.append(max_iter_cond)
+        solver.termination_conditions.extend(
+            self.termination_conditions.values())
 
         # Set up recorders
-        solver.recorders.append(PrimalRecorder())
-        solver.recorders.append(DualRecorder())
-        solver.recorders.append(StepLenRecorder())
-        solver.recorders.append(PrimalDirRecorder())
-        solver.recorders.append(DualDirRecorder())
+        self.recorder_names = self.recorders.keys()
+        solver.recorders.extend(self.recorders.values)
+
+        # Set up notification
+        solver.notifications.extend(self.notifications.values)
     
         return [solver,objects]
 
-
-    def extract(self,solver,**kwargs):
-        assert(0 == len(kwargs))
-               
+    def extract(self,solver):               
         # Extract the value information
         # TODO: generalize
-        names = ['primal','dual','steplen','primal_dir','dual_dir']
+        names = self.recorder_names
         assert(len(names) == len(solver.recorders))
         
         data = {}

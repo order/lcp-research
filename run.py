@@ -5,7 +5,7 @@ import pickle
 import numpy as np
 
 import mdp,gens,solvers
-from utils.parsers import ConfigParser
+from utils.parsers import ConfigParser, hier_key_dict
 from utils import load_class
 
 
@@ -15,14 +15,19 @@ from utils import load_class
 def build_generator(conf_file):
     parser = ConfigParser(conf_file)
     parser.add_handler('gen_fn',load_class)
-    args = parser.parse()
+    args = parser.parse()    
 
-    # "gen_fn" is a special keyword
-    gen = args['gen_fn']() # Instantiate
+    # "generator" and "name" are special keywords
+    gen_class = args['generator'] # Don't instantiate yet
     name = args.get('name',conf_file)
-    del args['gen_fn']
+    del args['generator']
     del args['name']
-    return (gen,name,args)  
+
+    gen_opts = hier_key_dict(args,':')
+    
+    gen_inst = gen_class(**gen_opts) # Rest of args for the gen instantiation
+    
+    return (gen_inst,name)  
 
 if __name__ == '__main__':
 
