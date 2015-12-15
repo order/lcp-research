@@ -1,13 +1,15 @@
 import numpy as np
 import utils
-from utils.parsers import KwargParser
+from utils.parsers import KwargParser,ConfigParser
 
 import matplotlib.pyplot as plt
-import time
-from optparse import OptionParser
-import pickle
+import time,sys,pickle,types
 
 def read_pickle(filename):
+    """
+    Read in information from a pickle file
+    Should have the discretizer, at least
+    """
     params = pickle.load(open(filename,'rb'))
     parser = KwargParser()
     parser.add('discretizer',None)
@@ -20,6 +22,39 @@ def read_pickle(filename):
     discretizer = params['discretizer']
     assert(2 == discretizer.get_dimension())    
     return params
+
+def read_config_file(filename):
+    """
+    Read in the analysis configuration file.
+    Should have details about the data processing function
+    and the plotting function.
+    """
+
+    data_process_str = 'data_process_fn'
+    data_prefix = 'data'
+    plotting_str = 'plotting_fn'
+    plot_prefix = 'plot'
+    
+    # Load configuration
+    parser = ConfigParser(filename)
+    parser.add_handler(data_process_str,utils.load_class)
+    parser.add_handler(plotting_str,utils.load_class)
+    args = parser.parse()
+
+    # filter out data processing args
+    data_process_fn = args[data_process_str]
+    plotting_fn = args[plotting_str]
+    assert(isinstance(data_process_fn,types.FunctionType))
+    assert(isinstance(plotting_fn,types.FunctionType))
+    del args[data_process_str]
+    del args[plotting_str]
+
+    hier_args = utils.parsers.hier_key_dict(args,':')
+    data_opts = hier_args.pop(data_prefix,{})
+    plot_opts = hier_args.pop(plot_prefix,{})
+    assert(0 == len(hier_args)) # only top-level options
+
+    return (data_process_fn,data_opts,plotting_fn,plot_opts)
     
 if __name__ == '__main__':
     ## Parser command line
@@ -35,53 +70,24 @@ if __name__ == '__main__':
     pickle_ext = '.pickle'
     assert(data_file.endswith(data_ext))
     
-    root_filename = data_file[:-len(data_ext)]    
-    pickle_filename = root_filename + pickle_ext
+    root_file = data_file[:-len(data_ext)]    
+    pickle_file = root_file + pickle_ext
     
-    print 'Source data file:',data_filename
-    print 'Source pickle file:',pickle_filename
+    print 'Source data file:',data_file
+    print 'Source pickle file:',pickle_file
 
-    # Load configuration
-    parser = ConfigParser(plot_conf_file)
-    parser.add_handler('data_process_fn',load_class)
-    parser.add_handler('plotting_fn',load_class)
-    args = parser.parse()
-
-    # filter out data processing args
-
-    hier_args = util.parsers.hier_key_dict(args,'.')
-    data_opts = hier_args.get('data',{})
-    plot_opts = hier_args.get('plot',{})
-    hier_args.pop('data',None)
-    hier_args.pop('plot',None)
-    assert(0 == len(hier_args)) # only top-level options
-
-    # FROM HERE....
+    # Read the data processing and plotting command
+    # configuration here
+    (data_fn,data_opts,plot_fn,plot_opts)\
+        = read_config_file(plot_conf_file)
     
     # Load data
-    data = np.load(data_filename)
-    params = read_pickle(pickle_filename)
+    data = np.load(data_file)
+    params = read_pickle(pickle_file)
 
-    # Set funcs (Hardcoded for now)
-    #process_fn = utils.processing.frame_processor
-    #plot_fn = utils.plotting.animate_frames
-    
-    plot_command = eval(args['command_fn_str'])
-    plot_fn = utils.plotting.animate_cdf
+    # Process the data
+    processed_data = data_fn(data,params,**data_opts)
 
-    command_fn = 
-    
-    # Filter out other options (Hardcoded for now)
-
-    title = '{0} with {1}, {2} {3}'.format(params['inst_name'],
-                                           params['solver_name'],
-                                           args['data_field'].capitalize(),
-                                           args['process_fn_str'])
-    plotting_options = {'title':title}
-    if 'save_file' in args:
-        plotting_options['save_file'] = args['save_file']
-    processing_options = {'fn' : args['process_fn_str'],
-                          'field' : args['data_field']}
-   
-    processed_data = process_fn(data,params,**processing_options)
-    plot_fn(processed_data,**plotting_options)
+    # Plot the processed data
+    plot_opts['save_file'] = save_file
+    plot_fn(processed_data,**plot_opts)

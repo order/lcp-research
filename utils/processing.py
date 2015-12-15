@@ -25,10 +25,12 @@ def split_into_frames(Data,A,n,x,y):
     Frames = np.swapaxes(Frames,1,3)
     return Frames
 
-def img_movie(data,params,**kwargs):
+def frame_processing(data,params,**kwargs):
     """
     Turns data into movie frames based on provided inputs
     """
+
+    # Inner functions for different processing options
     def val(F):
         return F[:,0,:,:]
 
@@ -37,13 +39,18 @@ def img_movie(data,params,**kwargs):
 
     def adv(F):
         SF = np.sort(F[:,1:,:,:],axis=1)
-    return np.log(SF[:,-1,:,:] - SF[:,-2,:,:] + 1e-22)
+        return np.log(SF[:,-1,:,:] - SF[:,-2,:,:] + 1e-22)
 
-    def complement(P,D):
-        return P * D
-    
-    data_field = data[kwargs['field']] # Hardcoded
-    fn = eval(kwargs['fn']) # Hardcoded
+    parser = KwargParser()
+    parser.add('field','primal') #primal/dual
+    parser.add('component','val')
+    args = parser.parse(kwargs)
+
+    if 'comp' == args['field']:
+        data_field = data['primal'] * data['dual']
+    else:
+        data_field = data[args['field']]
+    fn = eval(args['component'])
     
     discretizer = params['discretizer']
     A = discretizer.get_num_actions()
@@ -53,7 +60,7 @@ def img_movie(data,params,**kwargs):
 
     return fn(frames)
 
-def cdf_movie(data,params,**kwargs):
+def vector_processing(data,params,**kwargs):
     """
     Returns a subset of the data based on provided inputs
     """

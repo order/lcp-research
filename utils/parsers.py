@@ -137,7 +137,7 @@ def hier_key_dict(D,sep):
     """
     NewD = {}
     for key in D:
-        split_key = map(lambda x: x.strip() for x in key.split(sep)]
+        split_key = [x.strip() for x in key.split(sep)]
         CurrD = NewD
         for subkey in split_key[:-1]:
             if subkey not in CurrD:

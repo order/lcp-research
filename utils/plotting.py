@@ -47,6 +47,9 @@ def animate_cdf(X,**kwargs):
     plt.show()
 
 def animate_frames(Frames,**kwargs):
+    """
+    Turn frames into a movie
+    """
     # Parse input
     parser = KwargParser()
     parser.add_optional('save_file',str)
