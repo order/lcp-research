@@ -6,7 +6,7 @@ import numpy as np
 
 import mdp,gens,solvers
 from utils.parsers import ConfigParser, hier_key_dict
-from utils import load_class
+from utils import load_str
 
 
 #################
@@ -14,7 +14,12 @@ from utils import load_class
 
 def build_generator(conf_file):
     parser = ConfigParser(conf_file)
-    parser.add_handler('gen_fn',load_class)
+    parser
+    parser.add_handler('generator',load_str)
+    parser.add_prefix_handler('termination_conditions',load_str)
+    parser.add_prefix_handler('recorders',load_str)
+    parser.add_prefix_handler('notifications',load_str)
+
     args = parser.parse()    
 
     # "generator" and "name" are special keywords
@@ -40,17 +45,16 @@ if __name__ == '__main__':
     param_save_file = save_file + '.pickle'
     print 'Note: saving internal info to', param_save_file
 
-    (inst_gen,inst_name,inst_args) = build_generator(inst_conf_file)
+    (inst_gen,inst_name) = build_generator(inst_conf_file)
     assert(issubclass(type(inst_gen), gens.Generator))
-    discretizer = inst_gen.generate(**inst_args)
+    discretizer = inst_gen.generate()
     assert(issubclass(type(discretizer), mdp.MDPDiscretizer))
     
     # Build the solver
     # May build intermediate objects (MDP, LCP, projective LCP)
-    (sol_gen,sol_name,sol_args) = build_generator(solver_conf_file)
+    (sol_gen,sol_name) = build_generator(solver_conf_file)
     assert(issubclass(type(sol_gen), gens.SolverGenerator))    
-    [solver,objs] = sol_gen.generate(discretizer=discretizer,\
-                                  **sol_args)
+    [solver,objs] = sol_gen.generate(discretizer)
     assert(issubclass(type(solver), solvers.IterativeSolver))
     
     # Solve; return primal and dual trajectories

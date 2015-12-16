@@ -13,21 +13,18 @@ class KojimaGenerator(SolverGenerator):
     def __init__(self,**kwargs):
         # Parsing
         parser = KwargParser()
-        parser.add('discretizer')
-        parser.add('discount',0.99)
-        
+        parser.add('discount',0.99)        
         parser.add('termination_conditions')
         parser.add('recorders')
-        parser.add_optional('notification')
-        
+        parser.add_optional('notifications')
         args = parser.parse(kwargs)
 
         # Dump into self namespace
         self.__dict__.update(args)
             
-    def generate(self,**kwargs):
+    def generate(self,discretizer):
         # Build objects
-        mdp_obj = discretizer.build_mdp(discount=discount)
+        mdp_obj = discretizer.build_mdp(discount=self.discount)
         lcp_obj = mdp_obj.tolcp()
         iter = KojimaIPIterator(lcp_obj)
         objects = {'mdp':mdp_obj,'lcp':lcp_obj}
@@ -41,10 +38,10 @@ class KojimaGenerator(SolverGenerator):
 
         # Set up recorders
         self.recorder_names = self.recorders.keys()
-        solver.recorders.extend(self.recorders.values)
+        solver.recorders.extend(self.recorders.values())
 
         # Set up notification
-        solver.notifications.extend(self.notifications.values)
+        solver.notifications.extend(self.notifications.values())
     
         return [solver,objects]
 

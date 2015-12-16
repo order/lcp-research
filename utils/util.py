@@ -10,13 +10,20 @@ import matplotlib.pyplot as plt
 
 import importlib
         
-def load_class(mod_str):
+def load_str(mod_str):
+    args = ''
+    if '(' in mod_str:
+        # Strip out any arguments
+        idx = mod_str.find('(')
+        args = mod_str[idx:]
+        mod_str = mod_str[:idx]
+    
     if '.' not in mod_str:
         return eval(mod_str)
 
     splits = mod_str.split('.')
     mod = importlib.import_module('.'.join(splits[:-1]))
-    return eval('mod.{0}'.format(splits[-1]))
+    return eval('mod.{0}{1}'.format(splits[-1],args))
     
 
 def debug_mapprint(level,**kwargs):

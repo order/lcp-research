@@ -96,11 +96,25 @@ class ConfigParser(object):
     def __init__(self,filename):
         self.fh = open(filename,'r')
         self.handlers = {}
+        self.prefix_handlers = {}
         self.default_handler = eval
 
     def add_handler(self,key,fn):
         assert(isinstance(fn,types.FunctionType))
         self.handlers[key] = fn
+
+    def add_prefix_handler(self,prefix,fn):
+        assert(isinstance(fn,types.FunctionType))
+        self.prefix_handlers[prefix] = fn
+
+    def get_handler(self,S):
+        if S in self.handlers:
+            return self.handlers[S]
+        
+        for (prefix,handler) in self.prefix_handlers.items():
+            if S.startswith(prefix):
+                return handler
+        return None            
         
     def parse(self):
         args = {}
@@ -119,12 +133,17 @@ class ConfigParser(object):
             print "Parsing",line
             assert('=' in line)
             (key,val_str) = [x.strip() for x in line.split('=')]
-            if key in self.handlers:
-                # Handler provided
-                val = self.handlers[key](val_str)
+            handler = self.get_handler(key)
+            if handler:
+                val = handler(val_str)
             else:
                 # eval is default handler
-                val = self.default_handler(val_str)
+                try:
+                    val = self.default_handler(val_str)
+                except:
+                    warnings.warn('{0} not handled; leaving as string'\
+                                  .format(val_str))
+                    val = val_str
             args[key] = val
         return args
 

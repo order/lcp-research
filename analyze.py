@@ -37,8 +37,8 @@ def read_config_file(filename):
     
     # Load configuration
     parser = ConfigParser(filename)
-    parser.add_handler(data_process_str,utils.load_class)
-    parser.add_handler(plotting_str,utils.load_class)
+    parser.add_handler(data_process_str,utils.load_str)
+    parser.add_handler(plotting_str,utils.load_str)
     args = parser.parse()
 
     # filter out data processing args
