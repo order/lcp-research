@@ -85,10 +85,12 @@ class LCPIterator(Iterator):
     def get_gradient_vector(self):
         raise NotImplementedError()
 
-class IPIterator(LCPIterator):
+class IPIterator(Iterator):
     def get_step_len():
         raise NotImplementedError()
     def get_dir():
+        raise NotImplementedError()
+    def get_newton_system():
         raise NotImplementedError()
         
 class MDPIterator(Iterator):

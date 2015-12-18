@@ -19,8 +19,7 @@ def build_generator(conf_file):
     parser.add_prefix_handler('termination_conditions',load_str)
     parser.add_prefix_handler('recorders',load_str)
     parser.add_prefix_handler('notifications',load_str)
-
-    args = parser.parse()    
+    args = parser.parse()
 
     # "generator" and "name" are special keywords
     gen_class = args['generator'] # Don't instantiate yet
@@ -35,7 +34,6 @@ def build_generator(conf_file):
     return (gen_inst,name)  
 
 if __name__ == '__main__':
-
     # Parse command line
     if 4 != len(sys.argv):
         print 'Usage: python {0} <inst file> <solver file> <save_file>'\

@@ -1,10 +1,10 @@
-from solvers import IPIterator
+from solvers import IPIterator,LCPIterator
 import numpy as np
 import scipy.sparse as sps
 
 ##############################
 # Kojima lcp_obj
-class KojimaIPIterator(IPIterator):
+class KojimaIPIterator(IPIterator,LCPIterator):
     def __init__(self,lcp_obj,**kwargs):
         self.lcp = lcp_obj
         self.M = lcp_obj.M
@@ -22,6 +22,8 @@ class KojimaIPIterator(IPIterator):
         self.step = np.nan
         self.dir_x = np.full(n,np.nan)
         self.dir_y = np.full(n,np.nan)
+
+        self.newton_system = sps.eye(1)
         
         assert(not np.any(self.x < 0))
         assert(not np.any(self.y < 0))
@@ -50,6 +52,8 @@ class KojimaIPIterator(IPIterator):
             [-M,sps.eye(n)]],format='csc')          
         b = np.concatenate([sigma * dot / float(n) * np.ones(n) - x*y, r])
 
+        self.newton_system = A
+        
         dir = sps.linalg.spsolve(A,b)
         dir_x = dir[:n]
         dir_y = dir[n:]
@@ -85,3 +89,5 @@ class KojimaIPIterator(IPIterator):
         return self.dir_x
     def get_dual_dir(self):
         return self.dir_y
+    def get_newton_system(self):
+        return self.newton_system

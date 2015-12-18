@@ -29,14 +29,14 @@ class MDP(object):
             self.name = kwargs.get('name',loader['name'])
             self.discount = kwargs.get('discount',loader['discount'])
             
-        elif (3 == len(vargs)):
+        elif (4 == len(vargs)):
             # Get directly from command line
-            (transitions,costs,actions) = vargs
-            self.discount = kwargs.get('discount',0.99)
+            (transitions,costs,actions,discount) = vargs
             self.name = kwargs.get('name','Unnamed')
         else:
             assert(len(vargs) in [1,3])            
-            
+
+        self.discount = discount
         self.transitions = transitions
         self.costs = costs
         self.actions = actions
@@ -55,7 +55,7 @@ class MDP(object):
             assert(not np.any(np.isnan(costs[i])))
             
             assert((N,N) == transitions[i].shape)
-            assert(abs(transitions[i].sum() - N)/N <= 1e-12)
+            # Stochastic checking removed
             
     def write(self,filename):
         transition_array = pickles.multi_matrix_to_pickle_array(self.transitions)

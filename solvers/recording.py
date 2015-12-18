@@ -1,4 +1,5 @@
 import numpy as np
+from solvers import IPIterator
 
 ############################
 # Recording functions
@@ -22,10 +23,12 @@ class DualRecorder(Recorder):
 
 class PrimalDirRecorder(Recorder):
     def report(self,iteration):
+        assert(isinstance(iteration, IPIterator))
         self.data.append(iteration.get_primal_dir())
 
 class DualDirRecorder(Recorder):
     def report(self,iteration):
+        assert(isinstance(iteration, IPIterator))
         self.data.append(iteration.get_dual_dir())
 
 class ValueRecorder(Recorder):
@@ -34,6 +37,17 @@ class ValueRecorder(Recorder):
 
 class StepLenRecorder(Recorder):
     def report(self,iteration):
+        assert(isinstance(iteration, IPIterator))
         self.data.append(iteration.get_step_len())
 
+class NewtonCondNumRecorder(Recorder):
+    def report(self,iteration):
+        assert(isinstance(iteration, IPIterator))
+        A = iteration.get_newton_system()
+        try:
+            A = A.todense()
+        except:
+            pass
+        assert(2 == len(A.shape))
+        self.data.append(np.linalg.cond(A))
 

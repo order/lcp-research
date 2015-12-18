@@ -41,12 +41,14 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
     and a distinguished node-mapper responsible for discretizing non-abstract
     aspects of state-space.
     """
-    def __init__(self,physics,basic_mapper,cost_obj,actions):
-        self.exception_state_remappers = []
-        self.physics = physics
+    def __init__(self,physics,basic_mapper,cost_obj,actions,discount):
+        self.exception_state_remappers = [] # For domain wrapping
+        self.physics = physics # How physical states map to others
         
-        self.exception_node_mappers = []
-        self.basic_mapper = basic_mapper
+        self.exception_node_mappers = [] # For stuff like out-of-bounds
+        self.basic_mapper = basic_mapper # Essential discretization scheme
+
+        self.drain_states = [] # For implicit "win game" states
         
         self.cost_obj = cost_obj
         
@@ -59,6 +61,9 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         self.action_dim = actions.shape[1]
 
         self.state_dim = self.basic_mapper.get_dimension()
+
+        self.discount = discount
+
 
     def get_basic_boundary(self):
         return self.basic_mapper.get_boundary()
@@ -237,19 +242,47 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
             
         if 'name' not in kwargs:
             kwargs['name'] = 'MDP from Discretizer'
-        if 'discount' not in kwargs:
-            kwargs['discount'] = 0.99
-        mdp_obj = mdp.MDP(transitions,costs,self.actions,**kwargs)
+        mdp_obj = mdp.MDP(transitions,
+                          costs,
+                          self.actions,
+                          self.discount,
+                          **kwargs)
+
         return mdp_obj
+
+    def build_drain_mask(self):
+        """
+        Think about caching this.
+        """
+        total_nodes = self.get_num_nodes()
+        drain_mask = np.ones(total_nodes,dtype=bool)
+        drain_mask[self.drain_states] = False
+        assert(np.sum(drain_mask) == self.get_num_non_drain_states())
+        
+        return drain_mask
+
+    def get_num_non_drain_states(self):
+        return self.get_num_nodes() - len(self.drain_states)
         
     def build_cost_vector(self,action):
         """
         Build the cost vector for an action
         """
-        assert(1 == len(action.shape)) # Should be a vector
-        assert(self.action_dim == action.size)
+
+        # Action should be a vector of approp. size
+        assert((self.action_dim,) == action.shape)
+        
         node_states = self.get_node_states()
-        return self.cost_obj.cost(node_states,action)        
+        drain_mask = self.build_drain_mask()
+
+        # Get costs of non-drain node states
+        costs = self.cost_obj.cost(node_states[drain_mask,:],action)
+
+        # Size check
+        non_drain_states = self.get_num_non_drain_states()
+        assert((non_drain_states,) == costs.shape)
+        
+        return costs
     
     def build_transition_matrix(self,action,**kwargs):    
         """
@@ -272,7 +305,9 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         T = self.states_to_transition_matrix(next_states)
         assert((total_nodes,basic_nodes) == T.shape)
         if total_nodes > basic_nodes:
-            T = sps.hstack([T,sps.lil_matrix((total_nodes,total_nodes-basic_nodes))])
+            # Add non-physical nodes as a set of new columns
+            T = sps.hstack([T,sps.lil_matrix((total_nodes,
+                                              total_nodes-basic_nodes))])
         T = T.tocsr()            
         
         # Make sink nodes transition purely to themselves.
@@ -281,8 +316,112 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
             nid = mapper.sink_node
             A[nid,nid] = 1.0
         T = T + A.tocsr()
-            
-        assert(abs(T.sum() - total_nodes)/float(total_nodes) < 1e-9) # Coarse check that its stochastic
+
+
+        if len(self.drain_states) > 0:
+            # Form the drain mask
+            drain_mask = self.build_drain_mask()
+            T = T[:,drain_mask]
+            T = T[drain_mask,:]
+            # Is this really the way to do this?
+            # T[mask,mask] seems to do the wrong thing.
+
+        # Size check
+        non_drain_nodes = self.get_num_non_drain_states()
+        assert((non_drain_nodes,non_drain_nodes) == T.shape)
+        assert((T.sum() - non_drain_nodes) / non_drain_nodes <= 1e-12)
+        # Basic sanity check: if we just removed columns the sum should be
+        # exactly non_drain_nodes. We also removed some rows.
         
         return T
+
+    def add_drain(self,drain):
+        """
+        Adds a drain node to the discretizer.
+        The drain is presented as a node states (e.g. [0,0]).
+        """
+        assert((self.state_dim,) == drain.shape) # D-vector
+
+        # Get the node distribution for this state
+        dist = self.states_to_transition_matrix(drain[np.newaxis,:])
+        assert((self.get_num_nodes(),1) == dist.shape)
+
+        # Check that it is a pure state
+        dist = dist.tocoo()
+        assert(abs(1.0 - dist.max()) < 1e-12) # Max close to one
+        assert(abs(1.0 - dist.sum()) < 1e-12) # Sum close to one
+
+        # Get the index of the max element
+        idx = dist.data.argmax()
+        assert(0 == dist.col[idx])
+        assert(abs(1.0 - dist.data[idx]) < 1e-12)
+        drain_node_id = dist.row[idx]
+
+        # Expensive check: map back
+        states = self.get_node_states()
+        assert(np.linalg.norm(drain - states[drain_node_id]) < 1e-12)
+
+        # Add it to the list
+        self.drain_states.append(drain_node_id)
+               
+        
+    def pad_with_drain(self,X,pad_value=0.0):
+        """
+        Take (I,N) matrix and pad it so
+        """
+
+        # Well, we also support single vectors
+        was_vector = (1 == len(X.shape))
+        if was_vector:
+            X = X[np.newaxis,:]
+
+        (I,n) = X.shape
+        D = len(self.drain_states)
+        N = n + D # What we think the length should be
+        assert(N == self.get_num_nodes()) # Confirmed
+        
+        Pad = np.empty((I,N))
+        mask = self.build_drain_mask()
+
+        # Mask is True unless it is a drain state
+        Pad[:,mask] = X # Non-drain states take their own value
+        Pad[:,~mask] = pad_value # Pad drain states with provided value
+
+        # Transform back to vector if was a vector originally.
+        if was_vector:
+            Pad = Pad[0,:]
+        return Pad
+
+    def pad_stack_with_drain(self,X,pad_value=0.0):
+        """
+        Support for 'stacks', which are the concats of
+        the value and flow vectors (primal and dual variables)
+        """
+        
+        was_vector = (1 == len(X.shape))
+        if was_vector:
+            X = X[np.newaxis,:]
+
+        (I,J) == X.shape
+        D = len(self.drain_states)
+        A = self.num_actions
+        N = self.get_num_nodes()
+        padded_size = J + (A+1)*D # Size, plus A+1 pads
+        actual = (A+1) * N # What it actually should be
+        assert(padded_size == actual)
+        assert(J == (A+1)*(N - D)) # Same as above
+
+        Pad = np.empty((I,padded_size))
+
+        for a in xrange(A+1):
+            pre_slice = slice(a*(N-D),
+                              (a+1)*(N-D)) # Slice of component in X
+            post_slice = slice(a*N,
+                               (a+1)*N) # Target slice in Pad
+            Pad[post_slice] = self.pad_with_drain(X[pre_slice],
+                                                  pad_value)
+        
+        if was_vector:
+            Pad = Pad[0,:]
+        return Pad       
         

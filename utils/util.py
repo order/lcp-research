@@ -9,8 +9,12 @@ import scipy.sparse
 import matplotlib.pyplot as plt
 
 import importlib
-        
+
 def load_str(mod_str):
+    """
+    Load something from string, e.g. foo.bar.baz
+    Can also instatiate: foo.bar.baz(4,5)
+    """
     args = ''
     if '(' in mod_str:
         # Strip out any arguments
@@ -25,7 +29,7 @@ def load_str(mod_str):
     mod = importlib.import_module('.'.join(splits[:-1]))
     return eval('mod.{0}{1}'.format(splits[-1],args))
     
-
+# Some debugging routines
 def debug_mapprint(level,**kwargs):
     if level:
         for (k,v) in kwargs.items():

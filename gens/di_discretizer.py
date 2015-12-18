@@ -21,6 +21,8 @@ class DIGenerator(Generator):
         parser.add('set_point',np.zeros(2))
         parser.add('oob_costs',1.0)
         parser.add('discount',0.99)
+        
+        parser.add('drain',False) # Flow 'drains; out of (0,0)
         args = parser.parse(kwargs)
         
         self.__dict__.update(args)
@@ -53,11 +55,16 @@ class DIGenerator(Generator):
         discretizer = mdp.ContinuousMDPDiscretizer(physics,
                                                    basic_mapper,
                                                    cost_obj,
-                                                   actions)
+                                                   actions,
+                                                   self.discount)
     
         discretizer.add_state_remapper(state_remapper)
         discretizer.add_node_mapper(left_oob_mapper)
         discretizer.add_node_mapper(right_oob_mapper)
+
+        if self.drain:
+            # Makes 0,0 a drain state (must be a pure state)
+            discretizer.add_drain(np.array([0,0]))
         print "Built discretizer {0}s.".format(time.time() - start)
 
         return discretizer

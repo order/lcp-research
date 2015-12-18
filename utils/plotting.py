@@ -87,17 +87,20 @@ def animate_frames(Frames,**kwargs):
         im_ani.save(args['save_file'])
     plt.show()
 
-def plot(fn,**kwargs):
+def plot(data,**kwargs):
     parser = KwargParser()
+    parser.add_optional('save_file',str)
     parser.add('title','No title',str)
     parser.add('xlabel','x',str)
     parser.add('ylabel','y',str)
     args = parser.parse(kwargs)
     
-    plt.plot(fn)
+    plt.plot(data)
     plt.xlabel(args['xlabel'])
     plt.ylabel(args['ylabel'])
     plt.title(args['title'])
 
-    plot.show()
+    if 'save_file' in args:
+        plt.savefig(args['save_file'], bbox_inches='tight')
+    plt.show()
 

@@ -31,7 +31,7 @@ def frame_processing(data,params,**kwargs):
     """
 
     # Inner functions for different processing options
-    def val(F):
+    def value(F):
         return F[:,0,:,:]
 
     def flow(F):
@@ -43,14 +43,14 @@ def frame_processing(data,params,**kwargs):
 
     parser = KwargParser()
     parser.add('field','primal') #primal/dual
-    parser.add('component','val')
+    parser.add('option','val')
     args = parser.parse(kwargs)
 
     if 'comp' == args['field']:
         data_field = data['primal'] * data['dual']
     else:
         data_field = data[args['field']]
-    fn = eval(args['component'])
+    fn = eval(args['option'])
     
     discretizer = params['discretizer']
     A = discretizer.get_num_actions()
@@ -70,9 +70,12 @@ def vector_processing(data,params,**kwargs):
     def flow(F,n):
         return F[:,n:]
 
+    def log_flow(F,n):
+        return np.log10(flow(F,n))
+
     parser = KwargParser()
     parser.add('field','primal') #primal/dual
-    parser.add('component','val')
+    parser.add('option','val')
     args = parser.parse(kwargs)
 
     if 'comp' == args['field']:
@@ -80,7 +83,7 @@ def vector_processing(data,params,**kwargs):
     else:
         data_field = data[args['field']]
         
-    fn = eval(args['component'])
+    fn = eval(args['option'])
         
     discretizer = params['discretizer']
 
@@ -88,3 +91,38 @@ def vector_processing(data,params,**kwargs):
     n = discretizer.get_num_nodes()
 
     return fn(data_field,n)
+
+def time_series(data,params,**kwargs):
+    
+    def identity(x):
+        return x
+
+    def log_vector_cond(X):
+        """
+        Assumes X > 0, and it's of the form (I,N) = X.shape
+        where the rows are iteration numbers and columns are
+        components of the solution vector for that iteration.
+
+        The "vector condition number" is the ratio between the
+        max and the min values of X.
+
+        Log is taken because the condition numbers can blow up.
+        """
+        assert (2 == len(X.shape))
+        assert(not np.any(X <= 0))
+        (I,N) = X.shape
+        ret = np.amax(X,axis=1) / np.amin(X,axis=1)
+        assert((I,) == ret.shape)
+        return np.log10(ret)
+
+    parser = KwargParser()
+    parser.add('field')
+    parser.add('option','identity')
+    args = parser.parse(kwargs)
+
+    fn = eval(args['option'])
+    
+    ret = fn(data[args['field']])
+    assert(1 == len(ret.shape)) # Should be a vector
+
+    return ret
