@@ -5,36 +5,19 @@ import scipy.sparse as sps
 import matplotlib.pyplot as plt
 
 import lcp
-import utils.pickles
+from utils.parsers import KwargParser
 
 class MDP(object):
     """
     MDP object
     """
-    def __init__(self,*vargs,**kwargs):
-        if (1 == len(vargs)):
-            # Load from file
-            filename = vargs[0]
-            loader = scipy.load(filename)
-            transitions = pickles.pickle_array_to_multi_matrix(loader['transitions'])
-            long_costs = loader['costs']
-            actions = loader['actions']
-            
-            # Split up the costs from one long array to A small ones
-            N = transitions[0].shape[0]
-            A = len(actions)
-            assert(long_costs.size == N*A)
-            costs = [long_costs[(N*i):(N*(i+1))] for i in xrange(A)]
-            
-            self.name = kwargs.get('name',loader['name'])
-            self.discount = kwargs.get('discount',loader['discount'])
-            
-        elif (4 == len(vargs)):
-            # Get directly from command line
-            (transitions,costs,actions,discount) = vargs
-            self.name = kwargs.get('name','Unnamed')
-        else:
-            assert(len(vargs) in [1,3])            
+    def __init__(self,transitions,costs,actions,discount,**kwargs):
+        parser = KwargParser()
+        parser.add('name','Unnamed')
+        parser.add_optional('state_weights')
+        args = parser.parse(kwargs)
+        
+        self.name = args['name']
 
         self.discount = discount
         self.transitions = transitions
@@ -44,10 +27,18 @@ class MDP(object):
         A = len(actions)
         N = costs[0].size
         self.num_actions = A
-        self.num_states = N        
+        self.num_states = N
 
         assert(len(transitions) == A)
         assert(len(costs) == A)
+
+        # State-weight generation
+        if 'state_weights' in args:
+            self.state_weights = args['state_weights']
+        else:
+            # Uniform if not specified
+            self.state_weights = np.ones(N)
+        assert((N,) == self.state_weights.shape)
         
         # Ensure sizes are consistent
         for i in xrange(A):
@@ -57,16 +48,6 @@ class MDP(object):
             assert((N,N) == transitions[i].shape)
             # Stochastic checking removed
             
-    def write(self,filename):
-        transition_array = pickles.multi_matrix_to_pickle_array(self.transitions)
-        long_costs = np.concatenate(self.costs)
-        scipy.savez(filename,\
-            transitions=transition_array,\
-            costs=long_costs,\
-            actions=self.actions,\
-            name=self.name,\
-            discount=self.discount)
-        
     def get_action_matrix(self,a):
         """
         Build the action matrix E_a = I - \gamma * P_a^\top 
@@ -86,12 +67,12 @@ class MDP(object):
         Top = sps.lil_matrix((n,n))
         Bottom = None
         q = np.zeros(N)
-        q[0:n] = -np.ones(n)
+        q[0:n] = -self.state_weights
         for a in xrange(self.num_actions):
             E = self.get_action_matrix(a)
             
             # NewRow = [-E_a 0 ... 0]
-            NewRow = sps.hstack((-E,sps.coo_matrix((n,A*n))))
+            NewRow = sps.hstack((-E,sps.lil_matrix((n,A*n))))
             if Bottom == None:
                 Bottom = NewRow
             else:

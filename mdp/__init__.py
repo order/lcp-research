@@ -1,5 +1,5 @@
 from mdp import *
-from costs import *
+from state_functions import *
 from discretizer import *
 from node_mapper import *
 from policy import *

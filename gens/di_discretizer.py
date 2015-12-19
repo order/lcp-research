@@ -36,7 +36,10 @@ class DIGenerator(Generator):
         basic_mapper = mdp.InterpolatedRegularGridNodeMapper(self.x_desc,\
                                                              self.v_desc)
         physics = DoubleIntegratorRemapper()    
-        cost_obj = mdp.BallCost(self.set_point,self.radius)
+        cost_obj = mdp.BallSetFn(self.set_point,self.radius)
+        weight_obj = mdp.QuadraticFn(np.ones(2), # Quadratic coef
+                                     np.zeros(2), # Setpoint
+                                     override=1.0) # non-physical states
         actions = np.linspace(*self.a_desc)
 
         (x_lo,x_hi,x_n) = self.x_desc
@@ -55,6 +58,7 @@ class DIGenerator(Generator):
         discretizer = mdp.ContinuousMDPDiscretizer(physics,
                                                    basic_mapper,
                                                    cost_obj,
+                                                   weight_obj,
                                                    actions,
                                                    self.discount)
     

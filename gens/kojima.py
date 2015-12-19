@@ -24,7 +24,7 @@ class KojimaGenerator(SolverGenerator):
             
     def generate(self,discretizer):
         # Build objects
-        mdp_obj = discretizer.build_mdp(discount=self.discount)
+        mdp_obj = discretizer.build_mdp()
         lcp_obj = mdp_obj.tolcp()
         iter = KojimaIPIterator(lcp_obj)
         objects = {'mdp':mdp_obj,'lcp':lcp_obj}
