@@ -25,6 +25,45 @@ def split_into_frames(Data,A,n,x,y):
     Frames = np.swapaxes(Frames,1,3)
     return Frames
 
+def final_frame(data,params,**kwargs):
+    """
+    Like frame processing, but only the final frame
+    """
+    
+    # Inner functions for different processing options
+    def value(F):
+        return F[0,:,:]
+
+    def flow(F):
+        return np.argmax(F[1:,:,:],axis=0)
+
+    def agg_flow(F):
+        return np.sum(F[1:,:,:],axis=0)
+
+    def adv(F):
+        SF = np.sort(F[1:,:,:],axis=0)
+        return np.log(SF[-1,:,:] - SF[-2,:,:] + 1e-22)
+
+    parser = KwargParser()
+    parser.add('field','primal') #primal/dual
+    parser.add('option','value')
+    args = parser.parse(kwargs)
+
+    if 'comp' == args['field']:
+        data_field = data['primal'] * data['dual']
+    else:
+        data_field = data[args['field']]
+    fn = eval(args['option'])
+    
+    discretizer = params['discretizer']
+    A = discretizer.get_num_actions()
+    n = discretizer.get_num_nodes()
+    (x,y) = discretizer.get_basic_lengths()    
+    frames = split_into_frames(data_field,A,n,x,y)
+
+    return fn(frames[-1,:,:,:])
+    
+
 def frame_processing(data,params,**kwargs):
     """
     Turns data into movie frames based on provided inputs
@@ -37,13 +76,16 @@ def frame_processing(data,params,**kwargs):
     def flow(F):
         return np.argmax(F[:,1:,:,:],axis=1)
 
+    def agg_flow(F):
+        return np.sum(F[:,1:,:,:],axis=0)
+
     def adv(F):
         SF = np.sort(F[:,1:,:,:],axis=1)
         return np.log(SF[:,-1,:,:] - SF[:,-2,:,:] + 1e-22)
 
     parser = KwargParser()
     parser.add('field','primal') #primal/dual
-    parser.add('option','val')
+    parser.add('option','value')
     args = parser.parse(kwargs)
 
     if 'comp' == args['field']:
@@ -96,6 +138,9 @@ def time_series(data,params,**kwargs):
     
     def identity(x):
         return x
+
+    def log(x):
+        return np.log10(x)
 
     def log_vector_cond(X):
         """

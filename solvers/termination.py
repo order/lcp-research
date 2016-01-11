@@ -64,6 +64,7 @@ class ResidualTerminationCondition(TerminationCondition):
     def isdone(self,iterator):
         x = iterator.get_primal_vector()
         w = iterator.get_dual_vector()
+        N = x.size
             
         self.residual = np.linalg.norm(np.minimum(x,w))
         return self.residual < self.thresh

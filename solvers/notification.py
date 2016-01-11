@@ -121,6 +121,8 @@ class ResidualAnnounce(Notification):
     def announce(self,iterator):
         x = iterator.get_primal_vector()
         w = iterator.get_dual_vector()
+        N = x.size
+        
         r = np.linalg.norm(np.minimum(x,w))
         print 'Residual {0:.3g} at iteration {1}'\
             .format(r,iterator.get_iteration())
