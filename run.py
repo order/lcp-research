@@ -58,10 +58,14 @@ if __name__ == '__main__':
     # Solve; return primal and dual trajectories
     solver.solve()
     data = sol_gen.extract(solver)
+
     print 'Final iteration:',solver.get_iteration()
 
     # Save the trajectories for analysis
     np.savez(save_file,**data) # Extension auto-added
+    if 'primal' in data:
+        # Save the final primal iteration as the solution
+        np.save(save_file + '.sol',data['primal'][-1,:])
 
     #Save experiment parameters
     params = {'discretizer':discretizer,

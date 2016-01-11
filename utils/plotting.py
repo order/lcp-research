@@ -119,6 +119,8 @@ def pcolor(data,**kwargs):
     plt.xlabel(args['xlabel'])
     plt.ylabel(args['ylabel'])
     plt.title(args['title'])
+    plt.colorbar()
+
 
     if 'save_file' in args:
         plt.savefig(args['save_file'], bbox_inches='tight')

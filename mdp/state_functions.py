@@ -5,6 +5,45 @@ class StateSpaceFunction(object):
     def eval(self,points,**kwargs):
         raise NotImplementedError()
 
+class GaussianBowlFn(StateSpaceFunction):
+    """
+    Has a bowl with low-point 0
+    """
+
+    def __init__(self,bandwidth,setpoint,**kwargs):
+        parser = KwargParser()
+        parser.add('override',None) # Should be a float or int if set
+        args = parser.parse(kwargs)
+        self.override = args['override']  
+
+        assert(1 == len(setpoint.shape))
+        N = setpoint.size
+        self.setpoint = np.reshape(setpoint,(1,N))
+        self.bandwidth = bandwidth
+ 
+    def eval(self,points,**kwargs):
+        (N,D) = points.shape 
+
+        parser = KwargParser()
+        parser.add_optional('action') #Ignored
+        args = parser.parse(kwargs)
+        
+        # 1 - exp(-||x - m||^2 / b)
+        norm = np.sum(np.power(points - self.setpoint,2),axis=1) # ||x-m||^2
+        costs = 1 - np.exp(-norm / self.bandwidth)
+        print costs.shape
+        assert((N,) == costs.shape)
+
+        # Deal with overrides
+        mask = np.isnan(costs)
+        if not self.override:
+            assert(not np.any(mask))
+        else:
+            costs[mask] = self.override
+        assert(not np.any(np.isnan(costs)))
+        
+        return costs
+
 class QuadraticFn(StateSpaceFunction):
     """
     Quadratic cost for being away from the origin.

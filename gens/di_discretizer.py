@@ -40,6 +40,9 @@ class DIGenerator(Generator):
         weight_obj = mdp.QuadraticFn(np.ones(2), # Quadratic coef
                                      np.zeros(2), # Setpoint
                                      override=1.0) # non-physical states
+        #weight_obj = mdp.GaussianBowlFn(1, # bandwidth
+        #                                np.zeros(2), # Setpoint
+        #                                override = 1.0) # non-physical
         actions = np.linspace(*self.a_desc)
 
         (x_lo,x_hi,x_n) = self.x_desc
