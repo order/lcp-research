@@ -13,7 +13,9 @@ class KojimaGenerator(SolverGenerator):
     def __init__(self,**kwargs):
         # Parsing
         parser = KwargParser()
-        parser.add('discount',0.99)        
+        parser.add('discount',0.997)
+        parser.add('value_regularization',1e-12)
+        parser.add('flow_regularization',1e-12)
         parser.add('termination_conditions')
         parser.add('recorders')
         parser.add_optional('notifications')
@@ -24,7 +26,9 @@ class KojimaGenerator(SolverGenerator):
             
     def generate(self,discretizer):
         # Build objects
-        mdp_obj = discretizer.build_mdp()
+        mdp_obj = discretizer.\
+                  build_mdp(value_regularization=self.value_regularization,
+                            flow_regularization=self.flow_regularization)
         lcp_obj = mdp_obj.tolcp()
         iter = KojimaIPIterator(lcp_obj)
         objects = {'mdp':mdp_obj,'lcp':lcp_obj}

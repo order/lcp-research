@@ -5,6 +5,18 @@ class StateSpaceFunction(object):
     def eval(self,points,**kwargs):
         raise NotImplementedError()
 
+class ConstFn(StateSpaceFunction):
+    def __init__(self,v):
+        self.v = v
+    def eval(self,points,**kwargs):
+        (N,D) = points.shape 
+
+        parser = KwargParser()
+        parser.add_optional('action') #Ignored
+        args = parser.parse(kwargs)
+
+        return self.v * np.ones(N)
+
 class FixedVectorFn(StateSpaceFunction):
     def __init__(self,x):
         assert(1 == len(x.shape))

@@ -243,6 +243,8 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
 
         parser = KwargParser()
         parser.add_optional('name')
+        parser.add('value_regularization',1e-12)
+        parser.add('flow_regularization',1e-12)
         args = parser.parse(kwargs)
 
         # Build the transitions, costs, and so forth

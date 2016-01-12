@@ -15,6 +15,8 @@ class MDP(object):
         parser = KwargParser()
         parser.add('name','Unnamed')
         parser.add_optional('state_weights')
+        parser.add('value_regularization',1e-12)
+        parser.add('flow_regularization',1e-12)
         args = parser.parse(kwargs)
         
         self.name = args['name']
@@ -23,6 +25,9 @@ class MDP(object):
         self.transitions = transitions
         self.costs = costs
         self.actions = actions
+        
+        self.val_reg = args['value_regularization']
+        self.flow_reg = args['flow_regularization']
         
         A = len(actions)
         N = costs[0].size
@@ -81,6 +86,12 @@ class MDP(object):
             Top = sps.hstack((Top,E.T))
             q[((a+1)*n):((a+2)*n)] = self.costs[a]
         M = sps.vstack((Top,Bottom))
+
+        Reg = sps.lil_matrix((N,N))
+        Reg[n:,n:] = self.flow_reg*sps.eye(A*n)
+        Reg[:n,:n] = self.val_reg*sps.eye(n)
+        
+        M = M + Reg
 
         assert((N,N) == M.shape)
         assert((N,) == q.shape)

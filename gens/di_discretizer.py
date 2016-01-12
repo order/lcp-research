@@ -37,18 +37,11 @@ class DIGenerator(Generator):
                                                              self.v_desc)
         physics = DoubleIntegratorRemapper()    
         cost_obj = mdp.BallSetFn(self.set_point,self.radius)
-
-        print 'PLAYING AROUND WITH STATE-WEIGHT FUNCTIONS in di_discretizer.py'
-
-        weight_obj = mdp.QuadraticFn(np.ones(2), # Quadratic coef
-                                     np.zeros(2), # Setpoint
-                                     override=1.0) # non-physical states
-        #weight_obj = mdp.GaussianBowlFn(1, # bandwidth
+        #weight_obj = mdp.GaussianBowlFn(0.001, # bandwidth
         #                                np.zeros(2), # Setpoint
-        #                                override = 1.0) # non-physical
+        #                                override = 1e-8) # non-physical
 
-        #p = np.load('data/p.npy')
-        #weight_obj = mdp.FixedVectorFn(p)
+        weight_obj = mdp.ConstFn(1.0) #Just use uniform
 
         actions = np.linspace(*self.a_desc)
 
