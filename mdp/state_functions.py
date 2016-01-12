@@ -5,6 +5,21 @@ class StateSpaceFunction(object):
     def eval(self,points,**kwargs):
         raise NotImplementedError()
 
+class FixedVectorFn(StateSpaceFunction):
+    def __init__(self,x):
+        assert(1 == len(x.shape))
+        self.x = x
+    def eval(self,points,**kwargs):
+        (N,D) = points.shape 
+
+        parser = KwargParser()
+        parser.add_optional('action') #Ignored
+        args = parser.parse(kwargs)
+
+        assert((N,) == self.x.shape)
+        return self.x
+    
+
 class GaussianBowlFn(StateSpaceFunction):
     """
     Has a bowl with low-point 0

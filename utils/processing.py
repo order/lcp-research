@@ -40,6 +40,9 @@ def final_frame(data,params,**kwargs):
     def agg_flow(F):
         return np.sum(F[1:,:,:],axis=0)
 
+    def log_agg_flow(F):
+        return np.log10(np.sum(F[1:,:,:],axis=0))
+
     def adv(F):
         SF = np.sort(F[1:,:,:],axis=0)
         return np.log(SF[-1,:,:] - SF[-2,:,:] + 1e-22)

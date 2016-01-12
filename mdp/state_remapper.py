@@ -1,5 +1,6 @@
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 
 class StateRemapper(object):
     """
@@ -35,6 +36,7 @@ class RangeThreshStateRemapper(StateRemapper):
         """
         states[states[:,self.dim] > self.high,self.dim] = self.high - self.eps
         states[states[:,self.dim] < self.low,self.dim] = self.low + self.eps
+
         return states
         
     def __str__(self):
