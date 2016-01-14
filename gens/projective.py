@@ -1,3 +1,59 @@
+from utils.parsers import KwargParser
+
+import solvers
+from solvers.kojima import KojimaIPIterator
+from solvers.termination import *
+from solvers.notification import *
+from solvers.recording import *
+
+from generator import SolverGenerator
+import time
+
+class ProjectiveGenerator(SolverGenerator):
+    def __init__(self.**kwargs):
+        # Parsing
+        parser = KwargParser()
+        parser.add('discount',0.997)
+        parser.add('value_regularization',1e-12)
+        parser.add('flow_regularization',1e-12)
+        parser.add('termination_conditions')
+        parser.add('recorders')
+        parser.add('basis_config_file')
+        parser.add_optional('notifications')
+        args = parser.parse(kwargs)
+
+        # Dump into self namespace
+        self.__dict__.update(args)
+
+    def generate(self,discretizer):
+        mdp_obj = discretizer.\
+                  build_mdp(value_regularization=self.value_regularization,
+                            flow_regularization=self.flow_regularization)
+
+        # Get sizes
+        A = mdp_obj.num_actions
+        n = mdp_obj.num_states
+        N = (A+1)*n  
+
+        # Todo: implement this
+        basis_gen = build_basis_generator(self.basis_config_file)
+
+        points = discretizer.get_node_states()
+
+        Phi = basis_gen.generate(points)
+
+        if basis_gen.isortho():
+            Q = Phi
+        else:
+            #Orthogonalize using QR decomposition
+            [Q,R] = sp.linalg.qr(Phi,mode='economic')
+            assert(Q.shape == Phi.shape)
+            Phi = Q
+
+        # Form the blocks of U from blocks of M and Phi
+        U = np.linalg.lstsq(Phi,M)[0]
+
+
 ###########################################
 # Build a PROJECTIVE LCP
 
