@@ -33,25 +33,67 @@ class ProjectiveGenerator(SolverGenerator):
         # Get sizes
         A = mdp_obj.num_actions
         n = mdp_obj.num_states
-        N = (A+1)*n  
+        N = (A+1)*n
+        gamma = mdp_obj.discount
 
         # Todo: implement this
         basis_gen = build_basis_generator(self.basis_config_file)
 
         points = discretizer.get_node_states()
 
-        Phi = basis_gen.generate(points)
+        #Phi = basis_gen.generate(points)
+        Phi = np.eye(n)
+        (d,k) = Phi.shape
+        assert(d == n)
+        assert(k <= n)
+        K = (A+1)*k
 
-        if basis_gen.isortho():
-            Q = Phi
-        else:
+        #if basis_gen.isortho():
+        Q = Phi
+        #else:
             #Orthogonalize using QR decomposition
-            [Q,R] = sp.linalg.qr(Phi,mode='economic')
-            assert(Q.shape == Phi.shape)
-            Phi = Q
+        #    [Q,R] = sp.linalg.qr(Phi,mode='economic')
+        #    assert(Q.shape == Phi.shape)
 
-        # Form the blocks of U from blocks of M and Phi
-        U = np.linalg.lstsq(Phi,M)[0]
+
+        # Find the in-basis approximations for E = I - gamma* P
+        # Done with least-squares:
+        # E   ~= Phi U
+        # E.T ~= Phi W
+        
+        BigU_blocks = [[None]]
+        for a in xrange(A):
+            P = mdp_obj.transitions[a]
+            E = sps.eye(n) - gamma * P
+            U = linalg.lsmr_matrix(Q,E)
+            W = linalg.lsmr_matrix(Q,E.T)
+
+            BigU_blocks[0].append(U)
+            BigU_blocks.append([-W] + [None]*A)
+
+        # Construct the block basis:
+        # Phi 0   ... 0
+        # 0   Phi ... 0
+        #     ...
+        # 0   ...     Phi
+        BigQ = sps.block_diag([Q]*(A+1))
+        assert((N,K) == BigQ.shape)
+
+        # Construct the block coefficients:
+        # 0 U_1 ... U_A
+        # -W_1  0 ... 0
+        #         ...
+        # -W_A  0 ... 0
+        BigU = sps.bmat(BigU_blocks)
+        assert((K,N) == BigU.shape)
+
+        lcp_obj = mdp_obj.tolcp()
+        M = lcp_obj.M
+        approx_M = BigQ.dot(BigU)
+        print 'Approximation residual norm:', linalg.norm(M - approx_M)
+        quit()
+
+        
 
 
 ###########################################
