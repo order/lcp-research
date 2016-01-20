@@ -1,7 +1,7 @@
 import numpy as np
 
 import mdp
-from generator import Generator
+from config.generator import Generator
 from mdp.double_integrator import DoubleIntegratorRemapper
 from utils.parsers import KwargParser
 
@@ -36,6 +36,10 @@ class DoubleIntegratorGenerator(Generator):
                                                              self.v_desc)
         physics = DoubleIntegratorRemapper()    
         cost_obj = self.cost_obj
+        #weight_obj = mdp.GaussianBowlFn(0.001, # bandwidth
+        #                                np.zeros(2), # Setpoint
+        #                                override = 1e-8) # non-physical
+
         weight_obj = mdp.ConstFn(1.0) #Just use uniform
 
         actions = np.linspace(*self.a_desc)

@@ -64,7 +64,7 @@ class KwargParser(object):
         keys -= self.optional # remove optional keys
         missing = self.mandatory - set(D.keys())
         if len(missing) > 0:
-            raise Error('Missing options:', ','.join(map(str,missing)))
+            raise Exception('Missing options: '+','.join(map(str,missing)))
 
         ret = dict(self.defaults)
         ret.update(D)

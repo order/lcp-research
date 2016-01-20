@@ -10,7 +10,7 @@ from generator import SolverGenerator
 import time
 
 class ProjectiveGenerator(SolverGenerator):
-    def __init__(self.**kwargs):
+    def __init__(self,**kwargs):
         # Parsing
         parser = KwargParser()
         parser.add('discount',0.997)
