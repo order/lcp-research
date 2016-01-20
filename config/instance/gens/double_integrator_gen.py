@@ -34,7 +34,6 @@ class DoubleIntegratorGenerator(Generator):
                                                              self.v_desc)
         physics = DoubleIntegratorRemapper()    
         weight_obj = mdp.ConstFn(1.0) #Just use uniform
-
         actions = np.linspace(*self.a_desc)
 
         (x_lo,x_hi,x_n) = self.x_desc
