@@ -1,13 +1,13 @@
 import numpy as np
 import config
-import config.instance.gens.double_integrator_gen as gen
+import config.instance.gens.hillcar_gen as gen
 import mdp
+import mdp.hillcar
 
 """
 Weird issue: don't use a "from x import y"
 """
-
-class SmallDoubleIntegratorConfig(config.Config):
+class HillcarConfig(config.Config):
     def __init__(self):
         params = {}
         params['x_desc'] = (-5,5,20)
@@ -17,9 +17,11 @@ class SmallDoubleIntegratorConfig(config.Config):
         center = np.zeros(2)
         radius = 0.25
         params['cost_obj'] = mdp.BallSetFn(center,radius)
+
+        params['slope'] = mdp.hillcar.basic_slope
         
         params['discount'] = 0.99
         self.params = params
 
     def build(self):
-        return gen.DoubleIntegratorGenerator(**self.params)
+        return gen.HillcarGenerator(**self.params)

@@ -10,5 +10,5 @@ class Config(object):
     information.
     """
 
-    def get_object(self):
+    def build(self):
         raise NotImplementedError()

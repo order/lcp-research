@@ -1,8 +1,8 @@
 import numpy as np
 
 import mdp
-from generator import Generator
-from mdp.hillcar import HillcarRemapper,basic_slope
+from config.generator import Generator
+from mdp.hillcar import HillcarRemapper
 from utils.parsers import KwargParser
 
 import time
@@ -11,37 +11,33 @@ import time
 # Generate the DISCRETIZER object
 
 class HillcarGenerator(Generator):
-    def generate(self,**kwargs):
-        print "Generating discretizer..."
-        start = time.time()
-        xid,vid = 0,1
-
+    def __init__(self,**kwargs):
         parser = KwargParser()
         parser.add('x_desc')
         parser.add('v_desc')
         parser.add('a_desc')
-        parser.add('radius',0.25)
-        parser.add('set_point',np.zeros(2))
-        parser.add('oob_costs',1.0)
-        parser.add('discount',0.99)
+        parser.add('cost_obj')
+        parser.add('discount')
+        parser.add('slope')
         args = parser.parse(kwargs)
+        self.__dict__.update(args)
 
-        x_desc = args['x_desc']
-        v_desc = args['v_desc']
-        a_desc = args['a_desc']
-        radius = args['radius']
-        set_point = args['set_point']
-        oob_cost = args['oob_costs']
-        discount = args['discount']
-        assert(0 < discount < 1)
+        assert(0 < self.discount < 1)
 
-        basic_mapper = mdp.InterpolatedRegularGridNodeMapper(x_desc,v_desc)
-        physics = HillcarRemapper(slope=basic_slope) 
-        cost_obj = mdp.BallCost(set_point,radius)
-        actions = np.linspace(*a_desc)
+    def generate(self):
+        xid,vid = 0,1
 
-        (x_lo,x_hi,x_n) = x_desc
-        (v_lo,v_hi,v_n) = v_desc
+        print "Generating discretizer..."
+        start = time.time()
+        basic_mapper = mdp.InterpolatedRegularGridNodeMapper(self.x_desc,
+                                                             self.v_desc)
+        physics = HillcarRemapper(slope=self.slope)
+        weight_obj = mdp.ConstFn(1.0) #Just use uniform
+        actions = np.linspace(*self.a_desc)
+        
+
+        (x_lo,x_hi,x_n) = self.x_desc
+        (v_lo,v_hi,v_n) = self.v_desc
 
         # (-inf,x_lo] out-of-bound node mapper
         left_oob_mapper = mdp.OOBSinkNodeMapper(xid,-float('inf'),
@@ -55,7 +51,10 @@ class HillcarGenerator(Generator):
 
         discretizer = mdp.ContinuousMDPDiscretizer(physics,
                                                    basic_mapper,
-                                                   cost_obj,actions)
+                                                   self.cost_obj,
+                                                   weight_obj,
+                                                   actions,
+                                                   self.discount)
     
         discretizer.add_state_remapper(state_remapper)
         discretizer.add_node_mapper(left_oob_mapper)

@@ -4,31 +4,29 @@ import os
 import copy
 import math
 import operator
+import inspect
 
 import scipy.sparse
 import matplotlib.pyplot as plt
 
 import importlib
 
-def load_str(mod_str):
+def load_module_from_filename(filename):
     """
-    Load something from string, e.g. foo.bar.baz
-    Can also instatiate: foo.bar.baz(4,5)
-    """
-    args = ''
-    if '(' in mod_str:
-        # Strip out any arguments
-        idx = mod_str.find('(')
-        args = mod_str[idx:]
-        mod_str = mod_str[:idx]
+    Loads a module from a relative filename
+    e.g. config/solvers/foo.py will load
+    config.solvers.foo
     
-    if '.' not in mod_str:
-        return eval(mod_str)
+    """
+    assert(filename.endswith('.py'))
+    module_str = filename[:-3].replace(os.sep,'.')
+    module = importlib.import_module(module_str)
+    return module
 
-    splits = mod_str.split('.')
-    mod = importlib.import_module('.'.join(splits[:-1]))
-    return eval('mod.{0}{1}'.format(splits[-1],args))
-    
+def list_module_classes(mod):
+    classes = inspect.getmembers(mod, inspect.isclass)
+    return classes
+
 # Some debugging routines
 def debug_mapprint(level,**kwargs):
     if level:

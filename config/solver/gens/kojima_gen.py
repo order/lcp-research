@@ -6,16 +6,15 @@ from solvers.termination import *
 from solvers.notification import *
 from solvers.recording import *
 
-from generator import SolverGenerator
+from config.generator import SolverGenerator
 import time
 
 class KojimaGenerator(SolverGenerator):
     def __init__(self,**kwargs):
         # Parsing
         parser = KwargParser()
-        parser.add('discount',0.997)
-        parser.add('value_regularization',1e-12)
-        parser.add('flow_regularization',1e-12)
+        parser.add('value_regularization')
+        parser.add('flow_regularization')
         parser.add('termination_conditions')
         parser.add('recorders')
         parser.add_optional('notifications')

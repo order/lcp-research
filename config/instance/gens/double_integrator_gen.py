@@ -17,10 +17,8 @@ class DoubleIntegratorGenerator(Generator):
         parser.add('v_desc')
         parser.add('a_desc')
         
-        parser.add('radius',0.25)
-        parser.add('set_point',np.zeros(2))
-        parser.add('oob_costs',1.0)
-        parser.add('discount',0.99)
+        parser.add('cost_obj')
+        parser.add('discount')
         
         args = parser.parse(kwargs)
         
@@ -35,11 +33,6 @@ class DoubleIntegratorGenerator(Generator):
         basic_mapper = mdp.InterpolatedRegularGridNodeMapper(self.x_desc,\
                                                              self.v_desc)
         physics = DoubleIntegratorRemapper()    
-        cost_obj = self.cost_obj
-        #weight_obj = mdp.GaussianBowlFn(0.001, # bandwidth
-        #                                np.zeros(2), # Setpoint
-        #                                override = 1e-8) # non-physical
-
         weight_obj = mdp.ConstFn(1.0) #Just use uniform
 
         actions = np.linspace(*self.a_desc)
@@ -59,7 +52,7 @@ class DoubleIntegratorGenerator(Generator):
 
         discretizer = mdp.ContinuousMDPDiscretizer(physics,
                                                    basic_mapper,
-                                                   cost_obj,
+                                                   self.cost_obj,
                                                    weight_obj,
                                                    actions,
                                                    self.discount)
@@ -68,9 +61,6 @@ class DoubleIntegratorGenerator(Generator):
         discretizer.add_node_mapper(left_oob_mapper)
         discretizer.add_node_mapper(right_oob_mapper)
 
-        if self.drain:
-            # Makes 0,0 a drain state (must be a pure state)
-            discretizer.add_drain(np.array([0,0]))
         print "Built discretizer {0}s.".format(time.time() - start)
 
         return discretizer
