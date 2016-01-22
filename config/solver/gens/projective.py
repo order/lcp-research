@@ -86,7 +86,7 @@ class ProjectiveGenerator(SolverGenerator):
         BigU = sps.bmat(BigU_blocks)
         assert((K,N) == BigU.shape)
 
-        lcp_obj = mdp_obj.tolcp()
+        lcp_obj = mdp_obj.build_lcp()
         M = lcp_obj.M
         approx_M = BigQ.dot(BigU)
         print 'Approximation residual norm:', linalg.norm(M - approx_M)

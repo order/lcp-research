@@ -1,20 +1,12 @@
 import numpy as np
 import config
+import config.generator
 import mdp.hallway as gen
 import mdp
 
 """
 Weird issue: don't use a "from x import y"
 """
-
-class StubGenerator(object):
-    """
-    Stupid function
-    """
-    def __init__(self,generator):
-        self.generator
-    def generate(self):
-        return self.generator
 
 class SmallDoubleIntegratorConfig(config.Config):
     def __init__(self):
@@ -26,4 +18,5 @@ class SmallDoubleIntegratorConfig(config.Config):
         self.params = params
 
     def build(self):
-        return StubGenerator(gen.HallwayGenerator(**self.params))
+        return config.generator.StubGenerator(
+            gen.HallwayBuilder(**self.params))

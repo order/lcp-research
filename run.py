@@ -13,14 +13,17 @@ import os
 #################
 # Main function
 
-def build_generator(conf_file):
+def get_instance_from_file(conf_file):
+    """
+    Loads a class from file string
+    So if the string is 'foo/bar/baz.py' then load the UNIQUE class in
+    that file.
+    """
     module = utils.load_module_from_filename(conf_file)
-    print module
     classlist = utils.list_module_classes(module)
-    assert(1 == len(classlist))
 
-    instance = classlist[0][1]() # Instantiate the factory
-    return instance.build() # Build object
+    assert(1 == len(classlist)) # Class is UNIQUE.
+    return classlist[0][1]() # Instantiate too
     
 
 if __name__ == '__main__':
@@ -33,19 +36,22 @@ if __name__ == '__main__':
     param_save_file = save_file + '.pickle'
     print 'Note: saving internal info to', param_save_file
 
-    inst_gen = build_generator(inst_conf_file)
-    discretizer = inst_gen.generate()
-    assert(issubclass(type(discretizer), mdp.MDPDiscretizer))
+    # Get the instance generator and builder from file
+    instance_generator = get_instance_from_file(inst_conf_file)
+    instance_builder = instance_generator.generate()
     
-    # Build the solver
+    # Get the solver generator
+    solver_generator = get_instance_from_file(solver_conf_file)
+    assert(issubclass(type(solver_generator),
+                      config.generator.SolverGenerator))
     # May build intermediate objects (MDP, LCP, projective LCP)
-    solver_gen = build_generator(solver_conf_file)
-    [solver,objs] = solver_gen.generate(discretizer)
+    [solver,intermediate_objects] = solver_generator.generate(
+        object_builder=instance_builder)
     assert(issubclass(type(solver), solvers.IterativeSolver))
     
     # Solve; return primal and dual trajectories
     solver.solve()
-    data = solver_gen.extract(solver)
+    data = solver_generator.extract(solver)
 
     print 'Final iteration:',solver.get_iteration()
 

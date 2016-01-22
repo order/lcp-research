@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import lcp
 from utils.parsers import KwargParser
 
-class MDPGenerator(object):
+class MDPBuilder(object):
     """
-    Abstract class for anything that can generate an MDP
+    Abstract class for anything that can builder an MDP
     """
     def build_mdp(self,**kwargs):
         """
@@ -17,7 +17,7 @@ class MDPGenerator(object):
         """
         raise NotImplementedError()
 
-class MDP(object):
+class MDP(lcp.LCPBuilder):
     """
     MDP object
     """
@@ -74,7 +74,7 @@ class MDP(object):
         return sps.eye(self.num_states,format='lil')\
             - self.discount * self.transitions[a].T
 
-    def tolcp(self):
+    def build_lcp(self):
         n = self.num_states
         A = self.num_actions
         N = (A + 1) * n

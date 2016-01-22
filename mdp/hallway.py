@@ -3,7 +3,10 @@ import mdp
 import scipy.sparse as sps
 from utils.parsers import KwargParser
 
-class HallwayGenerator(mdp.MDPGenerator):
+class HallwayBuilder(mdp.MDPBuilder):
+    """
+    This is a function that 
+    """
     def __init__(self,**kwargs):
         parser = KwargParser()
         parser.add('wheel_slip')

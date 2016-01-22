@@ -6,10 +6,10 @@ import itertools
 
 from utils.parsers import KwargParser
 
-class MDPDiscretizer(mdp.MDPGenerator):
+class MDPDiscretizer(mdp.MDPBuilder):
     """
-    Abstract class for classes for describing an MDP as 
-    state remappers and node mappers.
+    Abstract class for classes for describing an MDP builder
+    by discretizing a continuous MDP
     """
     def states_to_node_dists(self,states,**kwargs):
         """

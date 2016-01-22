@@ -1,6 +1,10 @@
 import util
 import numpy as np
 
+class LCPBuilder(object):
+    def build_lcp(self,**kwargs):
+        pass
+
 class LCPObj(object):
     """An object that wraps around the matrix M and vector q
     for an LCP
@@ -26,8 +30,7 @@ class LCPObj(object):
         
 
     def __str__(self):
-        return '<{0} in R^{1}>'.format(self.name, self.dim)
-                
+        return '<{0} in R^{1}>'.format(self.name, self.dim)                
                 
             
 class MDPLCPObj(LCPObj):
@@ -35,7 +38,7 @@ class MDPLCPObj(LCPObj):
     """
     def __init__(self,MDP):
         self.MDP = MDP
-        (M,q) = MDP.tolcp()
+        (M,q) = MDP.build_lcp()
         super(MDPLCPObj,self).__init__(M,q)
         
     def split_vector(self,x):        
