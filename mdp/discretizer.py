@@ -6,10 +6,10 @@ import itertools
 
 from utils.parsers import KwargParser
 
-class MDPDiscretizer(object):
+class MDPDiscretizer(mdp.MDPGenerator):
     """
-    Abstract class defining how states are mapped to discrete nodes.
-    Usually a collection of StateRemappers and NodeMappers
+    Abstract class for classes for describing an MDP as 
+    state remappers and node mappers.
     """
     def states_to_node_dists(self,states,**kwargs):
         """
@@ -17,17 +17,11 @@ class MDPDiscretizer(object):
         each of the rows to a distribution over nodes
         """
         raise NotImplementedError()
-        
-    def build_mdp(self,**kwargs):
-        """
-        Construct the MDP
-        """
-        raise NotImplementedError()
+    
+    def get_actions(self):
+        raise NotImplementedError()    
         
     def get_basic_boundary(self):
-        raise NotImplementedError()
-
-    def get_actions(self):
         raise NotImplementedError()
 
     def get_basic_len(self):

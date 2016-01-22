@@ -1,32 +1,42 @@
 import numpy as np
-from mdp import MDP
-import scipy.sparse
-import matplotlib.pyplot as plt
+import mdp
+import scipy.sparse as sps
+from utils.parsers import KwargParser
 
-def generate_mdp(num_states,**kwargs):
-    """ Generates an MDP based on the hallway problem
-    Arguments: num_states (int)
-    Returns: MDP object
-    """
-    # Wheel_slip: probability of going nowhere
-    wheel_slip = kwargs.get('wheel_slipe',0.1)
+class HallwayGenerator(mdp.MDPGenerator):
+    def __init__(self,**kwargs):
+        parser = KwargParser()
+        parser.add('wheel_slip')
+        parser.add('num_states')
+        parser.add('discount')
+        args = parser.parse(kwargs)
 
-    # Actions: move left or right
-    Actions = [-1,1]
+        self.__dict__.update(args)
+        assert(0 < self.discount < 1)
+        assert(0 <= self.wheel_slip <= 1)
+        
+    def build_mdp(self):
+        N = self.num_states
+        w = self.wheel_slip
+        actions = [-1,1]
 
-    # Form the cost
-    target = num_states / 2
-    cost = np.ones(num_states)
-    cost[target] = 0
-    Costs = [cost,cost]
+        # Gaussian costs
+        cost = 1.0  - np.exp(-np.power(np.linspace(-2,2,N),2.0))
+        costs = [cost,cost] # Same for both actions
 
-    # Form the transition matrices
-    Transitions = []
-    for i in Actions:
-        P = wheel_slip*scipy.sparse.eye(num_states) \
-           + (1 - wheel_slip)*scipy.sparse.diags(np.ones(num_states-1),i)
-        P = P.tolil()
-        P[(num_states-1)*(1+i)/2,(num_states-1)*(1-i)/2] =  (1 - wheel_slip)
-        Transitions.append(P)
+        transitions = []
+        for i in Actions:
+            moved = sps.diags(np.ones(N-1),i,format=lil)
+            stay = sps.eye(N,format=lil)
+            P = w * stay + (1 - w) * moved
 
-    return MDP(Transitions,Costs,Actions,name='Hallway',**kwargs)
+            # Wrap around
+            # if i = -1 then (1 + i) / 2 = 0; is 1 if i = 1
+            P[(N-1)*(1+i)/2,(N-1)*(1-i)/2] =  (1 - w)
+            transitions.append(P)       
+        
+        return mdp.MDP(transitions,
+                       costs,
+                       actions,
+                       self.discount,
+                       name='Hallway')

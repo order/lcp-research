@@ -16,37 +16,43 @@ import time
 
 class BasisGenerator(object):
     """
-    This is an object that wraps around a "basic" basis generator and
-    deals with special nodes like out of bounds nodes.
+    This is an object that wraps around a "basic" basis generator 
+    and deals with special nodes like out of bounds nodes.
 
-    The assumption is that a special node requires a distinct elementary
-    vector associated with it because it is sufficiently different
+    The assumption is that a special node requires a distinct 
+    Elementary vector associated with it because it is 
+    sufficiently different
     """
     def __init__(self,gen_obj):
-        self.generator_function = gen_obj
-        self.remappers = None
         """
-        TODO: implement "remapper" logic so that special nodes can be mapped
-        to real physical locations that behave like we'd expect the special 
-        node to be similar to
-        """        
+        The generator function is a the object that does the actual
+        generation of the basis; this object just does some 
+        bookkeeping
+        """
+        self.basic_generator = gen_obj
+
 
     def generate(self, points,**kwargs):
         """
         Generates basis columns based on the provided points.
         
-        Note that any special points (e.g. non-physical points) will 
-        be given an elementary column vector. 
+        Note that any special points (e.g. non-physical points) 
+        will be given an elementary column vector. 
         """
+
+        parser = KwargParser()
+        parser.add('special_points',[])
+        args = parser.parse(kwargs)
 
         (N,D) = points.shape
 
-        # Special points are things like OOB nodes    
-        special_points = np.array(sorted(kwargs.get('special_points',[])))
+        # Special points are things like OOB nodes
+        unsorted_points = args('special_points',[])
+        special_points = np.array(sorted(unsorted_points))
         sp_set = set(special_points)
         S = len(sp_set)         
 
-        # Make sure any NaN row that wasn't remapped is a special state.
+        # Make sure any NaN row that wasn't remapped is special
         nan_mask = np.any(np.isnan(points),axis=1)
         assert((N,) == nan_mask.shape)
         nan_set = set(nan_mask.nonzero()[0])            
@@ -65,14 +71,17 @@ class BasisGenerator(object):
             B[special_points,:] = 0 # Blot all special points out
             B = np.hstack([B,np.zeros((N,S))])        
             B[special_points,K:] = np.eye(S)
+            
         #B = normalize_cols(B)
         return B
 
     def generate_block_diag(self,points,R,**kwargs):
         """
-        Builds a block diagonal matrix where each block is one of R identical copies of
-        a K-column basis matrix defined by the (N,d) point array, and the generator function.
+        Builds a block diagonal matrix where each block is one of 
+        R identical copies of a K-column basis matrix defined by 
+        the (N,d) point array, and the generator function.
         """
+        
         (N,d) = points.shape
         B = self.generate(points,**kwargs)
         (M,K) = B.shape
@@ -85,58 +94,33 @@ class BasisGenerator(object):
 
 class BasicBasisGenerator(object):
     """
-    The BasisGenerator uses these for actually doing to mapping of rows to basis values.
-    It handles some of the higher-level concerns like cleaning and special point handling
+    The BasisGenerator uses these for actually doing to mapping of 
+    rows to basis values. It handles some of the higher-level 
+    concerns like cleaning and special point handling
     """
     def __init__(self):
         pass
     def generate(self,points,**kwargs):
         raise NotImplementedError()
 
-class RandomFourierBasis(BasicBasisGenerator):
-    def __init__(self,**kwargs):
-        self.scale = kwargs.get('scale',1.0)
-        self.K = kwargs['num_basis']
-        assert(self.K >=1)
+class IdentityBasis(BasicBasisGenerator):
+    def __init__(self):
+        pass
     def generate(self,points,**kwargs):
-        K = self.K
-        (N,D) = points.shape
-        special_points = kwargs.get('special_points',[])
-
-        # Format: B = [1 | fourier columns]
-        W = self.scale * np.random.randn(D,K-1) # Weights
-        Phi = 2.0 * np.pi * np.random.rand(K-1) # Phases shift
-        F = np.sin(points.dot(W) + Phi) # Non-constant columns
-        assert((N,K-1) == F.shape)
-        B = np.hstack([1/np.sqrt(N)*np.ones((N,1)), np.sqrt(2.0 / float(N)) * F])
-        assert((N,K) == B.shape)
-
-        # Mask out any special points
-        if len(special_points) > 0:
-            B[special_points,:] = 0
-                
-        return B
-        
-        
-class RegularRadialBasis(BasicBasisGenerator):
-    def __init__(self,**kwargs):
-        self.centers = kwargs['centers']
-        self.bw = kwargs['bandwidth']
-    def generate(self,points,**kwargs):        
+        # Parse kwargs
+        parser = KwargParser()
+        parser.add('special_points',[])
+        args = parser.parser(kwargs)
+        special_points = args['special_points'] 
         (N,D) = points.shape
 
-        special_points = kwargs.get('special_points',[])
-        B = []
-        (K,d) = self.centers.shape
-        assert(d == D)
-        for i in xrange(K):
-            mu = self.centers[i,:]
-            assert((D,) == mu.shape)
-            B.append(gaussian_rbf(points,mu,self.bw))
+        num_normal = N - len(special_points)
+        normal_mask = np.ones(N,dtype=bool)
+        normal_mask[special_points] = False
         
-        B = np.column_stack(B)
-        assert((N,K) == B.shape)
-        B[special_points,:] = 0
+        B = np.empty((N,num_normal))
+        B[normal_mask,:] = np.eye(num_normal)
+        B[~normal_mask,:] = 0
                 
         return B
         
@@ -151,10 +135,5 @@ def normalize_cols(M):
     assert(not np.any(np.isnan(M)))
     return M
     
-def gaussian_rbf(X,mu,bw):
-    C = X - mu
-    assert(C.shape == X.shape)
-    RBF = np.exp(-np.power(np.linalg.norm(C,axis=1) / bw, 2))
-    assert(RBF.shape[0] == X.shape[0])
-    return RBF
+
     

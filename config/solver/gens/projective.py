@@ -13,22 +13,21 @@ class ProjectiveGenerator(SolverGenerator):
     def __init__(self,**kwargs):
         # Parsing
         parser = KwargParser()
-        parser.add('discount',0.997)
         parser.add('value_regularization',1e-12)
         parser.add('flow_regularization',1e-12)
         parser.add('termination_conditions')
         parser.add('recorders')
-        parser.add('basis_config_file')
         parser.add_optional('notifications')
+        parser.add('basis_gen')
         args = parser.parse(kwargs)
 
         # Dump into self namespace
         self.__dict__.update(args)
 
     def generate(self,discretizer):
-        mdp_obj = discretizer.\
-                  build_mdp(value_regularization=self.value_regularization,
-                            flow_regularization=self.flow_regularization)
+        reg = {'value_regularization':self.value_regularization,
+               'flow_regularization':self.flow_regularization}
+        mdp_obj = discretizer.build_mdp(**reg)
 
         # Get sizes
         A = mdp_obj.num_actions

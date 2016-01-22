@@ -7,6 +7,16 @@ import matplotlib.pyplot as plt
 import lcp
 from utils.parsers import KwargParser
 
+class MDPGenerator(object):
+    """
+    Abstract class for anything that can generate an MDP
+    """
+    def build_mdp(self,**kwargs):
+        """
+        Construct the MDP
+        """
+        raise NotImplementedError()
+
 class MDP(object):
     """
     MDP object
@@ -25,6 +35,8 @@ class MDP(object):
         self.transitions = transitions
         self.costs = costs
         self.actions = actions
+
+
         
         self.val_reg = args['value_regularization']
         self.flow_reg = args['flow_regularization']
