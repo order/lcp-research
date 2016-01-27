@@ -6,10 +6,10 @@ from solvers.termination import *
 from solvers.notification import *
 from solvers.recording import *
 
-from config.generator import SolverGenerator
+import config.generator as gen
 import time
 
-class KojimaGenerator(SolverGenerator):
+class KojimaGenerator(gen.SolverGenerator):
     def __init__(self,**kwargs):
         # Parsing
         parser = KwargParser()
@@ -34,29 +34,10 @@ class KojimaGenerator(SolverGenerator):
 
         # Set up the solver object
         solver = solvers.IterativeSolver(iter)
-
-        # Add termination conditions
-        solver.termination_conditions.extend(
-            self.termination_conditions.values())
-
-        # Set up recorders
-        self.recorder_names = self.recorders.keys()
-        solver.recorders.extend(self.recorders.values())
-
-        # Set up notification
-        solver.notifications.extend(self.notifications.values())
+        gen.add_trn(self,solvers) # Termination, Recording, and Notify      
     
         return [solver,objects]
 
     def extract(self,solver):               
-        # Extract the value information
-        # TODO: generalize
-        names = self.recorder_names
-        assert(len(names) == len(solver.recorders))
-        
-        data = {}
-        for i in xrange(len(names)):
-            data[names[i]] = np.array(solver.recorders[i].data)
-
-        return data
+        return gen.basic_extract(self,solver)
     

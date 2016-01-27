@@ -7,7 +7,7 @@ import mdp
 Weird issue: don't use a "from x import y"
 """
 
-class SmallDoubleIntegratorConfig(config.Config):
+class DoubleIntegratorConfig(config.InstanceConfig):
     def __init__(self):
         params = {}
         params['x_desc'] = (-5,5,20)
@@ -21,5 +21,6 @@ class SmallDoubleIntegratorConfig(config.Config):
         params['discount'] = 0.99
         self.params = params
 
-    def build(self):
-        return gen.DoubleIntegratorGenerator(**self.params)
+    def configure_instance_builder(self):
+        gen_fn = gen.DoubleIntegratorGenerator(**self.params)
+        return gen_fn.generate()

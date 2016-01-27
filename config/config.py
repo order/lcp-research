@@ -1,14 +1,27 @@
-class Config(object):
+"""
+Configuration classes are basically there to be small files that
+store the data to instantiate a particular solver or instances building
+object.
+"""
+
+class SolverConfig(object):
     """
-    Configuration stub.
-
-    Configurations should return an object without any additional
-    input. 
-
-    I'm calling a "parameterized" configuration file a "generator",
-    So the configuration may call a generator after providing additional
-    information.
+    An object that configures and builds a solver generator
     """
+    def configure_solver_generator(self):
+        """
+        Should return a 'Generator'; i.e. something 
+        that uses
+        """
+        raise NotImplementedError()
 
-    def build(self):
+class InstanceConfig(object):
+    """
+    An object that configures and builds a builder
+    """
+    def configure_instance_builder(self):
+        """
+        Should return a 'builder'; i.e. something 
+        like MDPBuilder or
+        """
         raise NotImplementedError()
