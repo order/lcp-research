@@ -34,7 +34,7 @@ class KojimaGenerator(gen.SolverGenerator):
 
         # Set up the solver object
         solver = solvers.IterativeSolver(iter)
-        gen.add_trn(self,solvers) # Termination, Recording, and Notify      
+        gen.add_trn(self,solver) # Termination, Recording, and Notify      
     
         return [solver,objects]
 

@@ -2,7 +2,7 @@ import config
 import solvers
 import config.solver.gens.kojima_gen as gen
 
-class KojimaBasicConfig(config.Config):
+class KojimaBasicConfig(config.SolverConfig):
     def __init__(self):
         params = {}
         params['value_regularization'] = 0.0
@@ -21,5 +21,5 @@ class KojimaBasicConfig(config.Config):
         params['notifications'] = notify
         self.params = params
 
-    def build(self):
+    def configure_solver_generator(self):
         return gen.KojimaGenerator(**self.params)
