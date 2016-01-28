@@ -7,7 +7,7 @@ import mdp.hillcar
 """
 Weird issue: don't use a "from x import y"
 """
-class HillcarConfig(config.Config):
+class HillcarConfig(config.InstanceConfig):
     def __init__(self):
         params = {}
         params['x_desc'] = (-5,5,20)
@@ -23,5 +23,6 @@ class HillcarConfig(config.Config):
         params['discount'] = 0.99
         self.params = params
 
-    def build(self):
-        return gen.HillcarGenerator(**self.params)
+    def configure_instance_builder(self):
+        gen_fn = gen.HillcarGenerator(**self.params)
+        return gen_fn.generate()

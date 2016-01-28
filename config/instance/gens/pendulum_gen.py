@@ -1,7 +1,7 @@
 import numpy as np
 
 import mdp
-from config.generator import Generator
+from config import Generator
 from mdp.pendulum import PendulumRemapper
 from mdp.costs import TargetZoneCost
 from mdp.state_remapper import AngleWrapStateRemaper,RangeThreshStateRemapper

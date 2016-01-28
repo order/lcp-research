@@ -28,18 +28,20 @@ class HallwayBuilder(mdp.MDPBuilder):
         costs = [cost,cost] # Same for both actions
 
         transitions = []
-        for i in Actions:
-            moved = sps.diags(np.ones(N-1),i,format=lil)
-            stay = sps.eye(N,format=lil)
+        for i in actions:
+            moved = sps.diags(np.ones(N-1),i,format='lil')
+            stay = sps.eye(N,format='lil')
             P = w * stay + (1 - w) * moved
 
             # Wrap around
             # if i = -1 then (1 + i) / 2 = 0; is 1 if i = 1
             P[(N-1)*(1+i)/2,(N-1)*(1-i)/2] =  (1 - w)
             transitions.append(P)       
-        
+        weights = np.ones(N)
+            
         return mdp.MDP(transitions,
                        costs,
                        actions,
                        self.discount,
+                       weights,
                        name='Hallway')

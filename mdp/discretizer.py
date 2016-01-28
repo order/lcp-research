@@ -228,18 +228,10 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
     def add_node_mapper(self,mapper):
         self.exception_node_mappers.append(mapper)
         
-    def build_mdp(self,**kwargs):
+    def build_mdp(self):
         """
-        Build the MDP after all the exceptions have been set up
-        
-        kwargs is mostly for passing through stuff to the MDP object
+        Build the MDP after all the exceptions have been set up        
         """
-
-        parser = KwargParser()
-        parser.add_optional('name')
-        parser.add('value_regularization',1e-12)
-        parser.add('flow_regularization',1e-12)
-        args = parser.parse(kwargs)
 
         # Build the transitions, costs, and so forth
         transitions = []
@@ -250,15 +242,13 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
             costs.append(self.build_cost_vector(action))
 
         weight = self.build_weight_vector()
-        args['state_weights'] = weight
-        if 'name' not in args:
-            args['name'] = 'MDP from Discretizer'
             
         mdp_obj = mdp.MDP(transitions,
                           costs,
                           self.actions,
                           self.discount,
-                          **args)
+                          weight,
+                          name='MDP from Discretizer')
 
         return mdp_obj
         

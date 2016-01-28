@@ -7,7 +7,7 @@ import mdp
 Weird issue: don't use a "from x import y"
 """
 
-class PendulumConfig(config.Config):
+class PendulumConfig(config.InstanceConfig):
     def __init__(self):
         params = {}
         params['q_n'] = 20
@@ -25,5 +25,6 @@ class PendulumConfig(config.Config):
         params['discount'] = 0.99
         self.params = params
 
-    def build(self):
-        return gen.PendulumGenerator(**self.params)
+    def configure_instance_builder(self):
+        gen_fn = gen.PendulumGenerator(**self.params)
+        return gen_fn.generate()

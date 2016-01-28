@@ -1,7 +1,7 @@
 import numpy as np
 
 import mdp
-from config.generator import Generator
+from config import Generator
 from mdp.hillcar import HillcarRemapper
 from utils.parsers import KwargParser
 

@@ -1,6 +1,5 @@
 import numpy as np
 import config
-import config.generator
 import mdp.hallway as gen
 import mdp
 
@@ -8,7 +7,7 @@ import mdp
 Weird issue: don't use a "from x import y"
 """
 
-class SmallDoubleIntegratorConfig(config.Config):
+class HallwayConfig(config.InstanceConfig):
     def __init__(self):
         params = {}
         params['wheel_slip'] = 0.1
@@ -17,6 +16,5 @@ class SmallDoubleIntegratorConfig(config.Config):
         params['discount'] = 0.99
         self.params = params
 
-    def build(self):
-        return config.generator.StubGenerator(
-            gen.HallwayBuilder(**self.params))
+    def configure_instance_builder(self):
+        return gen.HallwayBuilder(**self.params)

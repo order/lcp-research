@@ -25,3 +25,11 @@ class InstanceConfig(object):
         like MDPBuilder or
         """
         raise NotImplementedError()
+
+class Processor(object):
+    def process(self,data):
+        raise NotImplementedError()
+
+class Plotter(object):
+    def display(self,data,save_file):
+        raise NotImplementedError()  

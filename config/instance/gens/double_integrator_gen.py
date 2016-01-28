@@ -1,7 +1,7 @@
 import numpy as np
 
 import mdp
-from config.generator import Generator
+from config import Generator
 from mdp.double_integrator import DoubleIntegratorRemapper
 from utils.parsers import KwargParser
 

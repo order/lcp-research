@@ -6,10 +6,10 @@ from solvers.termination import *
 from solvers.notification import *
 from solvers.recording import *
 
-import config.generator as gen
+import config
 import time
 
-class ValueIterGenerator(gen.SolverGenerator):
+class ValueIterGenerator(config.SolverGenerator):
     def __init__(self,**kwargs):
         parser = KwargParser()
         parser.add('termination_conditions',[])
@@ -26,10 +26,10 @@ class ValueIterGenerator(gen.SolverGenerator):
 
         # Set up the solver object
         solver = solvers.IterativeSolver(iter)
-        gen.add_trn(self,solver) # Termination, Recording, and Notify    
+        config.add_trn(self,solver) # Termination, Recording, and Notify    
 
         return [solver,objects]
 
     def extract(self,solver,**kwargs):
-        return gen.basic_extract(self,solver)
+        return config.basic_extract(self,solver)
 

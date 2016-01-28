@@ -21,26 +21,18 @@ class MDP(lcp.LCPBuilder):
     """
     MDP object
     """
-    def __init__(self,transitions,costs,actions,discount,**kwargs):
-        parser = KwargParser()
-        parser.add('name','Unnamed')
-        parser.add_optional('state_weights')
-        parser.add('value_regularization',1e-12)
-        parser.add('flow_regularization',1e-12)
-        args = parser.parse(kwargs)
-        
-        self.name = args['name']
-
-        self.discount = discount
+    def __init__(self,transitions,costs,actions,discount,state_weights,**kwargs):
         self.transitions = transitions
         self.costs = costs
         self.actions = actions
+        self.discount = discount
+        self.state_weights = state_weights
 
+        parser = KwargParser()
+        parser.add('name','Unnamed')
+        args = parser.parse(kwargs)        
+        self.name = args['name']
 
-        
-        self.val_reg = args['value_regularization']
-        self.flow_reg = args['flow_regularization']
-        
         A = len(actions)
         N = costs[0].size
         self.num_actions = A
@@ -48,14 +40,6 @@ class MDP(lcp.LCPBuilder):
 
         assert(len(transitions) == A)
         assert(len(costs) == A)
-
-        # State-weight generation
-        if 'state_weights' in args:
-            self.state_weights = args['state_weights']
-        else:
-            # Uniform if not specified
-            self.state_weights = np.ones(N)
-        assert((N,) == self.state_weights.shape)
         
         # Ensure sizes are consistent
         for i in xrange(A):
@@ -74,13 +58,21 @@ class MDP(lcp.LCPBuilder):
         return sps.eye(self.num_states,format='lil')\
             - self.discount * self.transitions[a].T
 
-    def build_lcp(self):
+    def build_lcp(self,**kwargs):
+        # Optional regularization
+        parser = KwargParser()
+        parser.add('value_regularization',0.0)
+        parser.add('flow_regularization',0.0)
+        args = parser.parse(kwargs)        
+        self.val_reg = args['value_regularization']
+        self.flow_reg = args['flow_regularization']       
+        
         n = self.num_states
         A = self.num_actions
         N = (A + 1) * n
         d = self.discount
 
-        #Build the LCP
+        # Build the LCP
         Top = sps.lil_matrix((n,n))
         Bottom = None
         q = np.zeros(N)

@@ -7,17 +7,6 @@ import solvers
 import utils
 import config
 
-def get_instance_from_file(conf_file):
-    """
-    Loads a class from file string
-    So if the string is 'foo/bar/baz.py' then it loads the UNIQUE
-    class in that file.
-    """
-    module = utils.load_module_from_filename(conf_file)
-    classlist = utils.list_module_classes(module)
-
-    assert(1 == len(classlist)) # Class is UNIQUE.
-    return classlist[0][1]() # Instantiate too
 
 def get_instance_builder(inst_conf_file):
     """
@@ -25,7 +14,7 @@ def get_instance_builder(inst_conf_file):
     This object configures the instance builder (e.g. Discretizer)
     The builder is used in setting up the solver
     """
-    instance_config = get_instance_from_file(inst_conf_file)    
+    instance_config = utils.get_instance_from_file(inst_conf_file)    
     assert(issubclass(type(instance_config),
                       config.InstanceConfig))
     return instance_config.configure_instance_builder()  
@@ -38,7 +27,7 @@ def get_solver_generator(solver_conf_file):
     The generator uses the above builder to set up the solver.
     It also extracts data from the solver for reporting.
     """
-    solver_config = get_instance_from_file(solver_conf_file)
+    solver_config = utils.get_instance_from_file(solver_conf_file)
     assert(issubclass(type(solver_config),
                       config.SolverConfig))
     return solver_config.configure_solver_generator()
@@ -58,10 +47,19 @@ def save_data(save_file,data):
         # Save the final primal iteration as the solution
         np.save(save_file + '.sol',data['primal'][-1,:])
 
-def pickle_objects(param_save_file,instance_builder,objs):
-    #Save experiment's objects
+def pickle_objects(param_save_file,
+                   instance_builder,
+                   solver_generator,
+                   inst_conf_file,
+                   solver_conf_file,
+                   objects):
+    
+    #Save the runs's information
     params = {'instance_builder':instance_builder,
-              'objects':objs}
+              'solver_generator':solver_generator,
+              'inst_conf_file':inst_conf_file,
+              'solver_conf_file':solver_conf_file,
+              'objects':objects}
     pickle.dump(params,open(param_save_file,'wb'))
 
 
@@ -93,5 +91,8 @@ if __name__ == '__main__':
     save_data(save_file,data)
     pickle_objects(param_save_file,
                    instance_builder,
+                   solver_generator,
+                   inst_conf_file,
+                   solver_conf_file,
                    interm_objects)
 

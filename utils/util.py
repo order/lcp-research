@@ -11,6 +11,18 @@ import matplotlib.pyplot as plt
 
 import importlib
 
+def get_instance_from_file(conf_file):
+    """
+    Loads a class from file string
+    So if the string is 'foo/bar/baz.py' then it loads the UNIQUE
+    class in that file.
+    """
+    module = load_module_from_filename(conf_file)
+    classlist = list_module_classes(module)
+
+    assert(1 == len(classlist)) # Class is UNIQUE.
+    return classlist[0][1]() # Instantiate too
+
 def load_module_from_filename(filename):
     """
     Loads a module from a relative filename
