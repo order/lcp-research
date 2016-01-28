@@ -5,11 +5,12 @@ from solvers.kojima import KojimaIPIterator
 from solvers.termination import *
 from solvers.notification import *
 from solvers.recording import *
+import config
+import bases
 
-from generator import SolverGenerator
 import time
 
-class ProjectiveGenerator(SolverGenerator):
+class ProjectiveGenerator(config.SolverGenerator):
     def __init__(self,**kwargs):
         # Parsing
         parser = KwargParser()
@@ -18,16 +19,14 @@ class ProjectiveGenerator(SolverGenerator):
         parser.add('termination_conditions')
         parser.add('recorders')
         parser.add_optional('notifications')
-        parser.add('basis_gen')
+        parser.add('basic_basis_generator')
         args = parser.parse(kwargs)
 
         # Dump into self namespace
         self.__dict__.update(args)
 
     def generate(self,discretizer):
-        reg = {'value_regularization':self.value_regularization,
-               'flow_regularization':self.flow_regularization}
-        mdp_obj = discretizer.build_mdp(**reg)
+        mdp_obj = discretizer.build_mdp()
 
         # Get sizes
         A = mdp_obj.num_actions
@@ -35,13 +34,17 @@ class ProjectiveGenerator(SolverGenerator):
         N = (A+1)*n
         gamma = mdp_obj.discount
 
-        # Todo: implement this
-        basis_gen = build_basis_generator(self.basis_config_file)
+        # Actual basis generator wraps the
+        # basic basis generator
+        # (Which doesn't deal with non-phyiscal states)
+        basis_generator = bases.BasisGenerator(self.basic_basis_generator)
 
         points = discretizer.get_node_states()
 
-        #Phi = basis_gen.generate(points)
-        Phi = np.eye(n)
+        Phi = basis_generator.generate_basis(points)
+        assert((n,n) == Phi.shape)
+        Phi_other = np.eye(n)
+        assert(np.linalg.norm(Phi - Phi_other) / n < 1e-12)
         (d,k) = Phi.shape
         assert(d == n)
         assert(k <= n)
@@ -90,9 +93,7 @@ class ProjectiveGenerator(SolverGenerator):
         M = lcp_obj.M
         approx_M = BigQ.dot(BigU)
         print 'Approximation residual norm:', linalg.norm(M - approx_M)
-        quit()
-
-        
+        quit()  
 
 
 ###########################################

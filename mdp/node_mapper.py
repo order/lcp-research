@@ -331,7 +331,7 @@ class InterpolatedGridNodeMapper(BasicNodeMapper):
         
     def get_boundary(self):
         lows = [x[0] for x in self.grid_desc]
-        highs = [x[1] for x in self.grid_desc]
+        highs = [x[-1] for x in self.grid_desc]
         
         return zip(lows,highs)
         

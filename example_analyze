@@ -1,0 +1,1 @@
+python analyze.py data/test.npz config/plotter/pcolor_movie.py data/test.avi primal to2dframes x[:,0,:,:]

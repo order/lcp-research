@@ -1,8 +1,9 @@
 import config
 import solvers
+import bases
 import config.solver.gens.projective_gen as gen
 
-class ProjectiveBasicConfig(config.Config):
+class ProjectiveBasicConfig(config.SolverConfig):
     def __init__(self):
         params = {}
         params['value_regularization'] = 0.0
@@ -20,8 +21,10 @@ class ProjectiveBasicConfig(config.Config):
         params['recorders'] = recorders
         params['notifications'] = notify
 
-        params['basis_gen'] = 
+        # This is the basic part of the basis generation
+        # It's wrapped by BasisGenerator
+        params['basic_basis_generator'] = bases.IdentityBasis()
         self.params = params
 
-    def build(self):
+    def configure_solver_generator(self):
         return gen.ProjectiveGenerator(**self.params)

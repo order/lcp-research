@@ -30,6 +30,22 @@ class ValueChangeAnnounce(Notification):
             print 'Value iteration diff {0:.3g} at iteration {1}'.format(new_diff,iterator.get_iteration())
             self.diff = new_diff
 
+class ValueDiffAnnounce(Notification):
+    """
+    Prints the value difference
+    """
+    def __init__(self,**kwargs):
+        self.old_v = np.NaN # Don't have old iteration
+        
+    def announce(self,iterator):
+        v = iterator.get_value_vector()
+
+        if not np.any(self.old_v == np.NaN):
+            new_diff = np.linalg.norm(self.old_v - v)
+            print 'Value iteration diff {0:.3g} at iteration {1}'\
+                .format(new_diff,iterator.get_iteration())
+        self.old_v = v        
+
 class PrimalChangeAnnounce(Notification):
     """
     Checks if the value vector from an MDP iteration has changed 

@@ -17,17 +17,50 @@ class MDPDiscretizer(mdp.MDPBuilder):
         each of the rows to a distribution over nodes
         """
         raise NotImplementedError()
+
+    def get_num_nodes(self):
+        """
+        Return the number of nodes in the discretizer.
+
+        Some of the nodes may be non-physical, so different than
+        np.prod(self.get_basic_lengths())
+        """
+        raise NotImplementedError()
     
     def get_actions(self):
+        """
+        Gets the list of actions. Each action will be kD, where k is
+        the dimension of the control space.
+        """
+        raise NotImplementedError()
+
+    def get_num_actions(self):
+        """
+        Return the number of actions
+        """
         raise NotImplementedError()    
         
     def get_basic_boundary(self):
+        """
+        Returns a list of pairs, with the min and max along each dimension.
+        So [(-1,1),(-5,5)] could be the boundary for a problem, indicating
+        that the problem is 2D with a rectangular geometry [-1,1] x [-5,5]
+        """
         raise NotImplementedError()
 
-    def get_basic_len(self):
+    def get_basic_lengths(self):
+        """
+        Returns a tuple with the number of states in each dimension,
+        so (4,5) would indicate that there are 4 discrete states in the
+        discretization of the 1st dimension, and 5 in the second
+        """
         raise NotImplementedError()
 
     def get_dimension(self):
+        """
+        Return the number of physical dimensions in the problem,
+        e.g. 2 for the 1D double integrator (position and velocity)
+        """
         raise NotImplementedError()
 
 class ContinuousMDPDiscretizer(MDPDiscretizer):

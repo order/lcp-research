@@ -3,6 +3,7 @@ import numpy as np
 import scipy
 import scipy.sparse
 import scipy.sparse.linalg
+import utils.parsers
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -32,7 +33,7 @@ class BasisGenerator(object):
         self.basic_generator = gen_obj
 
 
-    def generate(self, points,**kwargs):
+    def generate_basis(self, points,**kwargs):
         """
         Generates basis columns based on the provided points.
         
@@ -40,14 +41,14 @@ class BasisGenerator(object):
         will be given an elementary column vector. 
         """
 
-        parser = KwargParser()
+        parser = utils.parsers.KwargParser()
         parser.add('special_points',[])
         args = parser.parse(kwargs)
 
         (N,D) = points.shape
 
         # Special points are things like OOB nodes
-        unsorted_points = args('special_points',[])
+        unsorted_points = args.get('special_points',[])
         special_points = np.array(sorted(unsorted_points))
         sp_set = set(special_points)
         S = len(sp_set)         
@@ -100,13 +101,13 @@ class BasicBasisGenerator(object):
     """
     def __init__(self):
         pass
-    def generate(self,points,**kwargs):
+    def generate_basis(self,points,**kwargs):
         raise NotImplementedError()
 
 class IdentityBasis(BasicBasisGenerator):
     def __init__(self):
         pass
-    def generate(self,points,**kwargs):
+    def generate_basis(self,points,**kwargs):
         # Parse kwargs
         parser = KwargParser()
         parser.add('special_points',[])
