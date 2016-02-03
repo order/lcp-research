@@ -101,12 +101,16 @@ class BasicBasisGenerator(object):
     """
     def __init__(self):
         pass
+    def isortho(self):
+        raise NotImplementedError()
     def generate_basis(self,points,**kwargs):
         raise NotImplementedError()
 
 class IdentityBasis(BasicBasisGenerator):
     def __init__(self):
         pass
+    def isortho(self):
+        return True
     def generate_basis(self,points,**kwargs):
         # Parse kwargs
         parser = utils.parsers.KwargParser()

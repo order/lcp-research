@@ -1,7 +1,8 @@
 import config
 import solvers
-import bases
+import bases.rbf as rbf
 import config.solver.gens.projective_gen as gen
+import numpy as np
 
 class ProjectiveBasicConfig(config.SolverConfig):
     def __init__(self):
@@ -23,7 +24,12 @@ class ProjectiveBasicConfig(config.SolverConfig):
 
         # This is the basic part of the basis generation
         # It's wrapped by BasisGenerator
-        params['basic_basis_generator'] = bases.RadialBasis()
+        K = 9
+        [X,V] = np.meshgrid(np.linspace(-5,5,11),np.linspace(-6,6,11))
+        centers = np.column_stack([X.flatten(),V.flatten()])
+        
+        params['basic_basis_generator'] = rbf.RadialBasis(centers=centers,
+                                                          bandwidth=0.6)
         self.params = params
 
     def configure_solver_generator(self):

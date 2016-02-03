@@ -113,20 +113,17 @@ class ProjectiveIPIterator(LCPIterator,IPIterator):
         G = ((A.dot(Y)).dot(Phi) - PtPUP)
 
         G_sparse = float(G.nnz) / float(np.prod(G.shape))
-        print 'G sparsity', G_sparse
-        assert(G_sparse < 0.1)
-        # If this gets violated, we should probably have some code
-        # that switches G to being dense
-        
-       
         assert((k,k) == G.shape)
+        
         h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
         assert((k,) == h.shape)
             
         # Step 5: Solve for del_w
         # G is essentially dense
-        #del_w = np.linalg.lstsq(G,h)[0]
-        del_w = sps.linalg.spsolve(G,h)
+        if G_sparse > 0.01:
+            del_w = np.linalg.lstsq(G.toarray(),h)[0]
+        else:
+            del_w = sps.linalg.spsolve(G,h)
         assert((k,) == del_w.shape)
             
             # Step 6

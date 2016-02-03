@@ -50,20 +50,18 @@ class ProjectiveGenerator(config.SolverGenerator):
 
         Phi = basis_generator.generate_basis(points,
                                              special_points=special_points)
-        assert((n,n) == Phi.shape)
-        Phi_other = np.eye(n)
-        assert(np.linalg.norm(Phi - Phi_other) / n < 1e-12)
+
         (d,k) = Phi.shape
         assert(d == n)
         assert(k <= n)
         K = (A+1)*k
 
-        #if basis_gen.isortho():
-        Q = Phi
-        #else:
+        if self.basic_basis_generator.isortho():
+            Q = Phi
+        else:
             #Orthogonalize using QR decomposition
-        #    [Q,R] = sp.linalg.qr(Phi,mode='economic')
-        #    assert(Q.shape == Phi.shape)
+            [Q,R] = sp.linalg.qr(Phi,mode='economic')
+            assert(Q.shape == Phi.shape)
 
 
         # Find the in-basis approximations for E = I - gamma* P

@@ -14,14 +14,18 @@ class RadialBasis(bases.BasicBasisGenerator):
         parser = KwargParser()
         parser.add('centers')
         parser.add('bandwidth')
-        args = parser.parser(kwargs)
+        args = parser.parse(kwargs)
         
         self.__dict__.update(args)
+        
+    def isortho(self):
+        return False
+        
     def generate_basis(self,points,**kwargs):
         # Parse kwargs
         parser = KwargParser()
         parser.add('special_points',[])
-        args = parser.parser(kwargs)
+        args = parser.parse(kwargs)
         special_points = args['special_points']        
 
         (N,D) = points.shape
@@ -32,7 +36,7 @@ class RadialBasis(bases.BasicBasisGenerator):
         for i in xrange(K):
             mu = self.centers[i,:]
             assert((D,) == mu.shape)
-            B.append(gaussian_rbf(points,mu,self.bw))
+            B.append(gaussian_rbf(points,mu,self.bandwidth))
         
         B = np.column_stack(B)
         assert((N,K) == B.shape)
