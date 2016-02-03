@@ -10,7 +10,7 @@ class Generator(object):
 class SolverGenerator(Generator):
     def generate(self,discretizer):
         raise NotImplementedError()
-    def extract(self):
+    def extract(self,solver):
         raise NotImplementedError()
 
 class StubGenerator(Generator):

@@ -17,7 +17,7 @@ class RadialBasis(bases.BasicBasisGenerator):
         args = parser.parser(kwargs)
         
         self.__dict__.update(args)
-    def generate(self,points,**kwargs):
+    def generate_basis(self,points,**kwargs):
         # Parse kwargs
         parser = KwargParser()
         parser.add('special_points',[])

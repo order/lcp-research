@@ -1,10 +1,10 @@
-from solvers import LCPIterator
+from solvers import LCPIterator,IPIterator
 
 import numpy as np
 import scipy as sp
 import scipy.sparse as sps
 
-class ProjectiveIPIterator(LCPIterator):
+class ProjectiveIPIterator(LCPIterator,IPIterator):
     def __init__(self,proj_lcp_obj,**kwargs):
         self.centering_coeff = kwargs.get('centering_coeff',0.99)
         self.linesearch_backoff = kwargs.get('linesearch_backoff',0.99)
@@ -31,6 +31,10 @@ class ProjectiveIPIterator(LCPIterator):
         self.x = kwargs.get('x0',np.ones(N))
         self.y = kwargs.get('y0',np.ones(N))
         self.w = kwargs.get('w0',np.zeros(k))
+        self.steplen = np.nan
+        self.dir_x = np.full(N,np.nan)
+        self.dir_y = np.full(N,np.nan)
+        self.dir_w = np.full(k,np.nan)
         
         assert((N,) == self.x.shape)
         assert((N,) == self.y.shape)
@@ -41,7 +45,8 @@ class ProjectiveIPIterator(LCPIterator):
     def next_iteration(self):
         """
         A projective interior point algorithm based on "Fast solutions to projective monotone LCPs" by Geoff Gordon. 
-        If M = \Phi U + \Pi_\bot where Phi is low rank (k << n) and \Pi_\bot is projection onto the nullspace of \Phi^\top, then each iteration only costs O(nk^2), rather than O(n^{2 + \eps}) for a full system solve.
+        If M = \Phi U + \Pi_\bot where Phi is low rank (k << n) and \Pi_\bot is projection onto the nullspace of \Phi^\top, 
+        then each iteration only costs O(nk^2), rather than O(n^{2 + \eps}) for a full system solve.
 
         This is a straight-forward implementation of Figure 2
         """
@@ -89,36 +94,39 @@ class ProjectiveIPIterator(LCPIterator):
                 [-M,I,Z],\
                 [-I,I,Phi]])
             print 'NewtonSystem: '
-            print '\tShape:',NewtonSystem.shape 
-            print '\tCond: {0:.3g}'.format(np.linalg.cond(NewtonSystem.todense()))           
+            print '\tShape:',NewtonSystem.shape
+            cond = np.linalg.cond(NewtonSystem.todense())
+            print '\tCond: {0:.3g}'.format(cond)         
             # Eliminate the x block
             ReductedNewtonSystem = sps.bmat([[X+Y,Y.dot(Phi)],\
                 [I - M, -M.dot(Phi)]])
                 
             print 'ReductedNewtonSystem: '
-            print '\tShape:',ReductedNewtonSystem.shape 
-            print '\tCond: {0:.3g}'.format(np.linalg.cond(ReductedNewtonSystem.todense()))      
+            print '\tShape:',ReductedNewtonSystem.shape
+            cond = np.linalg.cond(ReductedNewtonSystem.todense())
+            print '\tCond: {0:.3g}'.format(cond)      
             
         # Eliminate both the x and y blocks
         inv_XY = sps.diags(1.0/(x + y),0)
-        A = PtPU_P.dot(inv_XY)
+        A = (PtPU_P.dot(inv_XY))
         assert((k,N) == A.shape)        
-        G = ((A.dot(Y)).dot(Phi) - PtPUP).todense()
+        G = ((A.dot(Y)).dot(Phi) - PtPUP)
+
+        G_sparse = float(G.nnz) / float(np.prod(G.shape))
+        print 'G sparsity', G_sparse
+        assert(G_sparse < 0.1)
+        # If this gets violated, we should probably have some code
+        # that switches G to being dense
         
-        #print 'Reduced Newton system: '
-        #print '\tShape:',G.shape 
-        #print '\tCond: {0:.3g}'.format(np.linalg.cond(G))
-        
+       
         assert((k,k) == G.shape)
         h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
         assert((k,) == h.shape)
-        
-        
             
         # Step 5: Solve for del_w
         # G is essentially dense
         #del_w = np.linalg.lstsq(G,h)[0]
-        del_w = np.linalg.solve(G,h)
+        del_w = sps.linalg.spsolve(G,h)
         assert((k,) == del_w.shape)
             
             # Step 6
@@ -132,21 +140,13 @@ class ProjectiveIPIterator(LCPIterator):
         assert((N,) == del_x.shape)
         
             
-            # Step 8 Step length
+        # Step 8 Step length
         steplen = max(np.amax(-del_x/x),np.amax(-del_y/y))
         if steplen <= 0:
             steplen = float('inf')
         else:
             steplen = 1.0 / steplen
         steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
-
-        #steplen = 1
-        #x_cand = x + steplen*del_x
-        #y_cand = y + steplen*del_y    
-        #while np.any(x_cand < 0) or np.any(y_cand < 0):
-        #    steplen *= 0.99
-        #    x_cand = x + steplen*del_x
-        #    y_cand = y + steplen*del_y
             
         # Sigma is beta in Geoff's code
         if(steplen > 0.95):
@@ -154,12 +154,16 @@ class ProjectiveIPIterator(LCPIterator):
         else:
             sigma = 0.5 # Short step
 
+        # Update point and fields
         self.steplen = steplen
         self.centering_coeff = sigma
               
         self.x = x + steplen * del_x
         self.y = y + steplen * del_y
         self.w = w + steplen * del_w
+        self.dir_x = del_x
+        self.dir_y = del_y
+        self.dir_w = del_w
         self.iteration += 1
 
     def get_primal_vector(self):
@@ -168,3 +172,5 @@ class ProjectiveIPIterator(LCPIterator):
         return self.y
     def get_iteration(self):
         return self.iteration
+    def get_step_len(self):
+        return self.steplen

@@ -23,7 +23,7 @@ class ProjectiveBasicConfig(config.SolverConfig):
 
         # This is the basic part of the basis generation
         # It's wrapped by BasisGenerator
-        params['basic_basis_generator'] = bases.IdentityBasis()
+        params['basic_basis_generator'] = bases.RadialBasis()
         self.params = params
 
     def configure_solver_generator(self):

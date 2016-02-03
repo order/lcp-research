@@ -14,8 +14,9 @@ def lsmr_matrix(A,B,**kwargs):
     X = np.empty((k,M)) # Allocate the X matrix (dense)
     
     for i in xrange(M):
-        ret = sps.linalg.lsmr(A,B[:,i],**kwargs)
-        assert((k,) = ret[0].shape)
+        b = B[:,i].toarray()
+        ret = sps.linalg.lsmr(A,b,**kwargs)
+        assert((k,) == ret[0].shape)
         X[:,i] = ret[0]
 
     return X

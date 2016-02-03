@@ -86,11 +86,11 @@ class LCPIterator(Iterator):
         raise NotImplementedError()
 
 class IPIterator(Iterator):
-    def get_step_len():
+    def get_step_len(self):
         raise NotImplementedError()
-    def get_dir():
+    def get_dir(self):
         raise NotImplementedError()
-    def get_newton_system():
+    def get_newton_system(self):
         raise NotImplementedError()
         
 class MDPIterator(Iterator):

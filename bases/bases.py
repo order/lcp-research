@@ -56,13 +56,13 @@ class BasisGenerator(object):
         # Make sure any NaN row that wasn't remapped is special
         nan_mask = np.any(np.isnan(points),axis=1)
         assert((N,) == nan_mask.shape)
-        nan_set = set(nan_mask.nonzero()[0])            
+        nan_set = set(nan_mask.nonzero()[0])
         assert(nan_set <= sp_set)
         # All non-phyiscal states should be special
            
         # Generate all the bases, reserving bases for the special 
-        B = self.generator_function\
-                .generate(points,special_points=special_points)
+        B = self.basic_generator\
+                .generate_basis(points,special_points=special_points)
                 
         (M,K) = B.shape
         assert(N == M)
@@ -109,9 +109,9 @@ class IdentityBasis(BasicBasisGenerator):
         pass
     def generate_basis(self,points,**kwargs):
         # Parse kwargs
-        parser = KwargParser()
+        parser = utils.parsers.KwargParser()
         parser.add('special_points',[])
-        args = parser.parser(kwargs)
+        args = parser.parse(kwargs)
         special_points = args['special_points'] 
         (N,D) = points.shape
 

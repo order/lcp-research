@@ -26,6 +26,14 @@ class MDPDiscretizer(mdp.MDPBuilder):
         np.prod(self.get_basic_lengths())
         """
         raise NotImplementedError()
+
+    def get_special_node_indices(self):
+        """
+        Return the indices of any `special' or non-physical nodes
+        Typically the physical nodes are [0,N], and all the non-physical
+        Nodes follow.
+        """
+        raise NotImplementedError()        
     
     def get_actions(self):
         """
@@ -134,7 +142,7 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         """
         Returns a np.array containing all the node states
         
-        Exception nodes are assumed to be NaN
+        Special nodes are NaN
         """
         states = self.basic_mapper.get_node_states()
 
@@ -145,8 +153,21 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         num_nan_states = self.get_num_nodes() - N
         nans = np.NaN * np.ones((num_nan_states,D))        
         return np.vstack([states,nans])
+
+    def get_special_node_indices(self):
+        """
+        Return the indices of the special nodes
+        """
+        N = self.basic_mapper.get_num_nodes()
+        count = 0
+        for mapper in self.exception_node_mappers:
+            count += mapper.get_num_nodes()
+        return range(N,N+count)
         
     def get_num_nodes(self):
+        """
+        Count of nodes, including basic and special nodes
+        """
         count = self.basic_mapper.get_num_nodes()
         for mapper in self.exception_node_mappers:
             count += mapper.get_num_nodes()
