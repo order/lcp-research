@@ -1,1 +1,8 @@
-python analyze.py data/test.npz config/plotter/pcolor_movie.py data/test.avi primal to2dframes x[:,0,:,:]
+# Movie of 2D primal value
+python analyze.py data/test.npz config/plotter/pcolor_movie.py data/test.avi 2d_value_movie
+
+# Movie of 2D primal aggregate flow
+python analyze.py data/test.npz config/plotter/pcolor_movie.py data/test.avi 
+
+# Movie of 2D primal advantage
+python analyze.py data/test.npz config/plotter/pcolor_movie.py data/test.avi 2d_adv_movie

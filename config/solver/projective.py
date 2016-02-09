@@ -1,5 +1,6 @@
 import config
 import solvers
+import bases
 import bases.rbf as rbf
 import config.solver.gens.projective_gen as gen
 import numpy as np
@@ -25,13 +26,21 @@ class ProjectiveBasicConfig(config.SolverConfig):
         # This is the basic part of the basis generation
         # It's wrapped by BasisGenerator
         K = 9
-        [X,V] = np.meshgrid(np.linspace(-5,5,1),np.linspace(-6,6,1))
+        [X,V] = np.meshgrid(np.linspace(-5,5,3),np.linspace(-6,6,3))
         centers = np.column_stack([X.flatten(),V.flatten()])
-        centers = np.array([[0,0]])
 
-        basic_gen =  rbf.RadialBasis(centers=centers,
-                                     covariance=np.array([[1,-0.5],[-0.5,1]]))
-        params['basic_basis_generator'] = basic_gen
+        Zero = rbf.RadialBasis(centers=np.array([[0,0]]),
+                               covariance=0.1*np.eye(2))
+        One = bases.ConstBasis()
+        RBFs = rbf.RadialBasis(centers=centers,
+                               covariance=np.array([[1,-0.5],
+                                                    [-0.5,1]]))
+        SkewRBFs = rbf.RadialBasis(centers=centers,
+                               covariance=np.array([[1,-0.9],
+                                                    [-0.9,1]]))
+        generator = bases.BasisGenerator([Zero,One,RBFs])
+        
+        params['basis_generator'] = generator
         self.params = params
 
     def configure_solver_generator(self):

@@ -20,7 +20,7 @@ class To2DFramesProcessor(config.Processor):
         A = inst_builder.get_num_actions()
         n = inst_builder.get_num_nodes()
         assert(N == (A+1)*n)
-        
+ 
         (x,y) = inst_builder.get_basic_lengths()
         assert(n >= x*y)
         

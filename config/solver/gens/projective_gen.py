@@ -25,7 +25,7 @@ class ProjectiveGenerator(config.SolverGenerator):
         parser.add('termination_conditions')
         parser.add('recorders')
         parser.add_optional('notifications')
-        parser.add('basic_basis_generator')
+        parser.add('basis_generator')
         args = parser.parse(kwargs)
 
         # Dump into self namespace
@@ -43,26 +43,22 @@ class ProjectiveGenerator(config.SolverGenerator):
         # Actual basis generator wraps the
         # basic basis generator
         # (Which doesn't deal with non-phyiscal states)
-        basis_generator = bases.BasisGenerator(self.basic_basis_generator)
-
         points = discretizer.get_node_states()
         special_points = discretizer.get_special_node_indices()
 
-        Phi = basis_generator.generate_basis(points,
-                                             special_points=special_points)
+        BG = self.basis_generator
+        Phi = BG.generate_basis(points,
+                                special_points=special_points)
 
         (d,k) = Phi.shape
         assert(d == n)
         assert(k <= n)
         K = (A+1)*k
 
-        if self.basic_basis_generator.isortho():
-            Q = Phi
-        else:
-            #Orthogonalize using QR decomposition
-            [Q,R] = sp.linalg.qr(Phi,mode='economic')
-            assert(Q.shape == Phi.shape)
-
+        #Orthogonalize using QR decomposition
+        #[Q,R] = sp.linalg.qr(Phi,mode='economic')
+        #assert(Q.shape == Phi.shape)
+        Q = Phi
 
         # Find the in-basis approximations for E = I - gamma* P
         # Done with least-squares:

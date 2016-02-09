@@ -127,4 +127,17 @@ def basic_residual(x,w):
 def fb_residual(x,w):
     fb = np.sqrt(x**2 + w**2) - x - w
     return np.linalg.norm(fb)
-    
+
+
+def make_points(*gens):
+    """
+    Makes the mesh in the order you would expect for
+    np.reshape after.
+
+    E.g. if handed [np.linspace(0,1,5),np.linspace(0,1,7)]
+    then this would make the points P such that if mapped
+    the 2D plot makes spacial sense. So np.reshape(np.sum(P),(5,7))
+    would look pretty and not jumpy
+    """
+    meshes = np.meshgrid(*gens,indexing='ij')
+    return np.column_stack([M.flatten() for M in meshes])

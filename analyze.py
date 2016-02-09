@@ -9,6 +9,11 @@ import pickle
 import types
 import os
 
+ProcessorShortcuts = {'2d_value_movie':['primal','to2dframes', 'x[:,0,:,:]'],
+                      '2d_flow_movie':['primal','to2dframes', 'np.sum(x[:,1:,:,:],axis=1)'],
+                      '2d_adv_movie':['primal','to2dframes', 'advantage']    
+}
+
 def read_pickle(filename):
     """
     Read in information from a pickle file
@@ -70,9 +75,19 @@ if __name__ == '__main__':
     params = read_pickle(pickle_file)
 
     # Process the data
-    for (i,command) in enumerate(processing_commands):
-        print 'Command {0}: {1}'.format(i,command)
-        data = apply_processor(command,data,params)
+    iter_count = 0
+    while len(processing_commands) > 0:
+        iter_count += 1
+        assert(iter_count < 50) # Inf loop check.
+        
+        command = processing_commands.pop(0)
+        print 'Command',command
+        if command in ProcessorShortcuts:
+            # Expand the shortcut
+            processing_commands = ProcessorShortcuts[command] + processing_commands
+        else:
+            # Apply the processor and continue
+            data = apply_processor(command,data,params)
 
     # Display it
     plotter = utils.get_instance_from_file(plotter_file)

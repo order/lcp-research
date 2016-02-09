@@ -24,13 +24,13 @@ class BasisGenerator(object):
     Elementary vector associated with it because it is 
     sufficiently different
     """
-    def __init__(self,gen_obj):
+    def __init__(self,gen_objs):
         """
         The generator function is a the object that does the actual
         generation of the basis; this object just does some 
         bookkeeping
         """
-        self.basic_generator = gen_obj
+        self.basic_generators = gen_objs
 
 
     def generate_basis(self, points,**kwargs):
@@ -60,12 +60,12 @@ class BasisGenerator(object):
         assert(nan_set <= sp_set)
         # All non-phyiscal states should be special
            
-        # Generate all the bases, reserving bases for the special 
-        B = self.basic_generator\
-                .generate_basis(points,special_points=special_points)
-
-        # Add constant column
-        B = np.hstack([1.0 / np.sqrt(N) * np.ones((N,1)), B])
+        # Generate all the bases, reserving bases for the special
+        Bases = []
+        for gen in self.basic_generators:
+            Bases.append(gen.generate_basis(points,special_points=special_points))
+            
+        B = np.hstack(Bases)
                 
         (M,K) = B.shape
         assert(N == M)
@@ -75,26 +75,12 @@ class BasisGenerator(object):
             B[special_points,:] = 0 # Blot all special points out
             B = np.hstack([B,np.zeros((N,S))])        
             B[special_points,K:] = np.eye(S)
+
+        (M,K) = B.shape
+        assert(K <= M) # Shouldn't be a frame.
             
         #B = normalize_cols(B)
         return B
-
-    def generate_block_diag(self,points,R,**kwargs):
-        """
-        Builds a block diagonal matrix where each block is one of 
-        R identical copies of a K-column basis matrix defined by 
-        the (N,d) point array, and the generator function.
-        """
-        
-        (N,d) = points.shape
-        B = self.generate(points,**kwargs)
-        (M,K) = B.shape
-        assert(N == M)
-        
-        RepB = [B]*R
-        BDB = scipy.linalg.block_diag(*RepB)
-        assert((N*R,K*R) == BDB.shape)
-        return BDB
 
 class BasicBasisGenerator(object):
     """
@@ -109,11 +95,16 @@ class BasicBasisGenerator(object):
     def generate_basis(self,points,**kwargs):
         raise NotImplementedError()
 
+class ConstBasis(BasicBasisGenerator):
+    def __init__(self):
+        pass
+    def generate_basis(self,points,**kwargs):
+        (N,d) = points.shape
+        return np.ones((N,1)) / np.sqrt(N)
+
 class IdentityBasis(BasicBasisGenerator):
     def __init__(self):
         pass
-    def isortho(self):
-        return True
     def generate_basis(self,points,**kwargs):
         # Parse kwargs
         parser = utils.parsers.KwargParser()

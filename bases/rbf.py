@@ -33,9 +33,6 @@ class RadialBasis(bases.BasicBasisGenerator):
         
         self.__dict__.update(args)
         
-    def isortho(self):
-        return False
-        
     def generate_basis(self,points,**kwargs):
         # Parse kwargs
         parser = KwargParser()
