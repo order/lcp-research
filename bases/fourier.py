@@ -1,25 +1,31 @@
 import numpy as np
 import bases
 
-class RandomFourierBasis(bases.BasicBasisGenerator):
+class FourierBasis(bases.BasicBasisGenerator):
     def __init__(self,**kwargs):
-        self.scale = kwargs.get('scale',1.0)
-        self.K = kwargs['num_basis']
-        assert(self.K >=1)
+        parser = KwargParser()
+        parser.add('scale')
+        parser.add('num_basis')
+        args = parser.parse(kwargs)
         
-    def generate(self,points,**kwargs):
-        K = self.K
+        self.__dict__.update(args)
+
+    def isortho(self):
+        return False
+        
+    def generate_basis(self,points,**kwargs):
+        # Parse kwargs
+        parser = KwargParser()
+        parser.add('special_points',[])
+        args = parser.parse(kwargs)
+        special_points = args['special_points']
+        
         (N,D) = points.shape
-        special_points = kwargs.get('special_points',[])
-
-        W = self.scale * np.random.randn(D,K-1) # Weights
-        Phi = 2.0 * np.pi * np.random.rand(K-1) # Phases shift
-        F = np.sin(points.dot(W) + Phi) # Non-constant columns
-        assert((N,K-1) == F.shape)
-
-        # Format: B = [1 | fourier columns]        
-        B = np.hstack([1/np.sqrt(N)*np.ones((N,1)),
-                       np.sqrt(2.0 / float(N)) * F])
+        K = self.num_basis
+        
+        W = self.scale * np.random.randn(D,K) # Weights
+        Phi = 2.0 * np.pi * np.random.rand(K) # Phases shift
+        B = np.sqrt(2.0 / float(N)) * np.sin(points.dot(W) + Phi)
         assert((N,K) == B.shape)
 
         # Zero out any special points

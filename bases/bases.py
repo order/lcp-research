@@ -63,6 +63,9 @@ class BasisGenerator(object):
         # Generate all the bases, reserving bases for the special 
         B = self.basic_generator\
                 .generate_basis(points,special_points=special_points)
+
+        # Add constant column
+        B = np.hstack([1.0 / np.sqrt(N) * np.ones((N,1)), B])
                 
         (M,K) = B.shape
         assert(N == M)
