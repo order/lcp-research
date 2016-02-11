@@ -22,11 +22,14 @@ ProcessorShortcuts = {'2d_value_movie':['primal',
                                          'toframes',
                                          'policy'],
                       '1d_final_value':['primal',
+                                        'final',
                                         'toframes',
                                         'x[-1,0,:]'],
                       '1d_final_flows':['primal',
+                                        'final',
                                         'toframes',
-                                        'x[-1,1:,:].T']
+                                        'x[-1,1:,:].T'],
+                      'final':['(x[-1,:])[np.newaxis,:]']
                       
 }
 

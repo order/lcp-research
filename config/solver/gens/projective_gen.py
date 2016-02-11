@@ -50,7 +50,6 @@ class ProjectiveGenerator(config.SolverGenerator):
         A = mdp_obj.num_actions
         n = mdp_obj.num_states
         N = (A+1)*n
-        (xn,yn) = discretizer.get_basic_lengths()
         gamma = mdp_obj.discount
 
         # Actual basis generator wraps the
