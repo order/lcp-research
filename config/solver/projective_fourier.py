@@ -12,7 +12,7 @@ class ProjectiveBasicConfig(config.SolverConfig):
         params['flow_regularization'] = 1e-15
 
         term_conds = {'max_iter':solvers.MaxIterTerminationCondition(1000),
-                      'primal':solvers.PrimalChangeTerminationCondition(1e-8)}
+                      'primal':solvers.PrimalChangeTerminationCondition(1e-12)}
         recorders = {'primal':solvers.PrimalRecorder(),
                      'dual':solvers.DualRecorder(),
                      'steplen':solvers.StepLenRecorder()}
@@ -23,21 +23,21 @@ class ProjectiveBasicConfig(config.SolverConfig):
         params['recorders'] = recorders
         params['notifications'] = notify
 
+        # Experimental parameter
+        params['x_dual_bases'] = False
+
         # This is the basic part of the basis generation
         # It's wrapped by BasisGenerator
-        K = 9
-        [X,V] = np.meshgrid(np.linspace(-5,5,3),np.linspace(-6,6,3))
+        
+        [X,V] = np.meshgrid(np.linspace(-5,5,5),np.linspace(-6,6,5))
         centers = np.column_stack([X.flatten(),V.flatten()])
 
         Zero = rbf.RadialBasis(centers=np.array([[0,0]]),
-                               covariance=0.1*np.eye(2))
+                               covariance=0.01*np.eye(2))
         One = bases.ConstBasis()
         RBFs = rbf.RadialBasis(centers=centers,
                                covariance=np.array([[1,-0.5],
                                                     [-0.5,1]]))
-        SkewRBFs = rbf.RadialBasis(centers=centers,
-                               covariance=np.array([[1,-0.9],
-                                                    [-0.9,1]]))
         generator = bases.BasisGenerator([Zero,One,RBFs])
         
         params['basis_generator'] = generator

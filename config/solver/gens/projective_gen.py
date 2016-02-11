@@ -1,4 +1,3 @@
-from utils.parsers import KwargParser
 
 import solvers
 from solvers.projective import ProjectiveIPIterator
@@ -9,19 +8,32 @@ import config
 import bases
 import linalg
 import lcp
+import utils
+from utils.parsers import KwargParser
 
 import numpy as np
 import scipy as sp
 import scipy.sparse as sps
+import matplotlib.pyplot as plt
 
 import time
 
+def visualize_bases(Q,U,x,y,K):
+    xy = x*y
+    utils.banner('Visualizing bases')
+    for i in xrange(K):
+        f,(ax1,ax2) = plt.subplots(1,2)
+        ax1.pcolor(np.reshape(Q[:xy,i],(x,y)))
+        ax2.pcolor(np.reshape(U.T[:xy,i],(x,y)))
+        plt.show()
+                    
 class ProjectiveGenerator(config.SolverGenerator):
     def __init__(self,**kwargs):
         # Parsing
         parser = KwargParser()
         parser.add('value_regularization',1e-12)
         parser.add('flow_regularization',1e-12)
+        parser.add('x_dual_bases',False)
         parser.add('termination_conditions')
         parser.add('recorders')
         parser.add_optional('notifications')
@@ -38,6 +50,7 @@ class ProjectiveGenerator(config.SolverGenerator):
         A = mdp_obj.num_actions
         n = mdp_obj.num_states
         N = (A+1)*n
+        (xn,yn) = discretizer.get_basic_lengths()
         gamma = mdp_obj.discount
 
         # Actual basis generator wraps the
@@ -67,17 +80,32 @@ class ProjectiveGenerator(config.SolverGenerator):
         
         BigU_blocks = [[None]]
         flow_reg = self.flow_regularization
+        Uts = []
         for a in xrange(A):
             P = mdp_obj.transitions[a]
             E = sps.eye(n) - gamma * P
             U = linalg.lsmr_matrix(Q,E)
-            W = linalg.lsmr_matrix(Q,E.T)
             assert((k,n) == U.shape)
-            assert((k,n) == W.shape)
+
+            if not self.x_dual_bases:
+                W = linalg.lsmr_matrix(Q,E.T)
+                assert((k,n) == W.shape)
+
+            #visualize_bases(Q,U,xn,yn,k)
 
             BigU_blocks[0].append(U) # [0, U1, U2,...]
-            BigU_blocks.append([-W] + [None]*a + [flow_reg * Phi.T] +  [None]*(A-a-1))
-            # [-W, 0,...,flow_reg*Phi.T,0...]
+            if self.x_dual_bases:
+                Uts.append(U.T)
+                BigU_blocks.append([-Phi.T]\
+                                   + [None]*a\
+                                   + [flow_reg * U]\
+                                   + [None]*(A-a-1))
+            else:
+                BigU_blocks.append([-W]\
+                                   + [None]*a\
+                                   + [flow_reg * Phi.T]\
+                                   + [None]*(A-a-1))
+                # [-W, 0,...,flow_reg*Phi.T,0...]
 
         # Build the q vector
         q = np.hstack([-mdp_obj.state_weights]+ mdp_obj.costs)
@@ -88,7 +116,10 @@ class ProjectiveGenerator(config.SolverGenerator):
         # 0   Phi ... 0
         #     ...
         # 0   ...     Phi
-        BigQ = sps.block_diag([Q]*(A+1))
+        if self.x_dual_bases:
+            BigQ = sps.block_diag([Q] + Uts)
+        else:
+            BigQ = sps.block_diag([Q]*(A+1))
         assert((N,K) == BigQ.shape)
 
         # Construct the block coefficients:

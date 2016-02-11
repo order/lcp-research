@@ -9,9 +9,18 @@ import pickle
 import types
 import os
 
-ProcessorShortcuts = {'2d_value_movie':['primal','to2dframes', 'x[:,0,:,:]'],
-                      '2d_flow_movie':['primal','to2dframes', 'np.sum(x[:,1:,:,:],axis=1)'],
-                      '2d_adv_movie':['primal','to2dframes', 'advantage']    
+ProcessorShortcuts = {'2d_value_movie':['primal',
+                                        'to2dframes',
+                                        'x[:,0,:,:]'],
+                      '2d_flow_movie':['primal',
+                                       'to2dframes',
+                                       'np.sum(x[:,1:,:,:],axis=1)'],
+                      '2d_adv_movie':['primal',
+                                      'to2dframes',
+                                      'advantage'],
+                      '2d_policy_movie':['primal',
+                                         'to2dframes',
+                                         'policy']
 }
 
 def read_pickle(filename):

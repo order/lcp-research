@@ -11,6 +11,27 @@ import matplotlib.pyplot as plt
 
 import importlib
 
+def banner(msg):
+    # Introspect
+    f = inspect.currentframe().f_back
+    mod_str = f.f_code.co_filename
+    mods = mod_str.split(os.sep)
+    mod = os.sep.join(['...'] + mods[-2:]) # Use last 2 path elems
+    lineno = f.f_lineno
+    loc_msg = 'From: {0}:{1}'.format(mod,lineno)
+
+    # Pad
+    N = max(len(loc_msg), len(msg))
+    msg += ' '*(N - len(msg))
+    loc_msg += ' '*(N - len(loc_msg))
+    assert(len(msg) == len(loc_msg))
+    
+    # Print
+    print '#'*(N+4)
+    print '# ' + msg + ' #'
+    print '# ' + loc_msg + ' #'
+    print '#'*(N+4)
+
 def get_instance_from_file(conf_file):
     """
     Loads a class from file string
