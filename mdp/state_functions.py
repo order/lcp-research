@@ -114,8 +114,6 @@ class BallSetFn(StateSpaceFunction):
         self.radius = radius
         self.in_cost = 0.0
         self.out_cost = 1.0
-
-        assert(1 == len(center.shape))
     
     def eval(self,points,**kwargs):
         parser = KwargParser()
@@ -125,9 +123,11 @@ class BallSetFn(StateSpaceFunction):
         (N,d) = points.shape
         nan_mask = ~np.any(np.isnan(points),axis = 1)
         assert((N,) == nan_mask.shape)
+        n = nan_mask.sum()
 
         inbound = np.zeros(N,dtype=bool)
         r = np.linalg.norm(points[nan_mask,:] - self.center,axis=1)
+        assert((n,) == r.shape)
         inbound[nan_mask] = (r <= self.radius)
         
         costs = np.empty(points.shape[0])

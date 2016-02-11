@@ -10,17 +10,24 @@ import types
 import os
 
 ProcessorShortcuts = {'2d_value_movie':['primal',
-                                        'to2dframes',
+                                        'toframes',
                                         'x[:,0,:,:]'],
                       '2d_flow_movie':['primal',
-                                       'to2dframes',
+                                       'toframes',
                                        'np.sum(x[:,1:,:,:],axis=1)'],
                       '2d_adv_movie':['primal',
-                                      'to2dframes',
+                                      'toframes',
                                       'advantage'],
                       '2d_policy_movie':['primal',
-                                         'to2dframes',
-                                         'policy']
+                                         'toframes',
+                                         'policy'],
+                      '1d_final_value':['primal',
+                                        'toframes',
+                                        'x[-1,0,:]'],
+                      '1d_final_flows':['primal',
+                                        'toframes',
+                                        'x[-1,1:,:].T']
+                      
 }
 
 def read_pickle(filename):

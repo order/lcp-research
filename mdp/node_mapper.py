@@ -4,6 +4,8 @@ import itertools
 import operator
 import bisect
 
+import utils
+
 from collections import defaultdict
 
 class NodeMapper(object):
@@ -291,12 +293,13 @@ class PiecewiseConstRegularGridNodeMapper(BasicNodeMapper):
         
     def get_node_states(self):
         # Build the D different uniformly spaced ranges
-        linspaces = [np.linspace(low,high,n+1)[:-1] for (low,high,n) in self.grid_desc]
+        linspaces = [np.linspace(lo,hi,n+1)[:-1]\
+                     for (lo,hi,n) in self.grid_desc]
+        
         # Turn these into a mesh
-        meshes = np.meshgrid(*linspaces,indexing='ij')
-        # Flatten each into a vector; concat; transpose
-        node_states = np.column_stack(map(lambda x: x.ravel(),meshes))  
-        shift = [(high - low) / float(2.0 * (n)) for (low,high,n) in self.grid_desc]
+        node_states = utils.make_points(*linspaces)
+        shift = [(hi - lo) / (2.0 * (n))\
+                 for (lo,hi,n) in self.grid_desc]
         return node_states + shift
         
     def get_dimension(self):
@@ -490,10 +493,7 @@ class InterpolatedRegularGridNodeMapper(InterpolatedGridNodeMapper):
         Cache is an N x D matrix, so lookup is just 
         """
         # Turn grids into meshes
-        meshes = np.meshgrid(*self.cut_points,indexing='ij')        
-        
-        # Flatten each into a vector;
-        self.node_states_cache = np.column_stack([mesh.ravel() for mesh in meshes]) 
+        self.node_states_cache = utils.make_points(*self.cut_points) 
 
     def get_node_states(self):
         if not np.any(self.node_states_cache):

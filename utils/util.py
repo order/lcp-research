@@ -12,6 +12,13 @@ import matplotlib.pyplot as plt
 import importlib
 
 def banner(msg):
+    """
+    Take a look at banner!
+
+    Loudly announces something, and provide limited introspection
+    about what requested the banner.
+    """
+    
     # Introspect
     f = inspect.currentframe().f_back
     mod_str = f.f_code.co_filename
@@ -160,5 +167,8 @@ def make_points(*gens):
     the 2D plot makes spacial sense. So np.reshape(np.sum(P),(5,7))
     would look pretty and not jumpy
     """
+    if 1 == len(gens):
+        return gens[0][:,np.newaxis] # meshgrid needs 2 args
+    
     meshes = np.meshgrid(*gens,indexing='ij')
     return np.column_stack([M.flatten() for M in meshes])

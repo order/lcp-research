@@ -1,28 +1,32 @@
 from parsers import KwargParser
 import numpy as np
 
-def split_into_frames(Data,A,n,x,y):
+def split_into_frames(Data,A,n,lens):
     """
-    Take a I x N matrix where the columns are either
+    Take a (I,N) matrix where the columns are either
     primal or dual block-structured vectors from an 
     LCP'd MDP. The MDP should be based on 2 continuous
     dimensions (e.g. the double integrator)
 
-    Convert into an I x (A+1) x X x Y rank-4 tensor where
-    T[i,a,:,:] is a 2D image.
+    Convert into an (I,(A+1),X1,X2,...) tensor
     """
     (I,N) = Data.shape
     assert(N == (A+1)*n)
-    assert(x*y <= n )
+    xyz = np.prod(lens)
+    assert(xyz <= n )
 
-    # Reshape into I x n x (A+1)
+    # Reshape into I, n, (A+1)
     Frames = np.reshape(Data,(I,n,(A+1)),order='F')
+    
     # Crop out non-physical states
-    Frames = Frames[:,:(x*y),:]
-    # Reshape into  I x X x Y x (A+1)
-    Frames = np.reshape(Frames,(I,x,y,(A+1)),order='C')
+    Frames = Frames[:,:xyz,:]
+    
+    # Reshape into  I, X1, X2, X3, (A+1)
+    dims = [I] + lens+ [A+1]
+    Frames = np.reshape(Frames,dims,order='C')
+    
     # Swap axes to be I x (A+1) x Y x X
-    Frames = np.swapaxes(Frames,1,3)
+    Frames = np.rollaxis(Frames,-1,1)
     return Frames
 
 def final_frame(data,params,**kwargs):

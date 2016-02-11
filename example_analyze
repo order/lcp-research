@@ -1,3 +1,6 @@
+# Final 1D value
+python analyze.py data/test.npz config/plotter/plot.py data/test.png 1d_final_value
+
 # Movie of 2D primal value
 python analyze.py data/test.npz config/plotter/pcolor_movie.py data/test.avi 2d_value_movie
 
