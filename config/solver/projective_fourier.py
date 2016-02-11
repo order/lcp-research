@@ -1,7 +1,10 @@
 import config
 import solvers
+
 import bases
+import bases.fourier as fourier
 import bases.rbf as rbf
+
 import config.solver.gens.projective_gen as gen
 import numpy as np
 
@@ -24,7 +27,7 @@ class ProjectiveBasicConfig(config.SolverConfig):
         params['notifications'] = notify
 
         # Experimental parameter
-        params['x_dual_bases'] = False
+        params['x_dual_bases'] = True
 
         # This is the basic part of the basis generation
         # It's wrapped by BasisGenerator
@@ -35,10 +38,19 @@ class ProjectiveBasicConfig(config.SolverConfig):
         Zero = rbf.RadialBasis(centers=np.array([[0,0]]),
                                covariance=0.01*np.eye(2))
         One = bases.ConstBasis()
-        RBFs = rbf.RadialBasis(centers=centers,
-                               covariance=np.array([[1,-0.5],
-                                                    [-0.5,1]]))
-        generator = bases.BasisGenerator([Zero,One,RBFs])
+
+        random = False
+        if random:
+            Fourier = fourier.RandomFourierBasis(scale=1.0,
+                                                 num_basis=5,
+                                                 dim=2)
+        else:
+            (W,Phi) = fourier.make_regular_frequencies(3,3)
+
+            Fourier = fourier.FourierBasis(frequencies=W,
+                                           shifts=Phi)
+            
+        generator = bases.BasisGenerator([Zero,One,Fourier])
         
         params['basis_generator'] = generator
         self.params = params
