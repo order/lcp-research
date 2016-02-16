@@ -18,9 +18,12 @@ class DoubleIntegratorRemapper(StateRemapper):
         
         assert('action' in kwargs)
         u = kwargs['action']
+        u = u.flatten()
+        assert((N,) == u.shape)
+
         
         x_next = points[:,0] + self.step * points[:,1]
-        v_next = points[:,1] + self.step * u
+        v_next = 0.99 * points[:,1] + self.step * u
         assert((N,) == x_next.shape)
         assert((N,) == v_next.shape)
         

@@ -92,8 +92,12 @@ class MDPProblem(object):
         """
         Check if points are out of bounds for the rectangular boundary
         """
-        L = np.array([low for (low, high) in self.boundary])
-        U = np.array([high for (low,high) in self.boundary])
+        L = np.array([low for (low, high) in self.boundary],dtype=float)
+        U = np.array([high for (low,high) in self.boundary],dtype=float)
+        assert(not np.any(np.isnan(L)))
+        assert(not np.any(np.isnan(U)))
 
-        return np.any(points < L,axis=1) + np.any(points > U,axis=1)
+        lower = np.any(points < L,axis=1)
+        upper = np.any(points > U,axis=1)
+        return np.logical_or(lower,upper)
 

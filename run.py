@@ -17,7 +17,7 @@ def get_instance_builder(inst_conf_file):
     instance_config = utils.get_instance_from_file(inst_conf_file)    
     assert(issubclass(type(instance_config),
                       config.InstanceConfig))
-    return instance_config.configure_instance_builder()  
+    return instance_config.configure_object_builder()  
 
 def get_solver_generator(solver_conf_file):
     """

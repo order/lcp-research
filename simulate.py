@@ -1,5 +1,8 @@
 import numpy as np
-from config.instance.double_integrator import DoubleIntegratorConfig as inst_conf
+import matplotlib.pyplot as plt
+
+from config.instance.double_integrator\
+    import DoubleIntegratorConfig as inst_conf
 from mdp.policy import ConstantPolicy
     
 class SimulationObject(object):
@@ -10,15 +13,16 @@ class SimulationObject(object):
 
     def next(self,x):
         (N,d) = x.shape
-        assert(not np.any(x == np.nan))
+        assert(not np.any(np.isnan(x)))
 
         # Get the actions
-        actions = self.policy.get_decisions(x)
-
+        #actions = self.policy.get_decisions(x)
+        actions = (-0.05*x[:,0])[:,np.newaxis]
+        
         # Run the physics
         x_next = self.problem.next_states(x,actions)
         assert(x.shape == x_next.shape)
-        assert(not np.any(x == np.nan))
+        assert(not np.any(np.isnan(x)))
         # NAN-out unfixed oobs
         
         oobs = self.problem.out_of_bounds(x_next)
@@ -43,17 +47,22 @@ def simulate(problem,R,I):
     costs = np.full((R,I),oob_cost) # Default to oob_cost
     states = np.full((R,I,D),np.nan) # Default to nan.
 
-    policy = ConstantPolicy(0 * np.ones(2))
+    policy = ConstantPolicy(0 * np.ones(1))
     sim_obj = SimulationObject(problem,policy)
     x = uniform(R,boundaries)
     in_bounds = np.ones(R,dtype=bool)
     for i in xrange(I):
-        (x,c,new_oob) = sim_obj.next(x[in_bounds,:])
+        (x,c,new_oob) = sim_obj.next(x)
+        assert(not np.any(np.isnan(c)))
 
+        assert(in_bounds.sum() == x.shape[0])
         states[in_bounds,i,:] = x
         costs[in_bounds,i] = c
 
-        in_bounds[in_bounds] = 1 - new_oob # Update what is `inbounds'
+        # Crop out terminated sequences
+ 
+        x = x[~new_oob,:]        
+        in_bounds[in_bounds] = ~new_oob # Update what is `inbounds'
 
 
     return (costs,states)
@@ -61,6 +70,7 @@ def simulate(problem,R,I):
 
 problem = inst_conf().configure_problem_instance()
 
-(costs,states) = simulate(problem,2,10)
-print states
-print costs
+(costs,states) = simulate(problem,100,250)
+
+plt.plot(states[:,:,0].T,states[:,:,1].T,'-b',alpha=0.25)
+plt.show()

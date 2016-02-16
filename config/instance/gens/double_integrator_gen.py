@@ -2,6 +2,7 @@ import numpy as np
 
 import mdp
 from config import ProblemGenerator,DiscretizerGenerator
+from mdp import InterpolatedRegularGridNodeMapper as IRGNMapper
 from mdp.problem import MDPProblem
 from mdp.double_integrator import DoubleIntegratorRemapper
 from utils.parsers import KwargParser
@@ -54,11 +55,11 @@ class DoubleIntegratorGenerator(ProblemGenerator,DiscretizerGenerator):
 
 
     def generate_discretizer(self):
-        if not hasattr(self,problem):
+        if not hasattr(self,'problem'):
             self.generate_problem()
         
-        basic_mapper = mdp.InterpolatedRegularGridNodeMapper(self.x_desc,
-                                                             self.v_desc)
+        basic_mapper = IRGNMapper(self.x_desc,
+                                  self.v_desc)
         actions = np.linspace(*self.a_desc)
 
         discretizer = mdp.ContinuousMDPDiscretizer(self.problem,
@@ -66,13 +67,15 @@ class DoubleIntegratorGenerator(ProblemGenerator,DiscretizerGenerator):
                                                    actions)
         xid = 0
         (x_lo,x_hi,x_n) = self.x_desc
+        nnodes = basic_mapper.num_nodes
 
         # (-inf,x_lo] out-of-bound node mapper
         left_oob_mapper = mdp.OOBSinkNodeMapper(xid,-float('inf'),
-                                                x_lo,basic_mapper.num_nodes)
+                                                x_lo,
+                                                nnodes)
         # [x_hi,inf) out-of-bound node mapper
         right_oob_mapper = mdp.OOBSinkNodeMapper(xid,x_hi,float('inf'),
-                                                 basic_mapper.num_nodes+1)
+                                                 nnodes+1)
         
         discretizer.add_node_mapper(left_oob_mapper)
         discretizer.add_node_mapper(right_oob_mapper)

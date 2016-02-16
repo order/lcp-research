@@ -270,7 +270,7 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         mdp_obj = mdp.MDP(transitions,
                           costs,
                           self.actions,
-                          self.discount,
+                          self.problem.discount,
                           weight,
                           name='MDP from Discretizer')
 
@@ -282,12 +282,12 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         """
 
         # Action should be a vector of approp. size
-        assert((self.action_dim,) == action.shape)
+        assert((self.problem.action_dim,) == action.shape)
         
         node_states = self.get_node_states()
 
         # Get costs of non-drain node states
-        costs = self.problem.costs.evaluate(node_states,
+        costs = self.problem.cost_obj.evaluate(node_states,
                                                action=action)
 
         # Size check
@@ -302,7 +302,7 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         node_states = self.get_node_states()
 
         # Get costs of non-drain node states
-        weight = self.weights.evaluate(node_states)
+        weight = self.problem.weight_obj.evaluate(node_states)
 
         # Size check
         assert((self.get_num_nodes(),) == weight.shape)
@@ -314,7 +314,7 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         Builds a transition matrix based on the physics and exceptions
         """
         assert(1 == len(action.shape)) # Should be a vector
-        assert(self.action_dim == action.size)
+        assert(self.problem.action_dim == action.size)
         
         total_nodes = self.get_num_nodes()
         basic_nodes = self.basic_mapper.get_num_nodes()
@@ -323,8 +323,9 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         # Get the node states, and then use physics to remap them
         node_states = self.basic_mapper.get_node_states()
         assert(2 == len(node_states.shape))
-        next_states = self.problem.remap(node_states,
-                                         action)
+        actions = np.tile(action,(basic_nodes,1))
+        next_states = self.problem.next_states(node_states,
+                                               actions)
         assert(node_states.shape == next_states.shape)
         
         # Then get the node mappings for all next states
