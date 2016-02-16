@@ -1,10 +1,18 @@
+import pickle
+
 import numpy as np
 import matplotlib.pyplot as plt
 
 from config.instance.double_integrator\
     import DoubleIntegratorConfig as inst_conf
-from mdp.policy import ConstantPolicy
-    
+
+from mdp.policy import ConstantPolicy, MinFunPolicy, MaxFunPolicy
+from mdp.state_functions import InterpolatedFunction
+from mdp.q_estimation import get_q_vectors
+
+import utils
+from utils.plotting import cdf_points
+
 class SimulationObject(object):
     def __init__(self,problem,policy):
         self.policy = policy
@@ -30,7 +38,7 @@ class SimulationObject(object):
         
         costs = self.cost_obj.evaluate(x_next) # Should have NAN handling
         
-        return (x_next,costs,oobs)       
+        return (x_next,costs,actions,oobs)       
 
 def uniform(N,boundaries):
     D = len(boundaries)
@@ -39,38 +47,125 @@ def uniform(N,boundaries):
         x[:,i] = np.random.uniform(low,high,N)
     return x 
 
-def simulate(problem,R,I):
+def simulate(problem,policy,R,I):
     D = problem.get_dimension()
+    aD = problem.action_dim
     boundaries = problem.get_boundary()
 
     oob_cost = problem.cost_obj.evaluate(np.full((1,D),np.nan))
     costs = np.full((R,I),oob_cost) # Default to oob_cost
     states = np.full((R,I,D),np.nan) # Default to nan.
+    actions = np.full((R,I,aD),np.nan) 
 
     policy = ConstantPolicy(0 * np.ones(1))
     sim_obj = SimulationObject(problem,policy)
     x = uniform(R,boundaries)
     in_bounds = np.ones(R,dtype=bool)
     for i in xrange(I):
-        (x,c,new_oob) = sim_obj.next(x)
+        (x,c,a,new_oob) = sim_obj.next(x)
         assert(not np.any(np.isnan(c)))
 
         assert(in_bounds.sum() == x.shape[0])
         states[in_bounds,i,:] = x
         costs[in_bounds,i] = c
+        actions[in_bounds,i,:] = a
 
         # Crop out terminated sequences
  
         x = x[~new_oob,:]        
         in_bounds[in_bounds] = ~new_oob # Update what is `inbounds'
 
+    return (states,costs,actions)
 
-    return (costs,states)
+###############
+# Entry point #
+###############
+if __name__ == '__main__':
+    data = np.load('data/test.npz')
+    params = pickle.load(open('data/test.pickle','rb'))
+    
+    discretizer = params['instance_builder']
+    problem = discretizer.problem
+    mdp_obj = params['objects']['mdp']
 
+    N = discretizer.get_num_nodes()
+    A = discretizer.num_actions
+    B = discretizer.problem.boundary
+    
+    G = 101  
+    lins = ([np.linspace(l,h,G) for (l,h) in B])
+    P = utils.make_points(*lins)
+    assert((G*G,2) == P.shape)
 
-problem = inst_conf().configure_problem_instance()
+    # V
+    v = data['primal'][-1,:N]
+    v_fn = InterpolatedFunction(discretizer,v)
+    V = v_fn.evaluate(P)
 
-(costs,states) = simulate(problem,100,250)
+    #Q
+    q = get_q_vectors(mdp_obj,v)
+    Q = np.empty((G*G,A))
+    q_fns = []
+    for a in xrange(A):
+        q_fn = InterpolatedFunction(discretizer,q[:,a])
+        q_fns.append(q_fn)
+        Q[:,a] = q_fn.evaluate(P)
 
-plt.plot(states[:,:,0].T,states[:,:,1].T,'-b',alpha=0.25)
-plt.show()
+    #F
+    f = np.reshape(data['primal'][-1,N:],(N,A),order='F')
+    F = np.empty((G*G,A))
+    f_fns = []
+    for a in xrange(A):
+        f_fn = InterpolatedFunction(discretizer,f[:,a])
+        f_fns.append(f_fn)
+        F[:,a] = f_fn.evaluate(P)
+        
+    SortedFlow = np.sort(F,axis=1)
+    FlowAdv = SortedFlow[:,-1] - SortedFlow[:,-2]
+    
+    Policy = np.argmin(Q,axis=1)
+    PolicyFlow = np.argmax(F,axis=1)
+
+    R = 100
+    I = 1000
+    q_policy = MinFunPolicy(mdp_obj.actions,
+                            q_fns)
+    flow_policy = MaxFunPolicy(mdp_obj.actions,
+                               f_fns)
+    q_traces = simulate(problem,q_policy,R,I)
+    flow_traces = simulate(problem,q_policy,R,I)
+
+    #print q_traces[0].shape
+    #quit()
+
+    if False:
+        f, axarr = plt.subplots(3,2)
+        axarr[0][0].pcolor(np.reshape(V,(G,G)))
+        axarr[1][0].pcolor(np.reshape(Policy,(G,G)))
+        axarr[2][0].plot(q_traces[0][:,:,0].T,
+                         q_traces[0][:,:,1].T,
+                         '-b',
+                         alpha=0.25)
+    
+        axarr[0][1].pcolor(np.reshape(FlowAdv,(G,G)))
+        axarr[1][1].pcolor(np.reshape(PolicyFlow,(G,G)))
+        axarr[2][1].plot(flow_traces[0][:,:,0].T,
+                         flow_traces[0][:,:,1].T,
+                         '-r',
+                         alpha=0.25)
+
+    gamma = np.power(mdp_obj.discount,np.arange(I))
+    q_returns = np.sum(q_traces[1] * gamma,axis=1)
+    assert((R,) == q_returns.shape)
+    
+    f_returns = np.sum(flow_traces[1] * gamma,axis=1)
+    assert((R,) == f_returns.shape)
+    
+    (qx,qy) = cdf_points(q_returns)
+    (fx,fy) = cdf_points(f_returns)
+    plt.plot(qx,qy,'-b',fx,fy,'-r')
+
+    plt.show()
+    
+
+    

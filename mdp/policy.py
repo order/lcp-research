@@ -14,6 +14,46 @@ class ConstantPolicy(Policy):
         decision = np.tile(self.action,(N,1))
         assert((N,u) == decision.shape)
         return decision
+
+class MinFunPolicy(Policy):
+    def __init__(self,actions,fns):
+        self.actions = actions
+        self.fns = fns
+        
+    def get_decisions(self,points):
+        (N,d) = points.shape
+        (A,aD) = self.actions.shape
+        assert(aD == len(self.fns))
+               
+        F = np.empty((N,A))
+        for a in xrange(A):
+            F[:,a] = self.fns[a].evaluate(points)
+        a_index = np.argmin(F,axis=1)
+               
+        actions = np.empty((N,aD))               
+        for a in xrange(A):
+            actions[a_index==a,:] = self.actions[a,:]
+        return actions
+    
+class MaxFunPolicy(Policy):
+    def __init__(self,actions,fns):
+        self.actions = actions
+        self.fns = fns
+        
+    def get_decisions(self,points):
+        (N,d) = points.shape
+        (A,aD) = self.actions.shape
+        assert(aD == len(self.fns))
+               
+        F = np.empty((N,A))
+        for a in xrange(A):
+            F[:,a] = self.fns[a].evaluate(points)
+        a_index = np.argmax(F,axis=1)
+               
+        actions = np.empty((N,aD))               
+        for a in xrange(A):
+            actions[a_index==a,:] = self.actions[a,:]
+        return actions
         
 class KStepLookaheadPolicy(Policy):
     """

@@ -10,6 +10,11 @@ import numpy as np
 ##########################
 # Animate a rank 3 tensor along the first dimension
 
+def cdf_points(X):
+    (N,) = X.shape    
+    S = np.sort(X)
+    return (S,np.linspace(0,1,N))
+
 def animate_cdf(X,**kwargs):
     # Parse input
     parser = KwargParser()

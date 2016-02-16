@@ -5,6 +5,32 @@ class StateSpaceFunction(object):
     def evaluate(self,points,**kwargs):
         raise NotImplementedError()
 
+class InterpolatedFunction(StateSpaceFunction):
+    """
+    Take in a finite vector and a discretizer;
+    Enable evaluation at arbitrary points via interpolation
+    """
+    def __init__(self,discretizer,y):
+        assert(1 == len(y.shape))
+        assert(y.size == discretizer.get_num_nodes())
+        self.target_values = y
+        self.discretizer = discretizer
+        
+    def evaluate(self,states):
+        if 1 == len(states.shape):
+            states = states[np.newaxis,:]
+
+        y = self.target_values
+        (N,) = y.shape
+        (M,d) = states.shape
+        
+        # Convert state into node dist
+        P = self.discretizer.states_to_transition_matrix(states)
+        assert((N,M) == P.shape)
+        f = (P.T).dot(y)
+        assert((M,) == f.shape)
+        return f
+
 class ConstFn(StateSpaceFunction):
     def __init__(self,v):
         self.v = v
@@ -29,8 +55,7 @@ class FixedVectorFn(StateSpaceFunction):
         args = parser.parse(kwargs)
 
         assert((N,) == self.x.shape)
-        return self.x
-    
+        return self.x    
 
 class GaussianBowlFn(StateSpaceFunction):
     """

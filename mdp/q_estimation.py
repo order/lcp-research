@@ -1,26 +1,17 @@
-class QEstimator(object):
-    def get_q_values(self,states):
-        raise NotImplementedError()
+import numpy as np
 
-class BasicQEstimator(QEstimator):
-    def __init__(self,discretizer,v_fn):
-        self.discretizer = discretizer
-        self.v_fn = v_fn
+def get_q_vectors(mdp_obj,V):
+    A = mdp_obj.num_actions
+    N = mdp_obj.num_states
+    assert((N,) == V.shape)
+    
+    c = mdp_obj.costs
+    P = mdp_obj.transitions
+    g = mdp_obj.discount
+
+    Q = np.empty((N,A))
         
-    def get_q_values(self,states):
-        (N,d) = states.shape
-        A = self.discretizer.get_num_actions()
-        Actions = self.discretizer.get_actions()
+    for a in xrange(A):
+        Q[:,a] = c[a] + g * (P[a].T).dot(V)
 
-        Q = np.empty((N,A))
-
-        gamma = self.discretizer.discount
-        for a in actions:
-            action = actions[a,:]
-            costs = discretizer.cost_obj.evaluate(states,action=action)
-            xnext = discretizer.remap_states(states,action)
-            value = self.v_fn.evaluate(xnext)
-            
-            Q[:,a] = costs + gamma * value
-
-        return Q
+    return Q
