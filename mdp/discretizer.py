@@ -78,34 +78,24 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
     and a distinguished node-mapper responsible for discretizing non-abstract
     aspects of state-space.
     """
-    def __init__(self,physics,
-                 basic_mapper,
-                 cost_obj,
-                 weight_obj,
-                 actions,
-                 discount):
-        
-        self.exception_state_remappers = [] # For domain wrapping
-        self.physics = physics # How physical states map to others
+    def __init__(self, problem
+                 actions):
+
+        self.problem = problem
         
         self.exception_node_mappers = [] # For stuff like out-of-bounds
         self.basic_mapper = basic_mapper # Essential discretization scheme
-        
-        self.cost_obj = cost_obj
-        self.weight_obj = weight_obj
-        
+                
         if (1 == len(actions.shape)):
             actions = actions[:,np.newaxis] # convert to column vector
-            
-        self.actions = actions
+        assert(self.problem.action_dim == actions.shape[1])
+        self.actions = actions # Discrete actions
         
         self.num_actions = actions.shape[0]
-        self.action_dim = actions.shape[1]
 
-        self.state_dim = self.basic_mapper.get_dimension()
-
-        self.discount = discount
-
+        self.state_dim = self.problem.dimension
+        assert(self.state_dim == self.basic_mapper.get_dimension())
+        assert(self.problem.get_boundary() == self.basic_mapper.get_boundary())
 
     def get_basic_boundary(self):
         return self.basic_mapper.get_boundary()
@@ -114,14 +104,7 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         return self.basic_mapper.get_lengths()
 
     def __str__(self):
-        S = []
-        S.append('Physics: {0}'.format(self.physics))
-        for remapper in self.exception_state_remappers:
-            S.append('\tException: {0}'.format(remapper))
-        S.append('Basic Mapper: {0}'.format(self.basic_mapper))
-        for mapper in self.exception_node_mappers:
-            S.append('\tException: {0}'.format(mapper))
-        return '\n'.join(S)
+        raise NotImplementedError()
 
     def get_num_actions(self):
         return self.num_actions
@@ -149,7 +132,8 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         # Pad with NaN for any non-physical states
         D = self.basic_mapper.get_dimension()
         N = self.basic_mapper.get_num_nodes()
-        
+
+        # NaN always at the end.
         num_nan_states = self.get_num_nodes() - N
         nans = np.NaN * np.ones((num_nan_states,D))        
         return np.vstack([states,nans])
@@ -180,15 +164,12 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         assert(2 == len(states.shape))
         (N,d) = states.shape
         assert(d == self.basic_mapper.get_dimension())
-        # First remap any states (velocity cap, etc.)
-        for remapper in self.exception_state_remappers:
-            states = remapper.remap(states)
         
-        # Then map states to node distributions
+        # Map states to node distributions
         dealt_with = set() # Handled by an earlier mapper
         node_mapping = {} # Partial mapping so far
         
-        # Deal with the exceptions first
+        # Deal with the exceptions firts
         for mapper in self.exception_node_mappers:
             partial_mapping = mapper.\
                               states_to_node_dists(states,\
@@ -211,14 +192,9 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         return node_mapping 
         
     def remap_states(self,states,action):
-        assert(2 == len(states.shape))
-        (N,d) = states.shape
-        assert(d == self.basic_mapper.get_dimension())
-
-        next_states = self.physics.remap(states,action=action)
-        for remapper in self.exception_state_remappers:
-            next_states = remapper.remap(next_states)
-        return next_states
+        return problem.next_states(states,
+                                   action,
+                                   uniform_action=True)
 
     def states_to_transition_matrix(self,states):
         """
@@ -227,10 +203,6 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         assert(2 == len(states.shape))
         (N,d) = states.shape
         assert(d == self.basic_mapper.get_dimension())
-
-        # First remap any states (velocity cap, etc.)
-        for remapper in self.exception_state_remappers:
-            states = remapper.remap(states)
         
         # Then map states to node distributions
         dealt_with = set() # Handled by an earlier mapper
@@ -276,9 +248,6 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
             
         return T
         
-    def add_state_remapper(self,remapper):
-        self.exception_state_remappers.append(remapper)
-        
     def add_node_mapper(self,mapper):
         self.exception_node_mappers.append(mapper)
         
@@ -317,7 +286,8 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         node_states = self.get_node_states()
 
         # Get costs of non-drain node states
-        costs = self.cost_obj.eval(node_states,action=action)
+        costs = self.problem.costs.evaluate(node_states,
+                                               action=action)
 
         # Size check
         assert((self.get_num_nodes(),) == costs.shape)
@@ -331,7 +301,7 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         node_states = self.get_node_states()
 
         # Get costs of non-drain node states
-        weight = self.weight_obj.eval(node_states)
+        weight = self.weights.evaluate(node_states)
 
         # Size check
         assert((self.get_num_nodes(),) == weight.shape)
@@ -352,7 +322,8 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         # Get the node states, and then use physics to remap them
         node_states = self.basic_mapper.get_node_states()
         assert(2 == len(node_states.shape))
-        next_states = self.physics.remap(node_states,action=action)
+        next_states = self.problem.remap(node_states,
+                                         action)
         assert(node_states.shape == next_states.shape)
         
         # Then get the node mappings for all next states

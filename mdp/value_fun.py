@@ -1,8 +1,11 @@
-class ValueFunctionEvaluator(object):
-    def evaluate(self,state,action):
+class FunctionEvaluator(object):
+    def evaluate(self,states):
+        """
+        Evaluates a function at a set of states
+        """
         raise NotImplementedError()
         
-class BasicValueFunctionEvaluator(ValueFunctionEvaluator):
+class InterpolatedFunctionEvaluator(FunctionEvaluator):
     def __init__(self,discretizer,v):
         assert(1 == len(v.shape))
         assert(v.size == discretizer.get_num_nodes())

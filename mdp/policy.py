@@ -1,26 +1,19 @@
 import numpy as np
 
 class Policy(object):
-    """
-    Abstract class for policies
-    """
-    def get_decisions(self,states):
+    def get_decisions(self,points):
         raise NotImplementedError()
-        
+
 class ConstantPolicy(Policy):
-    """
-    Constant dumb policy
-    """
-    def __init__(self,decision):
-        self.decision = decision
-        
-    def get_decisions(self,states):
-        m = len(states.shape) # Remap vectors to row vectors
-        if 1 == m:
-            states = states[np.newaxis,:] 
-            
-        (N,d) = states.shape
-        return self.decision*np.ones(N)
+    def __init__(self,action):
+        assert(1 == len(action.shape))
+        self.action = action
+    def get_decisions(self,points):
+        (N,d) = points.shape
+        (u,) = self.action.shape
+        decision = np.tile(self.action,(N,1))
+        assert((N,u) == decision.shape)
+        return decision
         
 class KStepLookaheadPolicy(Policy):
     """
@@ -37,14 +30,18 @@ class KStepLookaheadPolicy(Policy):
         assert(type(k) == int)
 
         
-    def __get_vals(self,states,k):
+    def get_values(self,states,k):
+        """
+        Calculates the Q-values from the value function:
+        Q(s,a) = C(s,a) + \gamma * \sum_{s'} T(s',a,s) * V(s')
+        """
         (N,d) = states.shape
         assert(d == self.discretizer.basic_mapper.get_dimension())
         (A,ad) = self.actions.shape
         
         # Base case; vals are just the value function
         if k <= 0:
-            # Kludge: don't bother acutally duplicating
+            # Kludge: shouldn't actually bother duplicating
             vals = np.tile(self.value_fun_eval.evaluate(states),(1,1)).T
             return vals
 

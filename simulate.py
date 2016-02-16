@@ -1,22 +1,5 @@
-
 import numpy as np
 from config.instance.hallway_continuous import HallwayConfig as inst_conf
-
-class Policy(object):
-    def decide(self,points):
-        raise NotImplementedError()
-
-class ConstantPolicy(Policy):
-    def __init__(self,action):
-        assert(1 == len(action.shape))
-        self.action = action
-    def decide(self,points):
-        (N,d) = points.shape
-        (u,) = self.action.shape
-        decision = np.tile(self.action,(N,1))
-        assert((N,u) == decision.shape)
-        return decision
-        
     
 class SimulationObject(object):
     def __init__(self,discretizer,policy):
