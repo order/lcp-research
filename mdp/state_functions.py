@@ -2,13 +2,13 @@ import numpy as np
 from utils.parsers import KwargParser
 
 class StateSpaceFunction(object):
-    def eval(self,points,**kwargs):
+    def evaluate(self,points,**kwargs):
         raise NotImplementedError()
 
 class ConstFn(StateSpaceFunction):
     def __init__(self,v):
         self.v = v
-    def eval(self,points,**kwargs):
+    def evaluate(self,points,**kwargs):
         (N,D) = points.shape 
 
         parser = KwargParser()
@@ -21,7 +21,7 @@ class FixedVectorFn(StateSpaceFunction):
     def __init__(self,x):
         assert(1 == len(x.shape))
         self.x = x
-    def eval(self,points,**kwargs):
+    def evaluate(self,points,**kwargs):
         (N,D) = points.shape 
 
         parser = KwargParser()
@@ -48,7 +48,7 @@ class GaussianBowlFn(StateSpaceFunction):
         self.setpoint = np.reshape(setpoint,(1,N))
         self.bandwidth = bandwidth
  
-    def eval(self,points,**kwargs):
+    def evaluate(self,points,**kwargs):
         (N,D) = points.shape 
 
         parser = KwargParser()
@@ -89,7 +89,7 @@ class QuadraticFn(StateSpaceFunction):
         assert((N,) == setpoint.shape)
         self.setpoint = np.reshape(setpoint,(1,N))
     
-    def eval(self,points,**kwargs):
+    def evaluate(self,points,**kwargs):
         parser = KwargParser()
         parser.add_optional('action') #Ignored
         args = parser.parse(kwargs)
@@ -115,7 +115,7 @@ class BallSetFn(StateSpaceFunction):
         self.in_cost = 0.0
         self.out_cost = 1.0
     
-    def eval(self,points,**kwargs):
+    def evaluate(self,points,**kwargs):
         parser = KwargParser()
         parser.add_optional('action') #Ignored
         args = parser.parse(kwargs)
@@ -143,7 +143,7 @@ class TargetZoneFn(StateSpaceFunction):
         self.in_cost = 0.0
         self.out_cost = 1.0
     
-    def eval(self,points,**kwargs):
+    def evaluate(self,points,**kwargs):
         parser = KwargParser()
         parser.add_optional('action') #Ignored
         args = parser.parse(kwargs)

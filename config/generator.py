@@ -1,28 +1,25 @@
 import numpy as np
 
-class Generator(object):
-    def generate(self,**kwargs):
-        """
-        Generate something
-        """
-        raise NotImplementedError()    
+class ProblemGenerator(object):
+    def generate_problem(self):
+        raise NotImplementedError()
 
-class SolverGenerator(Generator):
-    def generate(self,discretizer):
+class DiscretizerGenerator(object):
+    """
+    Generates a discretizer from a problem
+    """
+    def generate_discretizer(self,problem):
+        raise NotImplementedError()        
+
+class SolverGenerator(object):
+    def generate_solver(self,builder):
+        """
+        Builder must be able to create whatever objects
+        generator needs
+        """
         raise NotImplementedError()
     def extract(self,solver):
         raise NotImplementedError()
-
-class StubGenerator(Generator):
-    """
-    Way of wrapping a Builder so it is a Generator
-    A Builder is something that builds an object (e.g. Discretizer)
-    A Generator is something that configures and generates a Builder
-    """
-    def __init__(self,builder):
-        self.builder = builder
-    def generate(self):
-        return self.builder
 
 def add_trn(gen,solver):
     """

@@ -1,80 +1,66 @@
 import numpy as np
-from config.instance.hallway_continuous import HallwayConfig as inst_conf
+from config.instance.double_integrator import DoubleIntegratorConfig as inst_conf
+from mdp.policy import ConstantPolicy
     
 class SimulationObject(object):
-    def __init__(self,discretizer,policy):
+    def __init__(self,problem,policy):
         self.policy = policy
-        self.physics = discretizer.physics
-        self.cost_obj = discretizer.cost_obj
-        self.exception_state_remappers = discretizer.exception_state_remappers
-        self.exception_node_mappers = discretizer.exception_node_mappers
+        self.problem = problem
+        self.cost_obj = problem.cost_obj
 
     def next(self,x):
         (N,d) = x.shape
         assert(not np.any(x == np.nan))
-        assert(1 == N) # (1,d) array
 
         # Get the actions
-        action = self.policy.decide(x)
+        actions = self.policy.get_decisions(x)
 
         # Run the physics
-        x_next = self.physics.remap(x,action=action)
-
-        # Fix some boundary violations
-        for remapper in self.exception_state_remappers:
-            x_next = remapper.remap(x_next)
-
-        # Report unfixable oobs
-        oob = {}
-        for mapper in self.exception_node_mappers:
-            oob = mapper.states_to_node_dists(next_states,ignore)
-            if len(oob) > 0:
-                x_next[:,:] = np.nan
-                break
-        terminate = len(oob) > 0
-        cost = self.cost_obj.eval(x_next)
-
-        return (x_next,cost,terminate)       
-
-def uniform(boundaries):
-    D = len(boundaries)
-    x = np.empty((1,D))
-    for (i,(low,high)) in enumerate(boundaries):        
-        x[0,i] = np.random.uniform(low,high)
+        x_next = self.problem.next_states(x,actions)
+        assert(x.shape == x_next.shape)
+        assert(not np.any(x == np.nan))
+        # NAN-out unfixed oobs
         
+        oobs = self.problem.out_of_bounds(x_next)
+        x_next[oobs,:] = np.nan
+        
+        costs = self.cost_obj.evaluate(x_next) # Should have NAN handling
+        
+        return (x_next,costs,oobs)       
+
+def uniform(N,boundaries):
+    D = len(boundaries)
+    x = np.empty((N,D))
+    for (i,(low,high)) in enumerate(boundaries):        
+        x[:,i] = np.random.uniform(low,high,N)
     return x 
 
-def simulate(discretizer,runs,iters):
-    D = discretizer.get_dimension()
-    boundaries = discretizer.get_basic_boundary()
-    
-    costs = np.empty((runs,iters))
-    states = np.empty((runs,iters,D))
+def simulate(problem,R,I):
+    D = problem.get_dimension()
+    boundaries = problem.get_boundary()
 
-    policy = ConstantPolicy(np.zeros(1))
-    sim_obj = SimulationObject(discretizer,policy)
-    for r in xrange(runs):
-        print 'Run',r
-        x = uniform(boundaries)
-        for i in xrange(iters):
-            (x,cost,terminal) = sim_obj.next(x)
+    oob_cost = problem.cost_obj.evaluate(np.full((1,D),np.nan))
+    costs = np.full((R,I),oob_cost) # Default to oob_cost
+    states = np.full((R,I,D),np.nan) # Default to nan.
 
-            if terminal:
-                sl = slice(i,iters)
-            else:
-                sl = slice(i,i+1)
+    policy = ConstantPolicy(0 * np.ones(2))
+    sim_obj = SimulationObject(problem,policy)
+    x = uniform(R,boundaries)
+    in_bounds = np.ones(R,dtype=bool)
+    for i in xrange(I):
+        (x,c,new_oob) = sim_obj.next(x[in_bounds,:])
 
-            states[r,sl,:] = x
-            costs[r,sl] = cost
+        states[in_bounds,i,:] = x
+        costs[in_bounds,i] = c
 
-            if terminal:
-                break
+        in_bounds[in_bounds] = 1 - new_oob # Update what is `inbounds'
+
 
     return (costs,states)
 
 
-discretizer = inst_conf().configure_instance_builder()
+problem = inst_conf().configure_problem_instance()
 
-(costs,states) = simulate(discretizer,1,10)
+(costs,states) = simulate(problem,2,10)
 print states
 print costs

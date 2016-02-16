@@ -21,6 +21,4 @@ class DoubleIntegratorConfig(config.InstanceConfig):
         params['discount'] = 0.99
         self.params = params
 
-    def configure_instance_builder(self):
-        gen_fn = gen.DoubleIntegratorGenerator(**self.params)
-        return gen_fn.generate()
+        self.gen_fn = gen.DoubleIntegratorGenerator(**self.params)

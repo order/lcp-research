@@ -20,6 +20,4 @@ class HallwayConfig(config.InstanceConfig):
         params['discount'] = 0.99
         self.params = params
 
-    def configure_instance_builder(self):
-        gen_fn = gen.HallwayGenerator(**self.params)
-        return gen_fn.generate()
+        self.gen_fn = gen.HallwayGenerator(**self.params)

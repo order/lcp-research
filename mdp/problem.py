@@ -1,10 +1,16 @@
 import numpy as np
 
-class Problem(object):
+class MDPProblem(object):
     """
     A problem is essentially the continuous part of a physics problem.
-    It contains the physics, the boundary description, costs
+    It contains the physics, the boundary description, costs, and so forth.
+
+    Basically this is a generative model of the MDP.
+    It has the physics, boundaries, any non-determinism and so forth
+    This can be fed directly into a simulator, or given to a
+    discretizer to yield a model.
     """
+    
     def __init__(self,
                  physics,
                  boundary,
@@ -19,14 +25,15 @@ class Problem(object):
         self.exception_state_remappers = []
         self.dimension = len(boundary)
 
-        self.costs = cost_obj
-        self.weights = weight_obj
+        # TODO: non-determinism
+        # self.action_perturb = [] # s' = T(s,a+w)
+        # self.pre_perturb = [] # s' = T(s+w,a)
+        # self.post_perturb = [] # s' = T(s,a) + w
+        # Maybe just one of the state perturbations?
 
-        self.action_dim = action_dim
-        
-        if (1 == len(actions.shape)):
-            actions = actions[:,np.newaxis] # convert to column vector
-            
+        self.cost_obj = cost_obj
+        self.weight_obj = weight_obj
+        self.action_dim = action_dim                    
         self.discount = discount
         
     def get_num_actions(self):
@@ -41,7 +48,7 @@ class Problem(object):
         So [(-1,1),(-5,5)] could be the boundary for a problem, indicating
         that the problem is 2D with a rectangular geometry [-1,1] x [-5,5]
         """
-        return self.boundaries
+        return self.boundary
 
     def get_dimension(self):
         """
@@ -50,7 +57,7 @@ class Problem(object):
         """
         return self.dimension
 
-    def next_states(self,states,actions,**kwargs)):
+    def next_states(self,states,actions,**kwargs):
         """
         Returns a successor state for every state.
 
@@ -66,21 +73,16 @@ class Problem(object):
         
         if 1 == len(actions.shape):
             uniform = True
-            assert((U,) == actions.shape))
+            assert((U,) == actions.shape)
         else:
             uniform = False
             assert((N,U) == actions.shape)
 
 
         # Initial map
-        if uniform:
-            next_states = self.physics.remap(states,action=action)
-        else:
-            next_states = np.empty((N,d))
-            for i in xrange(N):
-                next_states[i,:] = self.physics.remap(states[i,:],
-                                                      action=actions[i,:])
-        # Enforce boundaries
+        next_states = self.physics.remap(states,action=actions)
+
+        # Enforce boundary
         for remapper in self.exception_state_remappers:
             next_states = remapper.remap(next_states)
             
@@ -88,9 +90,10 @@ class Problem(object):
 
     def out_of_bounds(self,points):
         """
-        Check if points are out of bounds for the rectangular boundaries
+        Check if points are out of bounds for the rectangular boundary
         """
-        L = np.array([low for (low, high) in self.boundaries])
-        U = np.array([high for (low,high) in self.boundaries]])
-        return np.any(points < L,axis=1) + np.any(points < U,axis=1)
+        L = np.array([low for (low, high) in self.boundary])
+        U = np.array([high for (low,high) in self.boundary])
+
+        return np.any(points < L,axis=1) + np.any(points > U,axis=1)
 

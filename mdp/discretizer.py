@@ -78,7 +78,8 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
     and a distinguished node-mapper responsible for discretizing non-abstract
     aspects of state-space.
     """
-    def __init__(self, problem
+    def __init__(self, problem,
+                 basic_mapper,
                  actions):
 
         self.problem = problem

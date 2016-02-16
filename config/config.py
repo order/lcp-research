@@ -19,12 +19,21 @@ class InstanceConfig(object):
     """
     An object that configures and builds a builder
     """
-    def configure_instance_builder(self):
+    def configure_problem_instance(self):
+        """
+        Should return a problem instance like
+        MDPProblem
+        """
+        return self.gen_fn.generate_problem()
+
+    def configure_object_builder(self):
         """
         Should return a 'builder'; i.e. something 
-        like MDPBuilder or
+        like MDPBuilder or LCPBuilder
         """
-        raise NotImplementedError()
+        return self.gen_fn.generate_discretizer()
+
+        
 
 class Processor(object):
     def process(self,data):
