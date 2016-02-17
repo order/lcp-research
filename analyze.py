@@ -75,7 +75,7 @@ def apply_processor(keyword,x,params):
 ###############
 if __name__ == '__main__':
     if 5 > len(sys.argv):
-        print 'Usage: <data file> <plot config file> <save_file>'\
+        print 'Usage: <data file> <plot object> <save_file>'\
             + '<processing...>'
         quit()
     (_,data_file,plotter_file,save_file) = sys.argv[:4]

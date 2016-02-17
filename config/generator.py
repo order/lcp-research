@@ -21,6 +21,10 @@ class SolverGenerator(object):
     def extract(self,solver):
         raise NotImplementedError()
 
+class PolicyGenerator(object):
+    def generate_policy(self,data,params):
+        raise NotImplementedError()
+
 def add_trn(gen,solver):
     """
     Add termination, recording, and notification
