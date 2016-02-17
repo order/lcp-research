@@ -13,12 +13,13 @@ class DoubleIntegratorConfig(config.InstanceConfig):
         params['x_desc'] = (-5,5,20)
         params['v_desc'] = (-6,6,20)
         params['a_desc'] = (-1,1,3)
+        params['dampening'] = 1e-5
         
         center = np.zeros(2)
-        radius = 0.25
+        radius = 0.15
         params['cost_obj'] = mdp.BallSetFn(center,radius)
         
-        params['discount'] = 0.99
+        params['discount'] = 0.997
         self.params = params
 
         self.gen_fn = gen.DoubleIntegratorGenerator(**self.params)

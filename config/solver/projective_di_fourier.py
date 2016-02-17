@@ -12,9 +12,9 @@ class ProjectiveBasicConfig(config.SolverConfig):
     def __init__(self):
         params = {}
         params['value_regularization'] = 0.0
-        params['flow_regularization'] = 1e-15
+        params['flow_regularization'] = 1e-10
 
-        term_conds = {'max_iter':solvers.MaxIterTerminationCondition(1000),
+        term_conds = {'max_iter':solvers.MaxIterTerminationCondition(500),
                       'primal':solvers.PrimalChangeTerminationCondition(1e-12)}
         recorders = {'primal':solvers.PrimalRecorder(),
                      'dual':solvers.DualRecorder(),

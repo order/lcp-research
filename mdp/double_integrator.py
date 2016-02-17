@@ -4,6 +4,7 @@ from state_remapper import StateRemapper
 class DoubleIntegratorRemapper(StateRemapper):
     def __init__(self,**kwargs):
         self.step = kwargs.get('step',0.05)
+        self.dampening = kwargs.get('dampening',0.0)
         
     def remap(self,points,**kwargs):
         """
@@ -21,13 +22,13 @@ class DoubleIntegratorRemapper(StateRemapper):
         u = u.flatten()
         assert((N,) == u.shape)
 
-        
+        damp = self.dampening
         x_next = points[:,0] + self.step * points[:,1]
-        v_next = 0.99 * points[:,1] + self.step * u
+        v_next = (1-damp)*points[:,1] + self.step * u
         assert((N,) == x_next.shape)
         assert((N,) == v_next.shape)
         
-        ret = np.column_stack([x_next,v_next])        
+        ret = np.column_stack([x_next,v_next])
         assert((N,d) == ret.shape)
         
         return ret

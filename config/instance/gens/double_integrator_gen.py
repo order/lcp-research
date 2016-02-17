@@ -18,6 +18,7 @@ class DoubleIntegratorGenerator(ProblemGenerator,DiscretizerGenerator):
         parser.add('x_desc') # Mandatory
         parser.add('v_desc')
         parser.add('a_desc')
+        parser.add('dampening')
         
         parser.add('cost_obj')
         parser.add('discount')
@@ -28,7 +29,7 @@ class DoubleIntegratorGenerator(ProblemGenerator,DiscretizerGenerator):
         assert(0 < self.discount < 1)
        
     def generate_problem(self):
-        physics = DoubleIntegratorRemapper()    
+        physics = DoubleIntegratorRemapper(dampening=self.dampening)    
         weight_obj = mdp.ConstFn(1.0) #Just use uniform
         
         xid,vid = 0,1

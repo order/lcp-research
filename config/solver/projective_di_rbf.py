@@ -24,7 +24,7 @@ class ProjectiveBasicConfig(config.SolverConfig):
         params['notifications'] = notify
 
         # Experimental parameter
-        params['x_dual_bases'] = False
+        params['x_dual_bases'] = True
 
         # This is the basic part of the basis generation
         # It's wrapped by BasisGenerator

@@ -24,8 +24,8 @@ class SimulationObject(object):
         assert(not np.any(np.isnan(x)))
 
         # Get the actions
-        #actions = self.policy.get_decisions(x)
-        actions = (-0.05*x[:,0])[:,np.newaxis]
+        actions = self.policy.get_decisions(x)
+        #actions = (-0.05*x[:,0])[:,np.newaxis]
         
         # Run the physics
         x_next = self.problem.next_states(x,actions)
@@ -57,9 +57,9 @@ def simulate(problem,policy,R,I):
     states = np.full((R,I,D),np.nan) # Default to nan.
     actions = np.full((R,I,aD),np.nan) 
 
-    policy = ConstantPolicy(0 * np.ones(1))
     sim_obj = SimulationObject(problem,policy)
     x = uniform(R,boundaries)
+    #x = np.tile(np.array([[1,0]]),(R,1))
     in_bounds = np.ones(R,dtype=bool)
     for i in xrange(I):
         (x,c,a,new_oob) = sim_obj.next(x)
@@ -83,6 +83,9 @@ def simulate(problem,policy,R,I):
 if __name__ == '__main__':
     data = np.load('data/test.npz')
     params = pickle.load(open('data/test.pickle','rb'))
+
+    R = 100
+    I = 1000
     
     discretizer = params['instance_builder']
     problem = discretizer.problem
@@ -91,6 +94,8 @@ if __name__ == '__main__':
     N = discretizer.get_num_nodes()
     A = discretizer.num_actions
     B = discretizer.problem.boundary
+
+    
     
     G = 101  
     lins = ([np.linspace(l,h,G) for (l,h) in B])
@@ -110,6 +115,10 @@ if __name__ == '__main__':
         q_fn = InterpolatedFunction(discretizer,q[:,a])
         q_fns.append(q_fn)
         Q[:,a] = q_fn.evaluate(P)
+    Policy = np.argmin(Q,axis=1)
+    q_policy = MinFunPolicy(mdp_obj.actions,
+                            q_fns)
+    q_traces = simulate(problem,q_policy,R,I)
 
     #F
     f = np.reshape(data['primal'][-1,N:],(N,A),order='F')
@@ -123,22 +132,13 @@ if __name__ == '__main__':
     SortedFlow = np.sort(F,axis=1)
     FlowAdv = SortedFlow[:,-1] - SortedFlow[:,-2]
     
-    Policy = np.argmin(Q,axis=1)
     PolicyFlow = np.argmax(F,axis=1)
-
-    R = 100
-    I = 1000
-    q_policy = MinFunPolicy(mdp_obj.actions,
-                            q_fns)
     flow_policy = MaxFunPolicy(mdp_obj.actions,
                                f_fns)
-    q_traces = simulate(problem,q_policy,R,I)
     flow_traces = simulate(problem,q_policy,R,I)
 
-    #print q_traces[0].shape
-    #quit()
-
-    if False:
+    
+    if True:
         f, axarr = plt.subplots(3,2)
         axarr[0][0].pcolor(np.reshape(V,(G,G)))
         axarr[1][0].pcolor(np.reshape(Policy,(G,G)))
@@ -153,6 +153,8 @@ if __name__ == '__main__':
                          flow_traces[0][:,:,1].T,
                          '-r',
                          alpha=0.25)
+        plt.show()
+        
 
     gamma = np.power(mdp_obj.discount,np.arange(I))
     q_returns = np.sum(q_traces[1] * gamma,axis=1)
