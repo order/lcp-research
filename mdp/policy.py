@@ -43,7 +43,7 @@ class MaxFunPolicy(Policy):
     def get_decisions(self,points):
         (N,d) = points.shape
         (A,aD) = self.actions.shape
-        assert(aD == len(self.fns))
+        assert(A == len(self.fns))
                
         F = np.empty((N,A))
         for a in xrange(A):

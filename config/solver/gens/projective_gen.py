@@ -45,6 +45,8 @@ class ProjectiveGenerator(config.SolverGenerator):
 
     def generate(self,discretizer):
         mdp_obj = discretizer.build_mdp()
+        lens = discretizer.get_basic_lengths()
+        xy = np.prod(lens) # Physical size
 
         # Get sizes
         A = mdp_obj.num_actions
@@ -58,9 +60,48 @@ class ProjectiveGenerator(config.SolverGenerator):
         points = discretizer.get_node_states()
         special_points = discretizer.get_special_node_indices()
 
-        BG = self.basis_generator
-        Phi = BG.generate_basis(points,
-                                special_points=special_points)
+        svd = True
+        if svd:
+            num_svd = 25
+            utils.banner('Using SVD basis')
+            [U0,_,_] = sps.linalg.svds(mdp_obj.transitions[0],
+                                       k=num_svd,
+                                       tol=1e-8,
+                                       which='LM',
+                                       return_singular_vectors='u',
+                                       maxiter=1e5)
+            [U2,_,_] = sps.linalg.svds(mdp_obj.transitions[2],
+                                       k=num_svd,
+                                       tol=1e-8,
+                                       which='LM',
+                                       return_singular_vectors='u',
+                                       maxiter=1e5)
+            
+            for i in xrange(num_svd):
+                fig,axarr = plt.subplots(3)
+                ImgU0 = np.reshape(U0[:xy,i],lens)
+                ImgU2 = np.reshape(U2[:xy,i],lens)
+                Diff = ImgU0 - ImgU2
+                axarr[0].pcolor(ImgU0)
+                axarr[1].pcolor(ImgU2)
+                axarr[2].pcolor(Diff)
+                plt.show()
+
+            # Const
+            Ones = np.ones((n,1))
+            Ones[xy:] = 0
+            
+            # Special
+            sp = n - xy
+            Sp = np.zeros((n,sp))
+            Sp[xy:,:] = np.eye(sp)
+            
+            Phi = np.hstack([Ones,Sp,U0,U2])
+                
+        else:
+            BG = self.basis_generator
+            Phi = BG.generate_basis(points,
+                                    special_points=special_points)
 
         (d,k) = Phi.shape
         assert(d == n)
