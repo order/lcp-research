@@ -9,7 +9,7 @@ class KojimaBasicConfig(config.SolverConfig):
         params['flow_regularization'] = 1e-12
 
         term_conds = {'max_iter':solvers.MaxIterTerminationCondition(1000),
-                      'primal':solvers.PrimalChangeTerminationCondition(1e-12)}
+                      'primal':solvers.PrimalChangeTerminationCondition(1e-8)}
         recorders = {'primal':solvers.PrimalRecorder(),
                      'dual':solvers.DualRecorder(),
                      'steplen':solvers.StepLenRecorder()}

@@ -92,10 +92,10 @@ def get_policy(policy_file,data,params):
 ###############
 if __name__ == '__main__':
 
-    if 5 != len(sys.argv):
-        print 'Usage: <data file> <policy config file> <#runs> <#iters>'
+    if 6 != len(sys.argv):
+        print 'Usage: <data file> <policy file> <#runs> <#iters> <save file>'
         quit()
-    (_,data_file,policy_file,runs,iters) = sys.argv
+    (_,data_file,policy_file,runs,iters,save_file) = sys.argv
 
     assert(data_file.endswith('.npz'))
     root_file = data_file[:-3]
@@ -133,8 +133,9 @@ if __name__ == '__main__':
 
     # Find the returns
     gamma = np.power(mdp_obj.discount,np.arange(I))
-    returns = np.sum(costs[1] * gamma,axis=1)
+    returns = np.sum(costs * gamma,axis=1)
     assert((R,) == returns.shape)
-    
+
+    np.save(save_file,returns)
 
     

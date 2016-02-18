@@ -9,10 +9,10 @@ class ProjectiveBasicConfig(config.SolverConfig):
     def __init__(self):
         params = {}
         params['value_regularization'] = 0.0
-        params['flow_regularization'] = 1e-15
+        params['flow_regularization'] = 1e-12
 
         term_conds = {'max_iter':solvers.MaxIterTerminationCondition(1000),
-                      'primal':solvers.PrimalChangeTerminationCondition(1e-12)}
+                      'primal':solvers.PrimalChangeTerminationCondition(1e-8)}
         recorders = {'primal':solvers.PrimalRecorder(),
                      'dual':solvers.DualRecorder(),
                      'steplen':solvers.StepLenRecorder()}
@@ -24,12 +24,12 @@ class ProjectiveBasicConfig(config.SolverConfig):
         params['notifications'] = notify
 
         # Experimental parameter
-        params['x_dual_bases'] = True
+        params['x_dual_bases'] = False
 
         # This is the basic part of the basis generation
         # It's wrapped by BasisGenerator
         
-        [X,V] = np.meshgrid(np.linspace(-5,5,5),np.linspace(-6,6,5))
+        [X,V] = np.meshgrid(np.linspace(-5,5,5),np.linspace(-3,3,5))
         centers = np.column_stack([X.flatten(),V.flatten()])
 
         Zero = rbf.RadialBasis(centers=np.array([[0,0]]),
