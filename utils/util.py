@@ -38,6 +38,15 @@ def banner(msg):
     print '# ' + msg + ' #'
     print '# ' + loc_msg + ' #'
     print '#'*(N+4)
+    
+def split_extension(filename,ext=None):
+    if ext:
+        assert(not ext.startswith('.'))
+        assert(filename.endswith('.' + ext))
+
+    comps = filename.split('.')
+    return ('.'.join(comps[:-1]),comps[-1])
+    
 
 def kwargify(**kwargs):
     # I like this dict format
