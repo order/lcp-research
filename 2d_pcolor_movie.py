@@ -1,3 +1,4 @@
+import numpy as np
 from argparse import ArgumentParser
 
 import utils
@@ -27,17 +28,17 @@ if __name__ == '__main__':
     pickle_file = root_file + '.pickle'
 
     # Load data
-    data = np.load(data_file)
-    params = read_pickle(pickle_file)
+    data = np.load(args.data_file)
+    params = utils.processing.read_pickle(pickle_file)
 
     # Transform data
     command_queue = args.processors.split(';')
-    data = apply_command_queue(command_queue,data,params)
+    data = utils.processing.apply_command_queue(command_queue,data,params)
     assert(3 == len(data.shape))
 
     # Animate the data
     plot_args = utils.kwargify()
-    if args.save_file:
+    if hasattr(args,'save_file') and args.save_file:
         plot_args['save_file'] = args.save_file
     
     utils.plotting.animate_frames(data,**plot_args)

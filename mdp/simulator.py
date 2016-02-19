@@ -2,6 +2,21 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import animation
 
+def 
+
+def phase_animation(X,costs):
+    (I,N,D) = X.shape
+    assert(2 == D) # Position and velocity
+    figure = plt.figure()
+    anim = animation.FuncAnimation(figure,
+                                   self.animate,
+                                   iters,
+                                   self.set_up,
+                                   interval=2,
+                                   repeat=False)
+   
+    
+
 class Simulator(object):
     """
     Generic simulation object

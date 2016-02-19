@@ -1,5 +1,85 @@
-from parsers import KwargParser
 import numpy as np
+import pickle
+import os
+
+import utils
+from parsers import KwargParser
+
+ProcessorShortcuts = {'2d_value_movie':['primal',
+                                        'toframes',
+                                        'x[:,0,:,:]'],
+                      '2d_flow_movie':['primal',
+                                       'toframes',
+                                       'np.sum(x[:,1:,:,:],axis=1)'],
+                      '2d_adv_movie':['primal',
+                                      'toframes',
+                                      'advantage'],
+                      '2d_policy_movie':['primal',
+                                         'toframes',
+                                         'policy'],
+                      '1d_final_value':['primal',
+                                        'final',
+                                        'toframes',
+                                        'x[-1,0,:]'],
+                      '1d_final_flows':['primal',
+                                        'final',
+                                        'toframes',
+                                        'x[-1,1:,:].T'],
+                      'final':['(x[-1,:])[np.newaxis,:]']
+
+}
+
+def read_pickle(filename):
+    """
+    Read in information from a pickle file
+    Should have the discretizer, at least
+    """
+    params = pickle.load(open(filename,'rb'))
+    parser = KwargParser()
+    parser.add('instance_builder')
+    parser.add('solver_generator')
+    parser.add('inst_conf_file')
+    parser.add('solver_conf_file')
+    parser.add('objects')
+    params = parser.parse(params)   
+    return params
+
+def apply_command_queue(command_queue,data,params):
+    iter_count = 0
+    command_queue = list(reversed(command_queue))
+    while len(command_queue) > 0:
+        iter_count += 1
+        assert(iter_count < 30) # Anti-inf loop kludge
+
+        command = command_queue.pop()
+        if command in ProcessorShortcuts:
+            # Expand the shortcut
+            reversed_command = reversed(ProcessorShortcuts[command])
+            command_queue.extend(reversed_command)
+        else:
+            data = apply_single_processor(command,data,params)
+    return data        
+
+def apply_single_processor(keyword,x,params):
+    # First priority: is a file name in config/processor
+    if keyword.endswith('.py'):
+        filename = keyword
+    else:
+        filename = 'config/processor/' + keyword + '.py'
+    if os.path.isfile(filename):
+        print '\tUsing file',filename
+        processor = utils.get_instance_from_file(filename)
+        return processor.process(x,**params)
+
+    # Secord priority: is a key in the data
+    if keyword in x:
+        print '\tUsing data[{0}]'.format(keyword)
+        return x[keyword]
+
+    # Third priority: just evaluate it
+    print '\tEvaluating',keyword
+    return eval('{0}'.format(keyword))
+            
 
 def split_into_frames(Data,A,n,lens):
     """

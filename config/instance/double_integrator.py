@@ -12,7 +12,7 @@ class DoubleIntegratorConfig(config.InstanceConfig):
         params = {}
         params['x_desc'] = (-5,5,30)
         params['v_desc'] = (-4,4,20)
-        params['a_desc'] = (-1,1,3)
+        params['a_desc'] = (-5,5,3)
         params['dampening'] = 1e-5
         
         center = np.zeros(2)
