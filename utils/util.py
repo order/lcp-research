@@ -39,6 +39,10 @@ def banner(msg):
     print '# ' + loc_msg + ' #'
     print '#'*(N+4)
 
+def kwargify(**kwargs):
+    # I like this dict format
+    return kwargs
+
 def get_instance_from_file(conf_file):
     """
     Loads a class from file string

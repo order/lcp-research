@@ -44,13 +44,22 @@ class SimulationObject(object):
         return (x_next,costs,actions,oobs)       
 
 def uniform(N,boundaries):
+    """
+    Generate uniform points in a hyper-rectangle
+    """
     D = len(boundaries)
     x = np.empty((N,D))
     for (i,(low,high)) in enumerate(boundaries):        
         x[:,i] = np.random.uniform(low,high,N)
     return x 
 
-def simulate(problem,policy,R,I):
+def simulate(problem,policy,R,I,gamma):
+    """
+    Simulate the problem using the policy.
+    Do R parallel simulations, for I iterations.
+    Store the state,costs,actions, and returns
+    in the save_file
+    """
     D = problem.get_dimension()
     aD = problem.action_dim
     boundaries = problem.get_boundary()
@@ -78,7 +87,16 @@ def simulate(problem,policy,R,I):
         x = x[~new_oob,:]        
         in_bounds[in_bounds] = ~new_oob # Update what is `inbounds'
 
-    return (states,costs,actions)
+    # Find the returns
+    Gamma = np.power(gamma,np.arange(I))
+    returns = np.sum(costs * Gamma,axis=1)
+    assert((R,) == returns.shape)
+
+    return utils.kwargify(states=states,
+                          costs=costs,
+                          actions=actions,
+                          returns=returns)
+
 
 def get_policy(policy_file,data,params):
     policy_gen = utils.get_instance_from_file(policy_file)    
@@ -105,37 +123,17 @@ if __name__ == '__main__':
 
     R = int(runs)
     I = int(iters)
-    
+
+    # Get the problem
     problem = params['instance_builder'].problem
     mdp_obj = params['objects']['mdp']
 
-    # BUILD POLICY
+
+    # Build the policy
     policy = get_policy(policy_file, data, params)
 
     # Simulate
-    (states,costs,actions) = simulate(problem,policy,R,I)
-
-    (r,i,d) = states.shape
-    assert((R,I) == (r,i))
-    (r,i,ad) = actions.shape
-    assert((R,I) == (r,i))
-
-    if d == 2 and ad == 1:
-        plt.plot(states[:,:,0].T,
-                 states[:,:,1].T,
-                 '-b',
-                 alpha=0.5)
-        plt.scatter(states[:,:,0].flatten(),
-                    states[:,:,1].flatten(),
-                    c = actions.flatten(),
-                    edgecolors='none')
-        plt.show()    
-
-    # Find the returns
-    gamma = np.power(mdp_obj.discount,np.arange(I))
-    returns = np.sum(costs * gamma,axis=1)
-    assert((R,) == returns.shape)
-
-    np.save(save_file,returns)
+    results = simulate(problem,policy,R,I,mdp_obj.discount)
+    np.savez(save_file,**results)
 
     

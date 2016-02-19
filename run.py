@@ -63,6 +63,25 @@ def pickle_objects(param_save_file,
     pickle.dump(params,open(param_save_file,'wb'))
 
 
+def run(instance_builder,
+        solver_generator,
+        save_file):
+    [solver,interm_objects] = build_solver(solver_generator,
+                                         instance_builder)
+    
+    # Solve; return primal and dual trajectories
+    solver.solve()
+    data = solver_generator.extract(solver)
+
+    # Save
+    save_data(save_file,data)
+    pickle_objects(param_save_file,
+                   instance_builder,
+                   solver_generator,
+                   inst_conf_file,
+                   solver_conf_file,
+                   interm_objects)
+    
 ###############
 # Entry point #
 ###############
@@ -80,19 +99,5 @@ if __name__ == '__main__':
     # Configure and build
     instance_builder = get_instance_builder(inst_conf_file)
     solver_generator = get_solver_generator(solver_conf_file)
-    [solver,interm_objects] = build_solver(solver_generator,
-                                         instance_builder)
-    
-    # Solve; return primal and dual trajectories
-    solver.solve()
-    data = solver_generator.extract(solver)
 
-    # Save
-    save_data(save_file,data)
-    pickle_objects(param_save_file,
-                   instance_builder,
-                   solver_generator,
-                   inst_conf_file,
-                   solver_conf_file,
-                   interm_objects)
-
+    run(instance_builder,solver_generator,save_file)
