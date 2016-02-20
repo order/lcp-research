@@ -26,18 +26,16 @@ class ProjectiveBasicConfig(config.SolverConfig):
         # Experimental parameter
         params['x_dual_bases'] = False
 
-        self.center_grid = (5,5)
-
+        # This is the basic part of the basis generation
+        # It's wrapped by BasisGenerator
+        
+        params['basis_generator'] = generator
         self.params = params
 
     def configure_solver_generator(self,instance_builder):
+
         boundary = instance_builder.problem.boundary
-        assert(2 == len(boundary))
-        [(x_low,x_high),(v_low,v_high)] = boundary
-        (xn,vn) = self.center_grid
-        
-        [X,V] = np.meshgrid(np.linspace(x_low,x_high,xn),
-                            np.linspace(v_low,v_high,vn))
+        [X,V] = np.meshgrid(np.linspace(-5,5,5),np.linspace(-3,3,5))
         centers = np.column_stack([X.flatten(),V.flatten()])
 
         Zero = rbf.RadialBasis(centers=np.array([[0,0]]),
@@ -48,5 +46,4 @@ class ProjectiveBasicConfig(config.SolverConfig):
                                                     [-0.5,1]]))
         generator = bases.BasisGenerator([Zero,One,RBFs])
         
-        self.params['basis_generator'] = generator
         return gen.ProjectiveGenerator(**self.params)

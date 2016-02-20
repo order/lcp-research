@@ -4,6 +4,8 @@ import mdp
 import node_mapper
 import itertools
 
+import linalg
+
 from utils.parsers import KwargParser
 
 class MDPDiscretizer(mdp.MDPBuilder):
@@ -245,8 +247,7 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
             E = Data.size
             assert((E,) == Data.shape)
             assert((2,E) == IJ.shape)
-            T = T + sps.csr_matrix((Data,IJ),shape=(total_nodes,N))
-            
+            T = T + sps.csr_matrix((Data,IJ),shape=(total_nodes,N))        
         return T
         
     def add_node_mapper(self,mapper):
@@ -262,7 +263,10 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         costs = []
         for a in xrange(self.num_actions):
             action = self.actions[a,:]
-            transitions.append(self.build_transition_matrix(action))
+            T= self.build_transition_matrix(action)
+            transitions.append(T)
+            stp = 100.0*linalg.trace(T) / T.sum()
+            print 'Action {0} self-transition: {1}%'.format(a,stp)
             costs.append(self.build_cost_vector(action))
 
         weight = self.build_weight_vector()

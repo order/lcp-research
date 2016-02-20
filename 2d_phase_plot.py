@@ -23,17 +23,15 @@ if __name__ == '__main__':
     sim_data = np.load(args.sim_file)
 
     X = sim_data['states']
-    C = sim_data['costs']
     
     (R,I,D) = X.shape
     assert(D == 2) # Velocity and position
 
     for r in xrange(R):
         plt.plot(X[r,:,0],X[r,:,1],'-k',alpha=0.25)
-    for r in xrange(R):
-        plt.scatter(X[r,:,0],X[r,:,1],
-                    c=C[r,:],
-                    edgecolor='none')
+    #for r in xrange(R):
+    #    plt.scatter(X[r,:,0],X[r,:,1],
+    #                edgecolor='none')
     plt.show()
 
     

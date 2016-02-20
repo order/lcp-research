@@ -63,7 +63,7 @@ class ProjectiveGenerator(config.SolverGenerator):
         svd = True
         if svd:
             num_svd = 25
-            utils.banner('Using SVD basis')
+            utils.banner('Using SVD basis; split out a make more principled')
             [U0,_,_] = sps.linalg.svds(mdp_obj.transitions[0],
                                        k=num_svd,
                                        tol=1e-8,

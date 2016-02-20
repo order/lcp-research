@@ -19,7 +19,7 @@ def get_instance_builder(inst_conf_file):
                       config.InstanceConfig))
     return instance_config.configure_object_builder()  
 
-def get_solver_generator(solver_conf_file):
+def get_solver_generator(solver_conf_file,instance_builder):
     """
     Gets a SolverConfig from file.
     This object configures the solver generator (e.g. 
@@ -30,7 +30,7 @@ def get_solver_generator(solver_conf_file):
     solver_config = utils.get_instance_from_file(solver_conf_file)
     assert(issubclass(type(solver_config),
                       config.SolverConfig))
-    return solver_config.configure_solver_generator()
+    return solver_config.configure_solver_generator(instance_builder)
 
 def build_solver(solver_generator,instance_builder):
     # May build intermediate objects (MDP, LCP, projective LCP)
@@ -98,6 +98,7 @@ if __name__ == '__main__':
 
     # Configure and build
     instance_builder = get_instance_builder(inst_conf_file)
-    solver_generator = get_solver_generator(solver_conf_file)
+    solver_generator = get_solver_generator(solver_conf_file,
+                                            instance_builder)
 
     run(instance_builder,solver_generator,save_file)
