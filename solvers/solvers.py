@@ -96,3 +96,7 @@ class IPIterator(Iterator):
 class MDPIterator(Iterator):
     def get_value_vector(self):
         raise NotImplementedError()
+
+class PolicyIterator(Iterator):
+    def get_policy_vector(self):
+        raise NotImplementedError()
