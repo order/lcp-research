@@ -46,7 +46,7 @@ class ProjectiveBasicConfig(config.SolverConfig):
         RBFs = rbf.RadialBasis(centers=centers,
                                covariance=np.array([[1,-0.5],
                                                     [-0.5,1]]))
-        generator = bases.BasisGenerator([Zero,One,RBFs])
+        generator = bases.BasisWrapper([Zero,One,RBFs])
         
         self.params['basis_generator'] = generator
         return gen.ProjectiveGenerator(**self.params)

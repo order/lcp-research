@@ -1,7 +1,7 @@
 import math
 import numpy as np
 import scipy
-import scipy.sparse
+import scipy.sparse as sps
 import scipy.sparse.linalg
 import utils.parsers
 
@@ -16,8 +16,12 @@ from collections import defaultdict
 import time
 
 class BasisGenerator(object):
+    def generate_basis(self,points=None,**kwargs):
+        raise NotImplementedError()  
+
+class BasisWrapper(BasisGenerator):
     """
-    This is an object that wraps around a "basic" basis generator 
+    This is an object that wraps around a state-space basis generator 
     and deals with special nodes like out of bounds nodes.
 
     The assumption is that a special node requires a distinct 
@@ -33,7 +37,7 @@ class BasisGenerator(object):
         self.basic_generators = gen_objs
 
 
-    def generate_basis(self, points,**kwargs):
+    def generate_basis(self,points,**kwargs):
         """
         Generates basis columns based on the provided points.
         
@@ -63,7 +67,8 @@ class BasisGenerator(object):
         # Generate all the bases, reserving bases for the special
         Bases = []
         for gen in self.basic_generators:
-            Bases.append(gen.generate_basis(points,special_points=special_points))
+            Bases.append(gen.generate_basis(points,
+                                            special_points=special_points))
             
         B = np.hstack(Bases)
                 
@@ -81,47 +86,20 @@ class BasisGenerator(object):
             
         #B = normalize_cols(B)
         return B
-
-class BasicBasisGenerator(object):
-    """
-    The BasisGenerator uses these for actually doing to mapping of 
-    rows to basis values. It handles some of the higher-level 
-    concerns like cleaning and special point handling
-    """
-    def __init__(self):
-        pass
-    def isortho(self):
-        raise NotImplementedError()
-    def generate_basis(self,points,**kwargs):
-        raise NotImplementedError()
-
-class ConstBasis(BasicBasisGenerator):
+    
+class ConstBasis(BasisGenerator):
     def __init__(self):
         pass
     def generate_basis(self,points,**kwargs):
         (N,d) = points.shape
         return np.ones((N,1)) / np.sqrt(N)
 
-class IdentityBasis(BasicBasisGenerator):
+class IdentityBasis(BasisGenerator):
     def __init__(self):
         pass
     def generate_basis(self,points,**kwargs):
-        # Parse kwargs
-        parser = utils.parsers.KwargParser()
-        parser.add('special_points',[])
-        args = parser.parse(kwargs)
-        special_points = args['special_points'] 
-        (N,D) = points.shape
-
-        num_normal = N - len(special_points)
-        normal_mask = np.ones(N,dtype=bool)
-        normal_mask[special_points] = False
-        
-        B = np.empty((N,num_normal))
-        B[normal_mask,:] = np.eye(num_normal)
-        B[~normal_mask,:] = 0
-                
-        return B
+        (N,d) = points.shape
+        return sps.eye(N)
         
 def normalize_cols(M):
     (n,m) = M.shape

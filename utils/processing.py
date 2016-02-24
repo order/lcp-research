@@ -5,9 +5,11 @@ import os
 import utils
 from parsers import KwargParser
 
-ProcessorShortcuts = {'2d_value_movie':['primal',
+ProcessorShortcuts = {'2d_primal_value_movie':['primal',
                                         'toframes',
                                         'x[:,0,:,:]'],
+                      '2d_value_movie':['value',
+                                        'toframesvalue'],
                       '2d_flow_movie':['primal',
                                        'toframes',
                                        'np.sum(x[:,1:,:,:],axis=1)'],

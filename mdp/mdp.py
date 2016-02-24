@@ -56,7 +56,7 @@ class MDP(lcp.LCPBuilder):
         I guess we're using a sparse matrix here...
         """
         return sps.eye(self.num_states,format='lil')\
-            - self.discount * self.transitions[a].T
+            - self.discount * self.transitions[a]        
 
     def build_lcp(self,**kwargs):
         # Optional regularization
@@ -81,13 +81,13 @@ class MDP(lcp.LCPBuilder):
             E = self.get_action_matrix(a)
             
             # NewRow = [-E_a 0 ... 0]
-            NewRow = sps.hstack((-E,sps.lil_matrix((n,A*n))))
+            NewRow = sps.hstack((-E.T,sps.lil_matrix((n,A*n))))
             if Bottom == None:
                 Bottom = NewRow
             else:
                 Bottom = sps.vstack((Bottom,NewRow))
             # Top = [...E_a^\top]
-            Top = sps.hstack((Top,E.T))
+            Top = sps.hstack((Top,E))
             q[((a+1)*n):((a+2)*n)] = self.costs[a]
         M = sps.vstack((Top,Bottom))
 
@@ -173,4 +173,3 @@ def mdp_skew_assembler(A_list):
     assert((M+n,M+n) == SS.shape)    
 
     return SS
-        

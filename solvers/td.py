@@ -1,21 +1,28 @@
 import numpy as np
 
-from solver import MDPIterator
+from solvers import MDPIterator
 from utils.parsers import KwargParser
+import utils
 
-class TDIterator(MDPIterator):
-    def __init__(self,discretizer,**kwargs):
+class TabularTDIterator(MDPIterator):
+    """
+    TD(0) scheme based on an MDP;
+    Want to remove the use of a model in a subsequent
+    variant.
+    """
+    
+    def __init__(self,mdp_obj,**kwargs):
         parser = KwargParser()
-        parser.add('policy')
         parser.add('num_samples')
-        parser.add('state_distribution')
         parser.add('step_size')
-        args = parser.parser(kwargs)
+        parser.add('policy')
+        args = parser.parse(kwargs)
         self.__dict__.update(args)
         
-        self.discretizer = discretizer
+        self.mdp_obj = mdp_obj
+        N = mdp_obj.num_states
+        assert((N,) == self.policy.shape)
 
-        N = discretizer.get_num_nodes()
         self.v = np.zeros(N) # Assume tabular form
         self.iteration = 0
 
@@ -24,21 +31,44 @@ class TDIterator(MDPIterator):
         # 2) Get action from policy
         # 3) Get successor state S' and cost C
         # 4) V(S) <- V(S) + alpha[C + gamma V(S') - V(S)]
-        alpha = self.step_size
-        gamma = self.discretizer.discount
-
-        S = self.state_distribution.sample(self.num_samples)
-        A = self.policy.get_decisions(S)
-        R = self.problem.cost_obj.evaluate(S,actions=A)
-        S_next = self.discretizer.problem.next_states(S,A)
-
-        # TODO
-        # What is the right way of assuming the tabular form?
-        # Suppose that we're doing LSTD using an 'interpolation basis'
         
+        alpha = self.step_size
+        gamma = self.mdp_obj.discount
+
+        mdp_obj = self.mdp_obj
+        V = self.v
+
+        N = mdp_obj.num_states
+        A = mdp_obj.num_actions
+        
+        S = np.random.randint(0,N,self.num_samples) # Uniform indices
+        actions = self.policy[S]
+
+        for a in xrange(A):
+            a_mask = (actions == a) # Mask for action = a
+            n = a_mask.sum()
+            if 0 == n:
+                continue
+            
+            SA = S[a_mask] # State/action indicies
+            assert((n,) == SA.shape)
+            
+            costs = mdp_obj.costs[a][SA]
+            assert((n,) == costs.shape)
+
+            # Using the whole column
+            S_next = mdp_obj.transitions[a][:,SA]
+            assert((N,n) == S_next.shape)
+
+            V_next = (S_next.T).dot(V)
+            assert((n,) == V_next.shape)
+
+            V[SA] = (1.0 - alpha)*V[SA] + alpha * (costs + gamma * V_next)
+
+        self.iteration += 1        
 
     def get_value_vector(self):
-        return self.v
+        return np.array(self.v)
         
     def get_iteration(self):
         return self.iteration

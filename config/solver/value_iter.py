@@ -14,6 +14,6 @@ class ValueIterationConfig(config.SolverConfig):
         params['notifications'] = notify
         self.params = params
 
-    def configure_solver_generator(self):
+    def configure_solver_generator(self,discretizer):
         return gen.ValueIterGenerator(**self.params)
 

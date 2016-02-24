@@ -4,6 +4,20 @@ class Policy(object):
     def get_decisions(self,points):
         raise NotImplementedError()
 
+class DiscretePolicy(object):
+    def get_action_indices(self,points):
+        raise NotImplementedError()
+    
+class ConstantDiscretePolicy(DiscretePolicy):
+    def __init__(self,action_index):
+        self.action_index = action_index
+    def get_action_indices(self,points):
+        (N,d) = points.shape
+        actions = np.full(N,self.action_index)
+        assert((N,) == actions.shape)
+        return actions
+    
+
 class ConstantPolicy(Policy):
     def __init__(self,action):
         assert(1 == len(action.shape))

@@ -52,7 +52,7 @@ def gaussian_rbf(X,mu,Cov):
     # Return the normalized Gaussian
     return scale * np.exp( -0.5 * np.power(dist,2.0))
 
-class RadialBasis(bases.BasicBasisGenerator):
+class RadialBasis(bases.BasisGenerator):
     def __init__(self,**kwargs):
         parser = KwargParser()
         parser.add('centers')

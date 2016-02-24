@@ -16,8 +16,13 @@ def parse_command_line():
                         metavar='CMD',
                         help='processing commands separated by ";"'
                         + ' (see "apply_processor")',
-                        default='2d_value_movie',
+                        default='2d_primal_value_movie',
                         type=str)
+    parser.add_argument('-f','--frames',
+                        metavar='INT',
+                        help='max number of frames',
+                        default=100,
+                        type=int)
     args = parser.parse_args()
     return args    
 
@@ -35,11 +40,19 @@ if __name__ == '__main__':
     command_queue = args.processors.split(';')
     data = utils.processing.apply_command_queue(command_queue,data,params)
     assert(3 == len(data.shape))
+    (I,X,Y) = data.shape
 
     # Animate the data
     plot_args = utils.kwargify()
     if hasattr(args,'save_file') and args.save_file:
         plot_args['save_file'] = args.save_file
+
+    # Frame skip to maintain max frames
+    num_frames = args.frames
+    fs = int(np.floor(max(1.0,float(I) / num_frames)))
+    data = data[::fs,:,:]
+    print data.shape
+    assert(data.shape[0] <= num_frames+1)
     
     utils.plotting.animate_frames(data,**plot_args)
 

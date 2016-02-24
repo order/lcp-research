@@ -2,7 +2,7 @@ import bases
 import numpy as np
 from utils.parsers import KwargParser
 
-class ChebyshevBasis(bases.BasicBasisGenerator):
+class ChebyshevBasis(bases.BasisGenerator):
     def __init__(self,**kwargs):
         parser = KwargParser()
         parser.add('K')

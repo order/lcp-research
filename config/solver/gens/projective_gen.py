@@ -6,6 +6,7 @@ from solvers.notification import *
 from solvers.recording import *
 import config
 import bases
+from bases.svd import SVDBasis
 import linalg
 import lcp
 import utils
@@ -62,41 +63,23 @@ class ProjectiveGenerator(config.SolverGenerator):
 
         svd = True
         if svd:
-            num_svd = 25
+            num_svd = 1
             utils.banner('Using SVD basis; split out a make more principled')
-            [U0,_,_] = sps.linalg.svds(mdp_obj.transitions[0],
-                                       k=num_svd,
-                                       tol=1e-8,
-                                       which='LM',
-                                       return_singular_vectors='u',
-                                       maxiter=1e5)
-            [U2,_,_] = sps.linalg.svds(mdp_obj.transitions[2],
-                                       k=num_svd,
-                                       tol=1e-8,
-                                       which='LM',
-                                       return_singular_vectors='u',
-                                       maxiter=1e5)
+            BG = SVDBasis(num_svd)
+            [Q,Us] = BG.generate_basis(mdp_obj=mdp_obj,
+                                       discretizer=discretizer)
             
-            for i in xrange(num_svd):
-                fig,axarr = plt.subplots(3)
-                ImgU0 = np.reshape(U0[:xy,i],lens)
-                ImgU2 = np.reshape(U2[:xy,i],lens)
-                Diff = ImgU0 - ImgU2
-                axarr[0].pcolor(ImgU0)
-                axarr[1].pcolor(ImgU2)
-                axarr[2].pcolor(Diff)
+            for k in xrange(num_svd):
+                fig,axarr = plt.subplots(A+1)
+                stack = np.column_stack([Q[:,k],Us[:,:,k]])[np.newaxis,:]
+                assert((1,(A+1)*N) == stack.shape)
+                frame = utils.processing.split_into_frames(stack,A,N,lens)
+            
+                for a in xrange(A+1):
+                    axarr[a].pcolor(frame[0,a,:,:])
                 plt.show()
-
-            # Const
-            Ones = np.ones((n,1))
-            Ones[xy:] = 0
-            
-            # Special
-            sp = n - xy
-            Sp = np.zeros((n,sp))
-            Sp[xy:,:] = np.eye(sp)
-            
-            Phi = np.hstack([Ones,Sp,U0,U2])
+                
+            quit()
                 
         else:
             BG = self.basis_generator
