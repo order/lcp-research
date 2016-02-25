@@ -81,12 +81,12 @@ class ProjectiveIPIterator(LCPIterator,IPIterator):
         backoff = self.central_path_backoff
      
         Phi = self.Phi
-        U = self.U
+        #U = self.U
         q = self.q
         
         assert(len(Phi.shape) == 2)
         (N,k) = Phi.shape
-        assert((k,N) == U.shape)
+        #assert((k,N) == U.shape)
         assert((N,) == q.shape)
 
         PtP = self.PtP # FTF in Geoff's code

@@ -10,16 +10,21 @@ import utils.plotting
 ###############
 if __name__ == '__main__':
 
-    if len(sys.argv) < 2:
-        print 'Usage: <data files...> <> <>'
+    if len(sys.argv) < 3:
+        print 'Usage: <field> <data files...> <> <>'
         quit()
-    data_files = sys.argv[1:]
+    field = sys.argv[1]
+    data_files = sys.argv[2:]
 
+    handles = []
     for data_file in data_files:
-        assert(data_file.endswith('.npy'))
-        data = np.load(data_file)
+        assert(data_file.endswith('.npz'))
+        data = np.load(data_file)[field]
         (xs,fs) = utils.plotting.cdf_points(data)
-        plt.plot(xs,fs)
+        h = plt.plot(xs,fs,label=data_file)
+        handles.append(h)
+    plt.title(field)
+    plt.legend(data_files)
     plt.show()
         
 

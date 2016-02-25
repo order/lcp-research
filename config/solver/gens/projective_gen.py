@@ -120,14 +120,12 @@ class ProjectiveGenerator(config.SolverGenerator):
 
         svd = True
         if svd:
-            print N
-            print np.sqrt(N)
             num_svd = 10
             utils.banner('Using SVD basis; split out a make more principled')
             BG = SVDBasis(num_svd)
             Qs = BG.generate_basis(mdp_obj=mdp_obj,
                                    discretizer=discretizer)
-            visualize_bases(Qs,A,n,lens)
+            #visualize_bases(Qs,A,n,lens)
                                     
         else:
             raise NotImplementedError()

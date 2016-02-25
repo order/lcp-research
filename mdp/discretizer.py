@@ -3,9 +3,10 @@ import scipy.sparse as sps
 import mdp
 import node_mapper
 import itertools
-
+import matplotlib.pyplot as plt
 import linalg
 
+import utils
 from utils.parsers import KwargParser
 
 class MDPDiscretizer(mdp.MDPBuilder):
@@ -261,12 +262,13 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
         # Build the transitions, costs, and so forth
         transitions = []
         costs = []
+        utils.banner('Checking self-transitioning:')
         for a in xrange(self.num_actions):
             action = self.actions[a,:]
             T= self.build_transition_matrix(action)
             transitions.append(T)
             stp = 100.0*linalg.trace(T) / T.sum()
-            print 'Action {0} self-transition: {1}%'.format(a,stp)
+            print '\tAction {0}: {1}%'.format(a,stp)
             costs.append(self.build_cost_vector(action))
 
         weight = self.build_weight_vector()

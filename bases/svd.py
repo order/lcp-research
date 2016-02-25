@@ -36,8 +36,5 @@ class SVDBasis(object):
         Vs = []
         for a in xrange(A):
             V = Vt[:,a,:].T
-            Approx = ((U * S).dot(V.T))
-            assert(Approx.shape == Es[a].shape)
-            print np.linalg.norm(Es[a] - Approx)
             Vs.append(V)
         return [U]+Vs
