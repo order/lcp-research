@@ -3,6 +3,8 @@ import scipy.sparse as sps
 import bases
 from utils.parsers import KwargParser
 
+import matplotlib.pyplot as plt
+
 class SVDBasis(object):
     def __init__(self,K):
         self.K = K
@@ -15,23 +17,27 @@ class SVDBasis(object):
         A = mdp_obj.num_actions
         N = mdp_obj.num_states
         K = self.K
-
+        #K = 15
+        
         Es = [mdp_obj.get_action_matrix(a) for a in xrange(A)]
-        E_stack = sps.vstack(Es)
+        E_stack = sps.hstack(Es)
+        #E_stack = mdp_obj.get_action_matrix(1)
 
         [U,S,Vt] = sps.linalg.svds(E_stack,
                                    k=K,
-                                   tol=1e-8,
-                                   maxiter=1e4)
-        print U.shape
-        print (N,K)
+                                   which='LM',
+                                   tol=1e-10,
+                                   maxiter=1e5)
+        
         assert((N,K) == U.shape)
-        assert((K,N*A) == Vt.shape)
-        Vt = np.reshape(Vt,(K,A,N))
-        V = np.rollaxis(Vt,0,2)
-        assert((A,N,K) == V.shape)
-
+        #Vt = np.hstack([Vt]*A)
+        assert((K,N*A) == Vt.shape)        
+        Vt = np.reshape(Vt,(K,A,N),order='C')
+        Vs = []
         for a in xrange(A):
-            print np.linalg.norm(Es[a] - U.dot(S).dot(Vt[:,a,:]))
-
-        return [U,V]
+            V = Vt[:,a,:].T
+            Approx = ((U * S).dot(V.T))
+            assert(Approx.shape == Es[a].shape)
+            print np.linalg.norm(Es[a] - Approx)
+            Vs.append(V)
+        return [U]+Vs

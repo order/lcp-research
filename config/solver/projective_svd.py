@@ -11,7 +11,7 @@ class ProjectiveBasicConfig(config.SolverConfig):
         params['value_regularization'] = 0.0
         params['flow_regularization'] = 1e-12
 
-        term_conds = {'max_iter':solvers.MaxIterTerminationCondition(1000),
+        term_conds = {'max_iter':solvers.MaxIterTerminationCondition(2500),
                       'primal':solvers.PrimalChangeTerminationCondition(1e-8)}
         recorders = {'primal':solvers.PrimalRecorder(),
                      'dual':solvers.DualRecorder(),
@@ -29,7 +29,6 @@ class ProjectiveBasicConfig(config.SolverConfig):
         # This is the basic part of the basis generation
         # It's wrapped by BasisGenerator
         
-        params['basis_generator'] = generator
         self.params = params
 
     def configure_solver_generator(self,instance_builder):
@@ -44,6 +43,8 @@ class ProjectiveBasicConfig(config.SolverConfig):
         RBFs = rbf.RadialBasis(centers=centers,
                                covariance=np.array([[1,-0.5],
                                                     [-0.5,1]]))
-        generator = bases.BasisGenerator([Zero,One,RBFs])
+        generator = bases.BasisWrapper([Zero,One,RBFs])
+        self.params['basis_generator'] = generator
+
         
         return gen.ProjectiveGenerator(**self.params)

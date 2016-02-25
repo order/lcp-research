@@ -20,8 +20,8 @@ def parse_command_line():
                         type=str)
     parser.add_argument('-f','--frames',
                         metavar='INT',
-                        help='max number of frames',
-                        default=100,
+                        help='frames skip',
+                        default=1,
                         type=int)
     args = parser.parse_args()
     return args    
@@ -48,11 +48,8 @@ if __name__ == '__main__':
         plot_args['save_file'] = args.save_file
 
     # Frame skip to maintain max frames
-    num_frames = args.frames
-    fs = int(np.floor(max(1.0,float(I) / num_frames)))
+    fs = args.frames
     data = data[::fs,:,:]
-    print data.shape
-    assert(data.shape[0] <= num_frames+1)
     
     utils.plotting.animate_frames(data,**plot_args)
 

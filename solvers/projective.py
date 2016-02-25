@@ -4,6 +4,25 @@ import numpy as np
 import scipy as sp
 import scipy.sparse as sps
 
+import utils
+
+def form_Gh_dense(x,y,w,g,p,q,Phi,PtPUP,PtPU_P):
+    for v in [Phi,PtPUP,PtPU_P]:
+        assert(type(v) == np.ndarray)
+        
+    # Eliminate both the x and y blocks
+    (k,N) = PtPU_P.shape
+
+    A = (PtPU_P / (x+y))
+    assert((k,N) == A.shape)
+    G = ((A * y).dot(Phi) - PtPUP)
+    assert((k,k) == G.shape)
+    
+    h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
+    assert((k,) == h.shape)
+    return (G,h)
+    
+
 class ProjectiveIPIterator(LCPIterator,IPIterator):
     def __init__(self,proj_lcp_obj,**kwargs):
         self.centering_coeff = kwargs.get('centering_coeff',0.99)
@@ -27,6 +46,12 @@ class ProjectiveIPIterator(LCPIterator,IPIterator):
         # FMI in Geoff's code; I sometimes call it Psi in my notes
         assert((k,N) == self.PtPU_P.shape)            
         self.PtP = PtP
+
+        # Get dense versions. TODO: only if sparsity is low?
+        self.Phi_dense = Phi.toarray()
+        self.PtP_dense = PtP.toarray()
+        self.PtPUP_dense = self.PtPUP.toarray()
+        self.PtPU_P_dense =self.PtPU_P.toarray()
 
         self.x = kwargs.get('x0',np.ones(N))
         self.y = kwargs.get('y0',np.ones(N))
@@ -66,7 +91,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator):
 
         PtP = self.PtP # FTF in Geoff's code
         PtPUP = self.PtPUP
-        PtPU_P = self.PtPU_P 
+        PtPU_P = self.PtPU_P
 
         x = self.x
         y = self.y
@@ -86,9 +111,9 @@ class ProjectiveIPIterator(LCPIterator,IPIterator):
         Y = sps.diags(y,0)
         Z = sps.lil_matrix((N,k))
         I = sps.eye(N)
-        M = Phi.dot(U)
         
         if False:
+            M = Phi.dot(U)
             # Un-reduced system
             NewtonSystem = sps.bmat([[Y, X ,Z],\
                 [-M,I,Z],\
@@ -106,22 +131,14 @@ class ProjectiveIPIterator(LCPIterator,IPIterator):
             cond = np.linalg.cond(ReductedNewtonSystem.todense())
             print '\tCond: {0:.3g}'.format(cond)      
             
-        # Eliminate both the x and y blocks
-        inv_XY = sps.diags(1.0/(x + y),0)
-        A = (PtPU_P.dot(inv_XY))
-        assert((k,N) == A.shape)        
-        G = ((A.dot(Y)).dot(Phi) - PtPUP)
+        (G,h) =  form_Gh_dense(x,y,w,g,p,q,self.Phi_dense,
+                               self.PtPUP_dense,
+                               self.PtPU_P_dense)
 
-        G_sparse = float(G.nnz) / float(np.prod(G.shape))
-        assert((k,k) == G.shape)
-        
-        h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
-        assert((k,) == h.shape)
-            
         # Step 5: Solve for del_w
         # G is essentially dense
-        if G_sparse > 0.01:
-            del_w = np.linalg.lstsq(G.toarray(),h)[0]
+        if True:
+            del_w = np.linalg.lstsq(G,h)[0]
         else:
             del_w = sps.linalg.spsolve(G,h)
         assert((k,) == del_w.shape)
@@ -129,6 +146,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator):
             # Step 6
         Phidw= Phi.dot(del_w)
         assert((N,) == Phidw.shape)
+        inv_XY = sps.diags(1.0/(x + y),0)
         del_y = inv_XY.dot(g + y*p - y*Phidw)
         assert((N,) == del_y.shape)
         

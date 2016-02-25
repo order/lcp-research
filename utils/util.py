@@ -38,6 +38,9 @@ def banner(msg):
     print '# ' + msg + ' #'
     print '# ' + loc_msg + ' #'
     print '#'*(N+4)
+
+def sparsity_ratio(A):
+    return float(A.nnz) / float(np.prod(A.shape))
     
 def split_extension(filename,ext=None):
     if ext:

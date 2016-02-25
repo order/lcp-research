@@ -10,10 +10,10 @@ Weird issue: don't use a "from x import y"
 class DoubleIntegratorConfig(config.InstanceConfig):
     def __init__(self):
         params = {}
-        params['x_desc'] = (-5,5,40)
-        params['v_desc'] = (-4,4,30)
-        params['a_desc'] = (-1,1,3)
-        params['dampening'] = 1e-5
+        params['x_desc'] = (-5,5,100)
+        params['v_desc'] = (-4,4,64)
+        params['a_desc'] = (-2,2,3)
+        params['dampening'] = 1e-8
         
         center = np.zeros(2)
         radius = 0.15

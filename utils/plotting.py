@@ -75,10 +75,10 @@ def animate_frames(Frames,**kwargs):
     Plotters = []
     cmap = plt.get_cmap(args['cmap'])
     for i in xrange(I):
-        img = plt.pcolor(Frames[i,:,:],
-                         vmin = low,
-                         vmax = hi,
-                         cmap=cmap)
+        img = plt.pcolormesh(Frames[i,:,:],
+                             vmin = low,
+                             vmax = hi,
+                             cmap=cmap)
         Plotters.append([img])
     im_ani = animation.ArtistAnimation(fig,Plotters,\
                                        interval=50,\
@@ -120,7 +120,7 @@ def pcolor(data,**kwargs):
     args = parser.parse(kwargs)
 
     cmap = plt.get_cmap(args['cmap'])
-    plt.pcolor(data,cmap=cmap)
+    plt.pcolormesh(data,cmap=cmap)
     plt.xlabel(args['xlabel'])
     plt.ylabel(args['ylabel'])
     plt.title(args['title'])

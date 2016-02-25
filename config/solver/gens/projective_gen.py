@@ -19,14 +19,71 @@ import matplotlib.pyplot as plt
 
 import time
 
-def visualize_bases(Q,U,x,y,K):
-    xy = x*y
+def visualize_bases(Qs,A,n,lens):
+    assert(A+1 == len(Qs))
+    (_,K) = Qs[0].shape
+    Q_stack = np.vstack(Qs)    
+    
     utils.banner('Visualizing bases')
-    for i in xrange(K):
-        f,(ax1,ax2) = plt.subplots(1,2)
-        ax1.pcolor(np.reshape(Q[:xy,i],(x,y)))
-        ax2.pcolor(np.reshape(U.T[:xy,i],(x,y)))
+    for k in xrange(K):
+        v = (Q_stack[:,k])[np.newaxis,:]
+        Frames = utils.processing.split_into_frames(v,A,n,lens)
+        f,axarr = plt.subplots(1,A+1)
+        for i in xrange(A+1):
+            axarr[i].pcolormesh(Frames[0,i,:,:])
         plt.show()
+
+def build_projlcp_from_value_basis(Q,mdp_obj,flow_reg):
+    A = mdp_obj.num_actions
+    return build_projlcp_from_basis_list([Q]*(A+1),
+                                         mdp_obj,
+                                         flow_reg)
+
+def build_projlcp_from_basis_list(Qs,mdp_obj,flow_reg):
+    # Find the in-basis approximations for E = I - gamma* P
+    # Done with least-squares:
+    # E   ~= Phi U
+    # E.T ~= Phi W
+    n = mdp_obj.num_states
+    A = mdp_obj.num_actions
+    N = (A+1)*n
+    k = Qs[0].shape[1]
+    K = (A+1)*k
+    assert(k <= n)
+
+    for Q in Qs:
+        assert((n,k) == Q.shape)
+    
+    BigU_blocks = [[None]]
+    Uts = []
+    for a in xrange(A):
+        # Approximate E and E.T via least-squares
+        E = mdp_obj.get_action_matrix(a)
+        U = linalg.lsmr_matrix(Qs[a],E)
+        assert((k,n) == U.shape)
+
+        W = linalg.lsmr_matrix(Qs[a],E.T)
+        assert((k,n) == W.shape)
+
+        BigU_blocks[0].append(U) # [0, U1, U2,...]
+        BigU_blocks.append([-W]\
+                           + [None]*a\
+                           + [flow_reg * Qs[a].T]\
+                           + [None]*(A-a-1))
+        # [-W, 0,...,flow_reg*Phi.T,0...]
+
+    # Build the q vector
+    q = np.hstack([-mdp_obj.state_weights]+mdp_obj.costs)
+        
+    # Construct the block basis:
+    BigQ = sps.block_diag(Qs)
+    assert((N,K) == BigQ.shape)
+
+    # Construct the block coefficients:
+    BigU = sps.bmat(BigU_blocks)
+    assert((K,N) == BigU.shape)
+
+    return (BigQ,BigU,q)
                     
 class ProjectiveGenerator(config.SolverGenerator):
     def __init__(self,**kwargs):
@@ -63,95 +120,24 @@ class ProjectiveGenerator(config.SolverGenerator):
 
         svd = True
         if svd:
-            num_svd = 1
+            print N
+            print np.sqrt(N)
+            num_svd = 10
             utils.banner('Using SVD basis; split out a make more principled')
             BG = SVDBasis(num_svd)
-            [Q,Us] = BG.generate_basis(mdp_obj=mdp_obj,
-                                       discretizer=discretizer)
-            
-            for k in xrange(num_svd):
-                fig,axarr = plt.subplots(A+1)
-                stack = np.column_stack([Q[:,k],Us[:,:,k]])[np.newaxis,:]
-                assert((1,(A+1)*N) == stack.shape)
-                frame = utils.processing.split_into_frames(stack,A,N,lens)
-            
-                for a in xrange(A+1):
-                    axarr[a].pcolor(frame[0,a,:,:])
-                plt.show()
-                
-            quit()
-                
+            Qs = BG.generate_basis(mdp_obj=mdp_obj,
+                                   discretizer=discretizer)
+            visualize_bases(Qs,A,n,lens)
+                                    
         else:
+            raise NotImplementedError()
             BG = self.basis_generator
-            Phi = BG.generate_basis(points,
-                                    special_points=special_points)
+            Q = BG.generate_basis(points,
+                                  special_points=special_points)
 
-        (d,k) = Phi.shape
-        assert(d == n)
-        assert(k <= n)
-        K = (A+1)*k
-
-        #Orthogonalize using QR decomposition
-        #[Q,R] = sp.linalg.qr(Phi,mode='economic')
-        #assert(Q.shape == Phi.shape)
-        Q = Phi
-
-        # Find the in-basis approximations for E = I - gamma* P
-        # Done with least-squares:
-        # E   ~= Phi U
-        # E.T ~= Phi W
-        
-        BigU_blocks = [[None]]
-        flow_reg = self.flow_regularization
-        Uts = []
-        for a in xrange(A):
-            P = mdp_obj.transitions[a]
-            E = sps.eye(n) - gamma * P
-            U = linalg.lsmr_matrix(Q,E)
-            assert((k,n) == U.shape)
-
-            if not self.x_dual_bases:
-                W = linalg.lsmr_matrix(Q,E.T)
-                assert((k,n) == W.shape)
-
-            #visualize_bases(Q,U,xn,yn,k)
-
-            BigU_blocks[0].append(U) # [0, U1, U2,...]
-            if self.x_dual_bases:
-                Uts.append(U.T)
-                BigU_blocks.append([-Phi.T]\
-                                   + [None]*a\
-                                   + [flow_reg * U]\
-                                   + [None]*(A-a-1))
-            else:
-                BigU_blocks.append([-W]\
-                                   + [None]*a\
-                                   + [flow_reg * Phi.T]\
-                                   + [None]*(A-a-1))
-                # [-W, 0,...,flow_reg*Phi.T,0...]
-
-        # Build the q vector
-        q = np.hstack([-mdp_obj.state_weights]+ mdp_obj.costs)
-        
-
-        # Construct the block basis:
-        # Phi 0   ... 0
-        # 0   Phi ... 0
-        #     ...
-        # 0   ...     Phi
-        if self.x_dual_bases:
-            BigQ = sps.block_diag([Q] + Uts)
-        else:
-            BigQ = sps.block_diag([Q]*(A+1))
-        assert((N,K) == BigQ.shape)
-
-        # Construct the block coefficients:
-        # 0 U_1 ... U_A
-        # -W_1  0 ... 0
-        #         ...
-        # -W_A  0 ... 0
-        BigU = sps.bmat(BigU_blocks)
-        assert((K,N) == BigU.shape)
+        (BigQ,BigU,q) = build_projlcp_from_basis_list(Qs,
+                                                      mdp_obj,
+                                                      self.flow_regularization)
 
         proj_lcp_obj = lcp.ProjectiveLCPObj(BigQ,BigU,q)
         iter = ProjectiveIPIterator(proj_lcp_obj)
