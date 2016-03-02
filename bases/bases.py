@@ -16,8 +16,12 @@ from collections import defaultdict
 import time
 
 class BasisGenerator(object):
-    def generate_basis(self,points=None,**kwargs):
-        raise NotImplementedError()  
+    def generate_basis(self,**kwargs):
+        raise NotImplementedError()
+
+class BasisModifier(object):
+    def modify_basis(self,**kwargs):
+        raise NotImplementedError()
 
 class BasisWrapper(BasisGenerator):
     """
@@ -28,64 +32,51 @@ class BasisWrapper(BasisGenerator):
     Elementary vector associated with it because it is 
     sufficiently different
     """
-    def __init__(self,gen_objs):
+    def __init__(self,gen_objs,modifiers=[]):
         """
         The generator function is a the object that does the actual
         generation of the basis; this object just does some 
         bookkeeping
         """
         self.basic_generators = gen_objs
+        self.modifiers=modifiers
 
-
-    def generate_basis(self,points,**kwargs):
+    def generate_basis(self, **kwargs):
         """
         Generates basis columns based on the provided points.
         
         Note that any special points (e.g. non-physical points) 
         will be given an elementary column vector. 
         """
-
-        parser = utils.parsers.KwargParser()
-        parser.add('special_points',[])
-        args = parser.parse(kwargs)
-
-        (N,D) = points.shape
-
-        # Special points are things like OOB nodes
-        unsorted_points = args.get('special_points',[])
-        special_points = np.array(sorted(unsorted_points))
-        sp_set = set(special_points)
-        S = len(sp_set)         
-
-        # Make sure any NaN row that wasn't remapped is special
-        nan_mask = np.any(np.isnan(points),axis=1)
-        assert((N,) == nan_mask.shape)
-        nan_set = set(nan_mask.nonzero()[0])
-        assert(nan_set <= sp_set)
-        # All non-phyiscal states should be special
-           
-        # Generate all the bases, reserving bases for the special
         Bases = []
         for gen in self.basic_generators:
-            Bases.append(gen.generate_basis(points,
-                                            special_points=special_points))
-            
+            Bases.append(gen.generate_basis(**kwargs))
         B = np.hstack(Bases)
-                
-        (M,K) = B.shape
-        assert(N == M)
-
-        # Give any special points their own column
-        if len(special_points) > 0:
-            B[special_points,:] = 0 # Blot all special points out
-            B = np.hstack([B,np.zeros((N,S))])        
-            B[special_points,K:] = np.eye(S)
-
         (M,K) = B.shape
         assert(K <= M) # Shouldn't be a frame.
-            
-        #B = normalize_cols(B)
+
+        for mod in self.modifers:
+            mod.modify_bases(B)
+
+        assert(not np.any(np.isnan(B)))
+
         return B
+
+class SpecialCaseModifier(BasisModifier):
+    def __init__(self,node_id):
+        self.node_id = node_id
+    def modify_basis(self,B):
+        (N,K) = B.shape
+        nid = self.node_id
+
+        # Row is nan
+        if isinstance(B,np.ndarray):
+            B[nid,:] = 0
+            B = np.hstack([B,np.zeros(N,1)])
+            B[nid,K] = 1
+        else:
+            assert(isinstance(B,sps.spmatrix))
+            # TODO
     
 class ConstBasis(BasisGenerator):
     def __init__(self):

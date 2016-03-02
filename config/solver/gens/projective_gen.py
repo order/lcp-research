@@ -118,24 +118,17 @@ class ProjectiveGenerator(config.SolverGenerator):
         points = discretizer.get_node_states()
         special_points = discretizer.get_special_node_indices()
 
-        svd = True
-        if svd:
-            num_svd = 10
-            utils.banner('Using SVD basis; split out a make more principled')
-            BG = SVDBasis(num_svd)
-            Qs = BG.generate_basis(mdp_obj=mdp_obj,
-                                   discretizer=discretizer)
-            #visualize_bases(Qs,A,n,lens)
-                                    
-        else:
-            raise NotImplementedError()
-            BG = self.basis_generator
-            Q = BG.generate_basis(points,
-                                  special_points=special_points)
+        BG = self.basis_generator
+        Qs = BG.generate_basis(points=points,
+                               mdp_obj=mdp_obj,
+                               discretizer=discretizer,
+                               special_points=special_points)
+        #visualize_bases(Qs,A,n,lens)
 
+        f_reg = self.flow_regularization
         (BigQ,BigU,q) = build_projlcp_from_basis_list(Qs,
                                                       mdp_obj,
-                                                      self.flow_regularization)
+                                                      f_reg)
 
         proj_lcp_obj = lcp.ProjectiveLCPObj(BigQ,BigU,q)
         iter = ProjectiveIPIterator(proj_lcp_obj)

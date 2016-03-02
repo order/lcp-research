@@ -56,7 +56,22 @@ class MDP(lcp.LCPBuilder):
         I guess we're using a sparse matrix here...
         """
         return sps.eye(self.num_states,format='lil')\
-            - self.discount * self.transitions[a]        
+            - self.discount * self.transitions[a]
+
+    def get_value_residual(self,v):
+        N = self.num_states
+        A = self.num_actions
+        
+        comps = np.empty((N,A))
+        gamma = self.discount
+        for a in xrange(A):
+            c = self.costs[a]
+            Pt = self.transitions[a].T
+            comps[:,a] = c + gamma * Pt.dot(v)
+
+        res = v - np.amin(comps,axis=1)
+        assert((N,) == res.shape)
+        return res
 
     def build_lcp(self,**kwargs):
         # Optional regularization
