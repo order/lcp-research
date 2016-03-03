@@ -1,12 +1,20 @@
-from solvers import LCPIterator,IPIterator
+from solvers import LCPIterator,IPIterator,BasisIterator
 
 import numpy as np
 import scipy as sp
 import scipy.sparse as sps
 
 import utils
+import matplotlib.pyplot as plt
 
 def form_Gh_dense(x,y,w,g,p,q,Phi,PtPUP,PtPU_P):
+    """
+    Form the G matrix and h vector from DENSE 
+    matices.
+
+    TODO: what if some of the matrices are sparse?
+    PtP is likely dense, though.
+    """
     for v in [Phi,PtPUP,PtPU_P]:
         assert(type(v) == np.ndarray)
         
@@ -23,47 +31,36 @@ def form_Gh_dense(x,y,w,g,p,q,Phi,PtPUP,PtPU_P):
     return (G,h)
     
 
-class ProjectiveIPIterator(LCPIterator,IPIterator):
+class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
     def __init__(self,proj_lcp_obj,**kwargs):
         self.centering_coeff = kwargs.get('centering_coeff',0.99)
-        self.linesearch_backoff = kwargs.get('linesearch_backoff',0.99)
+        self.linesearch_backoff = kwargs.get('linesearch_backoff',
+                                             0.99)
         self.central_path_backoff = kwargs.get('central_path_backoff',0.9995)
+        self.mdp_obj = kwargs.get('mdp_obj',None)
+        self.lcp_obj = kwargs.get('lcp_obj',None)
+        
         
         self.proj_lcp_obj = proj_lcp_obj
         self.q = proj_lcp_obj.q
         Phi = proj_lcp_obj.Phi
-        U = proj_lcp_obj.U
-        self.Phi = Phi
-        self.U = U
-        (N,k) = Phi.shape
-         
-        # Preprocess
-        PtP = (Phi.T).dot(Phi) # FTF in Geoff's code
-        assert((k,k) == PtP.shape)
-        self.PtPUP = (PtP.dot(U)).dot(Phi)
-        assert((k,k) == self.PtPUP.shape)        
-        self.PtPU_P = (PtP.dot(U) - Phi.T)
-        # FMI in Geoff's code; I sometimes call it Psi in my notes
-        assert((k,N) == self.PtPU_P.shape)            
-        self.PtP = PtP
+        PtPU = proj_lcp_obj.PtPU
+        (N,K) = Phi.shape
+        assert((K,N) == PtPU.shape)
 
-        # Get dense versions. TODO: only if sparsity is low?
-        self.Phi_dense = Phi.toarray()
-        self.PtP_dense = PtP.toarray()
-        self.PtPUP_dense = self.PtPUP.toarray()
-        self.PtPU_P_dense =self.PtPU_P.toarray()
+        self.update_P_PtPU(Phi,PtPU)
 
         self.x = kwargs.get('x0',np.ones(N))
         self.y = kwargs.get('y0',np.ones(N))
-        self.w = kwargs.get('w0',np.zeros(k))
+        self.w = kwargs.get('w0',np.zeros(K))
         self.steplen = np.nan
         self.dir_x = np.full(N,np.nan)
         self.dir_y = np.full(N,np.nan)
-        self.dir_w = np.full(k,np.nan)
+        self.dir_w = np.full(K,np.nan)
         
         assert((N,) == self.x.shape)
         assert((N,) == self.y.shape)
-        assert((k,) == self.w.shape)
+        assert((K,) == self.w.shape)
 
         self.iteration = 0
         
@@ -113,7 +110,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator):
         I = sps.eye(N)
         
         if False:
-            M = Phi.dot(U)
+            #M = Phi.dot(U)
             # Un-reduced system
             NewtonSystem = sps.bmat([[Y, X ,Z],\
                 [-M,I,Z],\
@@ -185,7 +182,53 @@ class ProjectiveIPIterator(LCPIterator,IPIterator):
         return self.x
     def get_dual_vector(self):
         return self.y
+    def get_value_vector(self):
+        n = self.mdp_obj.num_states
+        return self.x[:n]
     def get_iteration(self):
         return self.iteration
     def get_step_len(self):
         return self.steplen
+
+    def update_basis(self,basis_fn,block_id):
+        Phi = self.Phi
+        (N,K) = Phi.shape
+        (n,) = basis_fn.shape
+        assert(0 == N % n)
+        Aplus1 = N / n
+
+        # Assuming sparse Phi
+        assert(isinstance(Phi,sps.spmatrix))
+        row = np.arange(block_id*n,(block_id+1)*n)
+        col = np.zeros(n)
+        basis_vector = sps.coo_matrix((basis_fn,(row,col)),
+                                      shape=(N,1))
+
+        # Better way of doing this to maintain block sparsity
+        Phi = sps.hstack([basis_vector,Phi])
+        M = self.lcp_obj.M
+        
+        PtPU = (Phi.T).dot(M)
+        self.update_P_PtPU(Phi,PtPU)
+        
+
+    def update_P_PtPU(self,Phi,PtPU):        
+        self.Phi = Phi
+        self.PtPU = PtPU
+        (N,K) = Phi.shape            
+         
+        # Preprocess
+        PtP = (Phi.T).dot(Phi) # FTF in Geoff's code
+        assert((K,K) == PtP.shape)
+        self.PtPUP = (PtPU).dot(Phi)
+        assert((K,K) == self.PtPUP.shape)        
+        self.PtPU_P = (PtPU - Phi.T)
+        # FMI in Geoff's codes
+        assert((K,N) == self.PtPU_P.shape)            
+        self.PtP = PtP
+
+        # Get dense versions. TODO: only if sparsity is low?
+        self.Phi_dense = Phi.toarray()
+        self.PtP_dense = PtP.toarray()
+        self.PtPUP_dense = self.PtPUP.toarray()
+        self.PtPU_P_dense =self.PtPU_P.toarray()

@@ -6,7 +6,8 @@ import numpy as np
 import solvers
 import utils
 import config
-
+import bases
+import bases.improve
 
 def get_instance_builder(inst_conf_file):
     """
@@ -39,6 +40,14 @@ def build_solver(solver_generator,instance_builder):
     assert(issubclass(type(solver), solvers.IterativeSolver))
     return [solver,intermediate_objects]
 
+def build_basis_improver(solver):
+    fundemental_improver\
+        = bases.improve.BellmanValueResidualBasisImprover()
+    improver\
+        = bases.improve.BasisImproverWrapper(solver,
+                                             fundemental_improver)
+    return improver
+                                          
 
 def save_data(save_file,data):
     # Save the trajectories for analysis
@@ -68,9 +77,10 @@ def run(instance_builder,
         save_file):
     [solver,interm_objects] = build_solver(solver_generator,
                                          instance_builder)
+    improver = build_basis_improver(solver)
     
     # Solve; return primal and dual trajectories
-    solver.solve()
+    improver.solve()
     data = solver_generator.extract(solver)
 
     # Save

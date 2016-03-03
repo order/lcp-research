@@ -135,10 +135,11 @@ class FromSolFileBasis(BasisGenerator):
         assert(0 == N % n)
 
         Aplus1 = N / n
-        sol = np.reshape(data,(n,Aplus1))
-        self.basis = sol[:,block]
+        sol = np.reshape(data,(n,Aplus1),order='F')
+        self.basis = sol[:,block]        
+        
     def generate_basis(self,**kwargs):
-        return self.basis        
+        return self.basis[:,np.newaxis]    
         
         
 def normalize_cols(M):

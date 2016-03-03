@@ -19,20 +19,12 @@ class LCPObj(object):
         assert(M.shape[0] == self.dim)
         assert(M.shape[1] == self.dim)
         
-        self.name = kwargs.get('name','Unnamed')
-
-    def to_csv(self,filename):
-        FH = open(filename,'w')
-        for r in self.M.todense():
-            FH.write(','.join(map(str,r.tolist()[0])) + '\n')
-        FH.write(','.join(map(str,self.q.tolist()[0])) + '\n')
-        FH.close()
-        
+        self.name = kwargs.get('name','Unnamed')        
 
     def __str__(self):
         return '<{0} in R^{1}>'.format(self.name, self.dim)                
-                
-            
+
+# Ever used?
 class MDPLCPObj(LCPObj):
     """LCP generated from an MDP
     """
@@ -49,41 +41,34 @@ class MDPLCPObj(LCPObj):
         
         assert((N,) == x.shape) # x is N-by-1
         
-        blocks = [x[(i*n):((i+1)*n)] for i in xrange(A+1)] # break in chucks 
-        return [blocks[0],blocks[1:]] # first block is value, rest is flow
+        blocks = [x[(i*n):((i+1)*n)] for i in xrange(A+1)]
+        # break in chucks
+
+        # first block is value, rest is flow
+        return [blocks[0],blocks[1:]]
            
 class ProjectiveLCPObj(LCPObj):
     """An object for a projective LCP where M = Phi U + Pi_bot
-    LCPs of this class can be rapidly solved using fast interior point algorithms like the one in "Fast solutions to projective monotone linear complementarity problems" (http://arxiv.org/pdf/1212.6958v1.pdf)  
+    LCPs of this class can be rapidly solved using fast interior 
+    point algorithms like the one in "Fast solutions to projective 
+    monotone linear complementarity problems" 
+    (http://arxiv.org/pdf/1212.6958v1.pdf)  
     """
-    def __init__(self,Phi,U,q,**kwargs):
+    def __init__(self,Phi,PtPU,q,**kwargs):
         self.Phi = Phi
-        self.U = U
+        self.PtPU = PtPU # <P,PU>
         self.q = q
-        self.dim = q.size
-        
-        assert(util.isvector(q))
-        assert(Phi.shape[0] == self.dim)
-        assert(U.shape[1] == self.dim)
+
+        # Shape checking
+        (N,) = q.shape
+        assert(N == Phi.shape[0])
+        (_,K) = Phi.shape
+        assert((K,N) == PtPU.shape)
         
         self.name = kwargs.get('name','Unnamed')
 
     def update_q(self,new_q):
         self.q = new_q
-
-    def to_csv(self,fileroot):
-        FH = open(fileroot + '_phi.csv','w')
-        for r in self.Phi.todense():
-            FH.write(','.join(map(str,r.tolist()[0])) + '\n')
-        FH.close()
-        FH = open(fileroot + '_u.csv','w')        
-        for r in self.U.todense():
-            FH.write(','.join(map(str,r.tolist()[0])) + '\n')           
-        FH.close()
-        FH = open(fileroot + '_q.csv','w')
-        FH.write(','.join(map(str,self.q)) + '\n')
-        FH.close()
- 
         
     def __str__(self):
         return '<{0} in R^{1}'.\

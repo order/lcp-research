@@ -1,3 +1,5 @@
+import utils
+
 class BasisImproverWrapper(object):
     def __init__(self,
                  solver,
@@ -7,26 +9,20 @@ class BasisImproverWrapper(object):
         self.termination_conditions = []
 
     def solve(self):
-        iterator = solver.iterator()
+        iterator = self.solver.iterator
         
         done = False
-        while not done:
-            # Check for termination
-            for term_cond in self.termination_conditions:
-                if term_cond.isdone(iterator):
-                    done = True
-                    break
-            if done:
-                break
-
+        utils.banner('Replace with actual termination conditions')
+        for i in xrange(2):
+            utils.banner('Basis outerloop iteration')
             # Inner loop solve
-            solver.solve()
+            self.solver.solve()
 
             # Generate a new basis function
             # (N,1) ndarray or sparse matrix
             (basis_fn,block_id) = self.basis_improver.\
                                   improve_basis(iterator)
-            iterator.update_basis(new_basis_fn,block_id) # update
+            iterator.update_basis(basis_fn,block_id) # update
 
 
 class BasisImprover(object):
@@ -37,6 +33,7 @@ class BellmanValueResidualBasisImprover(BasisImprover):
     def __init__(self):
         pass
     def improve_basis(self,iterator):
+        utils.banner('Will not always have access to MDP object')
         mdp_obj = iterator.mdp_obj
         v = iterator.get_value_vector()
         res = mdp_obj.get_value_residual(v)

@@ -30,43 +30,51 @@ def visualize_bases(Qs,A,n,lens):
         for i in xrange(A+1):
             axarr[i].pcolormesh(Frames[0,i,:,:])
         plt.show()
-
-def build_projlcp_from_value_basis(Q,mdp_obj,flow_reg):
-    A = mdp_obj.num_actions
-    return build_projlcp_from_basis_list([Q]*(A+1),
-                                         mdp_obj,
-                                         flow_reg)
+    
 
 def build_projlcp_from_basis_list(Qs,mdp_obj,flow_reg):
     # Find the in-basis approximations for E = I - gamma* P
     # Done with least-squares:
     # E   ~= Phi U
     # E.T ~= Phi W
+
+    Phi = sps.block_diag(Qs)
+    lcp_obj = mdp_obj.build_lcp(flow_regularization=flow_reg)
+    M = lcp_obj.M
+    q = lcp_obj.q
+    (N,) = q.shape
+    assert((N,N) == M.shape)
+    assert(N == Phi.shape[0])
+    
+    PtPU = (Phi.T).dot(M)
+    return (Phi,PtPU,q)
+    
+
+def OLD_build_projlcp_from_basis_list(Qs,mdp_obj,flow_reg):
     n = mdp_obj.num_states
     A = mdp_obj.num_actions
     N = (A+1)*n
-
-    for Q in Qs:
-        assert((n,_) == Q.shape[0])
     
     basis_sizes = [Qs[i].shape[1] for i in xrange(A+1)]
     K = sum(basis_sizes)
 
     BigU_blocks = [[None]]
     Uts = []
+    (_,k) = Qs[0].shape
     for a in xrange(A):
         # Approximate E and E.T via least-squares
         E = mdp_obj.get_action_matrix(a)
-        U = linalg.lsmr_matrix(Qs[a],E)
+        (_,d) = Qs[a+1].shape
+        
+        U = linalg.lsmr_matrix(Qs[0],E)
+        W = linalg.lsmr_matrix(Qs[a+1],E.T)
         assert((k,n) == U.shape)
-
-        W = linalg.lsmr_matrix(Qs[a],E.T)
-        assert((k,n) == W.shape)
-
+        assert((d,n) == W.shape)
+        
         BigU_blocks[0].append(U) # [0, U1, U2,...]
         BigU_blocks.append([-W]\
                            + [None]*a\
-                           + [flow_reg * Qs[a].T]\
+                           + [flow_reg * Qs[a+1].T]\
                            + [None]*(A-a-1))
         # [-W, 0,...,flow_reg*Phi.T,0...]
 
@@ -74,14 +82,19 @@ def build_projlcp_from_basis_list(Qs,mdp_obj,flow_reg):
     q = np.hstack([-mdp_obj.state_weights]+mdp_obj.costs)
         
     # Construct the block basis:
-    BigQ = sps.block_diag(Qs)
-    assert((N,K) == BigQ.shape)
+    Phi = sps.block_diag(Qs)
+    assert((N,K) == Phi.shape)
 
     # Construct the block coefficients:
     BigU = sps.bmat(BigU_blocks)
+    print Phi.shape
+    print BigU.shape
     assert((K,N) == BigU.shape)
+    PtP = (Phi.T).dot(Phi)
+    assert((K,K) == PtP.shape)
+    PtPU = PtP.dot(BigU)
 
-    return (BigQ,BigU,q)
+    return (Phi,PtPU,q)
                     
 class ProjectiveGenerator(config.SolverGenerator):
     def __init__(self,**kwargs):
@@ -125,12 +138,16 @@ class ProjectiveGenerator(config.SolverGenerator):
         #visualize_bases(Qs,A,n,lens)
 
         f_reg = self.flow_regularization
-        (BigQ,BigU,q) = build_projlcp_from_basis_list(Qs,
-                                                      mdp_obj,
-                                                      f_reg)
+        (Phi,PtPU,q) = build_projlcp_from_basis_list(Qs,
+                                                     mdp_obj,
+                                                     f_reg)
 
-        proj_lcp_obj = lcp.ProjectiveLCPObj(BigQ,BigU,q)
-        iter = ProjectiveIPIterator(proj_lcp_obj)
+        proj_lcp_obj = lcp.ProjectiveLCPObj(Phi,PtPU,q)
+        lcp_obj = mdp_obj.build_lcp()
+        utils.banner('Remove access to MDP and LCP when using sketch')
+        iter = ProjectiveIPIterator(proj_lcp_obj,
+                                    mdp_obj=mdp_obj,
+                                    lcp_obj=lcp_obj)
         objects = {'mdp':mdp_obj,
                    'proj_lcp':proj_lcp_obj}
 

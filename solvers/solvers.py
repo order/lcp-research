@@ -100,3 +100,7 @@ class MDPIterator(Iterator):
 class PolicyIterator(Iterator):
     def get_policy_vector(self):
         raise NotImplementedError()
+
+class BasisIterator(Iterator):
+    def update_basis(self):
+        raise NotImplementedError()
