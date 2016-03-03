@@ -1,4 +1,3 @@
-
 import solvers
 from solvers.projective import ProjectiveIPIterator
 from solvers.termination import *
@@ -6,7 +5,6 @@ from solvers.notification import *
 from solvers.recording import *
 import config
 import bases
-from bases.svd import SVDBasis
 import linalg
 import lcp
 import utils
@@ -47,13 +45,13 @@ def build_projlcp_from_basis_list(Qs,mdp_obj,flow_reg):
     n = mdp_obj.num_states
     A = mdp_obj.num_actions
     N = (A+1)*n
-    k = Qs[0].shape[1]
-    K = (A+1)*k
-    assert(k <= n)
 
     for Q in Qs:
-        assert((n,k) == Q.shape)
+        assert((n,_) == Q.shape[0])
     
+    basis_sizes = [Qs[i].shape[1] for i in xrange(A+1)]
+    K = sum(basis_sizes)
+
     BigU_blocks = [[None]]
     Uts = []
     for a in xrange(A):
@@ -91,11 +89,10 @@ class ProjectiveGenerator(config.SolverGenerator):
         parser = KwargParser()
         parser.add('value_regularization',1e-12)
         parser.add('flow_regularization',1e-12)
-        parser.add('x_dual_bases',False)
         parser.add('termination_conditions')
         parser.add('recorders')
         parser.add_optional('notifications')
-        parser.add('basis_generator')
+        parser.add('basis_generators')
         args = parser.parse(kwargs)
 
         # Dump into self namespace
@@ -118,11 +115,13 @@ class ProjectiveGenerator(config.SolverGenerator):
         points = discretizer.get_node_states()
         special_points = discretizer.get_special_node_indices()
 
-        BG = self.basis_generator
-        Qs = BG.generate_basis(points=points,
-                               mdp_obj=mdp_obj,
-                               discretizer=discretizer,
-                               special_points=special_points)
+        Qs = []
+        for BG in self.basis_generators:
+            Q = BG.generate_basis(points=points,
+                                  mdp_obj=mdp_obj,
+                                  discretizer=discretizer,
+                                  special_points=special_points)
+            Qs.append(Q)
         #visualize_bases(Qs,A,n,lens)
 
         f_reg = self.flow_regularization

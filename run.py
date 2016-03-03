@@ -43,6 +43,7 @@ def build_solver(solver_generator,instance_builder):
 def save_data(save_file,data):
     # Save the trajectories for analysis
     np.savez(save_file,**data) # Extension auto-added
+    
     if 'primal' in data:
         # Save the final primal iteration as the solution
         np.save(save_file + '.sol',data['primal'][-1,:])
@@ -72,8 +73,7 @@ def run(instance_builder,
     # Solve; return primal and dual trajectories
     solver.solve()
     data = solver_generator.extract(solver)
-
-    # Save
+    
     save_data(save_file,data)
     pickle_objects(param_save_file,
                    instance_builder,

@@ -61,12 +61,10 @@ class RadialBasis(bases.BasisGenerator):
         
         self.__dict__.update(args)
         
-    def generate_basis(self,points,**kwargs):
+    def generate_basis(self,**kwargs):
         # Parse kwargs
-        parser = KwargParser()
-        parser.add('special_points',[])
-        args = parser.parse(kwargs)
-        special_points = args['special_points']        
+        points = kwargs['points']
+        special_points = kwargs.get('special_points')
 
         (N,D) = points.shape
         (K,d) = self.centers.shape
