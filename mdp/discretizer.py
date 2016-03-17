@@ -273,12 +273,12 @@ class ContinuousMDPDiscretizer(MDPDiscretizer):
 
         weight = self.build_weight_vector()
             
-        mdp_obj = mdp.MDP(transitions,
-                          costs,
-                          self.actions,
-                          self.problem.discount,
-                          weight,
-                          name='MDP from Discretizer')
+        mdp_obj = mdp.DiscreteMDP(transitions,
+                                  costs,
+                                  self.actions,
+                                  self.problem.discount,
+                                  weight,
+                                  name='MDP from Discretizer')
 
         return mdp_obj
         

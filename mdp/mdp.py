@@ -17,9 +17,14 @@ class MDPBuilder(object):
         """
         raise NotImplementedError()
 
-class MDP(lcp.LCPBuilder):
+class MDP(object):
+    def next_step(self,state,action):
+        raise NotImplementedError
+    
+
+class DiscreteMDP(MDP, lcp.LCPBuilder):
     """
-    MDP object
+    MDP object assuming a discrete and tractable state space
     """
     def __init__(self,transitions,costs,actions,discount,state_weights,**kwargs):
         self.transitions = transitions
@@ -57,6 +62,34 @@ class MDP(lcp.LCPBuilder):
         """
         return sps.eye(self.num_states,format='lil')\
             - self.discount * self.transitions[a]
+
+    def next_state(self,state,action):
+        """
+        Takes in state and action INDEXES (already discretized)
+        and returns a reward and sampled next state
+        """
+        
+        N = self.num_states
+        A = self.num_actions
+        assert(0 <= state <= N)
+        assert(0 <= action <= A)
+
+        # Get the reward for doing action in state
+        reward = self.costs[action][states]
+
+        T = self.transitions[action]
+        if isinstance(T,np.ndarray):
+            # Dense sampling
+            dist = T[:,state]
+            assert((N,) == dist.shape)
+            next_state = np.random.choice(xrange(N),p=dist)
+        else:
+            # Sparse sampling
+            assert(isinstance(T,sps.spmatrix))
+            dist = (T.tocoo()).getcol(state)
+            next_state = np.random.choice(dist.row,p=dist.data)
+
+        return (next_state,reward)        
 
     def get_value_residual(self,v):
         N = self.num_states

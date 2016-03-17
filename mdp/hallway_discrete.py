@@ -39,12 +39,12 @@ class HallwayBuilder(mdp.MDPBuilder):
             transitions.append(P)       
         weights = np.ones(N)
             
-        return mdp.MDP(transitions,
-                       costs,
-                       actions,
-                       self.discount,
-                       weights,
-                       name='Hallway')
+        return mdp.DiscreteMDP(transitions,
+                               costs,
+                               actions,
+                               self.discount,
+                               weights,
+                               name='Hallway')
 
     def get_node_states(self):
         return np.full((self.num_states,1),np.nan)
