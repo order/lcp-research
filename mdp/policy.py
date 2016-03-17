@@ -12,11 +12,16 @@ class ConstantDiscretePolicy(DiscretePolicy):
     def __init__(self,action_index):
         self.action_index = action_index
     def get_action_indices(self,points):
-        (N,d) = points.shape
+        N = points.shape[0]
         actions = np.full(N,self.action_index)
-        assert((N,) == actions.shape)
         return actions
-    
+
+class UniformDiscretePolicy(DiscretePolicy):
+    def __init__(self,num_actions):
+        self.A = num_actions
+    def get_action_indices(self,points):
+        N = points.shape[0]
+        return np.random.randint(self.A,size=N)
 
 class ConstantPolicy(Policy):
     def __init__(self,action):

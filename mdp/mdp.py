@@ -17,14 +17,17 @@ class MDPBuilder(object):
         """
         raise NotImplementedError()
 
-class MDP(object):
-    def next_step(self,state,action):
+class ContinuousMDP(object):
+    def next_state(self,state,action):
         raise NotImplementedError
-    
 
-class DiscreteMDP(MDP, lcp.LCPBuilder):
+class DiscreteMDP(object):
+    def next_state_index(self,state_node_id,action_id):
+        raise NotImplementedError
+
+class TabularMDP(DiscreteMDP, lcp.LCPBuilder):
     """
-    MDP object assuming a discrete and tractable state space
+    MDP object assuming a discrete state-space with tabular representation.
     """
     def __init__(self,transitions,costs,actions,discount,state_weights,**kwargs):
         self.transitions = transitions
@@ -63,7 +66,7 @@ class DiscreteMDP(MDP, lcp.LCPBuilder):
         return sps.eye(self.num_states,format='lil')\
             - self.discount * self.transitions[a]
 
-    def next_state(self,state,action):
+    def next_state_index(self,state,action):
         """
         Takes in state and action INDEXES (already discretized)
         and returns a reward and sampled next state
