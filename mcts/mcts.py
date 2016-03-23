@@ -2,13 +2,50 @@ import heapq
 import defaultdict from collections
 import numpy as np
 from mdp.policy import UniformDiscretePolicy
+from utils.discretizer import IrregularSplit
 
-class MCTSNode(object):
-    def __init__(self,state,parent):
+def partition_samples(S,K):
+    """
+    Parition samples into D^K partitions by order statistic
+    """
+    (N,D) = S.shape
+
+    Prcnt = np.linspace(0,100,K+1) # Percentiles
+    Breaks = np.empty((K+1,D))
+    Cutpnts[0,:] = -np.inf
+    Cutpnts[-1,:] = np.inf
+    
+    for d in xrange(D):
+        Cutpnts[1:-1,D] = np.percentile(S[:,D],Prcnt)[1:-1]
+    
+    return IrregularSplit(Cutpnts)
+        
+
+class MCTSChanceNode(object):
+    def __init__(self,state,action):
         self.state = state
-        self.children = defaultdict(list) # Action -> list of nodes
-        self.child_value = {}
-        self.child_visits = {}
+        self.action = action
+
+        self.children = set()
+        self.visits = 0
+
+    def total_val(self):
+        assert(len(self.children)>0)
+        child_agg_value = [child.value_agg for child in self.children]
+        return np.sum(child_agg_value)
+        
+    def expected_value(self):        
+        return self.total_val() / self.visits
+
+    def 
+
+class MCTSDecisionNode(object):
+    """
+    Decision node for the Monte Carlo Tree Search
+    """
+    def __init__(self,state):
+        self.state = state
+        self.children = {} # Action -> chance nodes
 
         self.visits = 0.0 # visit counter
         self.value_agg = 0.0 # Total value
