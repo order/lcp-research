@@ -1,4 +1,5 @@
 import numpy as np
+import discretize
 
 class Indexer(object):
     def __init__(self,lens,order='C'):
@@ -36,7 +37,9 @@ class Indexer(object):
         """
         (N,D) = coords.shape
 
-        assert(is_int(coords))
+        assert(discretize.is_int(coords)
+               or 0 == np.sum(np.mod(coords,1.0)))
+        
         assert(D == self.dim) # Dimension right
         assert(not np.any(coords < 0)) # all non
         assert(np.all(coords < self.lens))

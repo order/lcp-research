@@ -16,8 +16,9 @@ class IrregularGridPartition(object):
         self.cpts = [np.array(c) for c in cpts]
         self.check_cutpoints()
         
-        self.num_cpts = [len(x) for x in cpts]
-        self.num_cells = np.prod([len(x)-1 for x in cpts])
+        self.num_cpts_per_dim = [len(x) for x in cpts]
+        self.lens = [len(x)-1 for x in cpts]
+        self.num_cells = np.prod(self.lens)
         self.boundary = [(cpts[d][0],cpts[d][-1]) for d in xrange(D)]
 
     def check_cutpoints(self):
@@ -68,7 +69,7 @@ class IrregularGridDiscretizer(object):
 
         Coords = np.empty((N,D))
         for d in xrange(D):
-            K = part.num_cpts[d]
+            K = part.lens[d]
             coord = np.searchsorted(part.cpts[d],
                                     points[:,d],
                                     side='right') - 1

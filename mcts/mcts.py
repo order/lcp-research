@@ -2,26 +2,7 @@ import heapq
 import defaultdict from collections
 import numpy as np
 from mdp.policy import UniformDiscretePolicy
-from utils.discretizer import IrregularSplit
-
-def partition_samples(S,K):
-    """
-    Parition samples into D^K partitions by order statistic
-    """
-    (N,D) = S.shape
-
-    Prcnt = np.linspace(0,100,K+1) # Percentiles
-    Breaks = np.empty((K+1,D))
-    
-    for d in xrange(D):
-        Cutpnts[:,D] = np.percentile(S[:,D],Prcnt)
-        IrregularSplit(Cutpnts)
-    # Do midpoint calculation before setting boundaries to be infinite
-    Cutpnts[0,:] = -np.inf
-    Cutpnts[-1,:] = np.inf
-    
-    return IrregularSplit(Cutpnts)
-        
+import discrete       
 
 class MCTSChanceNode(object):
     def __init__(self,state,action):
