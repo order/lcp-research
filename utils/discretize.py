@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import time
 
 class RegularGridPartition(object):
@@ -156,6 +157,21 @@ class IrregularGridDiscretizer(object):
             Coords[oob_mask,d] = np.nan
         return Coords
     
+    def lower_corner(self,Coords):
+        (N,D) = Coords.shape
+        Corner = np.empty(Coords.shape)
+        Cuts = self.partition.cpts
+        for d in xrange(D):
+            Corner[:,d] = Cuts[d][Coords[:,d].astype('int')]
+        return Corner
+    
+    def upper_corner(self,Coords):
+        return self.lower_corner(Coords+1)
+    
+    def midpoints(self,Coords):
+        return 0.5*self.lower_corner(Coords)\
+            +0.5*self.upper_corner(Coords)
+    
 class Indexer(object):
     def __init__(self,lens,order='C'):
         lens = np.array(lens)
@@ -243,32 +259,7 @@ def make_points(gens,order='C'):
     points = np.column_stack([M.flatten() for M in meshes])
     if 'F' == order:
         return np.fliplr(points)
-    return points
-
-def trial_interpolate(X,low,high):
-    (N,D) = X.shape
-    assert(np.all(X >= 0))
-    assert(np.all(X <= 1))
-    assert((D,) == low.shape)
-    assert((D,) == high.shape)
-    
-    Coef = np.empty((N,2*D))
-    for d in xrange(D):
-        Z = high[d] - low[d]
-        Coef[:,2*d] = (X[:,d] - low[d])/Z
-        Coef[:,2*d+1] = (high[d] - X[:,d])/Z
-
-    Weights = np.empty((N,2**D))
-    for i in xrange(2**D):
-        b_str = np.binary_repr(i,width=D)
-        b = np.array([int(x) for x in b_str],dtype=bool)
-        vert = np.empty(2*D,dtype=bool)
-        vert[::2] = b
-        vert[1::2] = 1 - b
-        Weights[:,i] = np.prod(Coef[:,vert],axis=1)
-    return Weights
-
-    
+    return points    
 
 #############################3
 # Tests
@@ -335,10 +326,58 @@ def test_timing():
                                       irr_coord[n,:])
     assert(np.all(reg_coord == irr_coord))
 
+def test_2d():
+    N = 3
+    S = 50
+    cuts = IrregularGridPartition([np.linspace(0,1,N+1),
+                                   np.linspace(0,1,N+1)])
+    irr_disc = IrregularGridDiscretizer(cuts)
+    
+    points = make_points([np.linspace(0,1,S),
+                          np.linspace(0,1,S)])
+    coords = irr_disc.to_cell_coord(points)
+    midpoints = irr_disc.midpoints(coords)
+    (n,d) = midpoints.shape
+    assert(d == 2)
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    for i in xrange(n):
+        ax.plot([points[i,0],midpoints[i,0]],
+                    [points[i,1],midpoints[i,1]],
+                    [0,1],'-b',alpha = 0.1)
+    ax.view_init(elev=90,azim=0) # 2D view
+    plt.show()
+    
+###############################
+# Interp trial (should flesh out).
+    
+def trial_interpolate(X,low,high):
+    (N,D) = X.shape
+    assert(np.all(X >= 0))
+    assert(np.all(X <= 1))
+    assert((D,) == low.shape)
+    assert((D,) == high.shape)
+    
+    Coef = np.empty((N,2*D))
+    for d in xrange(D):
+        Z = high[d] - low[d]
+        Coef[:,2*d] = (X[:,d] - low[d])/Z
+        Coef[:,2*d+1] = (high[d] - X[:,d])/Z
+
+    Weights = np.empty((N,2**D))
+    for i in xrange(2**D):
+        b_str = np.binary_repr(i,width=D)
+        b = np.array([int(x) for x in b_str],dtype=bool)
+        vert = np.empty(2*D,dtype=bool)
+        vert[::2] = b
+        vert[1::2] = 1 - b
+        Weights[:,i] = np.prod(Coef[:,vert],axis=1)
+    return Weights
+    
 def test_interp():
     x = np.array([[0.2,0.1]])
     low = np.array([0,0])
     high = np.array([1,1])
     print trial_interpolate(x,low,high)
 
-test_interp()
+test_2d()

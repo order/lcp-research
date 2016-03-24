@@ -12,11 +12,13 @@ def partition_samples(S,K):
 
     Prcnt = np.linspace(0,100,K+1) # Percentiles
     Breaks = np.empty((K+1,D))
-    Cutpnts[0,:] = -np.inf
-    Cutpnts[-1,:] = np.inf
     
     for d in xrange(D):
-        Cutpnts[1:-1,D] = np.percentile(S[:,D],Prcnt)[1:-1]
+        Cutpnts[:,D] = np.percentile(S[:,D],Prcnt)
+        IrregularSplit(Cutpnts)
+    # Do midpoint calculation before setting boundaries to be infinite
+    Cutpnts[0,:] = -np.inf
+    Cutpnts[-1,:] = np.inf
     
     return IrregularSplit(Cutpnts)
         
