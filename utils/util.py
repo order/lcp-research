@@ -41,6 +41,23 @@ def banner(msg):
 
 def sparsity_ratio(A):
     return float(A.nnz) / float(np.prod(A.shape))
+
+def shift_array(x,pos,pad=np.nan):        
+    (N,) = x.shape # Just for array atm
+    
+    shift = np.empty(N)
+    if pos >= 0:
+        # Right shift:
+        # [0 0 0 x x ... x]
+        shift[:pos] = pad
+        shift[pos:] = x[:-pos]
+    else:
+        # Left shift:
+        #[x ... x x 0 0 0]
+        shift[:pos] = x[-pos:]
+        shift[pos:] = pad
+    
+    return shift
     
 def split_extension(filename,ext=None):
     if ext:
@@ -171,20 +188,3 @@ def basic_residual(x,w):
 def fb_residual(x,w):
     fb = np.sqrt(x**2 + w**2) - x - w
     return np.linalg.norm(fb)
-
-
-def make_points(*gens):
-    """
-    Makes the mesh in the order you would expect for
-    np.reshape after.
-
-    E.g. if handed [np.linspace(0,1,5),np.linspace(0,1,7)]
-    then this would make the points P such that if mapped
-    the 2D plot makes spacial sense. So np.reshape(np.sum(P),(5,7))
-    would look pretty and not jumpy
-    """
-    if 1 == len(gens):
-        return gens[0][:,np.newaxis] # meshgrid needs 2 args
-    
-    meshes = np.meshgrid(*gens,indexing='ij')
-    return np.column_stack([M.flatten() for M in meshes])
