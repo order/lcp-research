@@ -1,5 +1,22 @@
 import numpy as np
 
+class Discretizer(object):
+    def points_to_indices(self,points):
+        """
+        Takes in (n,d) points,
+        Returns (n,N) sparse row-stochastic matrix indicating index
+        distribution
+        """
+        raise NotImplementedError()
+    def indices_to_points(self,indices):
+        """
+        Takes in (n,) indices,
+        Returns (n,d) matrix indicating canonical points associated
+        with each
+        """
+        raise NotImplementedError()        
+    
+
 #######################################
 # AUX functions
     

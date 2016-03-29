@@ -12,7 +12,7 @@ class RegularGridPartition(object):
         self.grid_desc = grid_desc # List of (low,high,num) triples
 
         self.dim = D
-        self.num_grid = np.array([n for (l,h,n) in self.grid_desc])
+        self.lengths = np.array([n for (l,h,n) in self.grid_desc])
         self.num_cells = np.prod(self.num_grid)
         self.skip = np.array([(h-l) / n for (l,h,n) in self.grid_desc])
                 
@@ -41,10 +41,11 @@ class RegularGridPartition(object):
 ####################################
 # REGULAR GRID DISCRETIZER
 
-class RegularGridDiscretizer(object):
-    def __init__(self,grid_partition):
-        self.partition = grid_partition
+class RegularGridDiscretizer(discretize.Discretizer):
+    def __init__(self,grid_desc):
+        self.partition = RegularGridPartition(grid_desc)
         self.num_cells = grid_partition.num_cells
+        
         self.fuzz = 1e-12
 
     def to_cell_coord(self,points):
@@ -68,3 +69,10 @@ class RegularGridDiscretizer(object):
                                      points[:,d] > high + self.fuzz)
             Coords[oob_mask,d] = np.nan            
         return Coords
+
+    def points_to_indicies(self,points):
+        coords = self.to_cell_coords(points)
+        I = indexer.Indexer(self.partition.lengths)
+        indices = I.coorders_to_indices(coords)
+
+        return sps.coo_matrix(

@@ -1,5 +1,6 @@
 import numpy as np
 import discretize
+import itertools
 
 class Indexer(object):
     def __init__(self,lens,order='C'):
@@ -36,21 +37,23 @@ class Indexer(object):
         Turn D dimensional coords into indices
         """
         (N,D) = coords.shape
-
+        nan_mask = np.any(np.isnan(coords),axis=1)
         assert(discretize.is_int(coords)
-               or 0 == np.sum(np.mod(coords,1.0)))
+               or 0 == np.sum(np.mod(coords[~nan_mask,:],1.0)))
         
         assert(D == self.dim) # Dimension right
-        assert(not np.any(coords < 0)) # all non
-        assert(np.all(coords < self.lens))
+        assert(not np.any(coords[~nan_mask,:] < 0))
+        assert(np.all(coords[~nan_mask,:] < self.lens))
         
-        return coords.dot(self.coef)
+        indices = coords.dot(self.coef)
+        indices[nan_mask] = self.max_index
+        return indices
     
     def indices_to_coords(self,indices):
         (N,) = indices.shape
         D = len(self.coef)
         
-        assert(is_int(indices))     
+        assert(discretize.is_int(indices))     
         res = indices
         coords = np.empty((N,D))
         if 'C' == self.order:
@@ -64,3 +67,14 @@ class Indexer(object):
                                  indices >= self.max_index)
         coords[oob_mask] = np.nan
         return coords.astype('i')
+
+    def cell_shift(self):
+        D = self.dim
+        shift = np.empty(2**D)
+
+        for (i,diff) in enumerate(itertools.product([0,1],repeat=D)):
+            diff = np.array(diff)
+            shift[i] = diff.dot(self.coef)
+            
+        return shift
+        
