@@ -34,100 +34,41 @@ class InterpolatedFunction(StateSpaceFunction):
 class ConstFn(StateSpaceFunction):
     def __init__(self,v):
         self.v = v
-    def evaluate(self,points,**kwargs):
+    def evaluate(self,points):
         (N,D) = points.shape 
-
-        parser = KwargParser()
-        parser.add_optional('action') #Ignored
-        args = parser.parse(kwargs)
-
         return self.v * np.ones(N)
 
 class FixedVectorFn(StateSpaceFunction):
     def __init__(self,x):
         assert(1 == len(x.shape))
         self.x = x
-    def evaluate(self,points,**kwargs):
+    def evaluate(self,points):
         (N,D) = points.shape 
-
-        parser = KwargParser()
-        parser.add_optional('action') #Ignored
-        args = parser.parse(kwargs)
 
         assert((N,) == self.x.shape)
         return self.x    
 
-class GaussianBowlFn(StateSpaceFunction):
-    """
-    Has a bowl with low-point 0
-    """
-
-    def __init__(self,bandwidth,setpoint,**kwargs):
-        parser = KwargParser()
-        parser.add('override',None) # Should be a float or int if set
-        args = parser.parse(kwargs)
-        self.override = args['override']  
-
+class GaussianFn(StateSpaceFunction):
+    def __init__(self,bandwidth,
+                 setpoint,
+                 non_physical):
+        
         assert(1 == len(setpoint.shape))
         N = setpoint.size
         self.setpoint = np.reshape(setpoint,(1,N))
         self.bandwidth = bandwidth
+        self.non_phys = non_physical
  
-    def evaluate(self,points,**kwargs):
+    def evaluate(self,points):
         (N,D) = points.shape 
-
-        parser = KwargParser()
-        parser.add_optional('action') #Ignored
-        args = parser.parse(kwargs)
         
-        # 1 - exp(-||x - m||^2 / b)
-        norm = np.sum(np.power(points - self.setpoint,2),axis=1) # ||x-m||^2
-        costs = 1 - np.exp(-norm / self.bandwidth)
-        print costs.shape
+        norm = np.sum(np.power(points - self.setpoint,2),axis=1)
+        costs = np.exp(-norm / self.bandwidth)
         assert((N,) == costs.shape)
 
         # Deal with overrides
         mask = np.isnan(costs)
-        if not self.override:
-            assert(not np.any(mask))
-        else:
-            costs[mask] = self.override
-        assert(not np.any(np.isnan(costs)))
-        
-        return costs
-
-class QuadraticFn(StateSpaceFunction):
-    """
-    Quadratic cost for being away from the origin.
-    Has an override cost for any states with NaN
-    """
-    def __init__(self,coeff,setpoint,**kwargs):
-        parser = KwargParser()
-        parser.add('override',None) # Should be a float or int if set
-        args = parser.parse(kwargs)
-        self.override = args['override']
-
-        self.coeff = coeff
-        assert(1 == len(coeff.shape))
-        N = coeff.size        
-
-        assert((N,) == setpoint.shape)
-        self.setpoint = np.reshape(setpoint,(1,N))
-    
-    def evaluate(self,points,**kwargs):
-        parser = KwargParser()
-        parser.add_optional('action') #Ignored
-        args = parser.parse(kwargs)
-        
-        costs = np.power(points - self.setpoint, 2).dot(self.coeff)
-        
-        # Deal with overrides
-        mask = np.isnan(costs)
-        if not self.override:
-            assert(not np.any(mask))
-        else:
-            costs[mask] = self.override
-        assert(not np.any(np.isnan(costs)))
+        costs[mask] = self.non_phys
         
         return costs
         
@@ -137,54 +78,44 @@ class BallSetFn(StateSpaceFunction):
         
         self.center = center
         self.radius = radius
-        self.in_cost = 0.0
-        self.out_cost = 1.0
     
-    def evaluate(self,points,**kwargs):
-        parser = KwargParser()
-        parser.add_optional('action') #Ignored
-        args = parser.parse(kwargs)
-        
+    def evaluate(self,points):       
         (N,d) = points.shape
         nan_mask = ~np.any(np.isnan(points),axis = 1)
         assert((N,) == nan_mask.shape)
         n = nan_mask.sum()
 
         inbound = np.zeros(N,dtype=bool)
-        r = np.linalg.norm(points[nan_mask,:] - self.center,axis=1)
+        diff = points[nan_mask,:] - self.center
+        assert((n,d) == diff.shape)
+        r = np.linalg.norm(diff, axis=1)
         assert((n,) == r.shape)
         inbound[nan_mask] = (r <= self.radius)
         
         costs = np.empty(points.shape[0])
-        costs[inbound] = self.in_cost
-        costs[~inbound] = self.out_cost
+        costs[inbound] = 0.0
+        costs[~inbound] = 1.0
         
         return costs
         
 class TargetZoneFn(StateSpaceFunction):
 
     def __init__(self,targets):
+        assert((D,2) == targets.shape)
         self.targets = targets
-        self.in_cost = 0.0
-        self.out_cost = 1.0
+        self.D = D
     
-    def evaluate(self,points,**kwargs):
-        parser = KwargParser()
-        parser.add_optional('action') #Ignored
-        args = parser.parse(kwargs)
-        
+    def evaluate(self,points):
         (N,D) = points.shape
-        assert((2,D) == self.targets.shape)
-        
-        costs = self.out_cost*np.ones(N)
-        
-        goal_mask = np.ones(N,dtype='bool')
-        for d in xrange(D):
-            goal_mask = np.logical_and(goal_mask,
-                                       points[:,d] >= self.targets[0,d])
-            goal_mask = np.logical_and(goal_mask,
-                                       points[:,d] <= self.targets[1,d])
-        assert((N,) == goal_mask.shape)
-        costs[goal_mask] = self.in_cost
+        assert(self.D == D)
+
+        l_oob = points < self.target[:,0]
+        r_obb = points > self.target[:,1]
+        assert((N,) == l_oob.shape)
+        assert((N,) == l_oob.shape)
+
+        costs = np.zeros(N)
+        costs[l_oob] = 1.0
+        costs[r_oob] = 1.0
         
         return costs

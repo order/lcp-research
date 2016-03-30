@@ -1,9 +1,7 @@
 import numpy as np
-from state_remapper import StateRemapper
 from utils.parsers import KwargParser
-from transition_fn import TransitionFunction
 
-class DoubleIntegratorTransitionFunction(TransitionFunction):
+class DoubleIntegratorTransitionFunction(object):
     def __init__(self,**kwargs):
         parser = KwargParser()
         parser.add('step')

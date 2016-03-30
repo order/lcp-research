@@ -12,7 +12,8 @@ class RegularGridInterpolator(object):
         self.grid_desc = grid_desc # List of (low,high,num) triples
 
         # Number of cutpoints along each dimension
-        self.lengths = np.array([n+1 for (l,h,n) in self.grid_desc])
+        self.lengths = np.array([n+1 for (l,h,n)
+                                 in self.grid_desc])
         for l in self.lengths:
             assert(l >= 1)
 
@@ -42,7 +43,8 @@ class RegularGridInterpolator(object):
         Coords = np.empty((N,D))
         for d in xrange(D):
             (low,high,n) = self.grid_desc[d]
-            # Linearly transform the data so [low,high) will be in [0,n)
+            # Linearly transform the data so [low,high)
+            # will be in [0,n)
             transform = n * (points[:,d] - low) / (high - low)
             Coords[:,d] = np.floor(transform)
 
@@ -56,7 +58,7 @@ class RegularGridInterpolator(object):
             Coords[oob_mask,d] = np.nan            
         return Coords
         
-    def points_to_index_distribution(self,points):
+    def points_to_index_distributions(self,points):
         (N,D) = points.shape
         assert(D == self.D)
         
@@ -72,7 +74,8 @@ class RegularGridInterpolator(object):
         dist = (points - self.low - coords*self.delta) / self.delta
 
         weights = np.empty((N,2**D))
-        for (i,diff) in enumerate(itertools.product([0,1],repeat=D)):
+        for (i,diff) in enumerate(itertools.product([0,1],
+                                                    repeat=D)):
             mask = np.array(diff,dtype=bool)
             weights[:,i] = np.product(dist[:,mask],axis=1)\
                            * np.product(1 - dist[:,~mask],axis=1)
@@ -109,7 +112,8 @@ class RegularGridInterpolator(object):
         return sps.coo_matrix((data,(rows,cols)),shape=(M,N))    
 
     def get_cutpoints(self):
-        linspaces = [np.linspace(l,h,n+1) for (l,h,n) in self.grid_desc]
+        linspaces = [np.linspace(l,h,n+1) for (l,h,n)
+                     in self.grid_desc]
         N = self.num_nodes
         D = self.D
         points = np.empty((N,D))
