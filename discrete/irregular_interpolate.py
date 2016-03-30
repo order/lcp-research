@@ -6,22 +6,15 @@ import itertools
 import indexer
 import discretize
 
-class RegularGridInterpolator(object):
-    def __init__(self,grid_desc):
-        self.D = len(grid_desc)
-        self.grid_desc = grid_desc # List of (low,high,num) triples
+class IrregularGridInterpolator(object):
+    def __init__(self,grids):
+        self.D = len(grids)
+        self.grids = grids # Explicit grids
 
         # Number of cutpoints along each dimension
-        self.lengths = np.array([n+1 for (l,h,n) in self.grid_desc])
+        self.lengths = np.array([len(g) for g in self.grids])
         for l in self.lengths:
-            assert(l >= 1)
-
-        # Find the low points in the grid
-        self.low = np.array([l for (l,h,n) in self.grid_desc])
-
-        # Get the spacing for each dimension
-        self.delta = np.array([float(h-l) / float(n)
-                               for (l,h,n) in self.grid_desc])
+            assert(l > 1)
 
         # One for every cutpoint, plus an oob
         self.num_nodes = np.prod(self.lengths) + 1
@@ -41,19 +34,22 @@ class RegularGridInterpolator(object):
         
         Coords = np.empty((N,D))
         for d in xrange(D):
-            (low,high,n) = self.grid_desc[d]
-            # Linearly transform the data so [low,high) will be in [0,n)
-            transform = n * (points[:,d] - low) / (high - low)
-            Coords[:,d] = np.floor(transform)
+            K = self.lengths[d]
+            coord = np.searchsorted(self.grids[d],
+                                    points[:,d],
+                                    side='right') - 1
+            Coords[:,d] = coord
 
-            # Fuzz top boundary to get [low,high]
-            fuzz_mask = np.logical_and(high <= points[:,d],
-                                     points[:,d] < high + self.fuzz)
-            Coords[fuzz_mask,d] = n-1
+            # Fuzz to deal with difference between [low,hi) and [low,hi]
+            hi = self.grids[d][-1]
+            fuzz_mask = np.where(np.logical_and(points[:,d] >= hi,
+                                              points[:,d] < hi+self.fuzz))
+            Coords[fuzz_mask,d] = K-2                       
 
-            oob_mask = np.logical_or(low > points[:,d],
-                                     points[:,d] > high + self.fuzz)
-            Coords[oob_mask,d] = np.nan            
+            (left,right) = (self.grids[d][0],self.grids[d][-1])
+            oob_mask = np.logical_or(points[:,d] < left,
+                                     points[:,d] >= right + self.fuzz)
+            Coords[oob_mask,d] = np.nan         
         return Coords
         
     def points_to_index_distribution(self,points):
@@ -64,12 +60,15 @@ class RegularGridInterpolator(object):
         indices = self.indexer.coords_to_indices(coords)
         # Index of low cutpoint in cell
 
-        #dist = np.empty((N,D))
-        #for d in xrange(D):
-        #    (l,h,n) = self.grid_desc[d]
-        #    low_coord = l + coords[:,d]*self.delta[d]
-        #    dist[:,d] = (points[:,d] - low_coord) / self.delta[d]
-        dist = (points - self.low - coords*self.delta) / self.delta
+        nan_mask = np.any(np.isnan(coords),axis=1)
+        dist = np.empty((N,D))
+        for d in xrange(D):
+            idx = coords[~nan_mask,d].astype('i')
+            low_point= self.grids[d][idx]
+            hi_point = self.grids[d][idx + 1]
+            delta = (hi_point - low_point)
+            dist[~nan_mask,d] = (points[~nan_mask,d] - low_point) / delta
+        dist[nan_mask,:] = np.nan
 
         weights = np.empty((N,2**D))
         for (i,diff) in enumerate(itertools.product([0,1],repeat=D)):
@@ -109,11 +108,10 @@ class RegularGridInterpolator(object):
         return sps.coo_matrix((data,(rows,cols)),shape=(M,N))    
 
     def get_cutpoints(self):
-        linspaces = [np.linspace(l,h,n+1) for (l,h,n) in self.grid_desc]
         N = self.num_nodes
         D = self.D
         points = np.empty((N,D))
-        points[:-1,:] = discretize.make_points(linspaces)
+        points[:-1,:] = discretize.make_points(self.grids)
         points[-1,:] = np.nan
         return points
         
@@ -127,8 +125,9 @@ class RegularGridInterpolator(object):
         assert((N,D) == coords.shape)
 
         # (D,) + (N,D) * (D,) ; should be (N,D) at end
-        points = self.low + coords * self.delta
-        assert((N,D) == points.shape)
+        points = np.empty((N,D))
+        for d in xrange(D):
+            points[:,d] = self.grid[d][coords[:,d]]
 
         return points
         

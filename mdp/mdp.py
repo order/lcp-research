@@ -1,5 +1,5 @@
 import numpy as np
-import scipy
+import scipy as sp
 import scipy.sparse as sps
 
 import matplotlib.pyplot as plt
@@ -8,156 +8,76 @@ import lcp
 from utils.parsers import KwargParser
 
 class MDPBuilder(object):
-    """
-    Abstract class for anything that can builder an MDP
-    """
-    def build_mdp(self,**kwargs):
-        """
-        Construct the MDP
-        """
-        raise NotImplementedError()
+    def __init__(self,transition_function, # Main physics
+                 discretizer, # Maps points to nodes
+                 cost_function,
+                 actions, # discrete action set
+                 discount,
+                 samples):
 
-class ContinuousMDP(object):
-    def next_state(self,state,action):
-        raise NotImplementedError
-
-class DiscreteMDP(object):
-    def next_state_index(self,state_node_id,action_id):
-        raise NotImplementedError
-
-class TabularMDP(DiscreteMDP, lcp.LCPBuilder):
-    """
-    MDP object assuming a discrete state-space with tabular representation.
-    """
-    def __init__(self,transitions,costs,actions,discount,state_weights,**kwargs):
-        self.transitions = transitions
-        self.costs = costs
+        self.transition_function = transition_function
+        self.discretizer = discretizer
+        self.cost_function = cost_function
         self.actions = actions
         self.discount = discount
-        self.state_weights = state_weights
+        self.samples = samples
 
-        parser = KwargParser()
-        parser.add('name','Unnamed')
-        args = parser.parse(kwargs)        
-        self.name = args['name']
+        self.state_remappers = []
+        self.node_remappers = []
 
-        A = len(actions)
-        N = costs[0].size
-        self.num_actions = A
-        self.num_states = N
-
-        assert(len(transitions) == A)
-        assert(len(costs) == A)
-        
-        # Ensure sizes are consistent
-        for i in xrange(A):
-            assert((N,) == costs[i].shape)
-            assert(not np.any(np.isnan(costs[i])))
-            
-            assert((N,N) == transitions[i].shape)
-            # Stochastic checking removed
-            
-    def get_action_matrix(self,a):
+        self.mean_interp = True
         """
-        Build the action matrix E_a = I - \gamma * P_a^\top 
-        
-        I guess we're using a sparse matrix here...
-        """
-        return sps.eye(self.num_states,format='lil')\
-            - self.discount * self.transitions[a]
-
-    def next_state_index(self,state,action):
-        """
-        Takes in state and action INDEXES (already discretized)
-        and returns a reward and sampled next state
+        True to interpolate the mean sample, (probably faster)
+        False to average sample interpolation (probably slower, but better)
         """
         
-        N = self.num_states
-        A = self.num_actions
-        assert(0 <= state <= N)
-        assert(0 <= action <= A)
+    def build_mdp(self):
+        actions = self.actions
+        disc = self.discretizer
+        (A,action_dim) = actions.shape
+        S = self.samples
 
-        # Get the reward for doing action in state
-        reward = self.costs[action][states]
+        points = disc.get_cutpoints()
+        (N,state_dim) = points.shape
+        assert(N == disc.num_nodes)
 
-        T = self.transitions[action]
-        if isinstance(T,np.ndarray):
-            # Dense sampling
-            dist = T[:,state]
-            assert((N,) == dist.shape)
-            next_state = np.random.choice(xrange(N),p=dist)
-        else:
-            # Sparse sampling
-            assert(isinstance(T,sps.spmatrix))
-            dist = (T.tocoo()).getcol(state)
-            next_state = np.random.choice(dist.row,p=dist.data)
-
-        return (next_state,reward)        
-
-    def get_value_residual(self,v):
-        N = self.num_states
-        A = self.num_actions
-        
-        comps = np.empty((N,A))
-        gamma = self.discount
+        trans_matrices = []
+        costs = []
         for a in xrange(A):
-            c = self.costs[a]
-            Pt = self.transitions[a].T
-            comps[:,a] = c + gamma * Pt.dot(v)
+            # Costs
+            costs[a] = self.cost_function.cost(points,
+                                               actions[a,:])
 
-        res = v - np.amin(comps,axis=1)
-        assert((N,) == res.shape)
-        return res
+            # Transitions
+            samples = self.transition_function.transition(points,
+                                                          actions[a,:],
+                                                          samples=samples)
+            assert((S,N,state_dim) = samples.shape)
 
-    def build_lcp(self,**kwargs):
-        # Optional regularization
-        parser = KwargParser()
-        parser.add('value_regularization',0.0)
-        parser.add('flow_regularization',0.0)
-        args = parser.parse(kwargs)        
-        self.val_reg = args['value_regularization']
-        self.flow_reg = args['flow_regularization']       
-        
-        n = self.num_states
-        A = self.num_actions
-        N = (A + 1) * n
-        d = self.discount
-
-        # Build the LCP
-        Top = sps.lil_matrix((n,n))
-        Bottom = None
-        q = np.zeros(N)
-        q[0:n] = -self.state_weights
-        for a in xrange(self.num_actions):
-            E = self.get_action_matrix(a)
-            
-            # NewRow = [-E_a 0 ... 0]
-            NewRow = sps.hstack((-E.T,sps.lil_matrix((n,A*n))))
-            if Bottom == None:
-                Bottom = NewRow
+            if mean_interp:
+                mean_samples = np.mean(samples,axis=0)
+                assert((N,state_dim) == mean_samples.shape)
+                # Interpolate the mean sample
+                T = disc.points_to_index_distributions(mean_sample)
             else:
-                Bottom = sps.vstack((Bottom,NewRow))
-            # Top = [...E_a^\top]
-            Top = sps.hstack((Top,E))
-            q[((a+1)*n):((a+2)*n)] = self.costs[a]
-        M = sps.vstack((Top,Bottom))
+                T = sps.coo_matrix(shape=(N,N))
+                for s in xrange(S):
+                    # Interpolate the sample
+                    sample_T = disc.points_to_index_distributions(
+                        samples[s,:,:])
+                    T += 1.0 / float(S) * sample_T # Average the interp.
+            trans_matrix.append(T)
 
-        Reg = sps.lil_matrix((N,N))
-        Reg[n:,n:] = self.flow_reg*sps.eye(A*n)
-        Reg[:n,:n] = self.val_reg*sps.eye(n)
-        
-        M = M + Reg
-
-        assert((N,N) == M.shape)
-        assert((N,) == q.shape)
-        
-        return lcp.LCPObj(M,q,name='LCP from {0} MDP'.format(self.name))
-
-    def __str__(self):
-        return '<{0} with {1} actions and {2} states>'.\
-            format(self.name, self.num_actions, self.num_states)
-        
-        
+            
+        return TabularMDP(trans_matrices,
+                          costs,
+                          actions,
+                          discount,
+                          ...) 
+    
+class DiscreteMDP(object):
+    pass
+   
 class MDPValueIterSplitter(object):
     """
     Builds an LCP based on an MDP, and split it

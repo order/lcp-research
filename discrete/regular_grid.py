@@ -69,10 +69,3 @@ class RegularGridDiscretizer(discretize.Discretizer):
                                      points[:,d] > high + self.fuzz)
             Coords[oob_mask,d] = np.nan            
         return Coords
-
-    def points_to_indicies(self,points):
-        coords = self.to_cell_coords(points)
-        I = indexer.Indexer(self.partition.lengths)
-        indices = I.coorders_to_indices(coords)
-
-        return sps.coo_matrix(
