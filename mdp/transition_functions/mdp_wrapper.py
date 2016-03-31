@@ -17,24 +17,26 @@ def sample_matrix(P,S):
     return Samples
 
 class MDPTransitionWrapper(object):
-    def __init__(self,mdp_obj):
-        self.mdp_obj = mdp_obj
+    def __init__(self,transitions):
+        self.transitions = transitions
+        self.num_states = transitions[0].shape[0]
+        
     def transition(self,points,action,S=1):
-        (N,d) = points.shape
+        (Np,d) = points.shape
         assert(d == 1)
-        M = self.mdp_obj.num_states
+        Ns = self.num_states
         
         row = points[:,0]
-        col = np.arange(N)
-        data = np.ones(N)
-        X = sps.coo_matrix((data,(row,col)),shape=(M,N))
+        col = np.arange(Np)
+        data = np.ones(Np)
+        X = sps.coo_matrix((data,(row,col)),shape=(Ns,Np))
         
-        Post = self.mdp_obj.transitions[action].dot(X)
-        assert((M,N) == Post.shape)
+        Post = self.transitions[action].dot(X)
+        assert((Ns,Np) == Post.shape)
         
         Samples = sample_matrix(Post,S)
 
         Samples = (Samples.T)[:,:,np.newaxis]
-        assert((S,N,d) == Samples.shape)
+        assert((S,Np,d) == Samples.shape)
         return Samples
         

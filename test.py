@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+import time
+
 import discrete.regular_interpolate as reg_interp
 from discrete.discretize import make_points
 
@@ -14,6 +16,7 @@ import solvers
 from solvers.value_iter import ValueIterator
 import utils
 
+import mcts
 
 # Transition function
 di_params = utils.kwargify(step=0.01,
@@ -60,21 +63,20 @@ builder = mdp_builder.MDPBuilder(transition_function,
 mdp_obj = builder.build_mdp()
 
 
-discrete_trans = mdp_wrapper.MDPTransitionWrapper(mdp_obj)
+disc_trans = mdp_wrapper.MDPTransitionWrapper(
+    mdp_obj.transitions)
+disc_cost = costs.DiscreteCostWrapper(mdp_obj.costs)
 points = discretizer.get_cutpoints()
 N = mdp_obj.num_states
 
 start = np.random.randint(N)
 
-I = 25
-H = 100
-for i in xrange(I):
-    T = np.empty(H,dtype='i')
-    s = start
-    for h in xrange(H):
-        s = discrete_trans.transition(np.full((1,1),s),0)
-        T[h] = s
-    plt.plot(points[T,0],
-             points[T,1])
-plt.show()
+print 'Start: ',start,points[start,:]
+
+tree = mcts.MonteCarloTree(disc_trans,
+                           disc_cost,
+                           discount,
+                           actions,
+                           start,2)
+
 
