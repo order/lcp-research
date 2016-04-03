@@ -1,9 +1,49 @@
 import numpy as np
 from mdp.policy import UniformDiscretePolicy
 import discrete       
+from utils import hash_ndarray
+
+from graphviz import Digraph
 
 ###########################
 # CHANCE NODE
+
+class MCTSNode(object):
+    def __init__(self,state):
+        self.state=state
+        self.value=0.0
+        self.visits=0.0
+
+        self.children # Action_id -> set of next states
+
+    def is_leaf(self):
+        return (0 == len(self.children))
+
+    def best_action_uct(self):
+        """
+        Return the best action according to the
+        UCT criterion
+        """
+        assert(not self.is_leaf())
+        raise NotImplementedError()
+
+    def get_child(self,action):
+        """
+        Get an existing child
+        """
+        raise NotImplementedError()
+     
+
+    def sample_child(self,action):
+        """
+        Get a (possibly) new child
+        """
+        raise NotImplementedError()
+
+
+    def update(self,G):
+        
+        
 
 class MCTSChanceNode(object):
     def __init__(self, state, action):
@@ -18,25 +58,37 @@ class MCTSChanceNode(object):
     def next_node(self,trans_fn):
         """
         Currently assuming small branching factor
+        Return (decision_node,from_cache)
         """
 
         # Sample a state
-        state = trans_fn.transition(self.state,
-                                    self.action)[0,:,:]
+        state = trans_fn.single_transition(self.state,
+                                           self.action)
         assert(state.shape == self.state.shape)
 
+        state_hash = hash_ndarray(state) # Get the hash
+
         # Seen it before
-        if state in self.children:
-            return self.children[state]
+        if state_hash in self.children:
+            print 'Hashed state'
+            return (self.children[state_hash],True)
 
         # New node
+        print 'Found new state'
         new_node = MCTSDecisionNode(state)
-        self.children[state] = new_node
-        return new_node
+        self.children[state_hash] = new_node
+        return (new_node,False)
 
     def update(self,G):
         self.visits += 1.0
-        self.value += (1.0 / self.visits) * G
+        alpha = (1.0 / self.visits)
+        self.value = (1.0 - alpha)*self.value +  alpha * G
+
+    def __str__(self):
+        return '{0},{1},{2},{3}'.format(self.state,
+                                         self.action,
+                                         self.value,
+                                         self.visits)
         
 ###############################
 # DECISION NODE
@@ -69,11 +121,13 @@ class MCTSDecisionNode(object):
             action = actions[a_id,:]
             
             chance = MCTSChanceNode(self.state, action)
-            cost = cost_fn.cost(self.state, action)
+            cost = cost_fn.single_cost(self.state,
+                                       action)
             decision = chance.next_node(trans_fn)
-            
-            self.children[action] = chance
-            self.costs[action] = cost
+
+            # Use a_id as the hash
+            self.children[a_id] = chance
+            self.costs[a_id] = cost
             
             return (chance,cost,decision)
 
@@ -81,9 +135,10 @@ class MCTSDecisionNode(object):
         best_child = None
         best_cost = None
         best_uct = np.inf # Minimize cost
-        for action in self.children.keys():
-            cost = self.costs[action]
-            child = self.children[action]
+        for a_id in self.children:
+            # Using a_id as hash
+            cost = self.costs[a_id]
+            child = self.children[a_id]
             
             exploit = cost + discount*child.value
             explore =  np.sqrt(np.log(self.visits)
@@ -100,7 +155,14 @@ class MCTSDecisionNode(object):
 
     def update(self,G):
         self.visits += 1.0
-        self.value += (1.0 / self.visits) * G
+        alpha = (1.0 / self.visits)
+        self.value = (1.0 - alpha)*self.value +  alpha * G
+
+    def __str__(self):
+        return '{0},{1},{2}'.format(self.state,
+                                     self.value,
+                                     self.visits)
+        
 
 ###################################
 # MONTE CARLO TREE
@@ -121,44 +183,99 @@ class MonteCarloTree(object):
         self.discount = discount
         self.actions = actions
         self.horizon = horizon
-        
+
+        assert(1 == len(root_state.shape)) # vector
         self.root_node = MCTSDecisionNode(root_state)
 
     def path_to_leaf(self):
         A = len(self.actions)
         curr = self.root_node
 
-        # Path only contains decision nodes
-        path = [curr]
+        path = []
         while True:
+            # From the decision get the best
             res = curr.best_node(self.actions,
-                                 self.trans_fn)
+                                 self.trans_fn,
+                                 self.costs,
+                                 self.discount)
+            # From current decision get a chance node,
+            # a cost, and the next decision node
             (chance,cost,decision) = res
             assert(isinstance(chance,MCTSChanceNode))
             assert(isinstance(decision,MCTSDecisionNode))
-            path.append(res)
+            path.append((curr,cost,chance))
+            print (curr,cost,chance)
+            
             if decision.is_leaf():
+                res = decision.best_node(self.actions,
+                                         self.trans_fn,
+                                         self.costs,
+                                         self.discount)
+                (chance,cost,new_leaf) = res     
+                path.append((decision,cost,chance))
+                path.append((new_leaf,None,None))
                 return path
-            assert(1e3 > len(path))
+            if(len(path) >= 6):
+                display_tree(self.root_node)
+            assert(len(path) < 6)
+
 
     def rollout(self,path):
         A = self.actions.shape[0]
-        (_,_,decision) = path[-1]
+        (decision,_,_) = path[-1]
         state = decision.state
         
         G = 0.0
         for t in xrange(self.horizon):
             a_id = np.random.randint(A)
+
+            # Transition
             action = self.actions[a_id]
-            state = self.trans_fn(state, action)[0,:,:]
-            cost = self.costs.cost(state, action)
+            states = self.trans_fn.single_transition(state,
+                                                     action)
+            cost = self.costs.single_cost(state,
+                                          action)
+                
             G += (self.discount**t)*cost
         return G
 
     def backup(self,path,G):
         while path:
-            (chance,cost,decision) = path.pop()
-            chance.update(G)
+            (decision,cost,chance) = path.pop()
+            if chance:
+                # Chance node exists, so update
+                # the chance node and return
+                chance.update(G)
+                G = cost + self.discount*G
             decision.update(G)
-            G = curr.reward + self.discount*G
             
+def print_path(path):
+    for (i,(dec,cost,chance)) in enumerate(path):
+        print '{0}: [{1}] -> [{3}] (R: {2})'.format(i,
+                                                    dec,
+                                                    cost,
+                                                    chance)
+
+
+def display_tree(root):
+    dot = Digraph(comment='MCTS Tree')
+    fringe = [(None,root)]
+    while fringe:
+        (parent,child) = fringe.pop()
+        child_str = str(child)
+        child_hash = str(hash(child))
+        if isinstance(child,MCTSDecisionNode):
+            dot.attr('node',shape='box',style='')
+            dot.node(child_hash,child_str)
+        else:
+            assert(isinstance(child,MCTSChanceNode))
+            dot.attr('node',shape='ellipse',style='filled')
+            dot.node(child_hash,child_str)
+            
+        if parent:
+            parent_hash = str(hash(parent))
+            dot.edge(parent_hash,child_hash)
+            
+        for grandchild in child.children.values():
+            fringe.append((child,grandchild))
+    dot.render('data/test.gv', view=True)

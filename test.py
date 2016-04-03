@@ -45,9 +45,10 @@ cost_function = costs.CostWrapper(state_fun)
 
 # Actions:
 actions = np.array([[-1],[0],[1]])
+disc_actions = np.array([[0],[1],[2]])
 
 # Discount
-discount = 0.997
+discount = 0.97
 
 # Samples
 samples = 5
@@ -69,14 +70,20 @@ disc_cost = costs.DiscreteCostWrapper(mdp_obj.costs)
 points = discretizer.get_cutpoints()
 N = mdp_obj.num_states
 
-start = np.random.randint(N)
+start_id = np.argmin(np.sum(np.abs(points[:-1,:]),axis=1))
+#start_id =np.random.randint(N) 
+start_state = np.array([start_id])
+start_pos = points[start_id,:]
 
-print 'Start: ',start,points[start,:]
-
+print 'Start <{0}> {1}'.format(start_id,start_pos)
 tree = mcts.MonteCarloTree(disc_trans,
                            disc_cost,
                            discount,
-                           actions,
-                           start,2)
+                           disc_actions,
+                           start_state,2)
 
-
+for i in xrange(5):
+    path = tree.path_to_leaf()
+    G = tree.rollout(path)
+    tree.backup(path,G)
+mcts.display_tree(tree.root_node)

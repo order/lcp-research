@@ -13,7 +13,7 @@ import importlib
 
 def banner(msg):
     """
-    Take a look at banner!
+    Take a look at banner, Michael!
 
     Loudly announces something, and provide limited introspection
     about what requested the banner.
@@ -58,6 +58,9 @@ def shift_array(x,pos,pad=np.nan):
         shift[pos:] = pad
     
     return shift
+
+def hash_ndarray(A):
+    return hash(A.tostring())
     
 def split_extension(filename,ext=None):
     if ext:
