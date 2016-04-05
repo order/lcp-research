@@ -25,18 +25,24 @@ class MDPTransitionWrapper(TransitionFunction):
         
     def transition(self,points,action,S=1):
         (Np,d) = points.shape
-        assert(d == 1)
-        assert(np.all(0 <= points))
+        assert(d == 1) # 'points' are just node indices
+        assert(np.all(0 <= points)) # +ve
         Ns = self.num_states
         assert(np.all(points < Ns))
+        assert(np.sum(np.fmod(points[:,0],1)) < 1e-15) # ints
 
-        assert(np.sum(np.fmod(points[:,0],1)) <1e-15)
+        assert(1 == len(action.shape))
+        assert(1 == action.shape[0]) # just a singleton
+        a_id = action[0]
+        assert(a_id % 1 < 1e-15) # int
+        a_id = int(a_id)
+        
         row = points[:,0].astype('i')
         col = np.arange(Np)
         data = np.ones(Np)
         X = sps.coo_matrix((data,(row,col)),shape=(Ns,Np))
         
-        post = self.transitions[action].dot(X)
+        post = self.transitions[a_id].dot(X)
         assert((Ns,Np) == post.shape)
         
         samples = sample_matrix(post,S)
