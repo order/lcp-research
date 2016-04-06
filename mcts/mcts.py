@@ -7,6 +7,9 @@ from collections import defaultdict
 from graphviz import Digraph
 import heapq
 
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+
 ###########################
 # CHANCE NODE
 
@@ -72,8 +75,10 @@ class MCTSNode(object):
         C = len(self.children[a_id])
         for i in xrange(C):
             child_state = self.children[a_id][i].state
-            if np.sum(np.abs(target - child_state)) < 1e-15:
+            print 'Checking',target,child_state
+            if np.sum(np.abs(target - child_state)) < 1e-12:
                 # Already exists...
+                print '\tmatch'
                 return i
         return None
 
@@ -91,9 +96,10 @@ class MCTSNode(object):
                                    action)
         
         node_idx = self.find_node(a_id,next_state)
-        if node_idx:
-            return self.children[a_id][state_idx]
-
+        print 'Node idx:', node_idx
+        if node_idx != None:
+            return self.children[a_id][node_idx]
+        
         # create and return new node
         new_node = self.add_child(a_id,next_state,cost)
         return new_node
@@ -114,8 +120,11 @@ class MCTSNode(object):
         # Update Q
         c = self.costs[a_id]
         t = 1.0 / self.action_visits[a_id]
-        Q_new = (1 - t) * self.Q[a_id] \
-                + t * (c + discount * G)
+        if 1.0 < self.action_visits[a_id]:
+            Q_new = (1 - t) * self.Q[a_id] \
+                    + t * (c + discount * G)
+        else:
+            Q_new = (c + discount * G)
         self.Q[a_id] = Q_new
 
         # Update V
@@ -124,6 +133,8 @@ class MCTSNode(object):
 
         # Update UCT heap
         new_uct = ucb1(Q_new,
+                       self.total_visits,
+                       self.action_visits[a_id])
        
 
         # Ensure that the a_id was the top of the heap
@@ -184,7 +195,7 @@ class MonteCarloTree(object):
             assert(len(path) < 1e2)
 
     def expand_leaf(self,leaf):
-        assert(leaf.isleaf())
+        assert(leaf.is_leaf())
         a_id = 0
         assert(leaf.U[0][1] == a_id)
         action_0 = self.actions[a_id]
@@ -195,7 +206,7 @@ class MonteCarloTree(object):
                                               action_0)
         child_node = leaf.add_child(a_id,child_state,
                                     child_cost)
-        return node
+        return child_node
 
 
     def rollout(self,state):
@@ -225,15 +236,19 @@ class MonteCarloTree(object):
             a_id = action_list.pop()
             G = path.pop().update(a_id,self.discount,G)
 
-def display_tree(root,no_label=False):
+def display_path(path,a_list):
+    assert(len(path) - 1 == len(a_list))
+    for (i,node) in enumerate(path):
+        if i > 0:
+            print '\t->',a_list[i-1]
+        print i,node,node.__repr__()
+
+def display_tree(root,**kwargs):
     dot = Digraph(comment='MCTS Tree')
     fringe = [(None,root)]
     while fringe:
         (parent_hash,child) = fringe.pop()
-        if no_label:
-            child_str = ''
-        else:
-            child_str = str(child)
+        child_str = str(child)
         child_hash = str(hash(child))
 
         if child.is_leaf():
@@ -243,10 +258,7 @@ def display_tree(root,no_label=False):
         dot.node(child_hash,child_str)
             
         if parent_hash:
-            if no_label:
-                label = ''
-            else:
-                label = str(child.state)
+            label = str(child.state)
             dot.edge(parent_hash,
                      child_hash,
                      label=label)
@@ -257,17 +269,19 @@ def display_tree(root,no_label=False):
             child_aid_hash = child_hash + str(a_id)
             dot.node(child_aid_hash,'')
 
-            if no_label:
-                label = ''
-            else:
-                label = str(a_id)
+
+            label = str(a_id)
             dot.edge(child_hash,
                      child_aid_hash,
                      label=label)
             for gc in child.children[a_id]:
                 fringe.append((child_aid_hash,gc))
-                
-    dot.render('data/test.gv', view=True)
+    dot.format='png'
+    dot.render('data/test.gv')
+    img = mpimg.imread('data/test.gv.png')
+    plt.imshow(img)
+    plt.title(kwargs.get('title',''))
+    plt.show()
 
 
 def ucb1(Q, # Value of node

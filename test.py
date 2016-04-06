@@ -84,21 +84,20 @@ tree = mcts.MonteCarloTree(disc_trans,
                            discount,
                            disc_actions,
                            start_state,100)
-for i in xrange(1000):
+for i in xrange(10):
     print '-'*15
     (path,a_list) = tree.path_to_leaf()
     leaf = path[-1]
-
+    
     # Expand child
     child_node = tree.expand_leaf(leaf)
-    
+    a_list.append(0) # Defaults to first action
+   
     (G,a_id,state,cost) = tree.rollout(child_node.state)
     
-
-    a_list.append(a_id)
-    assert(len(a_list) == len(path))
+    #assert(len(a_list) == len(path))
     tree.backup(path,a_list,G)
-    print i,tree.root_node.value
+    #print i,tree.root_node.value
     
-#mcts.display_tree(tree.root_node)
-
+    mcts.display_tree(tree.root_node,
+                      title='Iteration '+str(i))
