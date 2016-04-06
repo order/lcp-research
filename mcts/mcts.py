@@ -12,20 +12,22 @@ import heapq
 
 class MCTSNode(object):
     def __init__(self,state,num_actions):
+        A = num_actions
         self.state=state
-        self.num_actions = num_actions
-        
-        self.value=0.0
-        self.visits=0.0
+        self.num_actions = A
 
-        self.children = defaultdict(list)
-        self.costs = defaultdict(float)
+        self.V=0.0 # State value
+        self.total_visits=0.0 # Total visits
 
-        # Init the heap
-        self.ucts = [(-np.inf,a) for a in xrange(num_actions)]
+        self.children = defaultdict(list) # a_id -> Node list
+        self.costs = np.full(A,np.nan) # Costs
+        self.Q = np.full(A,np.inf)# Q-values
+        self.action_visits = np.zeros(A)
+
+        # Init the UCT heap
+        self.U = [(-np.inf,a) for a in xrange(num_actions)]
 
     def is_leaf(self):
-        assert(len(self.costs) == len(self.children))
         return (0 == len(self.children))
 
     def best_action_by_uct(self):
@@ -34,36 +36,46 @@ class MCTSNode(object):
         UCT criterion
         """
         assert(not self.is_leaf())
-        (uct,a_id) = self.ucts[0]
+        (uct,a_id) = self.U[0] # Top of heap
         return a_id
     
-    def get_child(self,action):
+    def get_child(self,a_id):
         """
         Get an existing child
         """
-        C = len(self.children[action])
-        P = [float(child.visits) / float(self.visits)
-             for child in self.children[action]]
+        C = len(self.children[a_id])
+        P = self.actions_visits / self.total_visits
         assert(np.abs(np.sum(P) - 1.0) < 1e-15)
         
         i = np.random(C,p=P)
-        child = self.children[action][i]
+        child = self.children[a_id][i]
         assert(isinstance(child,MCTSNode))
         return child
 
-    def add_child(self,action,
+    def add_child(self,a_id,
                   state,
                   cost):
+        # Add cost, or ensure same as old value
+        # (assumes deterministic cost)
+        if len(self.children[a_id]) > 0:
+            assert(np.abs(self.costs[a_id] - cost) < 1e-12)
+        else:
+            self.costs[a_id] = cost
+        
         # Add the new node
-        new_node = MCTSNode(state,self.num_actions)
-        self.children[action].append(new_node)
-
-        # Add the cost
-        if action in self.costs:
-            assert(np.abs(self.costs[action] - cost) < 1e-12)
-        self.costs[action] = cost
+        new_node = MCTSNode(state,self.num_actions)  
+        self.children[a_id].append(new_node)
 
         return new_node
+
+    def find_node(self,a_id,target):
+        C = len(self.children[a_id])
+        for i in xrange(C):
+            child_state = self.children[a_id][i].state
+            if np.sum(np.abs(target - child_state)) < 1e-15:
+                # Already exists...
+                return i
+        return None
 
     def sample_and_add_child(self,a_id,
                              actions,
@@ -78,57 +90,54 @@ class MCTSNode(object):
         cost = cost_fn.single_cost(self.state,
                                    action)
         
-        C = len(self.children[a_id])
-        for i in xrange(C):
-            child_state = self.children[a_id][i].state
-            if np.sum(np.abs(next_state - child_state)) < 1e-15:
-                return self.children[a_id][i]
-            
-        new_node = self.add_child(a_id,next_state,cost)            
+        node_idx = self.find_node(a_id,next_state)
+        if node_idx:
+            return self.children[a_id][state_idx]
+
+        # create and return new node
+        new_node = self.add_child(a_id,next_state,cost)
         return new_node
 
-    def update(self,action,
+    def update(self,
+               a_id,
                discount,
                G):
+        """
+        We did action a_id, and saw a return of G.
+        Q(s,a) = E[V(s')]
+        """
+        
         # Update visits
-        self.visits += 1.0
+        self.total_visits += 1.0
+        self.action_visits[a_id] += 1.0
 
-        # Update return based on immediate cost
-        G = self.costs[action] + discount*G
+        # Update Q
+        c = self.costs[a_id]
+        t = 1.0 / self.action_visits[a_id]
+        Q_new = (1 - t) * self.Q[a_id] \
+                + t * (c + discount * G)
+        self.Q[a_id] = Q_new
 
-        # Update value
-        a = 1.0 / self.visits
-        self.values *= (1 - a)
-        self.values += a * G
+        # Update V
+        self.V = min(self.V,Q_new)
+
+
+        # Update UCT heap
+        new_uct = ucb1(Q_new,
+       
 
         # Ensure that the a_id was the top of the heap
-        (old_uct,a_id) = self.ucts[0]
-        assert(action == a_id) # Used best
-
-        # Aggregate expected value and visits
-        children = self.children[action]
-        C = len(children)
-        exp_value = 0.0
-        total_visits = 0.0
-        for child in children:            
-            total_visits += child.visits
-            exp_value += child_visits * child.value
-        exp_value /= total_visits
-        # TODO: cache this rather than recalculate
-            
-        explore = np.sqrt(np.log(self.visits) / total_visits)
-        c = np.sqrt(2.0) # Tradeoff between explore and exloit
-        new_uct = exp_value - c * explore
-
-        heapq.heapreplace(self.ucts,(new_uct,a_id))
-
-        return G
+        (top_uct,top_a) = self.U[0]
+        assert(top_a==a_id)
+        heapq.heapreplace(self.U,(new_uct,a_id))
+        
+        return self.V
         
 
     def __str__(self):
         return 'N<{0},{1},{2}>'.format(self.state,
-                                      self.value,
-                                      self.visits)
+                                      self.V,
+                                      self.total_visits)
 
         
 
@@ -174,6 +183,20 @@ class MonteCarloTree(object):
                                              self.cost_fn)
             assert(len(path) < 1e2)
 
+    def expand_leaf(self,leaf):
+        assert(leaf.isleaf())
+        a_id = 0
+        assert(leaf.U[0][1] == a_id)
+        action_0 = self.actions[a_id]
+        
+        child_state = self.trans_fn.single_transition(leaf.state,
+                                                      action_0)
+        child_cost = self.cost_fn.single_cost(leaf.state,
+                                              action_0)
+        child_node = leaf.add_child(a_id,child_state,
+                                    child_cost)
+        return node
+
 
     def rollout(self,state):
         A = self.num_actions
@@ -197,9 +220,10 @@ class MonteCarloTree(object):
         assert(asc)
         return (G,asc[0],asc[1],asc[2])
 
-    def backup(self,path,G):
+    def backup(self,path,action_list,G):
         while path:
-            G = path.pop().update(G)
+            a_id = action_list.pop()
+            G = path.pop().update(a_id,self.discount,G)
 
 def display_tree(root,no_label=False):
     dot = Digraph(comment='MCTS Tree')
@@ -244,3 +268,13 @@ def display_tree(root,no_label=False):
                 fringe.append((child_aid_hash,gc))
                 
     dot.render('data/test.gv', view=True)
+
+
+def ucb1(Q, # Value of node
+         T, # Visits
+         n):
+    assert(T >= n)
+    assert(n > 0)
+    explore = np.sqrt(np.log(T) / n)
+    c = np.sqrt(2.0) # Tradeoff between explore and exloit
+    return Q - c * explore # minus because costs
