@@ -5,33 +5,47 @@ class Policy(object):
         raise NotImplementedError()
     def get_single_decision(self,point):
         return self.get_decisions(point[np.newaxis,:])[0,:]
+
+class IndexPolicy(object):
+    def get_decision_indices(self,points):
+        raise NotImplementedError()
+    def get_single_decision_index(self,point):
+        return self.get_decision_indices(point[np.newaxis,:])[0]
+
+class IndexPolicyWrapper(Policy):
+    """
+    Converts an index policy into a normal policy
+    """
+    def __init__(self,policy,actions):
+        self.policy = policy
+        self.actions = actions
+    def get_decisions(self,points):
+        aid = self.policy.get_decision_indicies(points)
+        return self.actions[aid,:]
     
-class ConstantDiscretePolicy(Policy):
+class ConstantDiscretePolicy(IndexPolicy):
     def __init__(self,action_index):
         self.action_index = action_index
-    def get_decisions(self,points):
+    def get_decision_indices(self,points):
         N = points.shape[0]
         actions = np.full((N,1),self.action_index)
         return actions
 
-class UniformDiscretePolicy(Policy):
+class UniformDiscretePolicy(IndexPolicy):
     def __init__(self,num_actions):
         self.A = num_actions
-    def get_decision(self,points):
+    def get_decision_indices(self,points):
         N = points.shape[0]
         return np.random.randint(self.A,size=(N,1))
 
-class RandomDiscretePolicy(Policy):
-    def __init__(self,actions,p):
+class RandomDiscretePolicy(IndexPolicy):
+    def __init__(self,num_actions,p):
         assert(1 == len(p.shape))
         self.p = p
-        self.actions = actions
-    def get_decisions(self,points):
+    def get_decision_indices(self,points):
         N = points.shape[0]
-        (A,d) = self.actions.shape
-        assert((A,) == self.p.shape)
-        a_ids =  np.random.choice(A,size=N,p=self.p)
-        return self.actions[a_ids,:]
+        (A,) = self.p.size
+        return np.random.choice(A,size=N,p=self.p)
 
 class ConstantPolicy(Policy):
     def __init__(self,action):
@@ -44,45 +58,69 @@ class ConstantPolicy(Policy):
         assert((N,u) == decision.shape)
         return decision
 
-class MinFunPolicy(Policy):
-    def __init__(self,actions,fns):
-        self.actions = actions
+class EpsilonFuzzedPolicy(IndexPolicy):
+    def __init__(self,num_actions,epsilon,policy):
+        self.A = num_actions
+        self.e = epsilon
+        self.policy = policy
+    def get_decision_indices(self,points):
+        (N,d) = points.shape
+        decision = self.policy.get_decision_indices(points)
+        (M,) = decision.shape
+        assert(N == M)
+        
+        mask = (np.random.rand(N) < self.e)
+        S = np.sum(mask)
+        rand_aid = np.random.randint(self.A,size=S)
+        
+        decision[mask] = rand_aid
+        return decision
+
+class MinFunPolicy(IndexPolicy):
+    def __init__(self,fns):
         self.fns = fns
         
-    def get_decisions(self,points):
+    def get_decision_indices(self,points):
         (N,d) = points.shape
-        (A,aD) = self.actions.shape
-        assert(A == len(self.fns))
+        A = len(self.fns)
                
         F = np.empty((N,A))
         for a in xrange(A):
             F[:,a] = self.fns[a].evaluate(points)
-        a_index = np.argmin(F,axis=1)
-               
-        actions = np.empty((N,aD))               
-        for a in xrange(A):
-            actions[a_index==a,:] = self.actions[a,:]
-        return actions
+        return np.argmin(F,axis=1)
     
-class MaxFunPolicy(Policy):
-    def __init__(self,actions,fns):
-        self.actions = actions
+class MaxFunPolicy(IndexPolicy):
+    def __init__(self,fns):
         self.fns = fns
         
-    def get_decisions(self,points):
+    def get_decision_indices(self,points):
         (N,d) = points.shape
-        (A,aD) = self.actions.shape
-        assert(A == len(self.fns))
+        A = len(self.fns)
                
         F = np.empty((N,A))
         for a in xrange(A):
             F[:,a] = self.fns[a].evaluate(points)
-        a_index = np.argmax(F,axis=1)
+        return np.argmax(F,axis=1)
+
+class SoftMaxFunPolicy(IndexPolicy):
+    def __init__(self,fns):
+        self.fns = fns
+        
+    def get_decision_indices(self,points):
+        (N,d) = points.shape
+        A = len(self.fns)
                
-        actions = np.empty((N,aD))               
+        F = np.empty((N,A))
         for a in xrange(A):
-            actions[a_index==a,:] = self.actions[a,:]
-        return actions
+            F[:,a] = self.fns[a].evaluate(points)
+
+        F = F - np.max(F)
+        Z = np.sum(F,axis=1)
+        P = F / Z
+        decision = np.empty(N)
+        for i in xrange(N):
+            decision[i] = np.random.choice(A,p=P[i,:])
+        return decision
         
 class KStepLookaheadPolicy(Policy):
     """

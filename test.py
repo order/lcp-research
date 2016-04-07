@@ -23,7 +23,7 @@ import utils
 
 import mcts
 
-def make_di_mdp():
+def make_di_mdp(N):
 
     trans_params = utils.kwargify(step=0.01,
                                   num_steps=5,
@@ -31,8 +31,8 @@ def make_di_mdp():
                                   control_jitter=0.01)
     trans_fn = di.DoubleIntegratorTransitionFunction(
         **trans_params)
-    discretizer = reg_interp.RegularGridInterpolator([(-5,5,40),
-                                                      (-5,5,40)])
+    discretizer = reg_interp.RegularGridInterpolator([(-5,5,N),
+                                                      (-5,5,N)])
     x_bound = remapper.RangeThreshStateRemapper(0,-5,5)
     v_bound = remapper.RangeThreshStateRemapper(1,-5,5)
     state_remappers = [x_bound,v_bound]
@@ -58,15 +58,15 @@ def make_di_mdp():
 
     return builder,mdp_obj
 
-def solve_mdp_kojima(mdp_obj):
+def solve_mdp_kojima(mdp_obj,reg,tol):
     lcp_obj = mdp_obj.build_lcp()
     iterator = KojimaIPIterator(lcp_obj,
-                                val_reg=0.0,
-                                flow_reg=1e-12)
+                                val_reg=reg,
+                                flow_reg=reg)
     
     it_solver = solvers.IterativeSolver(iterator)
     it_solver.termination_conditions.append(
-        solvers.PrimalChangeTerminationCondition(1e-12))
+        solvers.PrimalChangeTerminationCondition(tol))
     it_solver.termination_conditions.append(
         solvers.MaxIterTerminationCondition(1e3))
     it_solver.notifications.append(
@@ -120,9 +120,9 @@ def make_tree(builder,value_fn,policy,rollout_horizon):
     return tree
 
 def run_tree(tree,N):
+    Vs = np.empty(N)
     for i in xrange(N):
-        print '-'*10
-        print 'Iter',i
+        print '.'
         (path,a_list) = tree.path_to_leaf()
         leaf = path[-1]
         
@@ -130,17 +130,35 @@ def run_tree(tree,N):
         a_list.append(a_id)
         
         #assert(len(a_list) == len(path))
-        if len(path) > 4:
-            print 'Action prefix:',a_list[:3]
         tree.backup(path,a_list,G)
-        print 'Value:',tree.root_node.V
+        Vs[i] = tree.root_node.V
+    return Vs
 
-        #mcts.display_tree(tree.root_node,
-        #                  title='Iteration '+str(i))
+    #mcts.display_tree(tree.root_node,
+    #                  title='Iteration '+str(i))
 
-(builder,mdp_obj) = make_di_mdp()
-x = solve_mdp_kojima(mdp_obj)
-(v_fn,q_fns) = make_interps(builder.discretizer,x)
-q_policy = mdp.policy.MaxFunPolicy(mdp_obj.actions, q_fns)
-tree = make_tree(builder,v_fn,q_policy,100)
-run_tree(tree,10)
+# Good DI
+(builder,mdp_obj) = make_di_mdp(80)
+x = solve_mdp_kojima(mdp_obj,1e-12,1e-12)
+(good_v_fn,good_q_fns) = make_interps(builder.discretizer,x)
+
+# Cheap DI
+(builder,mdp_obj) = make_di_mdp(20)
+x = solve_mdp_kojima(mdp_obj,1e-8,1e-6)
+(cheap_v_fn,cheap_q_fns) = make_interps(builder.discretizer,x)
+
+#q_policy = mdp.policy.MaxFunPolicy(q_fns)
+#tree_policy = mdp.policy.EpsilonFuzzedPolicy(len(q_fns),
+#                                             0.05,
+#                                             q_policy)
+tree_policy = mdp.policy.SoftMaxFunPolicy(cheap_q_fns)
+tree = make_tree(builder,cheap_v_fn,tree_policy,50)
+H = 2500
+Vs = run_tree(tree,H)
+v_good = good_v_fn.evaluate(tree.root_node.state[np.newaxis,:])[0]
+v_cheap = cheap_v_fn.evaluate(tree.root_node.state[np.newaxis,:])[0]
+
+plt.plot([0,H-1],[v_good,v_good],'--g',
+         [0,H-1],[v_cheap,v_cheap],'--r',
+         np.arange(H),Vs,'-b',lw=2.0)
+plt.show()

@@ -13,7 +13,6 @@ import matplotlib.image as mpimg
 ###########################
 # CHANCE NODE
 
-
 class MCTSNode(object):
     NODE_ID = 0
     def __init__(self,state,num_actions):
@@ -29,6 +28,7 @@ class MCTSNode(object):
         self.children = defaultdict(list) # a_id -> Node list
         self.costs = np.full(A,np.nan) # Costs
         self.Q = np.full(A,np.inf)# Q-values
+        self.QVar = np.full(A,np.inf)
         self.action_visits = np.zeros(A,dtype='i')
 
     def is_leaf(self):
@@ -93,6 +93,19 @@ class MCTSNode(object):
                 return i
         return None
 
+    def get_next_child(self, actions,
+                             trans_fn,
+                             cost_fn):
+        best_aid = self.best_action_by_uct()
+        C = len(self.children[best_aid])
+        if C == 0 or C < 3 + np.log(self.total_visits):
+            return self.sample_and_add_child(best_aid,
+                                             actions,
+                                             trans_fn,
+                                             cost_fn)
+        node = np.random.choice(self.children[best_aid])
+        return (best_aid,node,False)
+
     def sample_and_add_child(self,a_id,
                              actions,
                              trans_fn,
@@ -108,11 +121,11 @@ class MCTSNode(object):
         
         node_idx = self.find_node(a_id,next_state)
         if node_idx != None:
-            return (self.children[a_id][node_idx],False)
+            return (a_id,self.children[a_id][node_idx],False)
         
         # create and return new node
         new_node = self.add_child(a_id,next_state,cost)
-        return (new_node,True)
+        return (a_id,new_node,True)
 
     def init_q(self,a_id,G):
         assert(self.total_visits == 0.0)
@@ -189,6 +202,7 @@ class MonteCarloTree(object):
         self.discount = discount
         self.actions = actions
         self.policy = policy
+        self.value_fn = value_fn
         self.num_actions = actions.shape[0]
         self.horizon = horizon
         
@@ -202,25 +216,22 @@ class MonteCarloTree(object):
         action_list = []
         while True:
             # Add curr node and best action
-            best_action = curr.best_action_by_uct()
             path.append(curr)
-            action_list.append(best_action)
 
             # Sample next node
             had_unexplored = curr.has_unexplored()
-            ret = curr.sample_and_add_child(best_action,
-                                            self.actions,
-                                            self.trans_fn,
-                                            self.cost_fn)
-            (next_node,added) = ret
+            ret = curr.get_next_child(self.actions,
+                                      self.trans_fn,
+                                      self.cost_fn)
+            (best_aid,next_node,added) = ret
+            action_list.append(best_aid)
 
             if had_unexplored:
                 # Was an unexplored action; always take it
                 assert(added)
                 # Unique node on path is the one we just added
-                assert(1 == len(curr.children[best_action]))
-                assert(curr.children[best_action][0]
-                       == next_node)
+                assert(1 == len(curr.children[best_aid]))
+                assert(curr.children[best_aid][0] == next_node)
 
             if added:
                 # New node
@@ -254,10 +265,8 @@ class MonteCarloTree(object):
         asc = None # action,state,cost
         for t in xrange(self.horizon):
             # Policy
-            action = self.policy.get_single_decision(state)
-            assert((1,) == action.shape)
-            a_id = action[0] + 1
-
+            a_id = self.policy.get_single_decision_index(state)
+            action = self.actions[a_id,:]
             # Transition
             state = self.trans_fn.single_transition(state,
                                                      action)
@@ -268,6 +277,9 @@ class MonteCarloTree(object):
                 asc = (a_id,state,cost)
                 
             G += (self.discount**t)*cost
+        # Use value function for the rest
+        v = self.value_fn.evaluate(state[np.newaxis,:])[0]
+        G += (self.discount**self.horizon)*v
         assert(asc)
         return (G,asc[0],asc[1],asc[2])
 
@@ -353,5 +365,5 @@ def ucb1(Q, # Value of node
         return -np.inf
     explore = np.sqrt(np.log(T) / float(n))
     B = 1.0 / (1.0 - 0.99)
-    c = np.sqrt(B / 2) # Tradeoff between explore and exloit
+    c = np.sqrt(2) # Tradeoff between explore and exloit
     return Q - c * explore # minus because costs
