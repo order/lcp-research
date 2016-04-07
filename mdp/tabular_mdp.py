@@ -75,8 +75,8 @@ class TabularMDP(object):
             block_idx = slice((a+1)*n,(a+2)*n)
             E = self.get_E_matrix(a)
 
-            M[:n,block_idx] = E.T # blocks in value row
-            M[block_idx,:n] = -E # blocks in flow rows
+            M[:n,block_idx] = E # blocks in value row
+            M[block_idx,:n] = -E.T # blocks in flow rows
             q[block_idx] = self.costs[a]
 
         # Regularization

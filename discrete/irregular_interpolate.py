@@ -114,6 +114,14 @@ class IrregularGridInterpolator(object):
         points[:-1,:] = discretize.make_points(self.grids)
         points[-1,:] = np.nan
         return points
+
+    def has_point(self,target):
+        (N,) = target.shape
+        for i in xrange(N):
+            diff = np.min(np.abs(self.grids[i] - target[i]))
+            if diff > 1e-15:
+                return False
+        return True
         
     
     def indices_to_points(self,indices):

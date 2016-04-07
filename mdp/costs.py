@@ -27,3 +27,13 @@ class DiscreteCostWrapper(CostFunction):
         assert(np.sum(np.fmod(states[:,0],1)) < 1e-15)
         state_ids = states[:,0].astype('i')
         return self.costs[action][state_ids]
+
+class DiscreteMatchCost(CostFunction):
+    def __init__(self,state):
+        self.state = state
+    def cost(self,states,action):
+        (N,d) = states.shape
+        assert(1==d)
+        costs = np.ones(N)
+        costs[states[:,0] == self.state] = 0
+        return costs

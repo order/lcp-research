@@ -1,7 +1,9 @@
 import numpy as np
 from utils.parsers import KwargParser
 
-class DoubleIntegratorTransitionFunction(object):
+from mdp.transition import TransitionFunction
+
+class DoubleIntegratorTransitionFunction(TransitionFunction):
     def __init__(self,**kwargs):
         parser = KwargParser()
         parser.add('step')

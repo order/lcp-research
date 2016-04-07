@@ -3,25 +3,35 @@ import numpy as np
 class Policy(object):
     def get_decisions(self,points):
         raise NotImplementedError()
-
-class DiscretePolicy(object):
-    def get_action_indices(self,points):
-        raise NotImplementedError()
+    def get_single_decision(self,point):
+        return self.get_decisions(point[np.newaxis,:])[0,:]
     
-class ConstantDiscretePolicy(DiscretePolicy):
+class ConstantDiscretePolicy(Policy):
     def __init__(self,action_index):
         self.action_index = action_index
-    def get_action_indices(self,points):
+    def get_decisions(self,points):
         N = points.shape[0]
-        actions = np.full(N,self.action_index)
+        actions = np.full((N,1),self.action_index)
         return actions
 
-class UniformDiscretePolicy(DiscretePolicy):
+class UniformDiscretePolicy(Policy):
     def __init__(self,num_actions):
         self.A = num_actions
-    def get_action_indices(self,points):
+    def get_decision(self,points):
         N = points.shape[0]
-        return np.random.randint(self.A,size=N)
+        return np.random.randint(self.A,size=(N,1))
+
+class RandomDiscretePolicy(Policy):
+    def __init__(self,actions,p):
+        assert(1 == len(p.shape))
+        self.p = p
+        self.actions = actions
+    def get_decisions(self,points):
+        N = points.shape[0]
+        (A,d) = self.actions.shape
+        assert((A,) == self.p.shape)
+        a_ids =  np.random.choice(A,size=N,p=self.p)
+        return self.actions[a_ids,:]
 
 class ConstantPolicy(Policy):
     def __init__(self,action):

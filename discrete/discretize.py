@@ -18,8 +18,8 @@ class Discretizer(object):
     
 
 #######################################
-# AUX functions
-    
+# AUX functions    
+
 def is_int(x):
     return x.dtype.kind in 'ui'
 

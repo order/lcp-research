@@ -4,100 +4,143 @@ import matplotlib.pyplot as plt
 import time
 
 import discrete.regular_interpolate as reg_interp
-from discrete.discretize import make_points
+import discrete.discretize as discretize
 
 import mdp.transition_functions.double_integrator as di
 import mdp.transition_functions.mdp_wrapper as mdp_wrapper
+
+import mdp.policy
 import mdp.state_remapper as remapper
 import mdp.state_functions as state_fn
 import mdp.costs as costs
 import mdp.mdp_builder as mdp_builder
+
 import solvers
+from solvers.kojima import KojimaIPIterator
 from solvers.value_iter import ValueIterator
+
 import utils
 
 import mcts
 
-# Transition function
-di_params = utils.kwargify(step=0.01,
-                           num_steps=5,
-                           dampening=0.01,
-                           control_jitter=0)
-transition_function = di.DoubleIntegratorTransitionFunction(**di_params)
+def make_di_mdp():
 
-# Discretizer
-X = 74
-Y = 74
-x_grid_desc = (-5,5,X)
-v_grid_desc = (-5,5,Y)
-grid_descs = [x_grid_desc,v_grid_desc]
-discretizer = reg_interp.RegularGridInterpolator(grid_descs)
+    trans_params = utils.kwargify(step=0.01,
+                                  num_steps=5,
+                                  dampening=0.01,
+                                  control_jitter=0.01)
+    trans_fn = di.DoubleIntegratorTransitionFunction(
+        **trans_params)
+    discretizer = reg_interp.RegularGridInterpolator([(-5,5,40),
+                                                      (-5,5,40)])
+    x_bound = remapper.RangeThreshStateRemapper(0,-5,5)
+    v_bound = remapper.RangeThreshStateRemapper(1,-5,5)
+    state_remappers = [x_bound,v_bound]
 
+    cost_state_fn = state_fn.BallSetFn(np.zeros(2), 0.5)
+    cost_fn = costs.CostWrapper(cost_state_fn)
 
-# State_remappers
-state_remappers = [remapper.RangeThreshStateRemapper(0,-5,5),
-                  remapper.RangeThreshStateRemapper(1,-5,5)]
+    actions = np.array([[-1,0,1]]).T
 
-# Costs
-state_fun = state_fn.BallSetFn(np.zeros(2), 0.5)
-#state_fun = state_fn.GaussianFn(1,np.zeros(2),9)
-cost_function = costs.CostWrapper(state_fun)
+    discount = 0.997
 
-# Actions:
-actions = np.array([[-1],[0],[1]])
-disc_actions = np.array([[0],[1],[2]])
+    num_samples = 10
 
-# Discount
-discount = 0.97
+    builder = mdp_builder.MDPBuilder(trans_fn,
+                                     discretizer,
+                                     state_remappers,
+                                     cost_fn,
+                                     actions,
+                                     discount,
+                                     num_samples,
+                                     False)
+    mdp_obj = builder.build_mdp()
 
-# Samples
-samples = 5
+    return builder,mdp_obj
 
-builder = mdp_builder.MDPBuilder(transition_function,
-                                 discretizer,
-                                 state_remappers,
-                                 cost_function,
-                                 actions,
-                                 discount,
-                                 samples,
-                                 False)
-mdp_obj = builder.build_mdp()
-
-
-disc_trans = mdp_wrapper.MDPTransitionWrapper(
-    mdp_obj.transitions)
-disc_cost = costs.DiscreteCostWrapper(mdp_obj.costs)
-points = discretizer.get_cutpoints()
-N = mdp_obj.num_states
-
-target = np.array([-1,1])
-dist = np.sum(np.abs(points[:-1,:] - target),axis=1)
-start_id = np.argmin(dist)
-#start_id =np.random.randint(N) 
-start_state = np.array([start_id])
-start_pos = points[start_id,:]
-print 'Start index', start_id
-print 'Start state', start_pos
-
-tree = mcts.MonteCarloTree(disc_trans,
-                           disc_cost,
-                           discount,
-                           disc_actions,
-                           start_state,100)
-for i in xrange(10):
-    print '-'*15
-    (path,a_list) = tree.path_to_leaf()
-    leaf = path[-1]
+def solve_mdp_kojima(mdp_obj):
+    lcp_obj = mdp_obj.build_lcp()
+    iterator = KojimaIPIterator(lcp_obj,
+                                val_reg=0.0,
+                                flow_reg=1e-12)
     
-    # Expand child
-    child_node = tree.expand_leaf(leaf)
-    a_list.append(0) # Defaults to first action
-   
-    (G,a_id,state,cost) = tree.rollout(child_node.state)
+    it_solver = solvers.IterativeSolver(iterator)
+    it_solver.termination_conditions.append(
+        solvers.PrimalChangeTerminationCondition(1e-12))
+    it_solver.termination_conditions.append(
+        solvers.MaxIterTerminationCondition(1e3))
+    it_solver.notifications.append(
+        solvers.PrimalChangeAnnounce())
+
+    it_solver.solve()
+    return iterator.get_primal_vector()
+
+def solve_mdp_value(mdp_obj):
+    iterator = ValueIterator(mdp_obj)
     
-    #assert(len(a_list) == len(path))
-    tree.backup(path,a_list,G)
-    #print i,tree.root_node.value
+    it_solver = solvers.IterativeSolver(iterator)
+    it_solver.termination_conditions.append(
+        solvers.ValueChangeTerminationCondition(1e-6))
+    it_solver.termination_conditions.append(
+        solvers.MaxIterTerminationCondition(1e4))
+    it_solver.notifications.append(
+        solvers.ValueChangeAnnounce())
+
+    it_solver.solve()
+    return iterator.get_value_vector()
+
+def make_interps(discretizer,x):
+    (N,) = x.shape
+    n = discretizer.num_nodes
+    A = (N / n) - 1
+    assert((A % 1) < 1e-15)
+    A = int(A)
+    v = x[:n]
+
+    V = state_fn.InterpolatedFunction(discretizer,x[:n])
+    #V = state_fn.BallSetFn(np.zeros(2), 0.25)
     
-    mcts.display_tree(tree.root_node,
-                      title='Iteration '+str(i))
+    Qs = []
+    for a in xrange(A):
+        idx = slice((a+1)*n,(a+2)*n)
+        q = state_fn.InterpolatedFunction(discretizer,x[idx])
+        Qs.append(q)
+    return V,Qs
+    
+def make_tree(builder,value_fn,policy,rollout_horizon):
+    start_state = np.array([-1,1])
+    tree = mcts.MonteCarloTree(builder.transition_function,
+                               builder.cost_function,
+                               builder.discount,
+                               builder.actions,
+                               policy,
+                               value_fn,
+                               start_state,
+                               rollout_horizon)
+    return tree
+
+def run_tree(tree,N):
+    for i in xrange(N):
+        print '-'*10
+        print 'Iter',i
+        (path,a_list) = tree.path_to_leaf()
+        leaf = path[-1]
+        
+        (G,a_id,state,cost) = tree.rollout(leaf.state)
+        a_list.append(a_id)
+        
+        #assert(len(a_list) == len(path))
+        if len(path) > 4:
+            print 'Action prefix:',a_list[:3]
+        tree.backup(path,a_list,G)
+        print 'Value:',tree.root_node.V
+
+        #mcts.display_tree(tree.root_node,
+        #                  title='Iteration '+str(i))
+
+(builder,mdp_obj) = make_di_mdp()
+x = solve_mdp_kojima(mdp_obj)
+(v_fn,q_fns) = make_interps(builder.discretizer,x)
+q_policy = mdp.policy.MaxFunPolicy(mdp_obj.actions, q_fns)
+tree = make_tree(builder,v_fn,q_policy,100)
+run_tree(tree,10)

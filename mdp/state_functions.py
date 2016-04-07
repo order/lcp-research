@@ -11,8 +11,8 @@ class InterpolatedFunction(StateSpaceFunction):
     Enable evaluation at arbitrary points via interpolation
     """
     def __init__(self,discretizer,y):
-        assert(1 == len(y.shape))
-        assert(y.size == discretizer.get_num_nodes())
+        N = discretizer.num_nodes
+        assert((N,) == y.shape)
         self.target_values = y
         self.discretizer = discretizer
         
@@ -25,7 +25,7 @@ class InterpolatedFunction(StateSpaceFunction):
         (M,d) = states.shape
         
         # Convert state into node dist
-        P = self.discretizer.states_to_transition_matrix(states)
+        P = self.discretizer.points_to_index_distributions(states)
         assert((N,M) == P.shape)
         f = (P.T).dot(y)
         assert((M,) == f.shape)

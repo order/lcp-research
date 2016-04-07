@@ -120,6 +120,14 @@ class RegularGridInterpolator(object):
         points[:-1,:] = discretize.make_points(linspaces)
         points[-1,:] = np.nan
         return points
+
+    def has_point(self,target):
+        (N,) = target.shape
+        for (i,(l,h,n)) in enumerate(self.grid_desc):
+            skip = (target[i] - l) / n
+            if (skip % 1) > 1e-15:
+                return False
+        return True
         
     
     def indices_to_points(self,indices):
