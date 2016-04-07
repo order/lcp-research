@@ -98,7 +98,7 @@ class MCTSNode(object):
                              cost_fn):
         best_aid = self.best_action_by_uct()
         C = len(self.children[best_aid])
-        if C == 0 or C < 3 + np.log(self.total_visits):
+        if C == 0 or np.random.rand() < 1.0 / float(C):
             return self.sample_and_add_child(best_aid,
                                              actions,
                                              trans_fn,

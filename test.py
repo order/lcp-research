@@ -152,7 +152,7 @@ x = solve_mdp_kojima(mdp_obj,1e-8,1e-6)
 #                                             0.05,
 #                                             q_policy)
 tree_policy = mdp.policy.SoftMaxFunPolicy(cheap_q_fns)
-tree = make_tree(builder,cheap_v_fn,tree_policy,50)
+tree = make_tree(builder,cheap_v_fn,tree_policy,25)
 H = 2500
 Vs = run_tree(tree,H)
 v_good = good_v_fn.evaluate(tree.root_node.state[np.newaxis,:])[0]
