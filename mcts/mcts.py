@@ -267,11 +267,14 @@ class MonteCarloTree(object):
             # Policy
             a_id = self.policy.get_single_decision_index(state)
             action = self.actions[a_id,:]
+            
+            # Cost
+            cost = self.cost_fn.single_cost(state,
+                                            action)
             # Transition
             state = self.trans_fn.single_transition(state,
                                                      action)
-            cost = self.cost_fn.single_cost(state,
-                                            action)
+
             if t == 0:
                 assert(not asc)
                 asc = (a_id,state,cost)

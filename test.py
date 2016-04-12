@@ -3,21 +3,24 @@ import matplotlib.pyplot as plt
 
 import time
 
-import discrete.regular_interpolate as reg_interp
-import discrete.discretize as discretize
+from discrete.regular_interpolate import RegularGridInterpolator
+import discrete.discretize import
 
-import mdp.transition_functions.double_integrator as di
-import mdp.transition_functions.mdp_wrapper as mdp_wrapper
+from mdp.transition_functions.double_integrator\
+    import DoubleIntegratorTransitionFunction
 
 import mdp.policy
-import mdp.state_remapper as remapper
-import mdp.state_functions as state_fn
-import mdp.costs as costs
-import mdp.mdp_builder as mdp_builder
+from mdp.state_functions import BallSetFn
+from mdp.costs import CostWrapper
+from mdp.mdp_builder import MDPBuilder
+from mdp.boundary import SaturationBoundary
+from mdp.generative_model import GenerativeModel
+
 
 import solvers
 from solvers.kojima import KojimaIPIterator
 from solvers.value_iter import ValueIterator
+
 
 import utils
 
@@ -29,31 +32,30 @@ def make_di_mdp(N):
                                   num_steps=5,
                                   dampening=0.01,
                                   control_jitter=0.01)
-    trans_fn = di.DoubleIntegratorTransitionFunction(
+    trans_fn = DoubleIntegratorTransitionFunction(
         **trans_params)
-    discretizer = reg_interp.RegularGridInterpolator([(-5,5,N),
-                                                      (-5,5,N)])
-    x_bound = remapper.RangeThreshStateRemapper(0,-5,5)
-    v_bound = remapper.RangeThreshStateRemapper(1,-5,5)
-    state_remappers = [x_bound,v_bound]
+    boundary = SaturationBoundary([(-5,5),(-5,5)])
+    cost_state_fn = BallSetFn(np.zeros(2), 0.5)
+    cost_fn = CostWrapper(cost_state_fn)
+    state_dim = 2
+    action_dim = 1 
+    gen_model = GenerativeModel(trans_fn,
+                                boundary,
+                                cost_fn,
+                                state_dim,
+                                action_dim)
 
-    cost_state_fn = state_fn.BallSetFn(np.zeros(2), 0.5)
-    cost_fn = costs.CostWrapper(cost_state_fn)
+    discretizer = RegularGridInterpolator([(-5,5,N),
+                                           (-5,5,N)])
 
     actions = np.array([[-1,0,1]]).T
-
     discount = 0.997
-
     num_samples = 10
-
-    builder = mdp_builder.MDPBuilder(trans_fn,
+    builder = mdp_builder.MDPBuilder(gen_model,
                                      discretizer,
-                                     state_remappers,
-                                     cost_fn,
                                      actions,
                                      discount,
-                                     num_samples,
-                                     False)
+                                     num_samples)
     mdp_obj = builder.build_mdp()
 
     return builder,mdp_obj
@@ -151,9 +153,9 @@ x = solve_mdp_kojima(mdp_obj,1e-8,1e-6)
 #tree_policy = mdp.policy.EpsilonFuzzedPolicy(len(q_fns),
 #                                             0.05,
 #                                             q_policy)
-tree_policy = mdp.policy.SoftMaxFunPolicy(cheap_q_fns)
-tree = make_tree(builder,cheap_v_fn,tree_policy,25)
-H = 2500
+tree_policy = mdp.policy.SoftMaxFunPolicy(good_q_fns)
+tree = make_tree(builder,good_v_fn,tree_policy,25)
+H = 150
 Vs = run_tree(tree,H)
 v_good = good_v_fn.evaluate(tree.root_node.state[np.newaxis,:])[0]
 v_cheap = cheap_v_fn.evaluate(tree.root_node.state[np.newaxis,:])[0]
