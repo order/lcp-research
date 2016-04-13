@@ -5,7 +5,7 @@ class GenerativeModel(object):
                  trans_fn,
                  boundary,
                  cost_fn,
-                 state_dim
+                 state_dim,
                  action_dim):
 
         self.trans_fn = trans_fn
@@ -17,16 +17,17 @@ class GenerativeModel(object):
     def multisample_next(self,states,action,S):
         (N,D) = states.shape
         assert(D == self.state_dim)
-        assert((N,self.action_dim) == action.shape)
+        assert((self.action_dim,) == action.shape
+               or (N,self.action_dim) == action.shape)
 
         next_states = self.trans_fn.multisample_transition(states,
                                                            action,
                                                            S)
-        assert((S,N,D) == next_states)
-        states = self.boundary.enforce(next_states)
+        assert((S,N,D) == next_states.shape)
+        next_states = self.boundary.enforce(next_states)
 
         cost = self.cost_fns.cost(states,action)
-        assert((N,) == costs.shape)
+        assert((N,) == cost.shape)
         return (next_states,cost)
 
     def next(self,states,action):

@@ -10,7 +10,7 @@ class TransitionFunction(object):
     def multisample_transition(self,states,action,samples):
         """
         Most general function; transitions multiple samples
-        for multiple states
+        for multiple states with multiple actions
 
         Individual transition functions should implement this
         """

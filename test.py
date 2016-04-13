@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import time
 
 from discrete.regular_interpolate import RegularGridInterpolator
-import discrete.discretize import
 
 from mdp.transition_functions.double_integrator\
     import DoubleIntegratorTransitionFunction
@@ -20,7 +19,6 @@ from mdp.generative_model import GenerativeModel
 import solvers
 from solvers.kojima import KojimaIPIterator
 from solvers.value_iter import ValueIterator
-
 
 import utils
 
@@ -51,11 +49,11 @@ def make_di_mdp(N):
     actions = np.array([[-1,0,1]]).T
     discount = 0.997
     num_samples = 10
-    builder = mdp_builder.MDPBuilder(gen_model,
-                                     discretizer,
-                                     actions,
-                                     discount,
-                                     num_samples)
+    builder = MDPBuilder(gen_model,
+                         discretizer,
+                         actions,
+                         discount,
+                         num_samples)
     mdp_obj = builder.build_mdp()
 
     return builder,mdp_obj

@@ -14,15 +14,25 @@ class DoubleIntegratorTransitionFunction(TransitionFunction):
 
         self.__dict__.update(args)
         
-    def transition(self,points,action,samples=1):
+    def multisample_transition(self,points,actions,samples=1):
         """
         Physics step for a double integrator:
         dx = Ax + Bu = [0 1; 0 0] [x;v] + [0; 1] u
         """
         (N,d) = points.shape
         assert(d == 2) # Generalize
+
+        # Handling different action inputs
+        if isinstance(actions,np.ndarray):
+            if 2 == len(actions.shape):
+                assert((N,1) == actions.shape)
+                actions = actions[:,0]
+            else:
+                assert((1,) == actions.shape)
+        else:
+            assert(type(actions) in [int,float])
         
-        u = action
+        u = actions # Could be either a num, or vector
         damp = self.dampening
 
         Samples = np.empty((samples,N,2))

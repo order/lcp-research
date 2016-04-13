@@ -5,6 +5,9 @@ class Policy(object):
         raise NotImplementedError()
     def get_single_decision(self,point):
         return self.get_decisions(point[np.newaxis,:])[0,:]
+    def get_action_dim(self):
+        raise NotImplementedError()
+        
 
 class IndexPolicy(object):
     def get_decision_indices(self,points):
@@ -19,9 +22,14 @@ class IndexPolicyWrapper(Policy):
     def __init__(self,policy,actions):
         self.policy = policy
         self.actions = actions
+        (A,dimA) = actions.shape
+        self.num_actions = A
+        self.action_dim = dimA
     def get_decisions(self,points):
-        aid = self.policy.get_decision_indicies(points)
+        aid = self.policy.get_decision_indices(points)
         return self.actions[aid,:]
+    def get_action_did(self):
+        return self.action_dim        
     
 class ConstantDiscretePolicy(IndexPolicy):
     def __init__(self,action_index):
@@ -57,6 +65,8 @@ class ConstantPolicy(Policy):
         decision = np.tile(self.action,(N,1))
         assert((N,u) == decision.shape)
         return decision
+    def get_action_dim(self):
+        return self.action.size
 
 class EpsilonFuzzedPolicy(IndexPolicy):
     def __init__(self,num_actions,epsilon,policy):
