@@ -5,7 +5,8 @@ import pickle
 from solvers.kojima import KojimaIPIterator
 from solvers import IterativeSolver,\
     PrimalChangeTerminationCondition,\
-    MaxIterTerminationCondition
+    MaxIterTerminationCondition,\
+    PrimalChangeAnnounce
 
 def solve_with_kojima(mdp,thresh,max_iter):
     lcp = mdp.build_lcp(1e-12,1e-8)
@@ -13,8 +14,10 @@ def solve_with_kojima(mdp,thresh,max_iter):
     solver = IterativeSolver(iterator)
 
     term_conds = [PrimalChangeTerminationCondition(thresh),
-                  MaxIterTerminationCondition(max_iter)]    
+                  MaxIterTerminationCondition(max_iter)]
+    announce = [PrimalChangeAnnounce()]
     solver.termination_conditions.extend(term_conds)
+    solver.notifications.extend(announce)
 
     solver.solve()
     return (iterator.get_primal_vector(),
