@@ -47,12 +47,11 @@ class UniformDiscretePolicy(IndexPolicy):
         return np.random.randint(self.A,size=(N,1))
 
 class RandomDiscretePolicy(IndexPolicy):
-    def __init__(self,num_actions,p):
-        assert(1 == len(p.shape))
+    def __init__(self,p):
         self.p = p
     def get_decision_indices(self,points):
         N = points.shape[0]
-        (A,) = self.p.size
+        (A,) = self.p.shape
         return np.random.choice(A,size=N,p=self.p)
 
 class ConstantPolicy(Policy):

@@ -1,5 +1,5 @@
 import numpy as np
-from mdp.state_functions import InterpolatedFunction
+from state_functions import InterpolatedFunction
 
 def split_solution(mdp_obj,sol):
     """

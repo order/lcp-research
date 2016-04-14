@@ -10,18 +10,22 @@ def compare_with_simulation(problem,
                             policy,
                             value_fn,
                             num_states,
-                            horizon):
+                            horizon,
+                            samples):
     start_states = problem.gen_model.boundary.random_points(
         num_states)
 
     V = value_fn.evaluate(start_states)
 
-    (a,s,c) = simulate(problem,
-                       policy,
-                       start_states,
-                       horizon)
-    R = discounted_return(c,problem.discount)
-    return (V,R)
+    R = np.zeros(num_states)
+    for S in xrange(samples):
+        (a,s,c) = simulate(problem,
+                           policy,
+                           start_states,
+                           horizon)
+        R += discounted_return(c,problem.discount)
+    R /= float(samples)    
+    return (V,R,start_states)
 
 if __name__ == '__main__':
     parser = ArgumentParser(__file__,\
@@ -38,9 +42,6 @@ if __name__ == '__main__':
     parser.add_argument('data_out_file',
                         metavar='FILE',
                         help='data out file')
-    parser.add_argument('img_out_file',
-                        metavar='FILE',
-                        help='image out file')
     args = parser.parse_args()
 
     FH = open(args.val_fn_in_file,'r')
@@ -56,19 +57,15 @@ if __name__ == '__main__':
     problem = pickle.load(FH)
     FH.close()    
 
-    N = 250
-    H = 1000
-    (V,R) = compare_with_simulation(problem,
+    N = 2500 # Number of initial points
+    H = 1000 # Rollout
+    S = 1 # Number of samples
+    (V,R,states) = compare_with_simulation(problem,
                                     policy,
                                     v_fn,
-                                    N,
-                                    H)
-    assert((N,) == V.shape)
-    assert((N,) == R.shape)
-    l = min(np.min(V),np.min(R))
-    u = max(np.max(V),np.max(R))
-    plt.plot(V,R,'b.')
-    plt.plot([l,u],[l,u],':r')
-    plt.xlabel('Expected')
-    plt.ylabel('Empirical')
-    plt.show()
+                                    N,H,S)
+
+    FH = open(args.data_out_file,"w")
+    pickle.dump((V,R,states),FH)
+    FH.close()
+

@@ -10,7 +10,7 @@ class GenerativeModel(object):
 
         self.trans_fn = trans_fn
         self.boundary = boundary
-        self.cost_fns = cost_fn
+        self.cost_fn = cost_fn
         self.state_dim = state_dim
         self.action_dim = action_dim
 
@@ -26,7 +26,7 @@ class GenerativeModel(object):
         assert((S,N,D) == next_states.shape)
         next_states = self.boundary.enforce(next_states)
 
-        cost = self.cost_fns.cost(states,action)
+        cost = self.cost_fn.cost(states,action)
         assert((N,) == cost.shape)
         return (next_states,cost)
 

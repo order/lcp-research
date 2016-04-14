@@ -101,7 +101,7 @@ class BallSetFn(StateSpaceFunction):
 class TargetZoneFn(StateSpaceFunction):
 
     def __init__(self,targets):
-        assert((D,2) == targets.shape)
+        (D,_) = targets.shape
         self.targets = targets
         self.D = D
     
@@ -109,13 +109,13 @@ class TargetZoneFn(StateSpaceFunction):
         (N,D) = points.shape
         assert(self.D == D)
 
-        l_oob = points < self.target[:,0]
-        r_obb = points > self.target[:,1]
-        assert((N,) == l_oob.shape)
-        assert((N,) == l_oob.shape)
+        mask = np.any(np.isnan(points),axis=1)
+        mask[~mask] = np.any(points[~mask,:] < self.targets[:,0],
+                             axis=1)
+        mask[~mask] = np.any(points[~mask,:] > self.targets[:,1],
+                             axis=1)        
 
         costs = np.zeros(N)
-        costs[l_oob] = 1.0
-        costs[r_oob] = 1.0
-        
+        costs[mask] = 1.0
+
         return costs

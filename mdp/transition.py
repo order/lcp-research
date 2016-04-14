@@ -22,7 +22,7 @@ class TransitionFunction(object):
         multisample version
         """
         return self.multisample_transition(states,
-                                           actions,
+                                           action,
                                            1)[0,:,:]
     
         
@@ -30,6 +30,6 @@ class TransitionFunction(object):
         assert(1 == len(point.shape))
         (N,) = point.shape
         state = self.transition(point[np.newaxis,:], action)
-        assert((1,N) == states.shape)
-        return states[0,:]
+        assert((1,N) == state.shape)
+        return state[0,:]
         

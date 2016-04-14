@@ -208,6 +208,15 @@ class MonteCarloTree(object):
         
         assert(1 == len(root_state.shape)) # vector
         self.root_node = MCTSNode(root_state,self.num_actions)
+        
+    def grow_tree(self,budget):
+        for i in xrange(budget):
+            (path,a_list) = self.path_to_leaf()
+            leaf = path[-1]
+            (G,a_id,state,cost) = self.rollout(leaf.state)
+            a_list.append(a_id)
+
+            self.backup(path,a_list,G)        
 
     def path_to_leaf(self):
         curr = self.root_node
