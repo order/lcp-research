@@ -52,14 +52,14 @@ if __name__ == '__main__':
 
     # Build the q policy
     (v,flow) = split_solution(mdp,p)
-    #flow_fns = build_functions(mdp,disc,flow)
-    #flow_policy = MaxFunPolicy(flow_fns)
-    rand_policy = RandomDiscretePolicy(np.array([0.25,0.5,0.25]))
+    flow_fns = build_functions(mdp,disc,flow)
+    flow_policy = MaxFunPolicy(flow_fns)
+    #rand_policy = RandomDiscretePolicy(np.array([0.25,0.5,0.25]))
     v_fn = InterpolatedFunction(disc,v)
 
     mcts_policy = MCTSPolicy(problem,
                              mdp.actions,
-                             rand_policy, # rollout policy
+                             flow_policy, # rollout policy
                              v_fn, # fathom estimate
                              args.horizon, # rollout horizon
                              args.budget) # expansion budget

@@ -15,17 +15,25 @@ def compare_with_simulation(problem,
     start_states = problem.gen_model.boundary.random_points(
         num_states)
 
-    V = value_fn.evaluate(start_states)
+    vals = value_fn.evaluate(start_states)
 
-    R = np.zeros(num_states)
+    returns = np.zeros(num_states)
+    actions = []
+    states = []
+    costs = []
     for S in xrange(samples):
         (a,s,c) = simulate(problem,
                            policy,
                            start_states,
                            horizon)
-        R += discounted_return(c,problem.discount)
-    R /= float(samples)    
-    return (V,R,start_states)
+        actions.append(a)
+        states.append(s)
+        costs.append(c)
+        returns += discounted_return(c,problem.discount)
+    returns /= float(samples)
+
+    
+    return (vals,returns,start_states,actions, states, costs)
 
 if __name__ == '__main__':
     parser = ArgumentParser(__file__,\
@@ -42,6 +50,16 @@ if __name__ == '__main__':
     parser.add_argument('data_out_file',
                         metavar='FILE',
                         help='data out file')
+    parser.add_argument('-s','--samples',
+                        metavar='S',
+                        help='number of samples',
+                        default=250,
+                        type=int)
+    parser.add_argument('-r','--rollout',
+                        metavar='R',
+                        help='rollout length',
+                        default=500,
+                        type=int)
     args = parser.parse_args()
 
     FH = open(args.val_fn_in_file,'r')
@@ -57,15 +75,15 @@ if __name__ == '__main__':
     problem = pickle.load(FH)
     FH.close()    
 
-    N = 2500 # Number of initial points
-    H = 1000 # Rollout
+    N = args.samples # Number of initial points
+    H = args.rollout # Rollout
     S = 1 # Number of samples
-    (V,R,states) = compare_with_simulation(problem,
-                                    policy,
-                                    v_fn,
-                                    N,H,S)
+    ret = compare_with_simulation(problem,
+                                  policy,
+                                  v_fn,
+                                  N,H,S)
 
     FH = open(args.data_out_file,"w")
-    pickle.dump((V,R,states),FH)
+    pickle.dump(ret,FH)
     FH.close()
 

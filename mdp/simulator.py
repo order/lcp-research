@@ -8,7 +8,7 @@ def simulate(problem,
              rollout_horizon):
 
     H = rollout_horizon
-    action_dim = policy.action_dim
+    action_dim = policy.get_action_dim()
     (N,Sdim) = start_states.shape
 
     states = np.empty((H,N,Sdim))

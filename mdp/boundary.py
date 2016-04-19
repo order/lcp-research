@@ -24,7 +24,7 @@ class SaturationBoundary(Boundary):
 
         T = np.maximum(states,self.lower_bound)
         assert(states.shape == T.shape)
-        return np.minimum(states,self.upper_bound)
+        return np.minimum(T,self.upper_bound)
 
     def random_points(self,N):
         points = np.empty((N,self.D))

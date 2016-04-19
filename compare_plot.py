@@ -21,6 +21,47 @@ def qq_plot(V,R):
     plt.title('Expected return vs empirical return')
     plt.show()
 
+def heat_map(F,states,N,outfile):
+    # Plotting actual return vs v-function
+    K = 7 # Knumber of Knearest Kneighbors
+    knn = neighbors.KNeighborsRegressor(K,weights='distance')
+
+    bounds = problem.gen_model.boundary.boundary
+    cuts = [np.linspace(l,u,N) for (l,u) in bounds]
+    X,Y = np.meshgrid(*cuts)
+    P = discrete.make_points(cuts)
+
+    Z = knn.fit(states,F).predict(P)
+    assert((N*N,) == Z.shape)
+    Z = np.reshape(Z,(N,N),order='F')
+
+    g = problem.discount
+    plt.pcolor(X,Y,Z)
+    plt.colorbar()
+    plt.xlabel('X')
+    plt.ylabel('V')
+    plt.title(args.title)
+    plt.savefig('data/hand.heat.png')
+
+def trajectory(states,actions):
+    assert(1 == len(states))
+    assert(1 == len(actions))
+
+    (R,S,D) = states[0].shape
+    assert(D == 2)
+    assert((R,S,1) == actions[0].shape)
+
+    for s in xrange(S):
+        plt.scatter(states[0][:,s,0],
+                    states[0][:,s,1],
+                    c=actions[0][:,s,0],
+                    s=10,
+                    alpha=0.1,
+                    linewidth=0)
+    
+    plt.savefig('data/hand.traj.png')
+        
+
 
 
 if __name__ == '__main__':
@@ -43,37 +84,20 @@ if __name__ == '__main__':
                         help='x axis label')
     parser.add_argument('-y',
                         default='y',
-                        help='y axis label') 
+                        help='y axis label')
+    
     args = parser.parse_args()
 
     FH = open(args.sim_in_file,"r")
-    (V,R,states) = pickle.load(FH)
+    data = pickle.load(FH)
     FH.close()
+    (vals,returns,start_states,actions, states, costs) = data
 
     FH = open(args.problem_in_file,"r")
     problem = pickle.load(FH)
     FH.close()
 
-    N = 250
+    heat_map(vals,start_states,250,args.img_out_file)
+    trajectory(states,actions)
 
-    # Plotting actual return vs v-function
-    y = R - V
-    K = 7 # Knumber of Knearest Kneighbors
-    knn = neighbors.KNeighborsRegressor(K,weights='distance')
 
-    bounds = problem.gen_model.boundary.boundary
-    cuts = [np.linspace(l,u,N) for (l,u) in bounds]
-    X,Y = np.meshgrid(*cuts)
-    P = discrete.make_points(cuts)
-
-    Z = knn.fit(states,y).predict(P)
-    assert((N*N,) == Z.shape)
-    Z = np.reshape(Z,(N,N),order='F')
-
-    g = problem.discount
-    plt.pcolor(X,Y,Z)
-    plt.colorbar()
-    plt.xlabel('X')
-    plt.ylabel('V')
-    plt.title(args.title)
-    plt.savefig(args.img_out_file)

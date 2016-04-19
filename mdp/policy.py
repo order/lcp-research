@@ -190,6 +190,29 @@ class KStepLookaheadPolicy(Policy):
         assert(not np.any(np.isnan(decisions)))
         
         return decisions
+
+class BangBangPolicy(Policy):
+    def __init__(self):
+        pass
+        
+    def get_decisions(self,points):
+        (N,d) = points.shape
+        assert(d == 2)
+
+        v = points[:,1]
+        x = points[:,0]
+        
+        mask = v + np.sign(x) * np.sqrt(2 * np.abs(x)) > 0
+
+        I = np.ones((N,1))
+        I[mask,0] = -1
+
+        return I
+
+    def get_action_dim(self):
+        return 1
+        
+        
         
 class LinearFeedbackPolicy(Policy):
     """
