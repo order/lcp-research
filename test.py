@@ -4,8 +4,9 @@ from generate_mdp import make_uniform_mdp
 from solve_mdp_kojima import solve_with_kojima
 from mdp.state_functions import InterpolatedFunction
 from mdp.solution_process import *
-from mdp.policy import MinFunPolicy,\
+from mdp.policy import MinFunPolicy,MaxFunPolicy,\
     IndexPolicyWrapper,BangBangPolicy
+from mcts import MCTSPolicy
 from mdp.simulator import *
 
 import matplotlib.pyplot as plt
@@ -16,8 +17,8 @@ root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 500
-horizon = 2500
+num_start_states = 120
+horizon = 1000
 
 # Generate problem
 problem = make_di_problem()
@@ -38,8 +39,16 @@ q = q_vectors(mdp,v)
 q_fns = build_functions(mdp,disc,q)
 policies['q'] = IndexPolicyWrapper(MinFunPolicy(q_fns),
                                    mdp.actions)
-
+flow_fns = build_functions(mdp,disc,flow)
+policies['flow'] = IndexPolicyWrapper(MaxFunPolicy(flow_fns),
+                                      mdp.actions)
 policies['handcrafted'] = BangBangPolicy()
+policies['mcts'] = MCTSPolicy(problem,
+                              mdp.actions,
+                              BangBangPolicy(),
+                              v_fn,
+                              5,
+                              5)
 
 # Build start states
 start_states = problem.gen_model.boundary.random_points(
@@ -76,7 +85,6 @@ if writetodisk:
     dump(returns,root+'.returns.pickle')
     dump(vals,root+'.vals.pickle')
    
-quit()
 
 plt.figure(1)
 l = np.min(vals)

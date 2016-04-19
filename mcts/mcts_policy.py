@@ -49,3 +49,6 @@ class MCTSPolicy(IndexPolicy):
     def get_decisions(self,points):
         aids = self.get_decision_indices(points).astype('i')
         return self.actions[aids,:]
+
+    def get_action_dim(self):
+        return self.actions.shape[1]

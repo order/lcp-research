@@ -191,11 +191,17 @@ class KStepLookaheadPolicy(Policy):
         
         return decisions
 
-class BangBangPolicy(Policy):
+class BangBangPolicy(Policy,IndexPolicy):
     def __init__(self):
         pass
         
     def get_decisions(self,points):
+        I = self.get_decision_indices(points)
+        actions = np.array([[-1],[0],[1]])
+        assert((3,1) == actions.shape)
+        return actions[I,:]
+
+    def get_decision_indices(self,points):
         (N,d) = points.shape
         assert(d == 2)
 
@@ -204,8 +210,8 @@ class BangBangPolicy(Policy):
         
         mask = v + np.sign(x) * np.sqrt(2 * np.abs(x)) > 0
 
-        I = np.ones((N,1))
-        I[mask,0] = -1
+        I = 2*np.ones(N,dtype='int')
+        I[mask] = 0
 
         return I
 
