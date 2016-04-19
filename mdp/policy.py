@@ -28,7 +28,7 @@ class IndexPolicyWrapper(Policy):
     def get_decisions(self,points):
         aid = self.policy.get_decision_indices(points)
         return self.actions[aid,:]
-    def get_action_did(self):
+    def get_action_dim(self):
         return self.action_dim        
     
 class ConstantDiscretePolicy(IndexPolicy):

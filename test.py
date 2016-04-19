@@ -1,164 +1,94 @@
-import numpy as np
+from utils.pickle import dump, load
+from generate_di_problem import make_di_problem
+from generate_mdp import make_uniform_mdp
+from solve_mdp_kojima import solve_with_kojima
+from mdp.state_functions import InterpolatedFunction
+from mdp.solution_process import *
+from mdp.policy import MinFunPolicy,\
+    IndexPolicyWrapper,BangBangPolicy
+from mdp.simulator import *
+
 import matplotlib.pyplot as plt
-
-import time
-
-from discrete.regular_interpolate import RegularGridInterpolator
-
-from mdp.transition_functions.double_integrator\
-    import DoubleIntegratorTransitionFunction
-
-import mdp.policy
-from mdp.state_functions import BallSetFn
-from mdp.costs import CostWrapper
-from mdp.mdp_builder import MDPBuilder
-from mdp.boundary import SaturationBoundary
-from mdp.generative_model import GenerativeModel
+import utils.plotting
 
 
-import solvers
-from solvers.kojima import KojimaIPIterator
-from solvers.value_iter import ValueIterator
+root = 'data/di'
+disc_n = 20
+action_n = 3
+type_policy = 'hand'
+num_start_states = 500
+horizon = 2500
 
-import utils
+# Generate problem
+problem = make_di_problem()
+dump(problem,root+'.prob.pickle')
 
-import mcts
+# Generate MDP
+(mdp,disc) = make_uniform_mdp(problem,disc_n,action_n)
+dump(mdp,root+'.mdp.pickle')
+dump(disc,root+'.disc.pickle')
 
-def make_di_mdp(N):
+# Solve
+(p,d) = solve_with_kojima(mdp,1e-8,1000)
+dump(p, root+'.psol.pickle')
 
-    trans_params = utils.kwargify(step=0.01,
-                                  num_steps=5,
-                                  dampening=0.01,
-                                  control_jitter=0.01)
-    trans_fn = DoubleIntegratorTransitionFunction(
-        **trans_params)
-    boundary = SaturationBoundary([(-5,5),(-5,5)])
-    cost_state_fn = BallSetFn(np.zeros(2), 0.5)
-    cost_fn = CostWrapper(cost_state_fn)
-    state_dim = 2
-    action_dim = 1 
-    gen_model = GenerativeModel(trans_fn,
-                                boundary,
-                                cost_fn,
-                                state_dim,
-                                action_dim)
+# Build value function
+(v,flow) = split_solution(mdp,p)
+v_fn = InterpolatedFunction(disc,v)
+dump(v_fn,root+'.vfun.pickle')
 
-    discretizer = RegularGridInterpolator([(-5,5,N),
-                                           (-5,5,N)])
+# Build policies
+policies = {}
+q = q_vectors(mdp,v)
+q_fns = build_functions(mdp,disc,q)
+policies['q'] = IndexPolicyWrapper(MinFunPolicy(q_fns),
+                                   mdp.actions)
 
-    actions = np.array([[-1,0,1]]).T
-    discount = 0.997
-    num_samples = 10
-    builder = MDPBuilder(gen_model,
-                         discretizer,
-                         actions,
-                         discount,
-                         num_samples)
-    mdp_obj = builder.build_mdp()
+policies['handcrafted'] = BangBangPolicy()
+dump(policies,root+'.policies.pickle')
 
-    return builder,mdp_obj
+# Build start states
+start_states = problem.gen_model.boundary.random_points(
+    num_start_states)
+dump(start_states,root+'.start_states.pickle')
 
-def solve_mdp_kojima(mdp_obj,reg,tol):
-    lcp_obj = mdp_obj.build_lcp()
-    iterator = KojimaIPIterator(lcp_obj,
-                                val_reg=reg,
-                                flow_reg=reg)
-    
-    it_solver = solvers.IterativeSolver(iterator)
-    it_solver.termination_conditions.append(
-        solvers.PrimalChangeTerminationCondition(tol))
-    it_solver.termination_conditions.append(
-        solvers.MaxIterTerminationCondition(1e3))
-    it_solver.notifications.append(
-        solvers.PrimalChangeAnnounce())
+# Simulate
+results = {}
+for (name,policy) in policies.items():
+    result = simulate(problem,
+                      policy,
+                      start_states,
+                      horizon)
+    results[name] = result
+dump(results,root+'.sim.pickle')
 
-    it_solver.solve()
-    return iterator.get_primal_vector()
+# Return
+returns = {}
+for (name,result) in results.items():
+    (action,states,costs) = result
+    returns[name] = discounted_return(costs,
+                                      problem.discount)
+dump(returns,root+'.returns.pickle')
 
-def solve_mdp_value(mdp_obj):
-    iterator = ValueIterator(mdp_obj)
-    
-    it_solver = solvers.IterativeSolver(iterator)
-    it_solver.termination_conditions.append(
-        solvers.ValueChangeTerminationCondition(1e-6))
-    it_solver.termination_conditions.append(
-        solvers.MaxIterTerminationCondition(1e4))
-    it_solver.notifications.append(
-        solvers.ValueChangeAnnounce())
+# V
+vals = v_fn.evaluate(start_states)
+dump(vals,root+'.vals.pickle')
 
-    it_solver.solve()
-    return iterator.get_value_vector()
+quit()
 
-def make_interps(discretizer,x):
-    (N,) = x.shape
-    n = discretizer.num_nodes
-    A = (N / n) - 1
-    assert((A % 1) < 1e-15)
-    A = int(A)
-    v = x[:n]
+plt.figure(1)
+l = np.min(vals)
+u = np.max(vals)
+for ret in returns.values():
+    plt.plot(vals,ret,'.')
+plt.plot([l,u],[l,u],':r')
+plt.xlabel('Expected')
+plt.ylabel('Empirical')
+plt.legend(returns.keys())
 
-    V = state_fn.InterpolatedFunction(discretizer,x[:n])
-    #V = state_fn.BallSetFn(np.zeros(2), 0.25)
-    
-    Qs = []
-    for a in xrange(A):
-        idx = slice((a+1)*n,(a+2)*n)
-        q = state_fn.InterpolatedFunction(discretizer,x[idx])
-        Qs.append(q)
-    return V,Qs
-    
-def make_tree(builder,value_fn,policy,rollout_horizon):
-    start_state = np.array([-1,1])
-    tree = mcts.MonteCarloTree(builder.transition_function,
-                               builder.cost_function,
-                               builder.discount,
-                               builder.actions,
-                               policy,
-                               value_fn,
-                               start_state,
-                               rollout_horizon)
-    return tree
-
-def run_tree(tree,N):
-    Vs = np.empty(N)
-    for i in xrange(N):
-        print '.'
-        (path,a_list) = tree.path_to_leaf()
-        leaf = path[-1]
-        
-        (G,a_id,state,cost) = tree.rollout(leaf.state)
-        a_list.append(a_id)
-        
-        #assert(len(a_list) == len(path))
-        tree.backup(path,a_list,G)
-        Vs[i] = tree.root_node.V
-    return Vs
-
-    #mcts.display_tree(tree.root_node,
-    #                  title='Iteration '+str(i))
-
-# Good DI
-(builder,mdp_obj) = make_di_mdp(80)
-x = solve_mdp_kojima(mdp_obj,1e-12,1e-12)
-(good_v_fn,good_q_fns) = make_interps(builder.discretizer,x)
-
-# Cheap DI
-(builder,mdp_obj) = make_di_mdp(20)
-x = solve_mdp_kojima(mdp_obj,1e-8,1e-6)
-(cheap_v_fn,cheap_q_fns) = make_interps(builder.discretizer,x)
-
-#q_policy = mdp.policy.MaxFunPolicy(q_fns)
-#tree_policy = mdp.policy.EpsilonFuzzedPolicy(len(q_fns),
-#                                             0.05,
-#                                             q_policy)
-tree_policy = mdp.policy.SoftMaxFunPolicy(good_q_fns)
-tree = make_tree(builder,good_v_fn,tree_policy,25)
-H = 150
-Vs = run_tree(tree,H)
-v_good = good_v_fn.evaluate(tree.root_node.state[np.newaxis,:])[0]
-v_cheap = cheap_v_fn.evaluate(tree.root_node.state[np.newaxis,:])[0]
-
-plt.plot([0,H-1],[v_good,v_good],'--g',
-         [0,H-1],[v_cheap,v_cheap],'--r',
-         np.arange(H),Vs,'-b',lw=2.0)
+plt.figure(2)
+for ret in returns.values():
+    (xs,fs) = utils.plotting.cdf_points(ret)
+    plt.plot(xs,fs)
+plt.legend(returns.keys(),loc='best')
 plt.show()

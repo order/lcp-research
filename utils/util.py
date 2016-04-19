@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 
 import importlib
 
+
 def banner(msg):
     """
     Take a look at banner, Michael!

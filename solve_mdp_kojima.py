@@ -1,6 +1,6 @@
 import numpy as np
 from argparse import ArgumentParser
-import pickle
+from utils.pickle import dump, load
 
 from solvers.kojima import KojimaIPIterator
 from solvers import IterativeSolver,\
@@ -34,15 +34,6 @@ if __name__ == '__main__':
                         help='solution out file')
     args = parser.parse_args()
 
-    FH = open(args.mdp_in_file,'r')
-    mdp = pickle.load(FH)
-    FH.close()
-
-    """
-    ...
-    """
+    mdp = load(args.mdp_in_file)
     sol = solve_with_kojima(mdp,1e-9,1e4)
-    
-    FH = open(args.sol_out_file,'w')
-    pickle.dump(sol,FH)
-    FH.close() 
+    dump(p, args.sol_out_file)

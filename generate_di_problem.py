@@ -9,20 +9,24 @@ from mdp.generative_model import GenerativeModel
 from mdp.problem import Problem
 
 from argparse import ArgumentParser
-import pickle
+from utils.pickle import dump
 import discrete
 import matplotlib.pyplot as plt
 
 
 def make_di_problem():
+    """
+    Makes a double integrator problem
+    TODO: take in parameters
+    """
     state_dim = 2
     action_dim = 1
     
     # Set up parameters for the DI problem
     trans_params = utils.kwargify(step=0.01,
                                   num_steps=5,
-                                  dampening=0.01,
-                                  control_jitter=0.01)
+                                  dampening=0,
+                                  control_jitter=0.05)
     trans_fn = DoubleIntegratorTransitionFunction(
         **trans_params)
     
@@ -39,7 +43,7 @@ def make_di_problem():
                                 action_dim)
 
     action_boundary = [(-1,1)]
-    discount = 0.997
+    discount = 0.999
 
     problem = Problem(gen_model,
                       action_boundary,
@@ -48,13 +52,12 @@ def make_di_problem():
     return problem
 
 if __name__ == '__main__':
-    parser = ArgumentParser(__file__,'Generates a continuous double integrator problem')
+    parser = ArgumentParser(__file__,
+                            'Generates a double integrator problem')
     parser.add_argument('save_file',
                         metavar='FILE',
                         help='save file')
     args = parser.parse_args()
     
     problem = make_di_problem()
-    FH = open(args.save_file,'w')
-    pickle.dump(problem,FH)
-    FH.close()
+    dump(problem,args.save_file)

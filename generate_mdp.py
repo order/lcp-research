@@ -6,6 +6,8 @@ from mdp.mdp_builder import MDPBuilder
 from argparse import ArgumentParser
 import pickle
 
+from utils.pickle import load, dump
+
 def make_uniform_mdp(problem,N,A):
     boundary = problem.gen_model.boundary.boundary
     grid = [(l,u,N) for (l,u) in boundary]
@@ -46,19 +48,9 @@ if __name__ == '__main__':
                         help='discretizer save file')
     args = parser.parse_args()
 
-    FH = open(args.problem_in_file,'r')
-    problem = pickle.load(FH)
-    FH.close()
-
+    problem=load(args.problem_in_file)
     (mdp,disc) = make_uniform_mdp(problem,
                                   args.num_states,
                                   args.num_actions)
-
-    FH = open(args.mdp_out_file,'w')
-    pickle.dump(mdp,FH)
-    FH.close()
-                        
- 
-    FH = open(args.disc_out_file,'w')
-    pickle.dump(disc,FH)
-    FH.close()
+    dump(mdp,args.mdp_out_file)
+    dump(disc,args.disc_out_file)
