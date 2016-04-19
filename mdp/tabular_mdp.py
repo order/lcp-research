@@ -1,6 +1,7 @@
 import numpy as np
 import scipy as sp
 import scipy.sparse as sps
+import linalg
 
 import lcp
 
@@ -68,20 +69,44 @@ class TabularMDP(object):
             state_weights = np.ones(n)
 
         # Build the LCP
-        M = sps.lil_matrix((N,N))
-        q = np.zeros(N)
+        use_lil = True # COO method faster
+        q = np.empty(N)
         q[0:n] = -state_weights
-        for a in xrange(A):
-            block_idx = slice((a+1)*n,(a+2)*n)
-            E = self.get_E_matrix(a)
 
-            M[:n,block_idx] = E # blocks in value row
-            M[block_idx,:n] = -E.T # blocks in flow rows
-            q[block_idx] = self.costs[a]
+        if use_lil:
+            M = sps.lil_matrix((N,N))
+            q = np.empty(N)
+            for a in xrange(A):
+                block_idx = slice((a+1)*n,(a+2)*n)
+                E = self.get_E_matrix(a)
+                M[:n,block_idx] = E # blocks in value row
+                M[block_idx,:n] = -E.T # blocks in flow rows
+                q[block_idx] = self.costs[a]
 
-        # Regularization
-        M[n:,n:] = flow_reg * sps.eye(A*n)
-        M[:n,:n] = val_reg * sps.eye(n)
-        
+            # Regularization
+            M[n:,n:] = flow_reg * sps.eye(A*n)
+            M[:n,:n] = val_reg * sps.eye(n)
+        else:
+            row = []
+            col = []
+            data = []
+            for a in xrange(A):
+                shift = (a+1)*n
+                E = self.get_E_matrix(a).tocoo()
+                row.extend([E.row,E.col + shift])
+                col.extend([E.col + shift,E.row])
+                data.extend([E.data,-E.data])
+                q[shift:(shift+n)] = self.costs[a]
+
+            row.extend([np.arange(n),np.arange(n,N)])
+            col.extend([np.arange(n),np.arange(n,N)])
+            data.extend([val_reg*np.ones(n),
+                         flow_reg*np.ones(A*n)])
+            row = np.concatenate(row)
+            col = np.concatenate(col)
+            data = np.concatenate(data)
+            M = sps.coo_matrix((data,(row,col)),
+                               shape=(N,N))
+
         name = 'LCP from {0} MDP'.format(self.name)
         return lcp.LCPObj(M,q,name=name)
