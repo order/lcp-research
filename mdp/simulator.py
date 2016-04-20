@@ -14,14 +14,14 @@ def batch_simulate(problem,
     Batch up the different start states into different
     """
     if not workers:
-        workers = mp.cpu_count()
+        workers = mp.cpu_count()-1
     chunks = batch.break_ndarray(start_states,
-                                 num_states_per_job)
+                                 num_states_per_job)    
+                                 
     print 'Starting {0} jobs on {1} workers'.format(len(chunks),
                                             workers)
     f = lambda S:simulate(problem,policy,S,rollout_horizon)
-    res = batch.batch_process(f,chunks,workers)
-    
+    res = batch.batch_process(f,chunks,workers)    
 
 def simulate(problem,
              policy,

@@ -18,8 +18,8 @@ root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 200
-horizon = 100
+num_start_states = 3000
+horizon = 1000
 
 # Generate problem
 problem = make_di_problem()
@@ -36,13 +36,13 @@ v_fn = InterpolatedFunction(disc,v)
 
 # Build policies
 policies = {}
-q = q_vectors(mdp,v)
-q_fns = build_functions(mdp,disc,q)
-policies['q'] = IndexPolicyWrapper(MinFunPolicy(q_fns),
-                                   mdp.actions)
-flow_fns = build_functions(mdp,disc,flow)
-policies['flow'] = IndexPolicyWrapper(MaxFunPolicy(flow_fns),
-                                      mdp.actions)
+#q = q_vectors(mdp,v)
+#q_fns = build_functions(mdp,disc,q)
+#policies['q'] = IndexPolicyWrapper(MinFunPolicy(q_fns),
+#                                   mdp.actions)
+#flow_fns = build_functions(mdp,disc,flow)
+#policies['flow'] = IndexPolicyWrapper(MaxFunPolicy(flow_fns),
+#                                      mdp.actions)
 policies['handcrafted'] = BangBangPolicy()
 """
 policies['mcts'] = MCTSPolicy(problem,
@@ -66,7 +66,7 @@ for (name,policy) in policies.items():
                             policy,
                             start_states,
                             horizon,
-                            5,1)
+                            100,1)
     results[name] = result
 print '**Single thread total', time.time() - start
 
@@ -77,7 +77,7 @@ for (name,policy) in policies.items():
                             policy,
                             start_states,
                             horizon,
-                            5)
+                            100)
     results[name] = result
 print '**Multithread total', time.time() - start
 quit()
