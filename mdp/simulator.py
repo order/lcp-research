@@ -20,9 +20,12 @@ def batch_simulate(problem,
                                  
     print 'Starting {0} jobs on {1} workers'.format(len(chunks),
                                             workers)
-    f = lambda S:simulate(problem,policy,S,rollout_horizon)
-    res = batch.batch_process(f,chunks,workers)    
+    args = [(problem,policy,x,rollout_horizon) for x in chunks]
+    res = batch.batch_process(dummy_simulate,args,workers)    
 
+def dummy_simulate(args):
+    return simulate(*args)
+    
 def simulate(problem,
              policy,
              start_states,

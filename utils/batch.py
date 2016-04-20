@@ -1,5 +1,5 @@
 import multiprocessing as mp
-from multiprocessing.dummy import Pool
+from multiprocessing import Pool
 import time
 import numpy as np
 

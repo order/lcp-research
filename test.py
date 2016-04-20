@@ -19,7 +19,7 @@ disc_n = 20
 action_n = 3
 type_policy = 'hand'
 num_start_states = 3000
-horizon = 1000
+horizon = 2000
 
 # Generate problem
 problem = make_di_problem()
@@ -62,11 +62,10 @@ results = {}
 start = time.time()
 for (name,policy) in policies.items():
     print 'Running {0} jobs'.format(name)
-    result = batch_simulate(problem,
-                            policy,
-                            start_states,
-                            horizon,
-                            100,1)
+    result = simulate(problem,
+                      policy,
+                      start_states,
+                      horizon)
     results[name] = result
 print '**Single thread total', time.time() - start
 
