@@ -11,14 +11,15 @@ from mdp.simulator import *
 
 import matplotlib.pyplot as plt
 import utils.plotting
+import time
 
 writetodisk = False
 root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 120
-horizon = 1000
+num_start_states = 200
+horizon = 100
 
 # Generate problem
 problem = make_di_problem()
@@ -43,12 +44,14 @@ flow_fns = build_functions(mdp,disc,flow)
 policies['flow'] = IndexPolicyWrapper(MaxFunPolicy(flow_fns),
                                       mdp.actions)
 policies['handcrafted'] = BangBangPolicy()
+"""
 policies['mcts'] = MCTSPolicy(problem,
                               mdp.actions,
                               BangBangPolicy(),
                               v_fn,
                               5,
                               5)
+"""
 
 # Build start states
 start_states = problem.gen_model.boundary.random_points(
@@ -56,12 +59,28 @@ start_states = problem.gen_model.boundary.random_points(
 
 # Simulate
 results = {}
+start = time.time()
 for (name,policy) in policies.items():
-    result = simulate(problem,
-                      policy,
-                      start_states,
-                      horizon)
+    print 'Running {0} jobs'.format(name)
+    result = batch_simulate(problem,
+                            policy,
+                            start_states,
+                            horizon,
+                            5,1)
     results[name] = result
+print '**Single thread total', time.time() - start
+
+start = time.time()
+for (name,policy) in policies.items():
+    print 'Running {0} jobs'.format(name)
+    result = batch_simulate(problem,
+                            policy,
+                            start_states,
+                            horizon,
+                            5)
+    results[name] = result
+print '**Multithread total', time.time() - start
+quit()
 
 # Return
 returns = {}
@@ -74,6 +93,9 @@ for (name,result) in results.items():
 vals = v_fn.evaluate(start_states)
 
 if writetodisk:
+    """
+    Dump stuff...
+    """
     dump(problem,root+'.prob.pickle')
     dump(mdp,root+'.mdp.pickle')
     dump(disc,root+'.disc.pickle')

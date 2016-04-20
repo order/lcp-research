@@ -1,6 +1,27 @@
 import numpy as np
 import pickle
 import sys
+import utils.batch as batch
+import multiprocessing as mp
+
+def batch_simulate(problem,
+                   policy,
+                   start_states,
+                   rollout_horizon,
+                   num_states_per_job,
+                   workers=None):
+    """
+    Batch up the different start states into different
+    """
+    if not workers:
+        workers = mp.cpu_count()
+    chunks = batch.break_ndarray(start_states,
+                                 num_states_per_job)
+    print 'Starting {0} jobs on {1} workers'.format(len(chunks),
+                                            workers)
+    f = lambda S:simulate(problem,policy,S,rollout_horizon)
+    res = batch.batch_process(f,chunks,workers)
+    
 
 def simulate(problem,
              policy,
