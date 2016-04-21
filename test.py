@@ -20,9 +20,9 @@ root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 120
+num_start_states = 300
 batch_size = 1
-horizon = 10
+horizon = 100
 
 
 # Generate problem
@@ -52,12 +52,12 @@ bang_index_policy = BangBangPolicy()
 bang_policy = IndexPolicyWrapper(bang_index_policy,
                                  mdp.actions)
 policies['bangbang'] = bang_policy
-for epsilon in [0.2,0.3]:
+for epsilon in [0]:
     rollout_policy = EpsilonFuzzedPolicy(3,epsilon,
                                          bang_index_policy)
     name = 'bang_{0}'.format(epsilon)
-    for rollout in [25,50]:
-        for budget in [100,200]:
+    for rollout in [50]:
+        for budget in [300]:
             prob_scale = 10
             name = 'mcts_{0}_{1}_{2}'.format(epsilon,
                                              rollout,

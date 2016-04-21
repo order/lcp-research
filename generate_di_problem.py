@@ -32,8 +32,8 @@ def make_di_problem():
     
     boundary = SaturationBoundary([(-6,6),(-5,5)])
     
-    #cost_state_fn = BallSetFn(np.zeros(2), 0.5)
-    cost_state_fn = TargetZoneFn(np.array([[-0.5,0.5],[-0.5,0.5]]))
+    cost_state_fn = BallSetFn(np.zeros(2), 0.25)
+    #cost_state_fn = TargetZoneFn(np.array([[-0.5,0.5],[-0.5,0.5]]))
     cost_fn = CostWrapper(cost_state_fn)
     
     gen_model = GenerativeModel(trans_fn,
