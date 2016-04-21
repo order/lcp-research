@@ -6,6 +6,13 @@ class ActionProbability(object):
 
     def sample(self,states):
         raise NotImplementedError()
+
+class UniformProbability(ActionProbability):
+    def __init__(self,A):
+        self.A = A
+    def get_probs(self,states):
+        (N,d) = states.shape
+        return np.full((N,self.A),1.0 / float(self.A))
     
 class FunctionProbability(ActionProbability):
     def __init__(self,fns):

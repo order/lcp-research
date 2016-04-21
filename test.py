@@ -20,7 +20,7 @@ root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 300
+num_start_states = 200
 batch_size = 1
 horizon = 100
 
@@ -46,7 +46,8 @@ policies = {}
 #                                   mdp.actions)
 flow_fns = build_functions(mdp,disc,flow)
 
-initial_prob = probs.FunctionProbability(flow_fns)
+#initial_prob = probs.FunctionProbability(flow_fns)
+initial_prob = probs.UniformProbability()
 
 bang_index_policy = BangBangPolicy()
 bang_policy = IndexPolicyWrapper(bang_index_policy,
@@ -56,9 +57,9 @@ for epsilon in [0]:
     rollout_policy = EpsilonFuzzedPolicy(3,epsilon,
                                          bang_index_policy)
     name = 'bang_{0}'.format(epsilon)
-    for rollout in [50]:
-        for budget in [300]:
-            prob_scale = 10
+    for rollout in [25]:
+        for budget in [500]:
+            prob_scale = 1
             name = 'mcts_{0}_{1}_{2}'.format(epsilon,
                                              rollout,
                                              budget)
@@ -112,22 +113,3 @@ if writetodisk:
     dump(results,root+'.sim.pickle')
     dump(returns,root+'.returns.pickle')
     dump(vals,root+'.vals.pickle')
-   
-"""
-plt.figure(1)
-l = np.min(vals)
-u = np.max(vals)
-for ret in returns.values():
-    plt.plot(vals,ret,'.')
-plt.plot([l,u],[l,u],':r')
-plt.xlabel('Expected')
-plt.ylabel('Empirical')
-plt.legend(returns.keys())
-"""
-
-plt.figure(2)
-for ret in returns.values():
-    (xs,fs) = utils.plotting.cdf_points(ret)
-    plt.plot(xs,fs)
-plt.legend(returns.keys(),loc='best')
-plt.show()
