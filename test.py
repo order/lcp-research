@@ -15,14 +15,14 @@ import matplotlib.pyplot as plt
 import utils.plotting
 import time
 
-writetodisk = False
+writetodisk = True
 root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 30
-batch_size = 5
-horizon = 15
+num_start_states = 120
+batch_size = 1
+horizon = 10
 
 
 # Generate problem
@@ -45,16 +45,16 @@ policies = {}
 #policies['q'] = IndexPolicyWrapper(MinFunPolicy(q_fns),
 #                                   mdp.actions)
 flow_fns = build_functions(mdp,disc,flow)
-flow_index_policy = MaxFunPolicy(flow_fns)
-flow_policy = IndexPolicyWrapper(flow_index_policy,
-                                 mdp.actions)
 
-policies['flow'] = flow_policy
 initial_prob = probs.FunctionProbability(flow_fns)
 
-bang = BangBangPolicy()
-for epsilon in [0.25,0.3]:
-    rollout_policy = EpsilonFuzzedPolicy(3,epsilon,bang)
+bang_index_policy = BangBangPolicy()
+bang_policy = IndexPolicyWrapper(bang_index_policy,
+                                 mdp.actions)
+policies['bangbang'] = bang_policy
+for epsilon in [0.2,0.3]:
+    rollout_policy = EpsilonFuzzedPolicy(3,epsilon,
+                                         bang_index_policy)
     name = 'bang_{0}'.format(epsilon)
     for rollout in [25,50]:
         for budget in [100,200]:
@@ -69,12 +69,12 @@ for epsilon in [0.25,0.3]:
                                         v_fn,
                                         rollout,
                                         budget,
-                                        prob_scale)            
+                                        prob_scale) 
 
 # Build start states
 #start_states = problem.gen_model.boundary.random_points(
 #    num_start_states)
-start_states = linalg.random_points([(0.7,1.3),(-0.7,-1.3)],
+start_states = linalg.random_points([(0.4,0.6),(-0.4,-0.6)],
                                     num_start_states)
 # Simulate
 results = {}
@@ -86,6 +86,7 @@ for (name,policy) in policies.items():
                             start_states,
                             horizon,
                             batch_size)
+    assert((num_start_states,horizon) == result.costs.shape)
     results[name] = result
 print '**Multithread total', time.time() - start
 
