@@ -20,7 +20,7 @@ root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 300
+num_start_states = 120
 batch_size = 1
 horizon = 100
 
@@ -60,7 +60,7 @@ for epsilon in [0]:
                                          bang_index_policy)
     name = 'bang_{0}'.format(epsilon)
     for rollout in [15]:
-        for budget in [500]:
+        for budget in [100]:
             prob_scale = 10
             name = 'mcts_{0}_{1}_{2}'.format(epsilon,
                                              rollout,
