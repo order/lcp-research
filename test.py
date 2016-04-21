@@ -20,7 +20,7 @@ root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 200
+num_start_states = 150
 batch_size = 1
 horizon = 100
 
@@ -47,7 +47,7 @@ policies = {}
 flow_fns = build_functions(mdp,disc,flow)
 
 #initial_prob = probs.FunctionProbability(flow_fns)
-initial_prob = probs.UniformProbability()
+initial_prob = probs.UniformProbability(3)
 
 bang_index_policy = BangBangPolicy()
 bang_policy = IndexPolicyWrapper(bang_index_policy,
