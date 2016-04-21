@@ -53,7 +53,8 @@ def batch_simulate(problem,
     return comb_results
 
 def dummy_simulate(args):
-    return simulate(*args)
+    res = simulate(*args)
+    return res
     
 def simulate(problem,
              policy,
