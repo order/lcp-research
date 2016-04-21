@@ -17,29 +17,51 @@ class MCTSNode(object):
     NODE_ID = 0
     def __init__(self,
                  state,
-                 num_actions,
-                 init_prob_fn,
-                 prob_scale):
+                 num_actions):
         A = num_actions
         self.state=state
         self.num_actions = A
         self.id = MCTSNode.NODE_ID
         MCTSNode.NODE_ID += 1
 
-        self.V=np.inf # State value
+        self.V = None
         self.total_visits=0 # Total visits
 
         self.children = defaultdict(list) # a_id -> Node list
         self.costs = np.full(A,np.nan) # Costs
         
-        self.Q = np.full(A,np.inf)# Q-values
-        self.QVar = np.full(A,np.inf)
+        self.Q = None
         
         self.action_visits = np.zeros(A,dtype='i') # N values
 
-        self.init_prob_fn = init_prob_fn # Probability generating functions
-        self.P = init_prob_fn.get_single_prob(state) # Initial probabilities 
-        self.B = prob_scale # Relative weight of exploration terms
+        self.P = None
+        self.B = None
+
+    def initialize(self,
+                   v_fn,
+                   p_fn,
+                   p_scale):
+        V = v_fn.evaluate(self.state)
+        self.V = V
+        self.Q = np.full(self.num_actions,V)
+        self.P = p_fn.get_single_prob(self.state)
+        self.B = p_scale
+
+    def full_info(self):
+        S = []
+        S.append('State: {0}'.format(self.state))
+        S.append('Value: {0}'.format(self.V))
+        S.append('Total Visits: {0}'.format(self.total_visits))
+        S.append('Action Visits: {0}'.format(self.action_visits))
+        S.append('Q: {0}'.format(self.Q))
+        S.append('P: {0}'.format(self.P))
+
+        for a in xrange(self.num_actions):
+            S.append('Score[{0}]: {1}'.format(a, self.get_silver_score(a)))
+
+        return '\n'.join(S)
+       
+
 
     def is_leaf(self):
         return (0 == len(self.children))
@@ -60,7 +82,7 @@ class MCTSNode(object):
         P = self.P[a]
         Q = self.Q[a]
         B = self.B
-        return  Q + B * P / (1.0 + N)
+        return  Q - (B * P) / (1.0 + N)
 
     def best_action(self):
         """
@@ -100,9 +122,7 @@ class MCTSNode(object):
         
         # Add the new node
         new_node = MCTSNode(state,
-                            self.num_actions,
-                            self.init_prob_fn,
-                            self.B)  
+                            self.num_actions)  
         self.children[a_id].append(new_node)
 
         return new_node
@@ -192,6 +212,7 @@ class MCTSNode(object):
         self.V = np.min(self.Q)
 
         return self.V
+
         
 
     def __str__(self):
@@ -232,12 +253,14 @@ class MonteCarloTree(object):
         self.value_fn = value_fn
         self.num_actions = actions.shape[0]
         self.horizon = horizon
+        self.prob_scale = prob_scale
         
         assert(1 == len(root_state.shape)) # vector
         self.root_node = MCTSNode(root_state,
-                                  self.num_actions,
-                                  init_prob,
-                                  prob_scale)
+                                  self.num_actions)
+        self.root_node.initialize(self.value_fn,
+                                 self.init_prob,
+                                 self.prob_scale)
         
     def grow_tree(self,budget):
         for i in xrange(budget):
@@ -266,6 +289,9 @@ class MonteCarloTree(object):
 
             if added:
                 # New node
+                next_node.initialize(self.value_fn,
+                                    self.init_prob,
+                                    self.prob_scale)
                 path.append(next_node)
                 break
             else:

@@ -37,6 +37,7 @@ class MCTSPolicy(IndexPolicy):
                               self.horizon,
                               self.prob_scale)
         tree.grow_tree(self.budget)
+        print tree.root_node.full_info()
         a_id = np.argmax(tree.root_node.action_visits)
         return a_id
         
