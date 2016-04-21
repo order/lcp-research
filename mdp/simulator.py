@@ -4,6 +4,21 @@ import sys
 import utils.batch as batch
 import multiprocessing as mp
 
+class SimulationResults(object):
+    def __init__(self,actions,
+                 states,
+                 costs):
+        self.actions = actions
+        self.states = states
+        self.costs = costs
+    def merge(self,sim_results):
+        self.actions = np.vstack([self.actions,
+                                  sim_results.actions])
+        self.states = np.vstack([self.states,
+                                  sim_results.states])
+        self.costs = np.vstack([self.costs,
+                                  sim_results.costs])    
+
 def batch_simulate(problem,
                    policy,
                    start_states,
@@ -21,7 +36,12 @@ def batch_simulate(problem,
     print 'Starting {0} jobs on {1} workers'.format(len(chunks),
                                             workers)
     args = [(problem,policy,x,rollout_horizon) for x in chunks]
-    res = batch.batch_process(dummy_simulate,args,workers)    
+    res = batch.batch_process(dummy_simulate,args,workers)
+
+    comb_results = res[0]
+    for i in xrange(1,len(res)):
+        comb_results.merge(res[i])
+    return comb_results
 
 def dummy_simulate(args):
     return simulate(*args)
@@ -51,7 +71,7 @@ def simulate(problem,
         actions[t,:,:] = u
         costs[t,:] = cost
 
-    return (actions,states,costs)
+    return SimulationResults(actions,states,costs)
 
 
 def discounted_return(cost,discount):

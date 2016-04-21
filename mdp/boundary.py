@@ -1,5 +1,5 @@
 import numpy as np
-
+import linalg
 class Boundary(object):
     def enforce(self,states):
         raise NotImplmentedError()
@@ -27,10 +27,7 @@ class SaturationBoundary(Boundary):
         return np.minimum(T,self.upper_bound)
 
     def random_points(self,N):
-        points = np.empty((N,self.D))
-        for (i,(l,u)) in enumerate(self.boundary):
-            points[:,i] = np.random.uniform(l,u,N)
-        return points
-
+        return linalg.random_points(self.boundary,N)
+    
 # WrapBoundary -> torus
 # CompoundBoundary -> use list of state remappers to implement

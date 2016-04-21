@@ -84,7 +84,9 @@ class EpsilonFuzzedPolicy(IndexPolicy):
         
         decision[mask] = rand_aid
         return decision
-
+    def get_action_dim(self):
+        return self.A
+    
 class MinFunPolicy(IndexPolicy):
     def __init__(self,fns):
         self.fns = fns

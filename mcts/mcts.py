@@ -15,7 +15,11 @@ import matplotlib.image as mpimg
 
 class MCTSNode(object):
     NODE_ID = 0
-    def __init__(self,state,num_actions):
+    def __init__(self,
+                 state,
+                 num_actions,
+                 init_prob_fn,
+                 prob_scale):
         A = num_actions
         self.state=state
         self.num_actions = A
@@ -31,6 +35,10 @@ class MCTSNode(object):
         self.QVar = np.full(A,np.inf)
         self.action_visits = np.zeros(A,dtype='i')
 
+        self.init_prob_fn = init_prob_fn
+        self.P = init_prob_fn.get_single_prob(state)
+        self.B = prob_scale
+
     def is_leaf(self):
         return (0 == len(self.children))
 
@@ -40,18 +48,28 @@ class MCTSNode(object):
     def get_ucb(self,a):
         return ucb1(self.Q[a],
                     self.total_visits,
-                    self.action_visits[a])        
+                    self.action_visits[a])
 
-    def best_action_by_uct(self):
+    def get_silver_score(self,a):
         """
-        Return the best action according to the
-        UCT criterion
+        Score used in Silver's "Mastering Go" paper
+        """
+        N = self.action_visits[a]
+        P = self.P[a]
+        Q = self.Q[a]
+        B = self.B
+        return  Q + B * P / (1.0 + N)
+
+    def best_action(self):
+        """
+        Return the best action
         """
         A = self.num_actions
         best_U = np.inf
         best_a = -1
         for a in xrange(A):
-            U = self.get_ucb(a)
+            U = self.get_silver_score(a)
+            #U = self.get_ucb(a)
             if U < best_U:
                 best_U = U
                 best_a = a
@@ -79,7 +97,10 @@ class MCTSNode(object):
             self.costs[a_id] = cost
         
         # Add the new node
-        new_node = MCTSNode(state,self.num_actions)  
+        new_node = MCTSNode(state,
+                            self.num_actions,
+                            self.init_prob_fn,
+                            self.B)  
         self.children[a_id].append(new_node)
 
         return new_node
@@ -96,7 +117,7 @@ class MCTSNode(object):
     def get_next_child(self, actions,
                              trans_fn,
                              cost_fn):
-        best_aid = self.best_action_by_uct()
+        best_aid = self.best_action()
         C = len(self.children[best_aid])
         if C == 0 or np.random.rand() < 1.0 / float(C):
             return self.sample_and_add_child(best_aid,
@@ -188,10 +209,11 @@ class MonteCarloTree(object):
                  cost_function,
                  discount,
                  actions,
-                 policy,
+                 rollout_policy,
+                 init_prob,
                  value_fn,
                  root_state,
-                 horizon=100):
+                 horizon):
         """
         Expand later to include rollout policies and
         value functions
@@ -201,13 +223,19 @@ class MonteCarloTree(object):
         self.cost_fn = cost_function
         self.discount = discount
         self.actions = actions
-        self.policy = policy
+        self.rollout_policy = rollout_policy
+        self.init_prob = init_prob
         self.value_fn = value_fn
         self.num_actions = actions.shape[0]
         self.horizon = horizon
         
         assert(1 == len(root_state.shape)) # vector
-        self.root_node = MCTSNode(root_state,self.num_actions)
+        prob_scale = discount**horizon / (1.0 - discount)
+        print 'prob_scale', prob_scale
+        self.root_node = MCTSNode(root_state,
+                                  self.num_actions,
+                                  init_prob,
+                                  prob_scale)
         
     def grow_tree(self,budget):
         for i in xrange(budget):
@@ -272,9 +300,10 @@ class MonteCarloTree(object):
         
         G = 0.0
         asc = None # action,state,cost
+        rollout  = self.rollout_policy.get_single_decision_index
         for t in xrange(self.horizon):
             # Policy
-            a_id = self.policy.get_single_decision_index(state)
+            a_id = rollout(state)
             action = self.actions[a_id,:]
             
             # Cost

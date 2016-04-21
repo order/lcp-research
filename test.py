@@ -5,10 +5,12 @@ from solve_mdp_kojima import solve_with_kojima
 from mdp.state_functions import InterpolatedFunction
 from mdp.solution_process import *
 from mdp.policy import MinFunPolicy,MaxFunPolicy,\
-    IndexPolicyWrapper,BangBangPolicy
+    IndexPolicyWrapper,BangBangPolicy,EpsilonFuzzedPolicy
+import mdp.probs as probs
 from mcts import MCTSPolicy
 from mdp.simulator import *
 
+import linalg
 import matplotlib.pyplot as plt
 import utils.plotting
 import time
@@ -18,8 +20,10 @@ root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 3000
-horizon = 2000
+num_start_states = 50
+batch_size = 50
+horizon = 15
+
 
 # Generate problem
 problem = make_di_problem()
@@ -40,22 +44,37 @@ policies = {}
 #q_fns = build_functions(mdp,disc,q)
 #policies['q'] = IndexPolicyWrapper(MinFunPolicy(q_fns),
 #                                   mdp.actions)
-#flow_fns = build_functions(mdp,disc,flow)
-#policies['flow'] = IndexPolicyWrapper(MaxFunPolicy(flow_fns),
-#                                      mdp.actions)
-policies['handcrafted'] = BangBangPolicy()
-"""
-policies['mcts'] = MCTSPolicy(problem,
-                              mdp.actions,
-                              BangBangPolicy(),
-                              v_fn,
-                              5,
-                              5)
-"""
+flow_fns = build_functions(mdp,disc,flow)
+flow_index_policy = MaxFunPolicy(flow_fns)
+flow_policy = IndexPolicyWrapper(flow_index_policy,
+                                 mdp.actions)
+
+policies['flow'] = flow_policy
+initial_prob = probs.FunctionProbability(flow_fns)
+
+bang = BangBangPolicy()
+for epsilon in [0.175,0.2,0.225]:
+    rollout_policy = EpsilonFuzzedPolicy(3,epsilon,bang)
+    name = 'bang_{0}'.format(epsilon)
+    policies[name] = rollout_policy
+    for rollout in [25,50,75]:
+        for budget in [100,200,300]:
+            name = 'mcts_{0}_{1}_{2}'.format(epsilon,
+                                             rollout,
+                                             budget)
+            policies[name] = MCTSPolicy(problem,
+                                        mdp.actions,
+                                        rollout_policy,
+                                        initial_prob,
+                                        v_fn,
+                                        rollout,
+                                        budget)            
 
 # Build start states
-start_states = problem.gen_model.boundary.random_points(
-    num_start_states)
+#start_states = problem.gen_model.boundary.random_points(
+#    num_start_states)
+start_states = linalg.random_points([(0.7,1.3),(-0.7,-1.3)],
+                                    num_start_states)
 
 # Simulate
 results = {}
@@ -67,27 +86,13 @@ for (name,policy) in policies.items():
                       start_states,
                       horizon)
     results[name] = result
-print '**Single thread total', time.time() - start
-
-start = time.time()
-for (name,policy) in policies.items():
-    print 'Running {0} jobs'.format(name)
-    result = batch_simulate(problem,
-                            policy,
-                            start_states,
-                            horizon,
-                            100)
-    results[name] = result
 print '**Multithread total', time.time() - start
-quit()
 
 # Return
 returns = {}
 for (name,result) in results.items():
-    (action,states,costs) = result
-    returns[name] = discounted_return(costs,
+    returns[name] = discounted_return(result.costs,
                                       problem.discount)
-
 # V
 vals = v_fn.evaluate(start_states)
 
@@ -106,7 +111,7 @@ if writetodisk:
     dump(returns,root+'.returns.pickle')
     dump(vals,root+'.vals.pickle')
    
-
+"""
 plt.figure(1)
 l = np.min(vals)
 u = np.max(vals)
@@ -116,6 +121,7 @@ plt.plot([l,u],[l,u],':r')
 plt.xlabel('Expected')
 plt.ylabel('Empirical')
 plt.legend(returns.keys())
+"""
 
 plt.figure(2)
 for ret in returns.values():

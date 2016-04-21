@@ -7,6 +7,7 @@ class MCTSPolicy(IndexPolicy):
     def __init__(self,problem,
                  actions,
                  rollout_policy,
+                 initial_prob,
                  value_fn,
                  horizon,
                  budget):
@@ -14,7 +15,8 @@ class MCTSPolicy(IndexPolicy):
         self.cost_fn = problem.gen_model.cost_fn
         self.discount = problem.discount
         self.actions = actions
-        self.policy = rollout_policy
+        self.rollout_policy = rollout_policy
+        self.initial_prob = initial_prob
         self.val_fn = value_fn
         self.horizon = horizon
         self.budget = budget
@@ -26,7 +28,8 @@ class MCTSPolicy(IndexPolicy):
                               self.cost_fn,
                               self.discount,
                               self.actions,
-                              self.policy,
+                              self.rollout_policy,
+                              self.initial_prob,
                               self.val_fn,
                               point,
                               self.horizon)

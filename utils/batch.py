@@ -27,7 +27,7 @@ def batch_process(command,args,num_workers):
     start = time.time()
     pool = Pool(processes=num_workers)
     res = pool.map(command,args)
-    res = None
     print 'Processed {0} jobs in {1}s'.format(len(args),
                                               time.time()-start)
+    pool.close()
     return res
