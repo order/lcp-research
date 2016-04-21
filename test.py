@@ -20,8 +20,8 @@ root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 50
-batch_size = 50
+num_start_states = 30
+batch_size = 5
 horizon = 15
 
 
@@ -53,12 +53,12 @@ policies['flow'] = flow_policy
 initial_prob = probs.FunctionProbability(flow_fns)
 
 bang = BangBangPolicy()
-for epsilon in [0.175,0.2,0.225]:
+for epsilon in [0.25,0.3]:
     rollout_policy = EpsilonFuzzedPolicy(3,epsilon,bang)
     name = 'bang_{0}'.format(epsilon)
-    policies[name] = rollout_policy
-    for rollout in [25,50,75]:
-        for budget in [100,200,300]:
+    for rollout in [25,50]:
+        for budget in [100,200]:
+            prob_scale = 10
             name = 'mcts_{0}_{1}_{2}'.format(epsilon,
                                              rollout,
                                              budget)
@@ -68,23 +68,24 @@ for epsilon in [0.175,0.2,0.225]:
                                         initial_prob,
                                         v_fn,
                                         rollout,
-                                        budget)            
+                                        budget,
+                                        prob_scale)            
 
 # Build start states
 #start_states = problem.gen_model.boundary.random_points(
 #    num_start_states)
 start_states = linalg.random_points([(0.7,1.3),(-0.7,-1.3)],
                                     num_start_states)
-
 # Simulate
 results = {}
 start = time.time()
 for (name,policy) in policies.items():
     print 'Running {0} jobs'.format(name)
-    result = simulate(problem,
-                      policy,
-                      start_states,
-                      horizon)
+    result = batch_simulate(problem,
+                            policy,
+                            start_states,
+                            horizon,
+                            batch_size)
     results[name] = result
 print '**Multithread total', time.time() - start
 

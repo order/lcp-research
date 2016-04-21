@@ -10,6 +10,7 @@ class MCTSPolicy(IndexPolicy):
                  initial_prob,
                  value_fn,
                  horizon,
+                 prob_scale,
                  budget):
         self.trans_fn = problem.gen_model.trans_fn
         self.cost_fn = problem.gen_model.cost_fn
@@ -19,6 +20,7 @@ class MCTSPolicy(IndexPolicy):
         self.initial_prob = initial_prob
         self.val_fn = value_fn
         self.horizon = horizon
+        self.prob_scale = prob_scale
         self.budget = budget
 
         self.action_dim = actions.shape[1]
@@ -32,7 +34,8 @@ class MCTSPolicy(IndexPolicy):
                               self.initial_prob,
                               self.val_fn,
                               point,
-                              self.horizon)
+                              self.horizon,
+                              self.prob_scale)
         tree.grow_tree(self.budget)
         a_id = np.argmax(tree.root_node.action_visits)
         return a_id

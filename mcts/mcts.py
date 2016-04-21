@@ -31,13 +31,15 @@ class MCTSNode(object):
 
         self.children = defaultdict(list) # a_id -> Node list
         self.costs = np.full(A,np.nan) # Costs
+        
         self.Q = np.full(A,np.inf)# Q-values
         self.QVar = np.full(A,np.inf)
-        self.action_visits = np.zeros(A,dtype='i')
+        
+        self.action_visits = np.zeros(A,dtype='i') # N values
 
-        self.init_prob_fn = init_prob_fn
-        self.P = init_prob_fn.get_single_prob(state)
-        self.B = prob_scale
+        self.init_prob_fn = init_prob_fn # Probability generating functions
+        self.P = init_prob_fn.get_single_prob(state) # Initial probabilities 
+        self.B = prob_scale # Relative weight of exploration terms
 
     def is_leaf(self):
         return (0 == len(self.children))
@@ -83,7 +85,7 @@ class MCTSNode(object):
         P = self.actions_visits / self.total_visits
         assert(np.abs(np.sum(P) - 1.0) < 1e-15)
         
-        i = np.random(C,p=P)
+        i = np.random(C,p=P) # Pick a random child
         child = self.children[a_id][i]
         assert(isinstance(child,MCTSNode))
         return child
@@ -120,6 +122,7 @@ class MCTSNode(object):
         best_aid = self.best_action()
         C = len(self.children[best_aid])
         if C == 0 or np.random.rand() < 1.0 / float(C):
+            # Randomly add a new state
             return self.sample_and_add_child(best_aid,
                                              actions,
                                              trans_fn,
@@ -213,7 +216,8 @@ class MonteCarloTree(object):
                  init_prob,
                  value_fn,
                  root_state,
-                 horizon):
+                 horizon,
+                 prob_scale):
         """
         Expand later to include rollout policies and
         value functions
@@ -230,8 +234,6 @@ class MonteCarloTree(object):
         self.horizon = horizon
         
         assert(1 == len(root_state.shape)) # vector
-        prob_scale = discount**horizon / (1.0 - discount)
-        print 'prob_scale', prob_scale
         self.root_node = MCTSNode(root_state,
                                   self.num_actions,
                                   init_prob,
@@ -256,19 +258,11 @@ class MonteCarloTree(object):
             path.append(curr)
 
             # Sample next node
-            had_unexplored = curr.has_unexplored()
             ret = curr.get_next_child(self.actions,
                                       self.trans_fn,
                                       self.cost_fn)
             (best_aid,next_node,added) = ret
             action_list.append(best_aid)
-
-            if had_unexplored:
-                # Was an unexplored action; always take it
-                assert(added)
-                # Unique node on path is the one we just added
-                assert(1 == len(curr.children[best_aid]))
-                assert(curr.children[best_aid][0] == next_node)
 
             if added:
                 # New node
@@ -278,7 +272,7 @@ class MonteCarloTree(object):
                 # Been here before; continue down path
                 curr = next_node
                 
-            assert(len(path) < 1e4)
+            assert(len(path) < 1e4) # Cheap infinite loop check
         return (path,action_list)
 
     def expand_leaf(self,leaf):
