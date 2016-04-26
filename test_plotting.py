@@ -1,26 +1,42 @@
+import numpy as np
 import matplotlib.pyplot as plt
+from sklearn import neighbors
+
+import discrete
 import utils.plotting
 from utils.pickle import dump, load
 
 results = load('data/di.sim.pickle')
 returns = load('data/di.returns.pickle')
+states = load('data/di.start_states.pickle')
 
-plt.figure(1)
-for ret in returns.values():
-    (xs,fs) = utils.plotting.cdf_points(ret)
-    plt.plot(xs,fs)
-plt.legend(returns.keys(),loc='best')
+(N,D) = states.shape
+assert(D == 2)
 
-F = 2
+Grid = 250
 for (name,result) in results.items():
-    plt.figure(F)
-    F += 1
-    X = result.states
-    A = result.actions
-    C = result.costs
-    (N,d,T) = X.shape
-    plt.pcolor(C)
-    plt.title('Cost image for ' + name)
+    actions = result.actions
+    (n,d,t) = actions.shape
+    assert(N == n)
+    assert(d == 1)
+    F = actions[:,0,0] # First action
+
+    cuts = [np.linspace(-2,2,Grid),
+            np.linspace(-2,2,Grid)]
+    X,Y = np.meshgrid(*cuts)
+    P = discrete.make_points(cuts)
+    
+    K = 5 # Knumber of Knearest Kneighbors
+    knn = neighbors.KNeighborsRegressor(K,weights='distance')
+    Z = knn.fit(states,F).predict(P)
+    Z = np.reshape(Z,(Grid,Grid),order='F')
+
+    
+    plt.pcolor(X,Y,Z)
+    plt.scatter(states[:,0],
+                states[:,1],
+                c=F,s=10,lw=0)
+    plt.title(name)
 
 plt.show()
 

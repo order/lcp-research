@@ -20,9 +20,10 @@ root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 120
-batch_size = 1
-horizon = 100
+num_start_states = 1800
+batch = True
+batch_size = 50
+horizon = 1
 
 
 # Generate problem
@@ -42,11 +43,11 @@ v_fn = InterpolatedFunction(disc,v)
 policies = {}
 q = q_vectors(mdp,v)
 q_fns = build_functions(mdp,disc,q)
-policies['q'] = IndexPolicyWrapper(MinFunPolicy(q_fns),
-                                   mdp.actions)
+#policies['q'] = IndexPolicyWrapper(MinFunPolicy(q_fns),
+#                                   mdp.actions)
 flow_fns = build_functions(mdp,disc,flow)
-policies['q'] = IndexPolicyWrapper(MaxFunPolicy(flow_fns),
-                                   mdp.actions)
+#policies['flow'] = IndexPolicyWrapper(MaxFunPolicy(flow_fns),
+#                                   mdp.actions)
 
 initial_prob = probs.FunctionProbability(flow_fns)
 #initial_prob = probs.UniformProbability(3)
@@ -54,13 +55,13 @@ initial_prob = probs.FunctionProbability(flow_fns)
 bang_index_policy = BangBangPolicy()
 bang_policy = IndexPolicyWrapper(bang_index_policy,
                                  mdp.actions)
-policies['bangbang'] = bang_policy
+#policies['bangbang'] = bang_policy
 for epsilon in [0]:
     rollout_policy = EpsilonFuzzedPolicy(3,epsilon,
                                          bang_index_policy)
     name = 'bang_{0}'.format(epsilon)
     for rollout in [15]:
-        for budget in [100]:
+        for budget in [500]:
             prob_scale = 10
             name = 'mcts_{0}_{1}_{2}'.format(epsilon,
                                              rollout,
@@ -77,11 +78,10 @@ for epsilon in [0]:
 # Build start states
 #start_states = problem.gen_model.boundary.random_points(
 #    num_start_states)
-start_states = linalg.random_points([(0.4,0.6),(-0.4,-0.6)],
+start_states = linalg.random_points([(-2,2),(-2,2)],
                                     num_start_states)
 # Simulate
 results = {}
-batch = False
 start = time.time()
 for (name,policy) in policies.items():
     print 'Running {0} jobs'.format(name)
