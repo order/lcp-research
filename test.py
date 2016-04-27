@@ -81,7 +81,8 @@ for epsilon in [0]:
 #start_states = linalg.random_points([(-2,2),(-2,2)],
 #                                    num_start_states)
 x = 4*np.random.rand(num_start_states)-2
-v = -np.sign(x) * np.sqrt(2 * np.abs(x)) + np.random.randn(num_start_states)
+v = -np.sign(x) * np.sqrt(2 * np.abs(x)) + 0.05*np.random.randn(num_start_states)
+v = np.maximum(-2,np.minimum(2,v))
 start_states = np.column_stack([x,v])
 print start_states.shape
 assert((num_start_states,2) == start_states.shape)
