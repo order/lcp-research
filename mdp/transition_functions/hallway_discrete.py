@@ -5,22 +5,18 @@ import scipy.sparse as sps
 from mdp.transition import TransitionFunction
 
 class DiscreteHallwayTransition(TransitionFunction):
-    def __init__(self,N):
+    def __init__(self,N,D):
         self.num_states = N
-        self.sigma = 0.01
+        self.dim = D
         
-    def transition(self,points,action,S=1):
-        (Np,d) = points.shape
-        
-        assert(d == 1) # 'points' are just node indices
-        assert(np.all(0 <= points)) # +ve
+    def multisample_transition(self,points,actions,S=1):
+        (Np,Dp) = points.shape                
+        (Na,Da) = actions.shape
+        assert(Np == Na)
         Ns = self.num_states
-        assert(np.all(points < Ns))
-        assert(np.sum(np.fmod(points[:,0],1)) < 1e-15) # ints
 
-        assert(1 == len(action.shape))
-        assert(1 == action.shape[0]) # just a singleton
-        a_id = action[0]
+        assert(2 == len(action.shape))
+        
 
         samples = np.tile(points,(S,1,1))\
                   + a_id + self.sigma*np.random.randn(S,Np,d)

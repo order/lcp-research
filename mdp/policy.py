@@ -218,9 +218,7 @@ class BangBangPolicy(Policy,IndexPolicy):
         return I
 
     def get_action_dim(self):
-        return 1
-        
-        
+        return 1    
         
 class LinearFeedbackPolicy(Policy):
     """
