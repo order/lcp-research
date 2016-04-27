@@ -20,9 +20,9 @@ root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 310
+batch_size = 50
+num_start_states = 31*batch_size
 batch = True
-batch_size = 10
 horizon = 1
 
 
@@ -61,7 +61,7 @@ for epsilon in [0]:
                                          bang_index_policy)
     name = 'bang_{0}'.format(epsilon)
     for rollout in [15]:
-        for budget in [500]:
+        for budget in [50]:
             prob_scale = 10
             name = 'mcts_{0}_{1}_{2}'.format(epsilon,
                                              rollout,
@@ -80,11 +80,17 @@ for epsilon in [0]:
 #    num_start_states)
 #start_states = linalg.random_points([(-2,2),(-2,2)],
 #                                    num_start_states)
-x = 4*np.random.rand(num_start_states)-2
-v = -np.sign(x) * np.sqrt(2 * np.abs(x)) + 0.05*np.random.randn(num_start_states)
+N = num_start_states
+n = int(N / 2)
+start_states = np.empty((N,2))
+
+
+x = 4*np.random.rand(n)-2
+v = -np.sign(x) * np.sqrt(2 * np.abs(x)) + 0.2*np.random.rand(n) - 0.1
 v = np.maximum(-2,np.minimum(2,v))
-start_states = np.column_stack([x,v])
-print start_states.shape
+start_states[:n,0] = x
+start_states[:n,1] = v
+start_states[n:,:] = 4*np.random.rand(N-n,2) - 2
 assert((num_start_states,2) == start_states.shape)
 
 
