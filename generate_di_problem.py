@@ -26,7 +26,7 @@ def make_di_problem():
     trans_params = utils.kwargify(step=0.01,
                                   num_steps=5,
                                   dampening=0,
-                                  control_jitter=0.05)
+                                  control_jitter=0)
     trans_fn = DoubleIntegratorTransitionFunction(
         **trans_params)
     

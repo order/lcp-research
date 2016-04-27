@@ -60,9 +60,9 @@ for epsilon in [0]:
     rollout_policy = EpsilonFuzzedPolicy(3,epsilon,
                                          bang_index_policy)
     name = 'bang_{0}'.format(epsilon)
-    for rollout in [15]:
-        for budget in [50]:
-            prob_scale = 10
+    for rollout in [25]:
+        for budget in [500]:
+            prob_scale = 5
             name = 'mcts_{0}_{1}_{2}'.format(epsilon,
                                              rollout,
                                              budget)

@@ -26,7 +26,7 @@ for (name,result) in results.items():
     X,Y = np.meshgrid(*cuts)
     P = discrete.make_points(cuts)
     
-    K = 5 # Knumber of Knearest Kneighbors
+    K = 1 # Knumber of Knearest Kneighbors
     knn = neighbors.KNeighborsRegressor(K,weights='distance')
     Z = knn.fit(states,F).predict(P)
     Z = np.reshape(Z,(Grid,Grid),order='F')
