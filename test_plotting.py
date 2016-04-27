@@ -13,7 +13,7 @@ states = load('data/di.start_states.pickle')
 (N,D) = states.shape
 assert(D == 2)
 
-Grid = 250
+Grid = 500
 for (name,result) in results.items():
     actions = result.actions
     (n,d,t) = actions.shape
@@ -35,7 +35,7 @@ for (name,result) in results.items():
     plt.pcolor(X,Y,Z)
     plt.scatter(states[:,0],
                 states[:,1],
-                c=F,s=10,lw=0)
+                c=F,s=10,lw=1)
     plt.title(name)
 
 plt.show()

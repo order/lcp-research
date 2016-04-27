@@ -20,9 +20,9 @@ root = 'data/di'
 disc_n = 20
 action_n = 3
 type_policy = 'hand'
-num_start_states = 1800
+num_start_states = 310
 batch = True
-batch_size = 50
+batch_size = 10
 horizon = 1
 
 
@@ -78,8 +78,15 @@ for epsilon in [0]:
 # Build start states
 #start_states = problem.gen_model.boundary.random_points(
 #    num_start_states)
-start_states = linalg.random_points([(-2,2),(-2,2)],
-                                    num_start_states)
+#start_states = linalg.random_points([(-2,2),(-2,2)],
+#                                    num_start_states)
+x = 4*np.random.rand(num_start_states)-2
+v = -np.sign(x) * np.sqrt(2 * np.abs(x)) + np.random.randn(num_start_states)
+start_states = np.column_stack([x,v])
+print start_states.shape
+assert((num_start_states,2) == start_states.shape)
+
+
 # Simulate
 results = {}
 start = time.time()
