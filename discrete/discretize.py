@@ -1,7 +1,8 @@
 import numpy as np
+import scipy.sparse as sps
 
 class Discretizer(object):
-    def points_to_indices(self,points):
+    def points_to_index_distributions(self,points):
         """
         Takes in (n,d) points,
         Returns (n,N) sparse row-stochastic matrix indicating index
@@ -14,7 +15,43 @@ class Discretizer(object):
         Returns (n,d) matrix indicating canonical points associated
         with each
         """
-        raise NotImplementedError()        
+        raise NotImplementedError()
+
+    def get_cutpoints(self):
+        raise NotImplementedError()
+
+    def has_point(self,target):
+        (N,) = target.shape
+        for (i,(l,h,n)) in enumerate(self.grid_desc):
+            skip = (target[i] - l) / n
+            if (skip % 1) > 1e-15:
+                return False
+        return True
+        
+
+class TrivialDiscretizer(object):
+    def __init__(self,num_nodes):
+        self.num_nodes = num_nodes
+    def points_to_index_distributions(self,points):
+        (N,D) = points.shape
+        assert(D == 1)
+        assert(not np.any(points < 0))
+        assert(not np.any(points >= self.num_nodes))
+        data = np.ones(N)
+        row = points.flatten().astype('i')
+        col = np.arange(N)
+        return sps.coo_matrix((data,(row,col)),
+                              shape=(self.num_nodes,N))
+    def indicies_to_points(self,indices):
+        (N,) = indicies.shape
+        return np.array(indices).reshape((N,1))
+    def get_cutpoints(self):
+        N = self.num_nodes
+        return np.arange(N)[:,np.newaxis]
+    def has_point(self,target):
+        assert((1,) == target)
+        return 0 <= target[0] < self.num_nodes\
+           and (target[0] % 1) < 1e-15
     
 
 #######################################

@@ -27,6 +27,23 @@ def make_uniform_mdp(problem,N,A):
   
     return (mdp_obj,discretizer)
 
+def make_trivial_mdp(problem,N,actions):
+    boundary = problem.gen_model.boundary.boundary
+    assert(1 == len(boundary)) # 1 Dim problem
+    (l,u) = boundary[0]
+    assert(l == 0) # (0,N)
+    assert(u == N-1)
+
+    discretizer = discrete.TrivialDiscretizer(N)
+    num_samples = 15
+    
+    builder = MDPBuilder(problem,
+                         discretizer,
+                         actions,
+                         num_samples)
+    mdp_obj = builder.build_mdp()
+    return (mdp_obj,discretizer)
+
 if __name__ == '__main__':
     parser = ArgumentParser(__file__,'Generates an MDP from continuous problem')
     parser.add_argument('problem_in_file',
