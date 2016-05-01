@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 
 import importlib
 
-
 def banner(msg):
     """
     Take a look at banner, Michael!
@@ -38,7 +37,7 @@ def banner(msg):
     print '#'*(N+4)
     print '# ' + msg + ' #'
     print '# ' + loc_msg + ' #'
-    print '#'*(N+4)
+    print '#'*(N+4)      
 
 def sparsity_ratio(A):
     return float(A.nnz) / float(np.prod(A.shape))

@@ -1,6 +1,6 @@
 import numpy as np
 
-from mdp.policy import IndexPolicy
+from mdp.policies import IndexPolicy
 from mcts import MonteCarloTree
 
 class MCTSPolicy(IndexPolicy):

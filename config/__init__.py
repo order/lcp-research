@@ -1,2 +1,2 @@
-from config import *
-from generator import *
+import mdp
+import solver

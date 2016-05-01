@@ -1,5 +1,0 @@
-python run.py config/instance/double_integrator.py config/solver/kojima.py data/test
-
-python run.py config/instance/double_integrator.py config/solver/projective_di_rbf.py data/test
-
-python run.py config/instance/hallway_continuous.py config/solver/kojima.py data/test

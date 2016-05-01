@@ -1,5 +1,5 @@
 import numpy as np
-from mdp.policy import UniformDiscretePolicy
+from mdp.policies import UniformDiscretePolicy
 import discrete       
 from utils import hash_ndarray
 
