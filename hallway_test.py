@@ -16,12 +16,12 @@ root = 'data/hallway'
 nodes = 50
 action_n = 3
 type_policy = 'hand'
-batch_size = 100
+batch_size = 10
 num_start_states = 3*batch_size
 batch = True
-horizon = 50
+horizon = 70
 
-rebuild_all = True
+rebuild_all = False
 build_problem = False
 build_mdp = False
 run_solver = False
@@ -66,20 +66,27 @@ flow_fns = build_functions(mdp_obj,disc,flow)
 
 #######################
 # Build policies
+policy_dict = {}
+for _ in xrange(250): 
+    scale = 0.5*np.random.rand() + 0.1
+    q = q_vectors(mdp_obj,v + scale*np.random.randn(v.size))
+    q_fns = build_functions(mdp_obj,disc,q)
+    policy_dict[scale] = IndexPolicyWrapper(MinFunPolicy(q_fns),
+                                         mdp_obj.actions)
+"""
 print 'Building policies'
-policies = {}
 q = q_vectors(mdp_obj,v)
 q_fns = build_functions(mdp_obj,disc,q)
-policies['q'] = IndexPolicyWrapper(MinFunPolicy(q_fns),
+policy_dict['q'] = IndexPolicyWrapper(MinFunPolicy(q_fns),
                                        mdp_obj.actions)
-policies['hand'] = HallwayPolicy(nodes)
+policy_dict['hand'] = HallwayPolicy(nodes)
 
 rollout_policy = HallwayPolicy(nodes)
 initial_prob = probs.FunctionProbability(flow_fns)
 budget = 10
 rollout = 5
 prob_scale = 10
-policies['mcts'] = mcts.MCTSPolicy(problem,
+policy_dict['mcts'] = mcts.MCTSPolicy(problem,
                                    mdp_obj.actions,
                                    rollout_policy,
                                    initial_prob,
@@ -87,7 +94,7 @@ policies['mcts'] = mcts.MCTSPolicy(problem,
                                    rollout,
                                    prob_scale,
                                    budget) 
-
+"""
 start_states = np.random.randint(nodes,
                                  size=(num_start_states,1))
 dump(start_states,root + '.starts.pickle')
@@ -96,7 +103,7 @@ dump(start_states,root + '.starts.pickle')
 print 'Simulating'
 results = {}
 start = time.time()
-for (name,policy) in policies.items():
+for (name,policy) in policy_dict.items():
     print '\tRunning {0} jobs'.format(name)
     if batch:
         result = batch_simulate(problem,
@@ -119,6 +126,7 @@ returns = {}
 for (name,result) in results.items():
     returns[name] = discounted_return(result.costs,
                                       problem.discount)
+    assert((num_start_states,) == returns[name].shape)
 dump(returns,root + '.return.pickle')
 
 # V
