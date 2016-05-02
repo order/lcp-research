@@ -17,8 +17,8 @@ root = 'data/hallway'
 nodes = 50
 action_n = 3
 type_policy = 'hand'
-batch_size = 50
-batch = True
+batch_size = 25
+batch = False
 if batch:
     num_start_states = (mp.cpu_count()-1)*batch_size
 else:
@@ -99,7 +99,7 @@ policy_dict['flow_pert'] = IndexPolicyWrapper(pert_flow_policy,
 budget = 50
 rollout = 5
 prob_scale = 10
-for budget in [25,50,75,100]:
+for budget in [20]:
     name = 'mcts_{0}'.format(budget)
     policy_dict[name] = mcts.MCTSPolicy(problem,
                                         mdp_obj.actions,
