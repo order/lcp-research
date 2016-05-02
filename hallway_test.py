@@ -99,14 +99,16 @@ policy_dict['flow_pert'] = IndexPolicyWrapper(pert_flow_policy,
 budget = 50
 rollout = 5
 prob_scale = 10
-policy_dict['mcts'] = mcts.MCTSPolicy(problem,
-                                   mdp_obj.actions,
-                                   rollout_policy,
-                                   initial_prob,
-                                   v_pert_fn,
-                                   rollout,
-                                   prob_scale,
-                                   budget) 
+for budget in [25,50,75,100]:
+    name = 'mcts_{0}'.format(budget)
+    policy_dict[name] = mcts.MCTSPolicy(problem,
+                                        mdp_obj.actions,
+                                        rollout_policy,
+                                        initial_prob,
+                                        v_pert_fn,
+                                        rollout,
+                                        prob_scale,
+                                        budget) 
 start_states = np.random.randint(nodes,
                                  size=(num_start_states,1))
 dump(start_states,root + '.starts.pickle')
