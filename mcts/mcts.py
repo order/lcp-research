@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
 ###########################
-# CHANCE NODE
+# BASIC MCTS NODE
 
 class MCTSNode(object):
     NODE_ID = 0
@@ -57,7 +57,9 @@ class MCTSNode(object):
         S.append('P: {0}'.format(self.P))
 
         for a in xrange(self.num_actions):
-            S.append('Score[{0}]: {1}'.format(a, self.get_silver_score(a)))
+            score = self.get_silver_score(a)
+            info = 'Score[{0}]: {1}'.format(a,score)
+            S.append(info)
 
         return '\n'.join(S)
        
@@ -98,6 +100,7 @@ class MCTSNode(object):
                 best_U = U
                 best_a = a
         return best_a
+
     
     def get_child(self,a_id):
         """
@@ -127,11 +130,26 @@ class MCTSNode(object):
 
         return new_node
 
-    def find_node(self,a_id,target):
+    def find_node(self,target,thresh=1e-15):
+        """
+        Iterate over actions and states to match state
+        """
+        for a_id in xrange(self.num_actions):
+            c = self.find_child(a_id,target,thresh)
+            if c != None:
+                return (a_id,c)
+        return None
+
+    def find_child(self,a_id,target,thresh=1e-15):
+        """
+        Iterate over states given a particular action to match
+        state
+        """
         C = len(self.children[a_id])
         for i in xrange(C):
             child_state = self.children[a_id][i].state
-            if np.sum(np.abs(target - child_state)) < 1e-12:
+            l1_dist = np.sum(np.abs(target - child_state))
+            if l1_dist < thresh:
                 # Already exists...
                 return i
         return None
@@ -163,7 +181,7 @@ class MCTSNode(object):
         cost = cost_fn.single_cost(self.state,
                                    action)
         
-        node_idx = self.find_node(a_id,next_state)
+        node_idx = self.find_child(a_id,next_state)
         if node_idx != None:
             return (a_id,self.children[a_id][node_idx],False)
         
@@ -354,6 +372,15 @@ class MonteCarloTree(object):
             a_id = action_list.pop()
             G = path.pop().update(a_id,self.discount,G)
 
+    def num_visits(self):
+        return self.root_node.total_visits
+
+    def crop_subtree(self,a_id,c_id):
+        self.root_node = self.root_node.children[a_id][c_id]
+
+    def find_subtree(self,target,threshold):
+        return self.root_node.find_node(target,threshold)
+    
 ##########################################
 # Display path
             

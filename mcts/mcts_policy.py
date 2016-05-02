@@ -25,19 +25,38 @@ class MCTSPolicy(IndexPolicy):
 
         self.action_dim = actions.shape[1]
 
+        self.reuse_tree = False
+        self.sim_thresh = 1e-15
+
+        self.tree = None
+
     def get_single_decision_index(self,point):
-        tree = MonteCarloTree(self.trans_fn,
-                              self.cost_fn,
-                              self.discount,
-                              self.actions,
-                              self.rollout_policy,
-                              self.initial_prob,
-                              self.val_fn,
-                              point,
-                              self.horizon,
-                              self.prob_scale)
-        tree.grow_tree(self.budget)
-        a_id = np.argmax(tree.root_node.action_visits)
+        subtree_desc = None
+        if self.reuse_tree and self.tree:
+            subtree_desc = self.tree.find_subtree(point,
+                                               self.sim_thresh)
+            
+        if subtree_desc:
+            (a_id,c_id) = subtree_desc
+            self.tree.crop_subtree(a_id,c_id)
+            explore_budget = self.budget\
+                             - self.tree.num_visits()
+        else:
+            self.tree = MonteCarloTree(self.trans_fn,
+                                       self.cost_fn,
+                                       self.discount,
+                                       self.actions,
+                                       self.rollout_policy,
+                                       self.initial_prob,
+                                       self.val_fn,
+                                       point,
+                                       self.horizon,
+                                       self.prob_scale)
+            explore_budget = self.budget
+            
+            
+        self.tree.grow_tree(int(explore_budget))
+        a_id = np.argmax(self.tree.root_node.action_visits)
         return a_id
         
     def get_decision_indices(self,points):

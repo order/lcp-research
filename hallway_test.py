@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import multiprocessing as mp
 
 from utils import *
 
@@ -17,8 +18,11 @@ nodes = 50
 action_n = 3
 type_policy = 'hand'
 batch_size = 50
-num_start_states = 3*batch_size
 batch = True
+if batch:
+    num_start_states = (mp.cpu_count()-1)*batch_size
+else:
+    num_start_states = batch_size
 horizon = 50
 
 rebuild_all = True

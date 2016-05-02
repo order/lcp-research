@@ -36,8 +36,15 @@ class FunctionProbability(ActionProbability):
 
         Z = np.sum(P,axis=1)
         assert((N,) == Z.shape)
-
-        P = P / Z
+        assert(not np.any(Z < 0))
+        mask = (Z == 0)
+        n_mask = mask.sum()
+        
+        if n_mask < N:
+            P[~mask,:] = P[~mask,:] / Z[~mask]
+        if n_mask > 0: 
+            P[mask,:] = 1.0 / float(A)
+        assert (np.abs(np.sum(P) - N) / float(N) < 1e-15)
         assert((N,A) == P.shape)
         return P
         
