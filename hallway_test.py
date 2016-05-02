@@ -16,12 +16,12 @@ root = 'data/hallway'
 nodes = 50
 action_n = 3
 type_policy = 'hand'
-batch_size = 10
+batch_size = 50
 num_start_states = 3*batch_size
 batch = True
-horizon = 70
+horizon = 50
 
-rebuild_all = False
+rebuild_all = True
 build_problem = False
 build_mdp = False
 run_solver = False
@@ -59,42 +59,50 @@ soln_file = root + 'soln.pickle'
 print 'Building value function'
 (v,flow) = split_solution(mdp_obj,p)
 v_fn = InterpolatedFunction(disc,v)
-dump(v_fn,root + '.vfn.pickle')
-
-# Build flow functions
-flow_fns = build_functions(mdp_obj,disc,flow)
+dump(v_fn,root + '.vfn.pickle')                          
 
 #######################
 # Build policies
+print 'Building policies'
+
 policy_dict = {}
-for _ in xrange(250): 
-    scale = 0.5*np.random.rand() + 0.1
-    q = q_vectors(mdp_obj,v + scale*np.random.randn(v.size))
-    q_fns = build_functions(mdp_obj,disc,q)
-    policy_dict[scale] = IndexPolicyWrapper(MinFunPolicy(q_fns),
-                                         mdp_obj.actions)
-"""
+v_pert = v + 0.3*np.random.randn(v.size)
+v_pert_fn = InterpolatedFunction(disc,v_pert)
+q = q_vectors(mdp_obj,v_pert)
+q_fns = build_functions(mdp_obj,disc,q)
+policy_dict['q pert'] = IndexPolicyWrapper(MinFunPolicy(q_fns),
+                                           mdp_obj.actions)
 print 'Building policies'
 q = q_vectors(mdp_obj,v)
 q_fns = build_functions(mdp_obj,disc,q)
 policy_dict['q'] = IndexPolicyWrapper(MinFunPolicy(q_fns),
-                                       mdp_obj.actions)
-policy_dict['hand'] = HallwayPolicy(nodes)
+                                      mdp_obj.actions)
 
-rollout_policy = HallwayPolicy(nodes)
-initial_prob = probs.FunctionProbability(flow_fns)
-budget = 10
+policy_dict['hand'] = HallwayPolicy(nodes)
+rollout_policy = EpsilonFuzzedPolicy(3,
+                                     0.2,
+                                     HallwayPolicy(nodes))
+policy_dict['hand_pert'] = IndexPolicyWrapper(rollout_policy,
+                                              mdp_obj.actions)
+
+pert_flow = np.maximum(0,flow + 5*np.random.randn(*flow.shape))
+pert_flow_fns = build_functions(mdp_obj,disc,pert_flow)
+initial_prob = probs.FunctionProbability(pert_flow_fns)
+pert_flow_policy = MaxFunPolicy(pert_flow_fns)
+policy_dict['flow_pert'] = IndexPolicyWrapper(pert_flow_policy,
+                                              mdp_obj.actions)
+
+budget = 50
 rollout = 5
 prob_scale = 10
 policy_dict['mcts'] = mcts.MCTSPolicy(problem,
                                    mdp_obj.actions,
                                    rollout_policy,
                                    initial_prob,
-                                   v_fn,
+                                   v_pert_fn,
                                    rollout,
                                    prob_scale,
                                    budget) 
-"""
 start_states = np.random.randint(nodes,
                                  size=(num_start_states,1))
 dump(start_states,root + '.starts.pickle')
