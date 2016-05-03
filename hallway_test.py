@@ -17,10 +17,10 @@ root = 'data/hallway'
 nodes = 50
 action_n = 3
 type_policy = 'hand'
-batch_size = 25
-batch = False
+batch_size = 5
+batch = True
 if batch:
-    num_start_states = (mp.cpu_count()-1)*batch_size
+    num_start_states = 5*(mp.cpu_count()-1)*batch_size
 else:
     num_start_states = batch_size
 horizon = 50
@@ -96,19 +96,21 @@ pert_flow_policy = MaxFunPolicy(pert_flow_fns)
 policy_dict['flow_pert'] = IndexPolicyWrapper(pert_flow_policy,
                                               mdp_obj.actions)
 
-budget = 50
-rollout = 5
-prob_scale = 10
-for budget in [20]:
-    name = 'mcts_{0}'.format(budget)
-    policy_dict[name] = mcts.MCTSPolicy(problem,
-                                        mdp_obj.actions,
-                                        rollout_policy,
-                                        initial_prob,
-                                        v_pert_fn,
-                                        rollout,
-                                        prob_scale,
-                                        budget) 
+for budget in [50,75,100,125,150]:
+    for rollout in [4,6,8]:
+        for prob_scale in [2,4,6]:
+            name = 'mcts_{0}_{1}_{2}'.format(budget,
+                                             rollout,
+                                             prob_scale)
+            policy_dict[name] = mcts.MCTSPolicy(problem,
+                                                mdp_obj.actions,
+                                                rollout_policy,
+                                                initial_prob,
+                                                v_pert_fn,
+                                                rollout,
+                                                prob_scale,
+                                                budget)
+dump(policy_dict,root + '.policies.pickle')
 start_states = np.random.randint(nodes,
                                  size=(num_start_states,1))
 dump(start_states,root + '.starts.pickle')
@@ -132,6 +134,8 @@ for (name,policy) in policy_dict.items():
                           horizon)
     assert((num_start_states,horizon) == result.costs.shape)
     results[name] = result
+    dump(result,root+'.'+name+'.result.pickle')
+     
 print '**Multithread total', time.time() - start
 dump(results,root + '.results.pickle')
 
