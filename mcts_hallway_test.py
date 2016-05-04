@@ -13,13 +13,13 @@ import linalg
 import time
 
 writetodisk = True
-root = 'data/hallway'
+root = 'data/mcts_hallway'
 nodes = 50
 action_n = 3
-batch_size = 1
+batch_size = 2
 batch = True
 if batch:
-    num_start_states = 3*(mp.cpu_count()-1)*batch_size
+    num_start_states = 5*(mp.cpu_count()-1)*batch_size
 else:
     num_start_states = batch_size
 horizon = 50
@@ -95,7 +95,7 @@ pert_flow_policy = MaxFunPolicy(pert_flow_fns)
 policy_dict['flow_pert'] = IndexPolicyWrapper(pert_flow_policy,
                                               mdp_obj.actions)
 
-for budget in xrange(10,300,10):
+for budget in xrange(10,250,10):
     for rollout in [5]:
         for prob_scale in [2]:
             name = 'mcts_{0}_{1}_{2}'.format(budget,
