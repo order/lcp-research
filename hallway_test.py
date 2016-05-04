@@ -16,14 +16,13 @@ writetodisk = True
 root = 'data/hallway'
 nodes = 50
 action_n = 3
-type_policy = 'hand'
-batch_size = 5
+batch_size = 10
 batch = True
 if batch:
     num_start_states = 5*(mp.cpu_count()-1)*batch_size
 else:
     num_start_states = batch_size
-horizon = 50
+horizon = 30
 
 rebuild_all = True
 build_problem = False
@@ -96,9 +95,9 @@ pert_flow_policy = MaxFunPolicy(pert_flow_fns)
 policy_dict['flow_pert'] = IndexPolicyWrapper(pert_flow_policy,
                                               mdp_obj.actions)
 
-for budget in [50,75,100,125,150]:
-    for rollout in [4,6,8]:
-        for prob_scale in [2,4,6]:
+for budget in [100,500,1000]:
+    for rollout in [5]:
+        for prob_scale in [2]:
             name = 'mcts_{0}_{1}_{2}'.format(budget,
                                              rollout,
                                              prob_scale)

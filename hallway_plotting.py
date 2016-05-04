@@ -23,7 +23,7 @@ def trajectory_plot(results):
 def cdf_plot(returns):
     for (name,ret) in returns.items():
         (x,f) = cdf_points(ret)
-        plt.plot(x,f,'-o',lw=2,label=name)[0]
+        plt.plot(x,f,'-',lw=2,label=name)[0]
     plt.legend(returns.keys(),loc='best')
     plt.show()
 
@@ -38,9 +38,18 @@ def compare(returns,a,*vargs):
     
     
 root = 'data/hallway'
-results = load(root + '.results.pickle')
+#results = load(root + '.results.pickle')
 returns = load(root + '.return.pickle')
-states = load(root + '.starts.pickle')
+#states = load(root + '.starts.pickle')
+
 
 #compare(returns,'q','q pert','mcts')
-cdf_plot(returns)
+filtered_returns = {}
+for (name,ret) in returns.items():
+    split_name = name.split('_')
+    if split_name[0] == 'mcts'\
+       and not (split_name[2] == '6' and split_name[3] == '6'):
+        continue
+    filtered_returns[name] = ret
+        
+cdf_plot(filtered_returns)
