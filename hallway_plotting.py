@@ -37,7 +37,7 @@ def compare(returns,a,*vargs):
     plt.show()
     
     
-root = 'data/hallway'
+root = 'data/exper2/hallway'
 #results = load(root + '.results.pickle')
 returns = load(root + '.return.pickle')
 #states = load(root + '.starts.pickle')
@@ -47,9 +47,6 @@ returns = load(root + '.return.pickle')
 filtered_returns = {}
 for (name,ret) in returns.items():
     split_name = name.split('_')
-    if split_name[0] == 'mcts'\
-       and not (split_name[2] == '6' and split_name[3] == '6'):
-        continue
     filtered_returns[name] = ret
         
 cdf_plot(filtered_returns)
