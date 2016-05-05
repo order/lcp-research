@@ -3,7 +3,11 @@
 #include <assert.h>
 #include <set>
 
+#include <chrono>
+
+
 using namespace std;
+using namespace std::chrono;
 using namespace arma;
 
 struct RegGrid {
@@ -38,37 +42,28 @@ template <typename V>
 mat div_by_vec(const mat & A, const V & x){
   // Divides the columns of A by elements of x
   // So B[:,i] = A[:,i] / x[i]
-  assert(A.n_cols == x.n_elem);
-  mat B = mat(A.n_rows, A.n_cols);
-  for(uint d = 0; d < x.n_elem; ++d){
-    B.col(d) /= x(d);
-  }
-  return B;
+  uint N = A.n_rows;
+  uint D = A.n_cols;
+  assert(D == x.n_elem);
+
+  mat X = repmat(conv_to<rowvec>::from(x),N,1);
+  assert(N == X.n_rows && D == X.n_cols);
+  return A / X;
 }
 
 template <typename V>
 mat add_by_vec(const mat & A, const V & x){
-  //Adds elements of x to columns of A
-  // So B[:,i] = A[:,i] + x[i]
-  assert(A.n_cols == x.n_elem);
-  mat B = mat(A.n_rows, A.n_cols);
-  for(uint d = 0; d < x.n_elem; ++d){
-    B.col(d) += x(d);
-  }
-  return B;
+  uint N = A.n_rows;
+  uint D = A.n_cols;
+  assert(D == x.n_elem);
+
+  mat X = repmat(conv_to<rowvec>::from(x),N,1);
+  assert(N == X.n_rows && D == X.n_cols);
+  return A + X;
 }
 
 template <typename V>
-mat mult_by_vec(const mat & A, const V & x){
-  //Adds elements of x to columns of A
-  // So B[:,i] = A[:,i] + x[i]
-  assert(A.n_cols == x.n_elem);
-  mat B = mat(A.n_rows, A.n_cols);
-  for(uint d = 0; d < x.n_elem; ++d){
-    B.col(d) *= x(d);
-  }
-  return B;
-}
+mat mult_by_vec(const mat & A, const V & x){assert(false);}
 
 template <typename V>
 void replace(V & v,double rpl,const uvec & cnd){
@@ -95,6 +90,14 @@ uvec num2binvec(uint n,uint D){
     b(d) = ((1 << d) & n) >> d;
   }
   return b;
+}
+
+uvec binmask(uint d, uint D){
+  uvec mask = uvec(pow(2,D));
+  for(uint b = 0; b < pow(2,D); ++b){
+    mask[b] = ((1 << d) & b) >> d;
+  }
+  return mask;
 }
 
 mat make_points(const vector<vec> grids)
@@ -215,7 +218,7 @@ umat least_coord(const mat & points,
   return cuts;
 }
 
-void point_to_idx_dist(const mat & points,
+mat point_to_idx_dist(const mat & points,
 			 const RegGrid & grid){
   uint N = points.n_rows;
   uint D = points.n_cols;
@@ -228,9 +231,6 @@ void point_to_idx_dist(const mat & points,
   vec delta = (grid.high - grid.low) / grid.num;
 
   assert(D == grid.low.n_elem);
-
-  cout << size(coords * delta) << endl;
-  cout << size(grid.low) << endl;
 
   /*
     Want to get  distance from least cell cut points:
@@ -251,26 +251,55 @@ void point_to_idx_dist(const mat & points,
     norm_low); // mat + vec
   mat norm_diff = norm_points - norm_least_pos; // mat - mat
 
-  mat W = mat(N,pow(2,D));
-  for(uint b = 0; b < pow(2,D); ++b){
-  cout << b << ',' << conv_to<urowvec>::from(num2binvec(b,D))
-       << endl;
+  mat W = ones<mat>(N,pow(2,D));
+  uint pow2Dminus = pow(2,D-1);
+
+  for(uint d = 0; d < D; ++d){
+    uvec mask = binmask(d,D);
+    W.cols(find(mask == 1)) %=
+      repmat(norm_diff.col(d),1,pow2Dminus);
+    W.cols(find(mask == 0)) %=
+      repmat(1.0 - norm_diff.col(d),1,pow2Dminus);
   }
+  /*
+  // Other way of slicing the calc; seems slightly slower
+  uint pow2D = pow(2,D);
+  for(uint b = 0; b < pow2D; ++b){
+    uvec mask = num2binvec(b,D);
+    W.col(b) = prod(norm_diff.cols(find(mask == 1)),1)
+      % prod(1. - norm_diff.cols(find(mask == 0)),1);
+  }
+  */
+  return W;
 }
   
 
 int main(int argc, char** argv)
 {  
-  mat P = randu<mat>(10,2);
-  
-  cout << "Points:" << endl<< P << endl;
 
-  RegGrid grid;
-  grid.low = zeros<vec>(2);
-  grid.high = ones<vec>(2);
-  grid.num = 4*ones<uvec>(2);
+  uint N = 25;
+  uint D = 4;
+  vec x = vec(N);
+  for(uint i = 0; i < N; ++i){x[i] = float(i) / float(N);}
+  vector<vec> grids;
+  for(uint d = 0; d < D; ++d){grids.push_back(x);}
 
-  point_to_idx_dist(P,grid);
+  RegGrid g;
+  g.low = zeros<vec>(D);
+  g.high = ones<vec>(D);
+  g.num = ones<uvec>(D);
   
+  //mat P = make_points(grids);
+  mat P = randu<mat>(1,D);
+  //mat P = mat("0.1 0.1");
+
+  high_resolution_clock::time_point t1 = high_resolution_clock::now();
+  for(uint i = 0; i < 2500; ++i){
+    mat W = point_to_idx_dist(P,g);
+  }
+  high_resolution_clock::time_point t2 = high_resolution_clock::now();
+  cout << duration_cast<microseconds>( t2 - t1 ).count();
+  
+  //cout << W << endl;
   return 0;
 }
