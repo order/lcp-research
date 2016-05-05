@@ -9,17 +9,35 @@ import linalg
 class SimulationResults(object):
     def __init__(self,actions,
                  states,
-                 costs):
+                 costs,
+                 internal_results=None):
         self.actions = actions
         self.states = states
         self.costs = costs
+        self.internal_results = internal_results
+        
     def merge(self,sim_results):
+        """
+        Results are n x T and m x T,
+        Concatenate stacks them vertically
+        """
         self.actions = np.concatenate([self.actions,
                                        sim_results.actions])
         self.states = np.concatenate([self.states,
                                        sim_results.states])
         self.costs = np.concatenate([self.costs,
                                       sim_results.costs])
+
+        # Internal results is a list of T time steps, each of n
+        if not self.internal_results\
+           or not sim_results.internal_results:
+            return
+        
+        T = len(self.internal_results)
+        assert(T == len(sim_results.internal_results))
+        for t in xrange(T):
+            x = sim_results.internal_results[t]
+            self.internal_results[t].extend(x)
         
     def shape(self):
         return (self.actions.shape,
@@ -69,6 +87,8 @@ def simulate(problem,
     actions = np.empty((N,action_dim,H))
     costs = np.empty((N,H))
 
+    internal_state = []
+    
     curr = start_states
     for t in xrange(H):
         u = policy.get_decisions(curr)
@@ -80,7 +100,15 @@ def simulate(problem,
         states[:,:,t] = curr
         actions[:,:,t] = u
         costs[:,t] = cost
-    return SimulationResults(actions,states,costs)
+
+        if hasattr(policy,'get_internal_state'):
+            # Right now just for MCTS
+            internal_state.append(policy.get_internal_state())
+        
+    return SimulationResults(actions,
+                             states,
+                             costs,
+                             internal_state)
 
 
 def discounted_return(cost,discount):
