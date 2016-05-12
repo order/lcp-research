@@ -1,7 +1,6 @@
 #include <iostream>
-#include <armadillo>
 #include <assert.h>
-#include <set>
+#include "discrete.h"
 
 #include <chrono>
 
@@ -10,75 +9,28 @@ using namespace std;
 using namespace std::chrono;
 using namespace arma;
 
-struct RegGrid {
-  vec low;
-  vec high;
-  uvec num;
-};
-
-inline bool check_dim(const RegGrid & grid, uint D){
+bool check_dim(const RegGrid & grid, uint D){
+  // Make sure all dimensions of a RegGrid are consistant
   return grid.low.n_elem == D
     && grid.high.n_elem == D
     && grid.num.n_elem == D;
-}
-
-template <typename V>
-V nans(uint n){
-  V v = V(n);
-  v.fill(datum::nan);
-  return v;
-}
-
-uvec vec_mod(const uvec & a, const uvec n){
-  assert(a.n_elem == n.n_elem);
-  return a - (a / n) % n; // '%' overloaded to be elem-mult
 }
 
 uvec vec_mod(const uvec & a, uint n){
   return a - (a / n) * n;
 }
 
-template <typename V>
-mat div_by_vec(const mat & A, const V & x){
-  // Divides the columns of A by elements of x
-  // So B[:,i] = A[:,i] / x[i]
-  uint N = A.n_rows;
-  uint D = A.n_cols;
-  assert(D == x.n_elem);
-
-  mat X = repmat(conv_to<rowvec>::from(x),N,1);
-  assert(N == X.n_rows && D == X.n_cols);
-  return A / X;
+void replace(vec & v, double val, const uvec & cnd){
+  v(cnd) = val * ones<vec>(cnd.n_elem);  
 }
 
-template <typename V>
-mat add_by_vec(const mat & A, const V & x){
-  uint N = A.n_rows;
-  uint D = A.n_cols;
-  assert(D == x.n_elem);
-
-  mat X = repmat(conv_to<rowvec>::from(x),N,1);
-  assert(N == X.n_rows && D == X.n_cols);
-  return A + X;
+void replace(uvec & v, uint val, const uvec & cnd){
+  v(cnd) = val * ones<uvec>(cnd.n_elem);  
 }
 
-template <typename V>
-mat mult_by_vec(const mat & A, const V & x){assert(false);}
-
-template <typename V>
-void replace(V & v,double rpl,const uvec & cnd){
-  for(uvec::const_iterator it = cnd.begin();
-      it != cnd.end(); ++it){
-    v(*it) = rpl;
-  }
-}
-
-template <typename M>
-void replace_col(M & A,uint c,double rpl,const uvec & cnd){
-  for(uvec::const_iterator it = cnd.begin();
-      it != cnd.end(); ++it){
-    A.col(c)(*it) = rpl;
-  }
+void replace_col(umat & M, uint c, uint val, const uvec & cnd){
+  uvec v = M.col(c);
+  v(cnd) = val * ones<uvec>(cnd.n_elem);  
 }
 
 uvec num2binvec(uint n,uint D){
@@ -93,9 +45,14 @@ uvec num2binvec(uint n,uint D){
 }
 
 uvec binmask(uint d, uint D){
-  uvec mask = uvec(pow(2,D));
-  for(uint b = 0; b < pow(2,D); ++b){
-    mask[b] = ((1 << d) & b) >> d;
+  // For all of numbers in 0,..., 2**D-1, do they have bit d lit up?
+  // e.g. binmask(0,D) will be: [0,1,0,1,...]
+  // e.g. binmask(1,D) will be: [0,0,1,1,0,0,1,1,...]
+
+  uint N = pow(2,D);
+  uvec mask = uvec(N);
+  for(uint b = 0; b < N; ++b){
+    mask[b] = ((1 << d) & b) >> d; // Shift 1 over, mask, then shift back.
   }
   return mask;
 }
@@ -138,15 +95,33 @@ mat make_points(const vector<vec> grids)
 
 uvec c_order_coef(const uvec & lens){
   // Coeffs to convert coords to indicies (inline?)
-  uint n = lens.n_elem;
-  uvec coef = uvec(n);
+  uint D = lens.n_elem;
+  uvec coef = uvec(D);
 
   uint agg = 1;
-  for(uint i = n; i > 0; --i){
+  for(uint i = D; i > 0; --i){
     coef(i-1) = agg;
     agg *= lens(i-1);
   }
   return coef;
+}
+
+uvec cell_shift_coef(const uvec & lens){
+  // The index shift for the vertices of the hyper rectangle
+  // Basically, Hamming distance, but using c_order_coefs rather
+  // than ones(D) as the `weight' of each dimension.
+  
+  uint D = lens.n_elem;
+  uvec coef = c_order_coef(lens);
+  
+  uint V = pow(2,D);  
+  uvec shift = zeros<uvec>(V);
+  uvec b;
+  for(uint d = 0; d < D; ++d){
+    b = binmask(d,D);
+    shift(find(b == 1)) += coef[d];
+  }
+  return shift;
 }
 
 uvec coord_to_index(const umat & crd, const uvec & lens){
@@ -208,98 +183,115 @@ umat least_coord(const mat & points,
     // Fuzz to convert [l,h) to [l,h]
     uvec fuzz = find(points.col(d) >= h
 		     && points.col(d) < h+1e-12);
-    replace_col<umat>(cuts,d, n-1, fuzz);
+    replace_col(cuts, d, n-1, fuzz);
 
     // OOB
     uvec oob = find(points.col(d) < l
 		    || points.col(d) >= h+1e-12);
-    replace_col<umat>(cuts,d, n, oob);
+    replace_col(cuts, d, n, oob);
   }
   return cuts;
 }
 
-mat point_to_idx_dist(const mat & points,
-			 const RegGrid & grid){
+sp_mat point_to_idx_dist(const mat & points,
+			  const RegGrid & grid){
   uint N = points.n_rows;
   uint D = points.n_cols;
   assert(check_dim(grid,D));
 
-  // Grid coords (as mat)
-  umat coords = least_coord(points,grid);
-  uvec I = coord_to_index(coords,grid.num);
-
-  vec delta = (grid.high - grid.low) / grid.num;
-
-  assert(D == grid.low.n_elem);
-
+  uint num_grid_points = prod(grid.num)+1; // +1 for oob
+  umat low_coords = least_coord(points,grid); // least vertex in cube
+  rowvec delta = (grid.high.t() - grid.low.t()) / grid.num.t(); //grid increment
   /*
-    Want to get  distance from least cell cut points:
-    
-    o-----o
-    |  P  |
-    | /   |
-    L-----o
+    Want to get  distance from least cell cut points (denoted by the @ below):
+      o-----o
+     / |   /|
+    o--+--o |
+    |  o--|-o
+    | /   |/ 
+    @-----o
 
-    This distance is normalized by cell size (delta vector)
-
+    We want the distance normalized by cell size (delta vector):
     P / d - (C + (l /d)) = (P - (l + C*d)) / d
-
    */
-  mat norm_points = div_by_vec(points,delta); // mat / vec
-  vec norm_low = grid.low / delta; // vec / vec
-  mat norm_least_pos = add_by_vec(conv_to<mat>::from(coords),
-    norm_low); // mat + vec
-  mat norm_diff = norm_points - norm_least_pos; // mat - mat
+  mat norm_points = points.each_row() / delta; // (P / d)
+  rowvec norm_low = grid.low.t() / delta; // (l / d)
+  mat norm_least_pos = (conv_to<mat>::from(low_coords)).each_row() + norm_low;
+  //C + (l / d)
+  mat norm_diff = norm_points - norm_least_pos; // Whole thing
 
-  mat W = ones<mat>(N,pow(2,D));
-  uint pow2Dminus = pow(2,D-1);
+  // Calculate multi-linear weights over the cube vertices
+  uint V = pow(2,D);
+  mat W = ones<mat>(N,V);
+  uint halfV = pow(2,D-1);
 
   for(uint d = 0; d < D; ++d){
+    // Iterate through the dimensions
     uvec mask = binmask(d,D);
+    // Update half with the distance from the low side of the cube
     W.cols(find(mask == 1)) %=
-      repmat(norm_diff.col(d),1,pow2Dminus);
+      repmat(norm_diff.col(d),1,halfV);
+    // Update the rest with the distance from the far side
     W.cols(find(mask == 0)) %=
-      repmat(1.0 - norm_diff.col(d),1,pow2Dminus);
+      repmat(1.0 - norm_diff.col(d),1,halfV);
   }
-  /*
-  // Other way of slicing the calc; seems slightly slower
-  uint pow2D = pow(2,D);
-  for(uint b = 0; b < pow2D; ++b){
-    uvec mask = num2binvec(b,D);
-    W.col(b) = prod(norm_diff.cols(find(mask == 1)),1)
-      % prod(1. - norm_diff.cols(find(mask == 0)),1);
+
+
+  // Calculate the index of the low grid point
+  uvec low_indices = coord_to_index(low_coords,grid.num);
+  
+  // Calculate the shift for the regular grid cells
+  uvec shift = cell_shift_coef(grid.num);
+
+  // Build the sparse matrix
+  rowvec data = vectorise(W,1);
+  umat loc = umat(2,N*V); // Location pairs (i,j)
+
+  // Fill in loc matrix
+  uint I = 0;
+  for(uint j = 0; j < V; ++j){
+    for(uint i = 0; i < N; ++i){
+      uint row = low_indices(i) + shift(j);
+      loc(0,I) = min(row,num_grid_points);
+      loc(1,I) = i; // Column: point index
+      ++I;
+    }
   }
-  */
-  return W;
+
+  cout << loc << endl;
+  
+  sp_mat dist = sp_mat(loc,data);
+  return dist;
 }
   
 
 int main(int argc, char** argv)
-{  
-
-  uint N = 25;
-  uint D = 4;
+{
+  uint R = 1;
+  uint N = 4;
+  uint D = 2;
+  
   vec x = vec(N);
-  for(uint i = 0; i < N; ++i){x[i] = float(i) / float(N);}
+  for(uint i = 0; i < N; ++i){x[i] = float(i);}
   vector<vec> grids;
   for(uint d = 0; d < D; ++d){grids.push_back(x);}
 
   RegGrid g;
   g.low = zeros<vec>(D);
-  g.high = ones<vec>(D);
-  g.num = ones<uvec>(D);
+  g.high = N*ones<vec>(D);
+  g.num = N*ones<uvec>(D); // Number of CELLS
   
   //mat P = make_points(grids);
-  mat P = randu<mat>(1,D);
-  //mat P = mat("0.1 0.1");
+  //mat P = randu<mat>(1,D);
+  mat P = mat("0.1 0.1");
 
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
-  for(uint i = 0; i < 2500; ++i){
-    mat W = point_to_idx_dist(P,g);
+  for(uint i = 0; i < R; ++i){
+    sp_mat D = point_to_idx_dist(P,g);
+    cout << D << endl;
   }
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
-  cout << duration_cast<microseconds>( t2 - t1 ).count();
+  //cout << duration_cast<microseconds>( t2 - t1 ).count();
   
-  //cout << W << endl;
   return 0;
 }
