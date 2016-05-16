@@ -2,18 +2,8 @@
 #include <assert.h>
 #include "discrete.h"
 
-#include <boost/python.hpp>
-#include <boost/python/suite/indexing/vector_indexing_suite.hpp>
-#include <vector>
-
-#include <chrono>
-
-
 using namespace std;
-using namespace std::chrono;
 using namespace arma;
-using namespace boost::python;
-
 
 uvec num_grid_points_per_dim(const RegGrid & grid){
   // Number of cells + 1: | * | * |
@@ -377,28 +367,6 @@ sp_mat point_to_idx_dist(const mat & points,
   return dist;
 }
 
-uvec list_to_uvec(boost::python::list L){
-  uint N = boost::python::extract<int>(L.attr("__len__"));
-  uvec x = uvec(N);
-  for(uint i = 0; i < N; i++){
-    x(i) = boost::python::extract<uint>(L[i]);
-  }
-  return x;
-}
-void print_list(uvec L){
-  cout << "UVEC: " << L << endl;
-}
-
-void python_point_to_idx_dist(uint N,
-			      uint D,
-			      boost::python::list point_vector,
-			      boost::python::list low,
-			      boost::python::list high,
-			      boost::python::list num_cells){
-  uvec x = list_to_uvec(low);
-  cout << "PYTHON low:" << x << endl;
-}
-
 int main(int argc, char** argv)
 {
   uint R = 1; // Repetitions (for timing)
@@ -412,24 +380,11 @@ int main(int argc, char** argv)
   
   mat P = mat("0.9 0.1");
 
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
   for(uint i = 0; i < R; ++i){
     cout << "P:\n" << P << endl;
     sp_mat D = point_to_idx_dist(P,g);
     cout << "Dist:\n" << D << endl;
-  }
-  high_resolution_clock::time_point t2 = high_resolution_clock::now();
-  cout << duration_cast<microseconds>( t2 - t1 ).count();
-
-  cout << "(1) -> " << indices_to_coords(1*ones<uvec>(1),
-					 g.num_cells + 1) << endl;
-  
+  }  
   return 0;
 }
 
-//=====================================
-BOOST_PYTHON_MODULE(discrete){
-  class_<std::vector<uint> >("c_uint_vec")
-    .def(vector_indexing_suite<std::vector<uint> >());
-  def ("print_list", print_list);
-}

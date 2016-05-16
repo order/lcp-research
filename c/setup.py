@@ -5,7 +5,7 @@ from distutils.extension import Extension
  
 setup(name="PackageName",
     ext_modules=[
-        Extension("discrete", ["discrete.cpp"],
-                  libraries = ["boost_python","armadillo"],
+        Extension("cDiscrete", ["binding.cpp"],
+                  libraries = ["boost_python"],
                   extra_compile_args=['-std=c++11'])
     ])
