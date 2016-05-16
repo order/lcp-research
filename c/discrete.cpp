@@ -2,12 +2,18 @@
 #include <assert.h>
 #include "discrete.h"
 
+#include <boost/python.hpp>
+#include <boost/python/suite/indexing/vector_indexing_suite.hpp>
+#include <vector>
+
 #include <chrono>
 
 
 using namespace std;
 using namespace std::chrono;
 using namespace arma;
+using namespace boost::python;
+
 
 uvec num_grid_points_per_dim(const RegGrid & grid){
   // Number of cells + 1: | * | * |
@@ -20,11 +26,10 @@ uint num_grid_points(const RegGrid & grid){
 
 uint oob_index(const RegGrid& grid){
   // Out of bound index is the last valid index
-  return oob_index(grid.num_cells + 1);
+  return oob_index(num_grid_points_per_dim(grid));
 }
-uint oob_index(const uvec& lens){
-  // Lens = number of points per dimension
-  return prod(lens);
+uint oob_index(const uvec& points_per_dim){
+  return prod(points_per_dim);
 }
 
 vec width(const RegGrid & grid){
@@ -106,7 +111,7 @@ mat make_points(const vector<vec> & grids)
   
   uint rep_elem = N; // Element repetition
   uint rep_cycle = 1; // Pattern rep
-  for(int d = 0; d < D; d++){
+  for(uint d = 0; d < D; d++){
     uint n = grids[d].n_elem;
     rep_elem /= n;
     assert(N == rep_cycle * rep_elem * n);
@@ -126,26 +131,34 @@ mat make_points(const vector<vec> & grids)
   return P;
 }
 
-uvec c_order_coef(const uvec & lens){
-  // Coeffs to convert coords to indicies (inline?)
-  uint D = lens.n_elem;
+uvec c_order_coef(const RegGrid & grid){
+  return c_order_coef(num_grid_points_per_dim(grid));
+}
+
+uvec c_order_coef(const uvec & points_per_dim){
+  // Coeffs to converts from point grid coords to node indicies
+  uint D = points_per_dim.n_elem;
   uvec coef = uvec(D);
 
   uint agg = 1;
   for(uint i = D; i > 0; --i){
     coef(i-1) = agg;
-    agg *= lens(i-1);
+    agg *= points_per_dim(i-1);
   }
   return coef;
 }
 
-uvec cell_shift_coef(const uvec & lens){
+uvec cell_shift_coef(const RegGrid & grid){
+  return cell_shift_coef(num_grid_points_per_dim(grid));
+}
+
+uvec cell_shift_coef(const uvec & points_per_dim){
   // The index shift for the vertices of the hyper rectangle
   // Basically, Hamming distance, but using c_order_coefs rather
   // than ones(D) as the `weight' of each dimension.
   
-  uint D = lens.n_elem;
-  uvec coef = c_order_coef(lens);
+  uint D = points_per_dim.n_elem;
+  uvec coef = c_order_coef(points_per_dim);
   
   uint V = pow(2,D);  
   uvec shift = zeros<uvec>(V);
@@ -158,36 +171,53 @@ uvec cell_shift_coef(const uvec & lens){
 }
 
 bool coords_in_bound(const umat & coords,
-		      const uvec & lens,
+		      const uvec & points_per_dim,
 		      const Mask & oob){
-
+  // Check to make sure everything is in bounds
+  // or is marked as oob correctly
+  uint N = coords.n_rows;
   uint D = coords.n_cols;
   for(uint d = 0; d < D; d++){
-    if(any(coords.col(d) >= lens(d)))
-      return false;
+    uint n_max = points_per_dim(d);
+    for(uint i = 0; i < N; i++){
+      if(oob.mask(i) == 1 && coords(i,d) !=  OOB_COORD){
+	// Marked as out-of-bounds in mask, but doesn't have the
+	// OOB coordinate
+	return false;
+      }
+      if(oob.mask(i) == 0 && coords(i,d) >=  n_max){
+	return false;
+      }
+    }
   }
-  return all(all(coords.rows(oob.pos) == OOB_COORD));
+  return true;
 }
-
 uvec coords_to_indices(const umat & coords,
-		       const uvec & lens,
+		       const RegGrid & grid,
+		       const Mask & oob){
+  return coords_to_indices(coords,
+			   num_grid_points_per_dim(grid),
+			   oob);
+}
+uvec coords_to_indices(const umat & coords,
+		       const uvec & points_per_dim,
 		       const Mask & oob){
   // Converts a matrix of coordinates to indices
 
-  assert(coords_in_bound(coords,lens,oob));
+  assert(coords_in_bound(coords,points_per_dim,oob));
   
-  uvec coef = c_order_coef(lens);
+  uvec coef = c_order_coef(points_per_dim);
   uvec idx = uvec(coords.n_rows);
   idx.rows(oob.neg) = coords.rows(oob.neg) * coef;
-  idx.rows(oob.pos).fill(oob_index(lens));
+  idx.rows(oob.pos).fill(oob_index(points_per_dim));
   
   return idx;
 }
 
-umat indices_to_coords(const uvec & idx, const uvec & lens){
-  uvec coef = c_order_coef(lens);
+umat indices_to_coords(const uvec & idx, const uvec & points_per_dim){
+  uvec coef = c_order_coef(points_per_dim);
   
-  uint D = lens.n_elem;
+  uint D = points_per_dim.n_elem;
   uint N = idx.n_elem;
   
   umat crd = umat(N,D);
@@ -198,10 +228,10 @@ umat indices_to_coords(const uvec & idx, const uvec & lens){
   }
 
   // Deal with oob index
-  uvec oob = find(idx >= prod(lens));
+  uvec oob = find(idx >= prod(points_per_dim));
   for(uvec::const_iterator it = oob.begin();
       it != oob.end(); ++it){
-    crd.row(*it) = conv_to<urowvec>::from(lens);
+    crd.row(*it) = conv_to<urowvec>::from(points_per_dim);
   }
   
   return crd;
@@ -240,7 +270,6 @@ void out_of_bounds(Mask & oob_mask,
 		   const mat & points,
 		   const RegGrid & grid){
   uint N = points.n_rows;
-  uint D = points.n_cols;
   bvec mask = zeros<bvec>(N);
 
   mat T = (points.each_row() - grid.low.t());
@@ -269,7 +298,6 @@ sp_mat point_to_idx_dist(const mat & points,
 
   // Get the least vertex for the cell enclosing each point
   umat low_coords = least_coord(points,grid,oob_mask);
-  cout << "low:\n" << low_coords << endl;
   
   /*
     Want to get  distance from least cell cut points (denoted by the @ below):
@@ -306,48 +334,83 @@ sp_mat point_to_idx_dist(const mat & points,
   }
 
   // Calculate the index of the low grid point
-  uvec low_indices = coords_to_indices(low_coords,grid.num_cells,oob_mask);
+  uvec low_indices = coords_to_indices(low_coords,grid,oob_mask);
   
   // Calculate the shift for the regular grid cells
-  uvec shift = cell_shift_coef(grid.num_cells);
+  uvec shift = cell_shift_coef(grid);
 
   // Build the sparse matrix
-  rowvec data = vectorise(W,1);
-  umat loc = umat(2,N*V); // Location pairs (i,j)
+  uint sp_nnz = oob_mask.n_neg * V
+    + oob_mask.n_pos; // Number of nnz in sp_matrix
+  vec data = vec(sp_nnz);
+  umat loc = umat(2,sp_nnz); // Location pairs (i,j)
 
   // Fill in loc matrix
   uint oob_idx = oob_index(grid);
   uint I = 0;
-  cout << "OOB:" << oob_idx << endl;
-  for(uint j = 0; j < V; ++j){
-    for(uint i = 0; i < N; ++i){
-      uint row = low_indices(i) + shift(j);
-      loc(0,I) = min(row,oob_idx);
-      loc(1,I) = i; // Column: point index
-      ++I;
+  
+  // Fill in data and locations
+  for(uint j = 0; j < V; j++){
+    for(uint i = 0; i < N; i++){
+      if (oob_mask.mask(i) == 1 && j > 0){
+	// Already filled in oob entry
+	continue;
+      }
+      assert(I < sp_nnz);
+      if(oob_mask.mask(i) == 1 && j == 0){
+	// OOB and first occurance
+	data(I) = 1.0;
+	loc(0,I) = oob_idx;
+	loc(1,I) = i;
+      }
+      if(oob_mask.mask(i) == 0){
+	// In bounds
+	data(I) = W(i,j);
+	loc(0,I) = low_indices(i) + shift(j);
+	loc(1,I) = i;
+      }      
+      I++;
     }
   }
   
   sp_mat dist = sp_mat(loc,data);
   return dist;
 }
-  
+
+uvec list_to_uvec(boost::python::list L){
+  uint N = boost::python::extract<int>(L.attr("__len__"));
+  uvec x = uvec(N);
+  for(uint i = 0; i < N; i++){
+    x(i) = boost::python::extract<uint>(L[i]);
+  }
+  return x;
+}
+void print_list(uvec L){
+  cout << "UVEC: " << L << endl;
+}
+
+void python_point_to_idx_dist(uint N,
+			      uint D,
+			      boost::python::list point_vector,
+			      boost::python::list low,
+			      boost::python::list high,
+			      boost::python::list num_cells){
+  uvec x = list_to_uvec(low);
+  cout << "PYTHON low:" << x << endl;
+}
 
 int main(int argc, char** argv)
 {
   uint R = 1; // Repetitions (for timing)
-  uint N = 2; // Grid resolution (Number of cut
+  uint N = 1; // Grid resolution [0,N]**D hypercube; points at ints
   uint D = 2; // Dimension
 
   RegGrid g;
   g.low = zeros<vec>(D);
   g.high = N*ones<vec>(D);
   g.num_cells = N*ones<uvec>(D); // Number of CELLS
-
-  mat GP = make_points(g);
-  cout << "Grid points:\n" << GP << endl;
   
-  mat P = mat("2.1 1.1");
+  mat P = mat("0.9 0.1");
 
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
   for(uint i = 0; i < R; ++i){
@@ -356,7 +419,17 @@ int main(int argc, char** argv)
     cout << "Dist:\n" << D << endl;
   }
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
-  //cout << duration_cast<microseconds>( t2 - t1 ).count();
+  cout << duration_cast<microseconds>( t2 - t1 ).count();
+
+  cout << "(1) -> " << indices_to_coords(1*ones<uvec>(1),
+					 g.num_cells + 1) << endl;
   
   return 0;
+}
+
+//=====================================
+BOOST_PYTHON_MODULE(discrete){
+  class_<std::vector<uint> >("c_uint_vec")
+    .def(vector_indexing_suite<std::vector<uint> >());
+  def ("print_list", print_list);
 }

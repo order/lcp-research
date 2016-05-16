@@ -23,7 +23,7 @@ uvec num_cells; // Number of CELLS per dimension;
 uvec num_grid_points_per_dim(const RegGrid & grid);
 uint num_grid_points(const RegGrid & grid);
 uint oob_index(const RegGrid & grid);
-uint oob_index(const uvec & lens);
+uint oob_index(const uvec & points_per_dim);
 vec width(const RegGrid & grid);
 bool check_dim(const RegGrid & grid, uint D);
 
@@ -65,23 +65,23 @@ mat make_points(const vector<vec> & grids);
 //=======================================
 // INDEXING
 // Coefficients for converting D-tuples into indicies
-uvec c_order_coef(const uvec & lens);
-uvec cell_shift_coef(const uvec & lens);
+uvec c_order_coef(const uvec & points_per_dim);
+uvec cell_shift_coef(const uvec & points_per_dim);
 
 // Coverts D-coordinates into indicies
 bool coords_in_bound(const umat & coords,
-		     const uvec & lens,
+		     const uvec & points_per_dim,
 		     const Mask & oob);
 uvec coords_to_indices(const umat & coords,
-		       const uvec & lens,
+		       const uvec & points_per_dim,
 		       const Mask & oob);
 
 // Coverts indicies into D-coordinates
 // Can either supply the out-of-bound binary vector, or have it generated
 umat indices_to_coords(const uvec & indices,
-		       const uvec & lens);
+		       const uvec & points_per_dim);
 umat indices_to_coords(const uvec & indices,
-		       const uvec & lens,
+		       const uvec & points_per_dim,
 		       const bvec & oob_mask);
 
 // Returns the coordinates of smallest grid-point of the hypercube
@@ -101,6 +101,9 @@ void out_of_bounds(Mask & oob_mask,
 // where at most 2**D elements of each column is non-zero
 // and G is the number of mesh point (+1 for oob)
 sp_mat point_to_idx_dist(const mat & points,const RegGrid & grid);
-  
-  
+
+//===========================================
+// PYTHON STUFF
+void print_list(uvec L);
+
 #endif
