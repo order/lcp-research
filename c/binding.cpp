@@ -8,7 +8,6 @@ namespace bp = boost::python;
 
 typedef bp::object Object;
 
-
 Object export_vec(arma::vec & v) {
   npy_intp N = (npy_intp)v.n_elem;  
   npy_intp shape[1] = { N }; // array size
@@ -25,6 +24,7 @@ Object export_vec(arma::vec & v) {
 			      NULL); // Not sure
 
   // Memcopy all the data over
+  // (Best way of doing this?)
   double * dest = (double *) PyArray_DATA((PyArrayObject*)obj);
   double * data = (double *) v.memptr();
   memcpy(dest,data,sizeof(double) * N);
