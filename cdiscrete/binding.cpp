@@ -7,8 +7,12 @@
 #include "discrete.h"
 
 namespace bp = boost::python;
+using namespace arma;
 
-Object export_mat(arma::mat & A){
+//=======================================
+// EXPORTING
+
+Object export_mat(mat & A){
   npy_intp N = (npy_intp)A.n_rows;
   npy_intp D = (npy_intp)A.n_cols;
   npy_intp shape[2] = { N, D }; // array size
@@ -42,7 +46,7 @@ Object export_mat(arma::mat & A){
   return bp::object(array);  
 }
 
-Object export_vec(arma::vec & v) {
+Object export_vec(vec & v) {
   npy_intp N = (npy_intp)v.n_elem;  
   npy_intp shape[1] = { N }; // array size
 
@@ -72,7 +76,10 @@ Object export_vec(arma::vec & v) {
   return bp::object(array);  
 }
 
-arma::mat import_mat(PyObject * Obj){
+//==================================================
+// IMPORTING
+
+mat import_mat(PyObject * Obj){
   // Imports a matrix
   assert(PyArray_Check(Obj));
   assert(2 == PyArray_NDIM((PyArrayObject*)Obj)); // Is a matrix
@@ -80,35 +87,63 @@ arma::mat import_mat(PyObject * Obj){
 
   // Weird; the matrix is transposed coming in; but works
   // as you'd expect during export...
-  return arma::mat((double *)PyArray_DATA((PyArrayObject*)Obj),
-		   PyArray_DIM((PyArrayObject*)Obj,1),
-		   PyArray_DIM((PyArrayObject*)Obj,0),
-		   true, // Copy (safer...)
-		   false).t();
+  return mat((const double *)PyArray_DATA((PyArrayObject*)Obj),
+	     PyArray_DIM((PyArrayObject*)Obj,1),
+	     PyArray_DIM((PyArrayObject*)Obj,0)).t();
   
 }
 
-arma::vec import_vec(PyObject * Obj){
+vec import_vec(PyObject * Obj){
   // Imports an vector
   assert(PyArray_Check(Obj));
   assert(1 == PyArray_NDIM((PyArrayObject*)Obj)); // Is a vector
   assert(NPY_DOUBLE == PyArray_TYPE((PyArrayObject*)Obj)); // Double
   
-  return arma::vec((double *)PyArray_DATA((PyArrayObject*)Obj),
-		   PyArray_DIM((PyArrayObject*)Obj,0), // n_rows
-		   true, // Copy (safer...)
-		   false);
+  return vec((const double *)PyArray_DATA((PyArrayObject*)Obj),
+	     PyArray_DIM((PyArrayObject*)Obj,0)); // n_rows
   
+}
+
+uvec import_uvec(PyObject * Obj){
+  // Imports an vector
+  assert(PyArray_Check(Obj));
+  assert(1 == PyArray_NDIM((PyArrayObject*)Obj)); // Is a vector
+  assert(NPY_UINT64 == PyArray_TYPE((PyArrayObject*)Obj)); // Double
+
+  assert(sizeof(ullint) == PyArray_ITEMSIZE((PyArrayObject*)Obj));
+  
+  return uvec((const ullint *)PyArray_DATA((PyArrayObject*)Obj),
+	      PyArray_DIM((PyArrayObject*)Obj,0));
+  
+}
+
+//================================================
+// INTERPOLATE
+// Basic interpolation
+Object interpolate(PyObject * py_val,
+		   PyObject * py_points,
+		   PyObject * py_low,
+		   PyObject * py_high,
+		   PyObject * py_num_cells){
+  vec val    = import_vec(py_val);
+  mat points = import_mat(py_points);
+  
+  RegGrid grid;
+
+  grid.low      = import_vec(py_low);
+  grid.high     = import_vec(py_high);
+  grid.num_cells = import_uvec(py_num_cells);
+  
+  vec I = interp_fn(val,points,grid);
+  return export_vec(I);
 }
 
 // Simple debugging function
 Object incr(PyObject * Obj){
-  arma::mat A = import_mat(Obj);
-  std::cout << "[C] Imported:\n" << A << std::endl;
+  mat A = import_mat(Obj);
   A = A+1;
   return export_mat(A);
 }
-
 
 //=====================================
 BOOST_PYTHON_MODULE(cDiscrete){
@@ -118,5 +153,13 @@ BOOST_PYTHON_MODULE(cDiscrete){
   import_array(); // APPARENTLY YOU NEED THIS >:L
 
   // Create a vector of uints using list operations
-  bp::def ("incr",incr); 
+  bp::def ("export_mat",export_mat);
+  bp::def ("export_vec",export_vec);
+
+  bp::def ("import_mat",import_mat);
+  bp::def ("import_vec",import_vec);
+  bp::def ("import_uvec",import_uvec);
+
+  bp::def ("interpolate",interpolate);
+  
 }

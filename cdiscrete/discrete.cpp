@@ -2,15 +2,27 @@
 #include <assert.h>
 #include "discrete.h"
 
-using namespace std;
 using namespace arma;
+
+void print_shape(const uvec & u){
+  std::cout << '(' << u.n_elem << ')' << std::endl;
+}
+
+void print_shape(const vec & v){
+  std::cout << '(' << v.n_elem << ')' << std::endl;
+}
+
+void print_shape(const mat & A){
+  std::cout << '(' << A.n_rows
+	    << ',' << A.n_cols << ')' << std::endl;
+}
 
 uvec num_grid_points_per_dim(const RegGrid & grid){
   // Number of cells + 1: | * | * |
   return grid.num_cells + 1;
 }
 uint num_grid_points(const RegGrid & grid){
-  // Product, plus an addition
+  // Product, plus an additional point for oob
   return prod(grid.num_cells + 1) + 1;
 }
 
@@ -240,13 +252,14 @@ umat least_coord(const mat & points,
   assert(check_dim(grid,D));
 
   rowvec low = grid.low.t();
-  urowvec num = grid.num_cells.t();
+  rowvec num = conv_to<rowvec>::from(grid.num_cells);
   rowvec span = grid.high.t() - grid.low.t();
-  
+
   mat scaled = mat(N,D);
   if(oob_mask.n_neg > 0){
-    scaled.rows(oob_mask.neg) =
-      num % (points.each_row(oob_mask.neg) - low) / span;
+    mat S = repmat(num / span,oob_mask.n_neg,1);
+    mat L = repmat(low, oob_mask.n_neg,1);
+    scaled.rows(oob_mask.neg) = S % (points.rows(oob_mask.neg) - L);
   }
   if(oob_mask.n_pos > 0){
     scaled.rows(oob_mask.pos).fill(OOB_COORD);
@@ -273,6 +286,8 @@ void out_of_bounds(Mask & oob_mask,
 
 sp_mat point_to_idx_dist(const mat & points,
 			  const RegGrid & grid){
+
+
   uint N = points.n_rows;
   uint D = points.n_cols;
   assert(check_dim(grid,D));
@@ -367,24 +382,20 @@ sp_mat point_to_idx_dist(const mat & points,
   return dist;
 }
 
-int main(int argc, char** argv)
-{
-  uint R = 1; // Repetitions (for timing)
-  uint N = 1; // Grid resolution [0,N]**D hypercube; points at ints
-  uint D = 2; // Dimension
-
-  RegGrid g;
-  g.low = zeros<vec>(D);
-  g.high = N*ones<vec>(D);
-  g.num_cells = N*ones<uvec>(D); // Number of CELLS
+vec interp_fn(const vec & val, const mat & points,const RegGrid & grid){
   
-  mat P = mat("0.9 0.1");
+  uint G = num_grid_points(grid);
+  uint N = points.n_rows;
+  uint D = points.n_cols;  
+  assert(check_dim(grid,D));
+  assert(G == val.n_elem);
 
-  for(uint i = 0; i < R; ++i){
-    cout << "P:\n" << P << endl;
-    sp_mat D = point_to_idx_dist(P,g);
-    cout << "Dist:\n" << D << endl;
-  }  
-  return 0;
+  sp_mat point_dist = point_to_idx_dist(points,grid);
+  assert(G == point_dist.n_rows);
+  assert(N == point_dist.n_cols);  
+  
+  vec I = point_dist.t() * val;
+  assert(N == I.n_elem);
+
+  return I;
 }
-

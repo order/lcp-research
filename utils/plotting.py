@@ -3,9 +3,12 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 import matplotlib.animation as animation
 
+from sklearn import neighbors
+
 from parsers import KwargParser
 
 import numpy as np
+from discrete import make_points
 
 ##########################
 # Animate a rank 3 tensor along the first dimension
@@ -155,4 +158,29 @@ def cdf(data,**kwargs):
 
     if 'save_file' in args:
         plt.savefig(args['save_file'], bbox_inches='tight')
+    plt.show()
+
+def scatter_knn(y,X,K,G):
+    # K = number of neighbors
+    # G = grid points per dim
+    
+    (N,D) = X.shape
+    assert(2 == D)
+    assert(N == y.size)
+
+    print G
+    
+    # Make mesh
+    cuts = []
+    for d in xrange(D):
+        cuts.append(np.linspace(np.min(X[:,d]),np.max(X[:,d]),G))
+    P = make_points(cuts)
+    XI,YI = np.meshgrid(*cuts)
+
+    # Build model and eval on mesh
+    knn = neighbors.KNeighborsRegressor(K,weights='distance')
+    Z = knn.fit(X,y).predict(P)
+    Z = np.reshape(Z,(G,G),order='F')
+
+    plt.pcolor(XI,YI,Z)
     plt.show()

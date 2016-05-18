@@ -10,6 +10,10 @@ using namespace arma;
 #define OOB_COORD UINT_MAX // OOB "coordinate"
 #define GRID_FUDGE 1e-15
 
+void print_shape(const uvec & u);
+void print_shape(const vec & v);
+void print_shape(const mat & A);
+
 //=====================================
 // STRUCTURES
 
@@ -101,6 +105,11 @@ void out_of_bounds(Mask & oob_mask,
 // where at most 2**D elements of each column is non-zero
 // and G is the number of mesh point (+1 for oob)
 sp_mat point_to_idx_dist(const mat & points,const RegGrid & grid);
+
+
+//===========================================
+// INTERPOLATE
+vec interp_fn(const vec & val, const mat & points,const RegGrid & grid);
 
 //===========================================
 // PYTHON STUFF
