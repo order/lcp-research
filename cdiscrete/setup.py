@@ -7,5 +7,6 @@ setup(name="PackageName",
     ext_modules=[
         Extension("cDiscrete", ["binding.cpp"],
                   libraries = ["boost_python"],
+                  undef_macros = [ "NDEBUG" ],
                   extra_compile_args=['-std=c++11'])
     ])
