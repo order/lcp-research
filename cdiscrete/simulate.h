@@ -1,28 +1,50 @@
 #ifndef __POLICY_INCLUDED__
 #define __POLICY_INCLUDED__
 
-#include <aramdillo>
+#include <armadillo>
+using namespace arma;
+
+//=================================================
+// POLICIES
 
 // Abstract policy class
 class Policy{
  public:
   virtual vec get_actions(const mat & points);
-}
+};
 
 // Bang-bang policy for 2D (x,v) double integrator
-class  DIBangBangPolicy : public Policy{
+class DIBangBangPolicy : public Policy{
  public:
-  DIBangBangPolicy(const & mat actions);
+  DIBangBangPolicy(const mat & actions);
   uvec get_action_indices(const mat & points);
   vec get_actions(const mat & points);
- protected:
-  mat m_actions;
-  uint m_n_actions;
-}
+ private:
+  mat _actions;
+  uint _n_actions;
+};
+//=================================================
+// TRANSFER FUNCTIONS
 
-class TransferFn{
+// Abstract transfer function
+class TransferFunction{
  public:
-  virtual vec get_next_states(const mat & points, const vec);
-}
+  virtual mat get_next_states(const mat & points, const mat & actions);
+};
+
+class DoubleIntegrator : public TransferFunction{
+ public:
+  DoubleIntegrator(double step_size,
+		   uint num_steps,
+		   double damping,
+		   double jitter);
+  mat get_next_states(const mat & points, const mat & actions);
+  
+ private:
+  double _step_size;
+  uint _num_steps;
+  double _damping;
+  double _jitter;
+};
 
 #endif
