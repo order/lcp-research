@@ -3,16 +3,13 @@
 
 #include <armadillo>
 #include <climits>
+#include "misc.h"
 
 using namespace std;
 using namespace arma;
 
 #define OOB_COORD UINT_MAX // OOB "coordinate"
 #define GRID_FUDGE 1e-15
-
-void print_shape(const uvec & u);
-void print_shape(const vec & v);
-void print_shape(const mat & A);
 
 //=====================================
 // STRUCTURES
@@ -24,39 +21,13 @@ vec high;
 uvec num_cells; // Number of CELLS per dimension;
 // Number of grid cuts per dimension is +1 this
 };
+
 uvec num_grid_points_per_dim(const RegGrid & grid);
 uint num_grid_points(const RegGrid & grid);
 uint oob_index(const RegGrid & grid);
 uint oob_index(const uvec & points_per_dim);
 vec width(const RegGrid & grid);
 bool check_dim(const RegGrid & grid, uint D);
-
-// "Binary" vector
-typedef Col<unsigned char> bvec; // boolean vector; bool doesn't work in arma
-
-// Mask structure
-struct Mask {
-  bvec mask;
-  uvec pos; // positive occurances
-  uvec neg; // negative occurances
-  uint n_pos;
-  uint n_neg;
-};
-void generate_mask(Mask & mask, bvec & source);
-
-//=====================================
-// SIMPLE EXTENSIONS TO ARMADILLO
-
-// Element-wise modulus
-uvec vec_mod(const uvec & a, uint n);
-
-// Like above, but for a particular column
-// NB: this is to avoid passing A.col(i), which is a special subview type
-void replace_col(umat & M, uint col, double val,const uvec & cnd);
-
-// Binary ops
-bvec num2binvec(uint n,uint D);
-bvec binmask(uint d, uint D);
 
 //=======================================
 // MAKE POINTS

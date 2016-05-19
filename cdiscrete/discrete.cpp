@@ -1,21 +1,10 @@
 #include <iostream>
 #include <assert.h>
+
 #include "discrete.h"
+#include "misc.h"
 
 using namespace arma;
-
-void print_shape(const uvec & u){
-  std::cout << '(' << u.n_elem << ')' << std::endl;
-}
-
-void print_shape(const vec & v){
-  std::cout << '(' << v.n_elem << ')' << std::endl;
-}
-
-void print_shape(const mat & A){
-  std::cout << '(' << A.n_rows
-	    << ',' << A.n_cols << ')' << std::endl;
-}
 
 uvec num_grid_points_per_dim(const RegGrid & grid){
   // Number of cells + 1: | * | * |
@@ -52,34 +41,6 @@ void generate_mask(Mask & M, bvec & source){
   M.neg = find(source == 0);
   M.n_pos = M.pos.n_elem;
   M.n_neg = M.neg.n_elem;
-}
-
-uvec vec_mod(const uvec & a, uint n){
-  return a - (a / n) * n;
-}
-
-bvec num2binvec(uint n, uint D){
-  // Convert n to a D-bit binary vector
-  // Little endian
-  assert(n < pow(2,D));
-  bvec b = bvec(D);
-  for(uint d = 0; d < D; ++d){
-    b(d) = ((1 << d) & n) >> d;
-  }
-  return b;
-}
-
-bvec binmask(uint d, uint D){
-  // For all of numbers in 0,..., 2**D-1, do they have bit d lit up?
-  // e.g. binmask(0,D) will be: [0,1,0,1,...]
-  // e.g. binmask(1,D) will be: [0,0,1,1,0,0,1,1,...]
-
-  uint N = pow(2,D);
-  bvec mask = bvec(N);
-  for(uint b = 0; b < N; ++b){
-    mask[b] = ((1 << d) & b) >> d; // Shift 1 over, mask, then shift back.
-  }
-  return mask;
 }
 
 vector<vec> vectorize(const RegGrid & grid){
@@ -251,15 +212,15 @@ umat least_coord(const mat & points,
   assert(N > 0);
   assert(check_dim(grid,D));
 
-  rowvec low = grid.low.t();
-  rowvec num = conv_to<rowvec>::from(grid.num_cells);
-  rowvec span = grid.high.t() - grid.low.t();
-
   mat scaled = mat(N,D);
   if(oob_mask.n_neg > 0){
-    mat S = repmat(num / span,oob_mask.n_neg,1);
-    mat L = repmat(low, oob_mask.n_neg,1);
-    scaled.rows(oob_mask.neg) = S % (points.rows(oob_mask.neg) - L);
+    // Shift by l
+    mat diff = row_diff(points.rows(oob_mask.neg),grid.low.t());
+    
+    // Scale by n / (h - l)
+    rowvec scale = conv_to<rowvec>::from(grid.num_cells)
+      / (grid.high.t() - grid.low.t());    
+    scaled.rows(oob_mask.neg) = row_mult(diff,scale);
   }
   if(oob_mask.n_pos > 0){
     scaled.rows(oob_mask.pos).fill(OOB_COORD);

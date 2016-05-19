@@ -12,68 +12,71 @@ using namespace arma;
 //=======================================
 // EXPORTING
 
-Object export_mat(mat & A){
-  npy_intp N = (npy_intp)A.n_rows;
-  npy_intp D = (npy_intp)A.n_cols;
-  npy_intp shape[2] = { N, D }; // array size
-
-  // Create a ndarray with new memory
-  // 
-  PyObject* obj = PyArray_New(&PyArray_Type,
-			      2, shape, // dimension and shape
-			      NPY_DOUBLE, // data type
-			      NULL, // strides;
-			      NULL, // data pointer
-			      0, // item size; information in data type usually
-			      NPY_ARRAY_CARRAY, 
-			      NULL); // Not sure
-
-  // Get data pointers
-  double * dest = (double *) PyArray_DATA((PyArrayObject*)obj);
-  double * data = (double *) A.memptr();
+Object export_cube(const cube & C) {
   
-  // Careful checking of types and sizes
-  assert(sizeof(double) == (npy_intp) PyArray_ITEMSIZE((PyArrayObject*)obj));
-  assert(N*D == PyArray_SIZE((PyArrayObject*)obj));
-  size_t sz = sizeof(double) * N * D;
-  assert(sz == (size_t) PyArray_NBYTES((PyArrayObject*)obj));
+  uint n_elem = C.n_elem;
+  uint dim = 3;
+  npy_intp shape[3] = { (npy_intp) C.n_rows,
+			(npy_intp) C.n_cols,
+			(npy_intp) C.n_slices };
 
-  // MEMCOPY
-  memcpy(dest,data,sz);
-
-  // Not really sure what this does...
-  bp::handle<> array( obj );
-  return bp::object(array);  
+  return export_base(dim, shape, n_elem, (double *) C.memptr());
 }
 
-Object export_vec(vec & v) {
-  npy_intp N = (npy_intp)v.n_elem;  
-  npy_intp shape[1] = { N }; // array size
+Object export_mat(const mat & A) {
+  
+  uint n_elem = A.n_elem;
+  uint dim = 2;
+  npy_intp shape[2] = {(npy_intp) A.n_rows,
+		       (npy_intp) A.n_cols };
 
+  return export_base(dim, shape, n_elem, (double *) A.memptr());
+}
+
+Object export_vec(const vec & v) {
+  
+  uint n_elem = v.n_elem;
+  uint dim = 1;
+  npy_intp shape[1] = { (npy_intp) v.n_elem }; // array size
+
+  return export_base(dim, shape, n_elem, (double *) v.memptr());
+}
+
+Object export_base(uint dim,
+		   npy_intp * shape,
+		   uint n_elem,
+		   const double * data){
   // Create a ndarray with new memory
-  // 
   PyObject* obj = PyArray_New(&PyArray_Type,
-			      1, shape, // dimension and shape
+			      dim, shape, // dimension and shape
 			      NPY_DOUBLE, // data type
-			      NULL, // strides;
-			      NULL, // data pointer
-			      0, // item size; information in data type usually
+			      NULL, // strides; uses shape and type
+			      NULL, // data pointer; create new mem
+			      0, // item size; defaults to using type
 			      NPY_ARRAY_CARRAY, 
-			      NULL); // Not sure
+			      NULL);
 
-  // Memcopy all the data over
-  // (Best way of doing this?)
-  double * dest = (double *) PyArray_DATA((PyArrayObject*)obj);
-  double * data = (double *) v.memptr();
-  // More careful checking
+  
+  // Size checking
   assert(sizeof(double) == (npy_intp) PyArray_ITEMSIZE((PyArrayObject*)obj));
-  assert(N == PyArray_SIZE((PyArrayObject*)obj));
-  size_t sz = sizeof(double) * N;
+  assert(n_elem == PyArray_SIZE((PyArrayObject*)obj));
+  size_t sz = sizeof(double) * n_elem;
   assert(sz == (size_t) PyArray_NBYTES((PyArrayObject*)obj));
+  
+  // Memcopy all the data over
+  double * dest = (double *) PyArray_DATA((PyArrayObject*)obj);
   memcpy(dest,data,sz);
     
   bp::handle<> array( obj );
-  return bp::object(array);  
+  return bp::object(array);   
+}
+
+Object export_sim_results(const SimulationOutcome & res){
+  Object points = export_cube(res.points);
+  Object actions = export_cube(res.actions);
+  Object costs = export_mat(res.costs);
+
+  return make_tuple(points,actions,costs);
 }
 
 //==================================================
@@ -138,6 +141,22 @@ Object interpolate(PyObject * py_val,
   return export_vec(I);
 }
 
+Object simulate(){
+  SimulationOutcome res;
+  uint T = 100;
+  
+  mat x0 = randn<mat>(1,2);
+  mat actions = mat("-1;0;1");
+  TransferFunction f = DoubleIntegrator(0.01,5,1e-5,0);
+  CostFunction c = BallCosts(0.15,zeros<vec>(2));
+  Policy p = DIBangBangPolicy(actions);
+  
+  simulate(x0,f,c,p,T,res);
+
+  return export_sim_results(res);
+  
+}
+
 // Simple debugging function
 Object incr(PyObject * Obj){
   mat A = import_mat(Obj);
@@ -152,9 +171,16 @@ BOOST_PYTHON_MODULE(cDiscrete){
    */
   import_array(); // APPARENTLY YOU NEED THIS >:L
 
+
   // Create a vector of uints using list operations
+  bp::def ("export_cube",export_cube);  
   bp::def ("export_mat",export_mat);
   bp::def ("export_vec",export_vec);
+
+  // Figure out how to export structures properly
+  // Search for "classes" and "boost python converters"
+  bp::def ("export_sim_results",export_sim_results);
+
 
   bp::def ("import_mat",import_mat);
   bp::def ("import_vec",import_vec);

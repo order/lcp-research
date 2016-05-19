@@ -11,6 +11,7 @@ using namespace arma;
 class Policy{
  public:
   virtual vec get_actions(const mat & points);
+  virtual uint get_action_dim();
 };
 
 // Bang-bang policy for 2D (x,v) double integrator
@@ -19,6 +20,7 @@ class DIBangBangPolicy : public Policy{
   DIBangBangPolicy(const mat & actions);
   uvec get_action_indices(const mat & points);
   vec get_actions(const mat & points);
+  uint get_action_dim();
  private:
   mat _actions;
   uint _n_actions;
@@ -46,5 +48,39 @@ class DoubleIntegrator : public TransferFunction{
   double _damping;
   double _jitter;
 };
+//=================================================
+// COSTS
+
+class CostFunction{
+ public:
+  virtual vec get_costs(const mat & points, const mat & actions);
+};
+
+class BallCosts : public CostFunction{
+ public:
+  BallCosts(double radius, const vec & center);
+  vec get_costs(const mat & points, const mat & actions);
+
+ protected:
+  double _radius;
+  vec _center;
+};
+
+
+//==================================================
+// SIMULATOR
+
+struct SimulationOutcome{
+  cube points;
+  cube actions;
+  mat costs;  
+};
+
+void simulate(const mat & x0,
+	      const TransferFunction & trans_fn,
+	      const CostFunction & cost_fn, 
+	      const Policy & policy,
+	      uint T,
+	      SimulationOutcome & outcome);
 
 #endif

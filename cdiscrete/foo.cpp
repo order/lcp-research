@@ -2,22 +2,14 @@
 #include <armadillo>
 #include <assert.h>
 #include <set>
+#include "misc.h"
 using namespace std;
 using namespace arma;
 
 int main(int argc, char** argv)
 {
+  mat A = ones<mat>(2,2);
+  rowvec b = rowvec("0,0");
 
-  uint n = 3;
-  uint d = 2;
-  mat A = randu<mat>(n,d);
-  
-  uvec i = linspace<uvec>(0,n*n-1,n*n);
-  i = i - (i / n) * n;
-  cout << A << endl << endl;
-  cout << i << endl << endl;
-
-  mat w = A.rows(i);
-  cout << w << endl;
-
+  cout << dist(A,b) << endl;
 }

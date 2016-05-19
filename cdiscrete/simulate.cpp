@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <armadillo>
 
+#include "misc.h"
 #include "simulate.h"
 
 using namespace arma;
@@ -87,4 +88,54 @@ mat DoubleIntegrator::get_next_states(const mat & points,
     X = X * Tt + actions * Ut; // TODO: jitter
   }
   return X;
+}
+
+
+BallCosts::BallCosts(double radius, const vec & center){
+  _radius = radius;
+  _center = center;
+}
+
+vec BallCosts::get_costs(const mat & points, const mat & actions){
+  uint N = points.n_rows;
+  vec c = vec(N);
+  
+  uvec in_ball = dist(points,_center) <= _radius;
+  
+  c.rows(find(in_ball == 1)).fill(0);
+  c.rows(find(in_ball == 0)).fill(1);
+  return c;
+}
+
+
+void simulate(const mat & X0,
+	      const TransferFunction & trans_fn,
+	      const CostFunction & cost_fn,
+	      const Policy & policy,
+	      uint T,
+	      SimulationOutcome & outcome){
+
+  mat X = X0;
+  uint N = X.n_rows;
+  uint D = X.n_cols;
+  uint A = policy.get_action_dim();
+  
+  outcome.points = cube(N,D,T);
+  outcome.actions = cube(N,A,T);
+  outcome.costs = mat(N,T);
+
+  mat actions;
+  vec costs;
+  for(uint t = 0; t < T; t++){
+    actions = policy.get_actions();
+    costs = cost_fn.get_costs(X,actions);
+
+    outcome.points.slice(t) = X;
+    outcome.actions.slice(t) = actions;
+    outcome.costs.slice(t) = costs;
+
+    if(t < T-1){
+      X = trans_fn.get_next_states(X,actions);
+    }
+  }  
 }
