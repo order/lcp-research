@@ -18,7 +18,7 @@ DIBangBangPolicy::DIBangBangPolicy(const mat & actions){
   _n_actions = actions.n_rows;
 }
 
-uvec DIBangBangPolicy::get_action_indices(const mat & points){
+uvec DIBangBangPolicy::get_action_indices(const mat & points) const{
   // Gets the indices of the correct action
   uint N = points.n_rows;
   uint D = points.n_cols;
@@ -27,19 +27,28 @@ uvec DIBangBangPolicy::get_action_indices(const mat & points){
   vec x = points.col(0);
   vec v = points.col(1);
 
+
   // Decision boundary
   vec dec_fn = v + sign(x) * sqrt(2 * abs(x));
   
   // Assumes 0 is index of most negative,
   // and _n_actions is the index of most positive
   uvec a_idx = uvec(N);
-  a_idx(dec_fn > 0).fill(0);
-  a_idx(dec_fn < 0).fill(_n_actions);
-  
+  if(any(dec_fn>0)){
+    a_idx(find(dec_fn > 0)).fill(0);
+  }
+  if(any(dec_fn<=0)){
+    a_idx(find(dec_fn <= 0)).fill(_n_actions-1);
+  }
+
   return a_idx;
 }
 
-vec DIBangBangPolicy::get_actions(const mat & points){
+uint DIBangBangPolicy::get_action_dim() const{
+  return 1;
+}
+
+vec DIBangBangPolicy::get_actions(const mat & points) const{
   // Converts indicies into actual acceleration number
   // Using provided action list
   uvec a_idx = get_action_indices(points);
@@ -58,7 +67,7 @@ DoubleIntegrator::DoubleIntegrator(double step_size,
 }
 
 mat DoubleIntegrator::get_next_states(const mat & points,
-				      const mat & actions){
+				      const mat & actions) const{
   // Points are (N,D), actions (N,1)
   uint N = points.n_rows;
   uint D = points.n_cols;
@@ -93,10 +102,10 @@ mat DoubleIntegrator::get_next_states(const mat & points,
 
 BallCosts::BallCosts(double radius, const vec & center){
   _radius = radius;
-  _center = center;
+  _center = conv_to<rowvec>::from(center);
 }
 
-vec BallCosts::get_costs(const mat & points, const mat & actions){
+vec BallCosts::get_costs(const mat & points, const mat & actions) const{
   uint N = points.n_rows;
   vec c = vec(N);
   
@@ -127,15 +136,16 @@ void simulate(const mat & X0,
   mat actions;
   vec costs;
   for(uint t = 0; t < T; t++){
-    actions = policy.get_actions();
+    actions = policy.get_actions(X);
     costs = cost_fn.get_costs(X,actions);
 
+    
     outcome.points.slice(t) = X;
     outcome.actions.slice(t) = actions;
-    outcome.costs.slice(t) = costs;
+    outcome.costs.col(t) = costs;
 
     if(t < T-1){
       X = trans_fn.get_next_states(X,actions);
     }
-  }  
+  }
 }

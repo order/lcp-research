@@ -7,6 +7,7 @@ setup(name="PackageName",
     ext_modules=[
         Extension("cDiscrete", ["binding.cpp",
                                 "discrete.cpp",
+                                "misc.cpp",
                                 "simulate.cpp"],
                   libraries = ["boost_python","armadillo"],
                   undef_macros = [ "NDEBUG" ],

@@ -1,9 +1,10 @@
 #ifndef __BINDINGS_INCLUDED__
 #define __BINDINGS_INCLUDED__
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
 #include <boost/python.hpp>
+#include <numpy/ndarrayobject.h>
 #include <armadillo>
-
 #include "simulate.h"
 
 typedef boost::python::object Object;
@@ -37,11 +38,8 @@ Object interpolate(PyObject * py_val,
 		   PyObject * py_high,
 		   PyObject * py_num_cells);
 
-// Flesh this out more
-Object simulate();
-
-// Test function.
-Object incr(PyObject * Obj);
+// Debug for simluation
+Object simulate_test();
 
 //============================================================
 // NB: BOOST_PYTHON_MODULE in .cpp

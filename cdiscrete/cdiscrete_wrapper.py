@@ -65,7 +65,14 @@ def interpolate(vals,
                           high,
                           num_cells)
 
-def incr(A):
-    assert(check_mat(A))
-    return cd.incr(A)
-        
+class SimulationOutcome:
+    def __init__(self,points,
+                 actions,
+                 costs):
+        self.points = points
+        self.action = actions
+        self.costs = costs
+
+def simulate():
+    (X,A,C) = cd.simulate_test()
+    return SimulationOutcome(X,A,C)

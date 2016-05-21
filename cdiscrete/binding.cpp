@@ -1,8 +1,5 @@
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
-#include <numpy/ndarrayobject.h>
 #include <assert.h>
-
 #include "binding.h"
 #include "discrete.h"
 
@@ -76,7 +73,7 @@ Object export_sim_results(const SimulationOutcome & res){
   Object actions = export_cube(res.actions);
   Object costs = export_mat(res.costs);
 
-  return make_tuple(points,actions,costs);
+  return make_tuple<Object,Object,Object>(points,actions,costs);
 }
 
 //==================================================
@@ -141,27 +138,26 @@ Object interpolate(PyObject * py_val,
   return export_vec(I);
 }
 
-Object simulate(){
+
+//================================================
+// SIMULATION
+Object simulate_test(){
+  /*
+    Basic DI simulation with no arguments
+   */
   SimulationOutcome res;
   uint T = 100;
   
   mat x0 = randn<mat>(1,2);
   mat actions = mat("-1;0;1");
-  TransferFunction f = DoubleIntegrator(0.01,5,1e-5,0);
-  CostFunction c = BallCosts(0.15,zeros<vec>(2));
-  Policy p = DIBangBangPolicy(actions);
-  
+  DoubleIntegrator f = DoubleIntegrator(0.01,5,1e-5,0);
+  BallCosts c = BallCosts(0.15,zeros<vec>(2));
+  DIBangBangPolicy p = DIBangBangPolicy(actions);
+
   simulate(x0,f,c,p,T,res);
 
   return export_sim_results(res);
   
-}
-
-// Simple debugging function
-Object incr(PyObject * Obj){
-  mat A = import_mat(Obj);
-  A = A+1;
-  return export_mat(A);
 }
 
 //=====================================
@@ -169,23 +165,19 @@ BOOST_PYTHON_MODULE(cDiscrete){
   /*
     Python side: 
    */
-  import_array(); // APPARENTLY YOU NEED THIS >:L
+  import_array();
 
+  /*
+    Should be called from routines in "cdiscrete_wrapper.py"
+    which will do type checking on the python side.
 
-  // Create a vector of uints using list operations
-  bp::def ("export_cube",export_cube);  
-  bp::def ("export_mat",export_mat);
-  bp::def ("export_vec",export_vec);
-
-  // Figure out how to export structures properly
-  // Search for "classes" and "boost python converters"
-  bp::def ("export_sim_results",export_sim_results);
-
-
-  bp::def ("import_mat",import_mat);
-  bp::def ("import_vec",import_vec);
-  bp::def ("import_uvec",import_uvec);
-
-  bp::def ("interpolate",interpolate);
+    Basic bevahior:
+    1) Call using PyObjects (usually wrapping numpy.ndarray)
+    2) Convert to C++ objects using "import_*" functions
+    3) Call relavent C++ code
+    4) Convert results to boost::python::object with "export_*"
+   */
   
+  bp::def ("interpolate",interpolate);
+  bp::def ("simulate_test",simulate_test);  
 }
