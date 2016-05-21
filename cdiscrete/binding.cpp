@@ -141,23 +141,11 @@ Object interpolate(PyObject * py_val,
 
 //================================================
 // SIMULATION
-Object simulate_test(){
-  /*
-    Basic DI simulation with no arguments
-   */
+
+Object simulate_test_export(){
   SimulationOutcome res;
-  uint T = 100;
-  
-  mat x0 = randn<mat>(1,2);
-  mat actions = mat("-1;0;1");
-  DoubleIntegrator f = DoubleIntegrator(0.01,5,1e-5,0);
-  BallCosts c = BallCosts(0.15,zeros<vec>(2));
-  DIBangBangPolicy p = DIBangBangPolicy(actions);
-
-  simulate(x0,f,c,p,T,res);
-
+  simulate_test(res);
   return export_sim_results(res);
-  
 }
 
 //=====================================
@@ -179,5 +167,5 @@ BOOST_PYTHON_MODULE(cDiscrete){
    */
   
   bp::def ("interpolate",interpolate);
-  bp::def ("simulate_test",simulate_test);  
+  bp::def ("simulate_test",simulate_test_export);  
 }

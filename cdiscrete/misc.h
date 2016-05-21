@@ -38,6 +38,10 @@ vec row_2_norm(const mat & A);
 vec dist(const mat & A, const mat & B);
 vec dist(const mat & A, const rowvec & b);
 
+mat row_min(const mat & A, const rowvec & b);
+mat row_max(const mat & A, const rowvec & b);
+void row_min_inplace(mat & A, const rowvec & b);
+void row_max_inplace(mat & A, const rowvec & b);
 
 // Like above, but for a particular column
 // NB: this is to avoid passing A.col(i), which is a special subview type

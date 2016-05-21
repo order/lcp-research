@@ -25,6 +25,7 @@ class DIBangBangPolicy : public Policy{
   mat _actions;
   uint _n_actions;
 };
+
 //=================================================
 // TRANSFER FUNCTIONS
 
@@ -49,6 +50,24 @@ class DoubleIntegrator : public TransferFunction{
   double _damping;
   double _jitter;
 };
+
+//=================================================
+// BOUNDARY AND ENFORCEMENT
+
+struct Boundary{
+  vec low;
+  vec high;
+};
+
+class BoundaryEnforcer : public TransferFunction{
+ public:
+  BoundaryEnforcer(TransferFunction * trans_fn_ptr, Boundary & boundary);
+  mat get_next_states(const mat & points, const mat & actions) const;
+ protected:
+  TransferFunction * _trans_fn_ptr;
+  Boundary _boundary;
+};
+
 //=================================================
 // COSTS
 
@@ -67,6 +86,15 @@ class BallCosts : public CostFunction{
   rowvec _center;
 };
 
+//===================================================
+// PROBLEM DESCRIPTION
+struct Problem{
+  mat actions;
+  TransferFunction * trans_fn;
+  CostFunction * cost_fn;
+  double discount;
+};
+
 
 //==================================================
 // SIMULATOR
@@ -78,10 +106,11 @@ struct SimulationOutcome{
 };
 
 void simulate(const mat & x0,
-	      const TransferFunction & trans_fn,
-	      const CostFunction & cost_fn, 
+	      const Problem & problem,
 	      const Policy & policy,
 	      uint T,
 	      SimulationOutcome & outcome);
+
+void simulate_test(SimulationOutcome & res);
 
 #endif

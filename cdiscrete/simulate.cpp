@@ -99,6 +99,26 @@ mat DoubleIntegrator::get_next_states(const mat & points,
   return X;
 }
 
+BoundaryEnforcer::BoundaryEnforcer(TransferFunction * trans_fn_ptr,
+				   Boundary & boundary){
+  _trans_fn_ptr = trans_fn_ptr;
+  _boundary.low = boundary.low;
+  _boundary.high = boundary.high;
+}
+
+mat BoundaryEnforcer::get_next_states(const mat & points,
+				      const mat & actions) const{  
+  mat next_states = _trans_fn_ptr->get_next_states(points,actions);
+  uint D = points.n_cols;
+  assert(D == _boundary.low.n_elem);
+  assert(D == _boundary.high.n_elem);
+  
+  row_max_inplace(next_states,_boundary.low.t());
+  row_min_inplace(next_states,_boundary.high.t());
+ 
+  return next_states;
+}
+
 
 BallCosts::BallCosts(double radius, const vec & center){
   _radius = radius;
@@ -118,8 +138,7 @@ vec BallCosts::get_costs(const mat & points, const mat & actions) const{
 
 
 void simulate(const mat & X0,
-	      const TransferFunction & trans_fn,
-	      const CostFunction & cost_fn,
+	      const Problem & problem,
 	      const Policy & policy,
 	      uint T,
 	      SimulationOutcome & outcome){
@@ -137,7 +156,7 @@ void simulate(const mat & X0,
   vec costs;
   for(uint t = 0; t < T; t++){
     actions = policy.get_actions(X);
-    costs = cost_fn.get_costs(X,actions);
+    costs = problem.cost_fn->get_costs(X,actions);
 
     
     outcome.points.slice(t) = X;
@@ -145,7 +164,36 @@ void simulate(const mat & X0,
     outcome.costs.col(t) = costs;
 
     if(t < T-1){
-      X = trans_fn.get_next_states(X,actions);
+      X = problem.trans_fn->get_next_states(X,actions);
     }
   }
+}
+
+void simulate_test(SimulationOutcome & res){
+  /*
+    Basic DI simulation with no arguments
+   */
+  uint T = 100;
+  arma_rng::set_seed_random();
+  mat x0 = 100*ones<mat>(1,2);
+  std::cout << x0 << std::endl;
+  
+  mat actions = mat("-1;0;1");
+
+  Boundary boundary;
+  boundary.low=vec("-5,-5");
+  boundary.high=vec("5,5");
+  
+  DoubleIntegrator di_fn = DoubleIntegrator(0.01,5,1e-5,0);
+  BoundaryEnforcer bounded_di_fn = BoundaryEnforcer(&di_fn,boundary);
+  BallCosts cost_fn = BallCosts(0.15,zeros<vec>(2));
+
+  Problem problem;
+  problem.trans_fn = &bounded_di_fn;
+  problem.cost_fn = &cost_fn;
+  problem.discount = 0.997;
+
+  DIBangBangPolicy policy = DIBangBangPolicy(actions);
+
+  simulate(x0,problem,policy,T,res);  
 }

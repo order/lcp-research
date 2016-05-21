@@ -38,8 +38,7 @@ Object interpolate(PyObject * py_val,
 		   PyObject * py_high,
 		   PyObject * py_num_cells);
 
-// Debug for simluation
-Object simulate_test();
+Object simulate_test_export();
 
 //============================================================
 // NB: BOOST_PYTHON_MODULE in .cpp

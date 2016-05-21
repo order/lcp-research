@@ -45,6 +45,44 @@ vec dist(const mat & A, const rowvec & b){
   return row_2_norm(A.each_row() - b);
 }
 
+mat row_min(const mat & A, const rowvec & b){
+  uint D = A.n_cols;
+  mat B = A;
+  uvec col_idx = uvec(1);  
+  for(uint d = 0; d < D; d++){
+    col_idx.fill(d);
+    B.submat(find(B.col(d) > b(d)),col_idx).fill(b(d));
+  }
+  return B;
+}
+mat row_max(const mat & A, const rowvec & b){
+  uint D = A.n_cols;
+  mat B = A;
+  uvec col_idx = uvec(1);  
+  for(uint d = 0; d < D; d++){
+    col_idx.fill(d);
+    B.submat(find(B.col(d) < b(d)),col_idx).fill(b(d));
+  }
+  return B;
+}
+
+void row_min_inplace(mat & A, const rowvec & b){
+  uint D = A.n_cols;
+  uvec col_idx = uvec(1);  
+  for(uint d = 0; d < D; d++){
+    col_idx.fill(d);
+    A.submat(find(A.col(d) > b(d)),col_idx).fill(b(d));
+  }
+}
+void row_max_inplace(mat & A, const rowvec & b){
+  uint D = A.n_cols;
+  uvec col_idx = uvec(1);  
+  for(uint d = 0; d < D; d++){
+    col_idx.fill(d);
+    A.submat(find(A.col(d) < b(d)),col_idx).fill(b(d));
+  }
+}
+
 //=================================================
 bvec num2binvec(uint n, uint D){
   // Convert n to a D-bit binary vector
