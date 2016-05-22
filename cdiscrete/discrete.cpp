@@ -354,13 +354,13 @@ mat interp_fns(const mat & vals, const mat & points,const RegGrid & grid){
   uint M = vals.n_cols;
   
   assert(check_dim(grid,D));
-  assert(G == val.n_rows);
+  assert(G == vals.n_rows);
 
   sp_mat point_dist = point_to_idx_dist(points,grid);
   assert(G == point_dist.n_rows);
   assert(N == point_dist.n_cols);  
   
-  mat I = point_dist.t() * val;
+  mat I = point_dist.t() * vals;
   assert(N == I.n_rows);
   assert(M == I.n_cols);
 
@@ -372,7 +372,12 @@ uvec max_interp_fns(const mat & vals,
 		    const RegGrid & grid){
   uint N = points.n_rows;
   mat I = interp_fns(vals,points,grid);
-  vec idx = argmax(I,1);
-  
+  uvec idx = col_argmax(I);
+  assert(N == idx.n_elem);
+  return idx;
 }
-uvec min_interp_fns(const mat & vals, const mat & points, const RegGrid & grid);
+uvec min_interp_fns(const mat & vals,
+		    const mat & points,
+		    const RegGrid & grid){
+  return max_interp_fns(-vals,points,grid);
+}

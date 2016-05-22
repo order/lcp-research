@@ -80,9 +80,19 @@ sp_mat point_to_idx_dist(const mat & points,const RegGrid & grid);
 
 //===========================================
 // INTERPOLATE
-vec interp_fn(const vec & val, const mat & points,const RegGrid & grid);
-uvec max_interp_fns(const mat & vals, const mat & points, const RegGrid & grid);
-uvec min_interp_fns(const mat & vals, const mat & points, const RegGrid & grid);
+vec interp_fn(const vec & val,
+	      const mat & points,
+	      const RegGrid & grid);
+mat interp_fns(const mat & vals,
+	       const mat & points,
+	       const RegGrid & grid);
+
+uvec max_interp_fns(const mat & vals,
+		    const mat & points,
+		    const RegGrid & grid);
+uvec min_interp_fns(const mat & vals,
+		    const mat & points,
+		    const RegGrid & grid);
 
 //===========================================
 // PYTHON STUFF
