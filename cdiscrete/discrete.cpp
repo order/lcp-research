@@ -343,20 +343,36 @@ sp_mat point_to_idx_dist(const mat & points,
   return dist;
 }
 
-vec interp_fn(const vec & val, const mat & points,const RegGrid & grid){
-  
+vec interp_fn(const vec & vals, const mat & points,const RegGrid & grid){
+  return interp_fns(vals,points,grid); // Should cast appropriately
+}
+
+mat interp_fns(const mat & vals, const mat & points,const RegGrid & grid){
   uint G = num_grid_points(grid);
   uint N = points.n_rows;
-  uint D = points.n_cols;  
+  uint D = points.n_cols;
+  uint M = vals.n_cols;
+  
   assert(check_dim(grid,D));
-  assert(G == val.n_elem);
+  assert(G == val.n_rows);
 
   sp_mat point_dist = point_to_idx_dist(points,grid);
   assert(G == point_dist.n_rows);
   assert(N == point_dist.n_cols);  
   
-  vec I = point_dist.t() * val;
-  assert(N == I.n_elem);
+  mat I = point_dist.t() * val;
+  assert(N == I.n_rows);
+  assert(M == I.n_cols);
 
   return I;
 }
+
+uvec max_interp_fns(const mat & vals,
+		    const mat & points,
+		    const RegGrid & grid){
+  uint N = points.n_rows;
+  mat I = interp_fns(vals,points,grid);
+  vec idx = argmax(I,1);
+  
+}
+uvec min_interp_fns(const mat & vals, const mat & points, const RegGrid & grid);

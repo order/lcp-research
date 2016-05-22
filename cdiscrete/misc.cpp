@@ -76,11 +76,30 @@ void row_min_inplace(mat & A, const rowvec & b){
 }
 void row_max_inplace(mat & A, const rowvec & b){
   uint D = A.n_cols;
-  uvec col_idx = uvec(1);  
+  uvec col_idx = uvec(1);
   for(uint d = 0; d < D; d++){
     col_idx.fill(d);
     A.submat(find(A.col(d) < b(d)),col_idx).fill(b(d));
   }
+}
+
+uvec col_argmax(const mat & V){
+  uint N = V.n_rows;
+  vec m = max(V,1);
+  assert(N == m.n_elem);
+
+  uvec am = uvec(N);
+  uvec::fixed<1> idx;
+  for(uint i = 0; i < N; i++){
+    idx = find(V.row(i) == m(i), 1);
+    assert(1 == idx.n_elem);
+    am(i) = idx(0); // find first index that matches
+  }
+  return am;
+}
+
+uvec col_argmin(const mat & V){
+  return col_argmax(-V);
 }
 
 //=================================================

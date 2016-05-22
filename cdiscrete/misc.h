@@ -38,10 +38,15 @@ vec row_2_norm(const mat & A);
 vec dist(const mat & A, const mat & B);
 vec dist(const mat & A, const rowvec & b);
 
+// Return B(i,j) = min(A(i,j),b(j))
 mat row_min(const mat & A, const rowvec & b);
 mat row_max(const mat & A, const rowvec & b);
 void row_min_inplace(mat & A, const rowvec & b);
 void row_max_inplace(mat & A, const rowvec & b);
+
+// Index of maximum column for each row in V
+uvec col_argmax(const mat & V);
+uvec col_argmin(const mat & V);
 
 // Like above, but for a particular column
 // NB: this is to avoid passing A.col(i), which is a special subview type
