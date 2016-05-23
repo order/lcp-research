@@ -9,7 +9,7 @@ using namespace std;
 using namespace arma;
 
 #define OOB_COORD UINT_MAX // OOB "coordinate"
-#define GRID_FUDGE 1e-15
+#define GRID_FUDGE 1e-12
 
 //=====================================
 // STRUCTURES

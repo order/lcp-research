@@ -238,10 +238,10 @@ void out_of_bounds(Mask & oob_mask,
 
   mat T = (points.each_row() - grid.low.t());
   mask(find(any(T < 0,1))).fill(1);
-
+  
   T = (grid.high.t() - points.each_row());
-  mask(find(any(T < GRID_FUDGE,1))).fill(1);
-
+  mask(find(any(T < -GRID_FUDGE,1))).fill(1);
+  
   generate_mask(oob_mask,mask);
 }
 
@@ -338,8 +338,9 @@ sp_mat point_to_idx_dist(const mat & points,
       I++;
     }
   }
-  
-  sp_mat dist = sp_mat(loc,data);
+  uint G = num_grid_points(grid);
+  assert(G == oob_idx + 1);
+  sp_mat dist = sp_mat(loc,data,G,N);
   return dist;
 }
 

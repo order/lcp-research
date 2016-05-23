@@ -3,20 +3,17 @@ import cdiscrete as cd
 from discrete import make_points
 import matplotlib.pyplot as plt
 
-vals = np.random.rand(5,2)
-
 low = np.zeros(2)
-high = np.ones(2)
-num = np.ones(2,dtype='uint64')
+high = np.array([2.0,1.0],dtype='double')
+num = np.array([2,1],dtype='uint64')
 
-G = 50
-cuts = np.linspace(0,1,G)
-XI,YI = np.meshgrid(cuts,cuts)
-P = make_points([cuts]*2)
+v = np.zeros((3,2))
+v[1,1] = 1
+v = np.hstack([v.flatten(),-1])
+print v
 
-I = cd.argmax_interpolate(vals,P,low,high,num)
+P = make_points([np.linspace(low[d],high[d],num[d]+1) for d in xrange(2)])
+print P
 
-ZI = np.reshape(I,(G,G))
-plt.pcolor(XI,YI,ZI)
-plt.colorbar()
-plt.show()
+I = cd.interpolate(v,P,low,high,num)
+print I
