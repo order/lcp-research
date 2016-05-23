@@ -45,6 +45,10 @@ vec dist(const mat & A, const rowvec & b){
   return row_2_norm(A.each_row() - b);
 }
 
+double dist(const vec & v, const vec & u){
+  return norm(v - u);
+};
+
 mat row_min(const mat & A, const rowvec & b){
   uint D = A.n_cols;
   mat B = A;
