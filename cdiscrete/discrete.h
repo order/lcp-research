@@ -1,5 +1,5 @@
-#ifndef __DISCRETE_INCLUDED__
-#define __DISCRETE_INCLUDED__
+#ifndef __Z_DISCRETE_INCLUDED__
+#define __Z_DISCRETE_INCLUDED__
 
 #include <armadillo>
 #include <climits>
@@ -93,18 +93,6 @@ uvec max_interp_fns(const mat & vals,
 uvec min_interp_fns(const mat & vals,
 		    const mat & points,
 		    const RegGrid & grid);
-
-class InterpFunction{
- public:
-  InterpFunction(const vec & val,
-		 const RegGrid & grid);
-  vec f(const mat & points) const;
-  double f(const vec & points) const;
- 
- protected:
-  vec _val;
-  RegGrid _grid;
-};
 
 //===========================================
 // PYTHON STUFF

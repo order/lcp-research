@@ -1,7 +1,14 @@
-#ifndef __ARMA_MISC_INCLUDED__
-#define __ARMA_MISC_INCLUDED__
+#ifndef __Z_MISC_INCLUDED__
+#define __Z_MISC_INCLUDED__
 
 #include <armadillo>
+#include <random>
+#include <chrono>
+
+//=====================================
+// RANDOM GENERATOR
+extern unsigned SEED;
+extern std::mt19937 MT_GEN;
 
 using namespace arma;
 
