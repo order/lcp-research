@@ -382,3 +382,17 @@ uvec min_interp_fns(const mat & vals,
 		    const RegGrid & grid){
   return max_interp_fns(-vals,points,grid);
 }
+
+InterpFunction::InterpFunction(const vec & val,
+			       const RegGrid & grid){
+  _val = val;
+  _grid = grid;
+}
+
+
+vec InterpFunction::f(const mat & points) const{
+  return interp_fn(_val,points,grid);
+}
+double InterpFunction::f(const vec & points) const{
+  return interp_fn(_val,points.t(),grid)[0];
+}

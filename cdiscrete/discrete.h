@@ -94,6 +94,18 @@ uvec min_interp_fns(const mat & vals,
 		    const mat & points,
 		    const RegGrid & grid);
 
+class InterpFunction{
+ public:
+  InterpFunction(const vec & val,
+		 const RegGrid & grid);
+  vec f(const mat & points) const;
+  double f(const vec & points) const;
+ 
+ protected:
+  vec _val;
+  RegGrid _grid;
+};
+
 //===========================================
 // PYTHON STUFF
 void print_list(uvec L);
