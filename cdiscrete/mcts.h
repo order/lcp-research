@@ -1,19 +1,32 @@
 #ifndef __MCTS_INCLUDED__
 #define __MCTS_INCLUDED__
 
+#include <armadillo>
+#include <vector>
+
+#include "costs.h"
+#include "function.h"
+#include "policy.h"
+#include "transfer.h"
+
+
+using namespace arma;
+
+class MCTSNode; //forward declare
+
 // List (indexed by action id) of lists of children
-typedef vector<MCTSNode*> ChildList;
+typedef std::vector<MCTSNode*> ChildList;
 
 struct MCTSContext{
   uint _NODE_ID = 0;
-  vector<MCTSNode*> _master_list;
+  std::vector<MCTSNode*> _master_list;
 
   TransferFunction * trans_fn;
-  CostFuction * cost_fn;
+  CostFunction * cost_fn;
   double discount;
 
-  QFunction * q_fn;
-  ActionProbDist * prob_fn;
+  MultiFunction * q_fn;
+  ProbFunction * prob_fn;
   Policy * rollout;
   
   mat * actions;
@@ -38,9 +51,9 @@ class MCTSNode{
   
   MCTSNode * pick_child(uint a_idx);
   MCTSNode * get_best_child();
-  MCTSNode * sample_new_node();
-  MCTSNode * add_child(uint a_idx, vec & state);
-  MCTSNode * find_child(uint a_idx, vec & state, double thresh=1e-6);
+  MCTSNode * sample_new_node(uint a_idx);
+  MCTSNode * add_child(uint a_idx, const vec & state);
+  MCTSNode * find_child(uint a_idx, const vec & state, double thresh=1e-6);
   
   double update_stats(uint a_id, double G);
   
@@ -67,7 +80,7 @@ class MCTSNode{
   vec _prob;
 
   uint _n_children;
-  vector<ChildList> _children;
+  std::vector<ChildList> _children;
 };
 
 #endif

@@ -1,11 +1,14 @@
+#include <assert.h>
+
 #include "mcts.h"
-#include "rand.h"
+#include "misc.h"
+
 
 MCTSNode::MCTSNode(const vec & state,
 		   MCTSContext * context){
 
   // Store state and context information
-  _id = _NODE_ID++;
+  _id = context->_NODE_ID++;
   _state = state;
   _context = context;
   _n_actions = context->n_actions;
@@ -13,18 +16,18 @@ MCTSNode::MCTSNode(const vec & state,
   // Init visits
   _total_visits = 0;
   _child_visits = zeros<uvec>(_n_actions);
-  _ucb_scale = context->_ucb_scale;
+  _ucb_scale = context->ucb_scale;
 
   // Init Q estimate and costs cache
-  _q = _q_fn.f(_state);
+  _q = context->q_fn->f(_state);
   _v = max(_q);
-  _costs = context->_cost_fn.costs(_state,*context->actions);
+  _costs = context->cost_fn->get_costs(_state,*context->actions);
   assert(_n_actions == _costs.n_elem);
 
 
   // Init action probabilities
-  _p_scale = context->_p_scale;
-  _prob = context->_prob_fn.p(state);
+  _p_scale = context->p_scale;
+  _prob = context->prob_fn->f(state);
   assert(_n_actions == _prob.n_elem);
 
   _n_children = 0;
@@ -75,13 +78,13 @@ MCTSNode* MCTSNode::pick_child(uint a_idx){
     log_2(visits + 1) + 1, then draw a new child.
   */
   uint n_nodes = _children[a_idx].size();
-  uint n_visit = _child_visits[a_idx];
+  uint n_visits = _child_visits[a_idx];
   // Use a log schedule
   bool new_node = (n_nodes < log2(n_visits + 1) + 1);
   assert(n_nodes == 0 ? n_nodes : true);
 
   if(new_node){
-    return sample_new_node(uint a_idx);
+    return sample_new_node(a_idx);
   }
   else{
     std::uniform_int_distribution<uint> c_dist(0,n_nodes-1);
@@ -95,29 +98,29 @@ MCTSNode* MCTSNode::get_best_child(){
   return pick_child(a_idx);
 }
 
-MCTSNode * MCTSNode::sample_new_node(uint a_idx) const{
-  vec action = _context->_actions.row(a_idx);
-  vec state =  _context->_trans_fn.get_next_state(_state,action);
+MCTSNode * MCTSNode::sample_new_node(uint a_idx){
+  vec action = _context->actions->row(a_idx);
+  vec state =  _context->trans_fn->get_next_state(_state,action);
 
   return add_child(a_idx,state);
 }
 
-MCTSNode * add_child(uint a_idx, const vec & state){
-  MCTSNode * find_res = find_node(a_idx,state);
+MCTSNode * MCTSNode::add_child(uint a_idx, const vec & state){
+  MCTSNode * find_res = find_child(a_idx,state);
   if(NULL != find_res){
     return find_res;
   }
   MCTSNode * new_child = new MCTSNode(state,_context);
-  _context->master_list.push_back(new_child); // Add to master
+  _context->_master_list.push_back(new_child); // Add to master
   _children[a_idx].push_back(new_child); // Add to action list
   return new_child;
 }
 
-MCTSNode * find_child(uint a_idx, const vec & state, double thresh){
+MCTSNode * MCTSNode::find_child(uint a_idx, const vec & state, double thresh){
   for(ChildList::const_iterator it = _children[a_idx].begin();
       it != _children[a_idx].end(); ++it){
-    double dist = dist(state,(*it)->_state);
-    if(dist < thresh){
+    double dst = norm(state - (*it)->_state);
+    if(dst < thresh){
       return *it;
     }
   }

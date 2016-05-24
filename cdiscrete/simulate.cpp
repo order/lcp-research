@@ -186,7 +186,7 @@ void simulate_test(SimulationOutcome & res){
   
   DoubleIntegrator di_fn = DoubleIntegrator(0.01,5,1e-5,0);
   BoundaryEnforcer bounded_di_fn = BoundaryEnforcer(&di_fn,boundary);
-  BallCosts cost_fn = BallCosts(0.15,zeros<vec>(2));
+  BallCost cost_fn = BallCost(0.15,zeros<vec>(2));
 
   Problem problem;
   problem.trans_fn = &bounded_di_fn;

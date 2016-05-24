@@ -2,6 +2,9 @@
 #define __Z_COSTS_INCLUDED__
 
 #include <armadillo>
+
+#include "misc.h"
+
 using namespace arma;
 
 //=================================================
@@ -12,23 +15,14 @@ class CostFunction{
   virtual vec get_costs(const mat & points, const mat & actions) const = 0;
 };
 
-class BallCosts : public CostFunction{
+class BallCost : public CostFunction{
  public:
-  BallCosts(double radius, const vec & center);
+  BallCost(double radius, const vec & center);
   vec get_costs(const mat & points, const mat & actions) const;
 
  protected:
   double _radius;
   rowvec _center;
-};
-
-//===================================================
-// PROBLEM DESCRIPTION
-struct Problem{
-  mat actions;
-  TransferFunction * trans_fn;
-  CostFunction * cost_fn;
-  double discount;
 };
 
 #endif

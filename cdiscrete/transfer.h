@@ -12,8 +12,8 @@ class TransferFunction{
  public:
   virtual mat get_next_states(const mat & points,
 			      const mat & actions) const = 0;
-  virtual vec get_next_state(const vec & points,
-			     const vec & action) const = 0;
+  vec get_next_state(const vec & points,
+			     const vec & action) const;
 };
 
 class DoubleIntegrator : public TransferFunction{

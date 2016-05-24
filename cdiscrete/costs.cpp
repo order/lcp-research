@@ -1,11 +1,11 @@
 #include "costs.h"
 
-BallCosts::BallCosts(double radius, const vec & center){
+BallCost::BallCost(double radius, const vec & center){
   _radius = radius;
   _center = conv_to<rowvec>::from(center);
 }
 
-vec BallCosts::get_costs(const mat & points, const mat & actions) const{
+vec BallCost::get_costs(const mat & points, const mat & actions) const{
   uint N = points.n_rows;
   vec c = vec(N);
   

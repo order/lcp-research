@@ -1,4 +1,14 @@
+#include <assert.h>
+
+#include "misc.h"
 #include "transfer.h"
+
+vec TransferFunction::get_next_state(const vec & points,
+				     const vec & action) const{
+  mat r = get_next_state(conv_to<mat>::from(points.t()),action);
+  assert(1 == r.n_rows);
+  return r.row(0);
+}
 
 DoubleIntegrator::DoubleIntegrator(double step_size,
 				   uint num_steps,
