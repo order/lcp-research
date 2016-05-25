@@ -1,11 +1,13 @@
 from mdp import *
+from config.mdp import *
+from config.solver import *
+from utils import *
 
-root = 'data/di'
+# This file is for pushing V and flow vectors to C++ code for simulation
+
+root = 'data/di/' # root filename
 disc_n = 20
 action_n = 3
-batch = True
-horizon = 1
-
 
 # Generate problem
 problem = make_di_problem()
@@ -18,4 +20,4 @@ problem = make_di_problem()
 
 # Build value function
 S = block_solution(mdp,p)
-save_ndarray_hdf5(root + '.solver_data.h5',S)
+save_ndarray_hdf5(root + 'solver_data.h5',S)

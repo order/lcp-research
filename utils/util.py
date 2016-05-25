@@ -14,7 +14,7 @@ import importlib
 
 def save_ndarray_hdf5(filename,A):
     f = h5py.File(filename,'w')
-    dset = f.create_dataset("dataset", data=M)
+    dset = f.create_dataset("dataset", data=A)
     f.close()
 
 def banner(msg):

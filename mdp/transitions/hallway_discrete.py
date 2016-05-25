@@ -3,7 +3,7 @@ import scipy as sp
 import scipy.sparse as sps
 import linalg
 
-from mdp.transition import TransitionFunction
+from transition import TransitionFunction
 
 class DiscreteHallwayTransition(TransitionFunction):
     def __init__(self,stuck,nodes):
