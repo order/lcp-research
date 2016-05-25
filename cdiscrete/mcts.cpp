@@ -1,8 +1,82 @@
 #include <assert.h>
+#include <sstream>
+#include <string>
 
 #include "mcts.h"
 #include "misc.h"
 
+#include "boost/graph/graphviz.hpp"
+#include "boost/graph/adjacency_list.hpp"
+
+
+
+string node_name(uint id){
+  stringstream ss;
+  ss << "N" << id;
+  return ss.str();
+}
+
+string action_name(uint id,uint a_idx){
+  stringstream ss;
+  ss << "a_" << id << "_" << a_idx;
+  return ss.str();
+}
+
+void print_nodes(const MCTSContext & context){
+  for(std::vector<MCTSNode*>::const_iterator it = context.master_list.begin();
+      it != context.master_list.end(); it++){
+    (*it)->print_debug();
+  }
+}
+
+void write_dot_file(std::string filename, MCTSNode * root){
+  uint max_depth = 3;
+  uint A = root->_context->n_actions;
+
+  typedef std::pair<MCTSNode*,uint> f_elem;
+  vector<f_elem> fringe;
+  fringe.push_back(make_pair(root,0));
+  
+  ofstream fh;
+  fh.open(filename);
+  fh << "digraph mcts_tree {" << std::endl;
+
+  while(fringe.size() > 0){
+    f_elem curr_elem = fringe.back();
+    fringe.pop_back();
+
+    MCTSNode * curr_node = curr_elem.first;
+    uint depth = curr_elem.second;
+    if(depth > max_depth){continue;}
+
+    // Build node
+    fh << "\t" << node_name(curr_node->_id) << " [shape=box];" << std::endl;
+    for(uint a_idx = 0; a_idx < A; a_idx++){
+      for(ChildList::const_iterator it = curr_node->_children[a_idx].begin();
+	  it != curr_node->_children[a_idx].end(); it++){
+	if(it == curr_node->_children[a_idx].begin()){
+	  // Build action node:
+	  fh << "\t" << action_name(curr_node->_id,a_idx)
+	     << " [shape=diamond,label=\"A"
+	     << a_idx << "\"];" << std::endl;
+	  
+	  // Connect parent to action
+	  fh << "\t" << node_name(curr_node->_id)
+	     << " -> "
+	     << action_name(curr_node->_id,a_idx) <<";"<< std::endl;
+	}
+	// Connect action to child
+	fh << "\t" << action_name(curr_node->_id,a_idx)
+	   << " -> "
+	   << node_name((*it)->_id) << ";" << std::endl;
+	fringe.push_back(make_pair(*it,depth+1));
+      }
+    }
+  }
+  
+  fh << "}" << std::endl;
+  fh.close();
+}
 
 MCTSNode::MCTSNode(const vec & state,
 		   MCTSContext * context){
@@ -21,8 +95,11 @@ MCTSNode::MCTSNode(const vec & state,
   // Init Q estimate and costs cache
   _q = context->q_fn->f(_state);
   _v = max(_q);
-  _costs = context->cost_fn->get_costs(_state,*context->actions);
-  assert(_n_actions == _costs.n_elem);
+  mat costs = context->cost_fn->get_costs(_state.t(),
+					  *context->actions);
+  assert(1 == costs.n_rows);
+  assert(_n_actions == costs.n_cols);
+  _costs = costs.row(0).t();
 
 
   // Init action probabilities
@@ -36,8 +113,30 @@ MCTSNode::MCTSNode(const vec & state,
 
 void MCTSNode::print_debug() const{
   // Basic debug information
-  std::cout << "N[" << _id << "] = <"
-	    << _state << ',' << _v << '>' << std::endl;
+
+  vec u = get_all_ucbs();
+  
+  std::cout << "N" << _id << ":\n"
+	    << "\tState:"<< _state.t()
+	    << "\tQ:" << _q.t()
+    	    << "\t\tv: " << _v << std::endl
+	    << "\t\tcosts:" << _costs.t()
+	    << "\tP:" << _prob.t()
+	    << "\tVisits" << _child_visits.t()
+	    << "\t\tTotal: " << _total_visits << std::endl
+	    << "\tUCB:" << u.t()
+	    << "\tChildren:" << std::endl;
+  for(uint a_idx = 0; a_idx < _n_actions; a_idx++){
+    std::cout << "\t\ta" << a_idx << ": [";
+    for(ChildList::const_iterator it = _children[a_idx].begin();
+	it != _children[a_idx].end(); it++){
+      if(it != _children[a_idx].begin()){
+	std::cout << ',';
+      }
+      std::cout << 'N' << (*it)->_id;
+    }
+    std::cout << ']' << std::endl;
+  }
 }
 
 bool MCTSNode::is_leaf() const{
@@ -48,14 +147,23 @@ bool MCTSNode::has_unexplored() const{
   return _n_actions > _n_children;
 }
 
+vec MCTSNode::get_all_ucbs() const{
+  vec u = vec(_n_actions);
+  for(uint a_idx = 0; a_idx < _n_actions; a_idx++){
+    u(a_idx) = get_action_ucb(a_idx);
+  }
+  return u;
+}
+
 double MCTSNode::get_action_ucb(uint a_idx) const{
   // Actually the "lower confidence bound" because we're minimizing cost
 
+  uint total_v = _total_visits+1; // +1 to avoid nan
+  uint child_v = _child_visits(a_idx)+1;
   return _q(a_idx)
-    + _ucb_scale * sqrt(2.0 * log(_total_visits) / _child_visits(a_idx))
-    + _p_scale * _prob(a_idx) / (1.0 + _child_visits(a_idx));
+    + _ucb_scale * sqrt(2.0 * log(total_v) / child_v)
+    + _p_scale * _prob(a_idx) / child_v;
 }
-
 
 uint MCTSNode::get_best_action() const{
   assert(_n_actions > 0);
@@ -111,7 +219,7 @@ MCTSNode * MCTSNode::add_child(uint a_idx, const vec & state){
     return find_res;
   }
   MCTSNode * new_child = new MCTSNode(state,_context);
-  _context->_master_list.push_back(new_child); // Add to master
+  _context->master_list.push_back(new_child); // Add to master
   _children[a_idx].push_back(new_child); // Add to action list
   return new_child;
 }

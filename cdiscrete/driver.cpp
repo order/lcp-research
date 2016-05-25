@@ -34,5 +34,14 @@ int main(int argc, char ** argv){
   context.p_scale = 1;
   context.ucb_scale = 2;
 
+  vec state = ones<vec>(2);
+  MCTSNode root = MCTSNode(state, &context);
+  root.add_child(0,randu<vec>(2));
+  root.add_child(0,randu<vec>(2));  
+  root.add_child(1,randu<vec>(2));  
+
+  //node.print_debug();
+  write_dot_file("test.dot", &root);
+  print_nodes(context);
   
 }

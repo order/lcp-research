@@ -3,6 +3,9 @@
 
 #include <armadillo>
 #include <vector>
+#include <iostream>
+#include <fstream>
+#include <string>
 
 #include "costs.h"
 #include "function.h"
@@ -19,7 +22,7 @@ typedef std::vector<MCTSNode*> ChildList;
 
 struct MCTSContext{
   uint _NODE_ID = 0;
-  std::vector<MCTSNode*> _master_list;
+  std::vector<MCTSNode*> master_list;
 
   TransferFunction * trans_fn;
   CostFunction * cost_fn;
@@ -37,6 +40,13 @@ struct MCTSContext{
 
 };
 
+void print_nodes(const MCTSContext & context);
+
+string node_name(uint id);
+string action_name(uint id, uint a_idx);
+//void write_dot_file(std::string filename, MCTSNode * root);
+
+
 class MCTSNode{
  public:
   MCTSNode(const vec & state,
@@ -45,7 +55,8 @@ class MCTSNode{
   
   bool is_leaf() const;
   bool has_unexplored() const;
-  
+
+  vec get_all_ucbs() const;
   double get_action_ucb(uint a_idx) const;
   uint get_best_action() const;
   
@@ -55,8 +66,11 @@ class MCTSNode{
   MCTSNode * add_child(uint a_idx, const vec & state);
   MCTSNode * find_child(uint a_idx, const vec & state, double thresh=1e-6);
   
-  double update_stats(uint a_id, double G);
-  
+  double update_status(uint a_id, double G);
+
+  friend void write_dot_file(std::string filename, MCTSNode * root);
+
+
  protected:
   // Identity
   uint _id; // Node ID

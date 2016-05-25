@@ -1,3 +1,5 @@
+#include <assert.h>
+
 #include "costs.h"
 
 BallCost::BallCost(double radius, const vec & center){
@@ -5,10 +7,14 @@ BallCost::BallCost(double radius, const vec & center){
   _center = conv_to<rowvec>::from(center);
 }
 
-vec BallCost::get_costs(const mat & points, const mat & actions) const{
+mat BallCost::get_costs(const mat & points, const mat & actions) const{
   uint N = points.n_rows;
-  vec c = vec(N);
-  
+  uint A = actions.n_rows;
+  mat c = mat(N,A);
+
+  uint D = _center.n_elem;
+  assert(D == points.n_cols);
+    
   uvec in_ball = dist(points,_center) <= _radius;
   
   c.rows(find(in_ball == 1)).fill(0);

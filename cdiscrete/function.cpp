@@ -74,10 +74,15 @@ mat ProbFunction::f(const mat & points) const{
   return unnorm;
   
 }
-vec ProbFunction::f(const vec & points) const{
-  mat r = f(conv_to<mat>::from(points));
-  assert(1 == r.n_rows);
-  return r.row(0);
+vec ProbFunction::f(const vec & point) const{
+  mat points = conv_to<mat>::from(point.t());
+  assert(1 == points.n_rows);
+  assert(point.n_elem == points.n_cols);
+  
+  mat res = f(points);
+  assert(1 == res.n_rows);
+  assert(res.n_cols == range_dim());
+  return res.row(0).t();
 }
 uint ProbFunction::dom_dim() const{
   return _base->dom_dim(); // Not sure; doesn't matter

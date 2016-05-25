@@ -1,6 +1,14 @@
 import numpy as np
 from state_functions import InterpolatedFunction
 
+def block_solution(mdp_obj,sol):
+    """
+    Reshape solution into matrix
+    """
+    A = mdp_obj.num_actions
+    n = mdp_obj.num_states
+    return sol.reshape(n,A+1,order='F')
+
 def split_solution(mdp_obj,sol):
     """
     Break the solution into value and flow components

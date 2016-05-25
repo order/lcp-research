@@ -12,13 +12,13 @@ using namespace arma;
 
 class CostFunction{
  public:
-  virtual vec get_costs(const mat & points, const mat & actions) const = 0;
+  virtual mat get_costs(const mat & points, const mat & actions) const = 0;
 };
 
 class BallCost : public CostFunction{
  public:
   BallCost(double radius, const vec & center);
-  vec get_costs(const mat & points, const mat & actions) const;
+  mat get_costs(const mat & points, const mat & actions) const;
 
  protected:
   double _radius;

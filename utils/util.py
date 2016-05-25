@@ -9,7 +9,13 @@ import inspect
 import scipy.sparse
 import matplotlib.pyplot as plt
 
+import h5py
 import importlib
+
+def save_ndarray_hdf5(filename,A):
+    f = h5py.File(filename,'w')
+    dset = f.create_dataset("dataset", data=M)
+    f.close()
 
 def banner(msg):
     """
@@ -191,3 +197,4 @@ def basic_residual(x,w):
 def fb_residual(x,w):
     fb = np.sqrt(x**2 + w**2) - x - w
     return np.linalg.norm(fb)
+
