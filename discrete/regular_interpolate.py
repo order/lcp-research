@@ -3,8 +3,20 @@ import scipy as sp
 import scipy.sparse as sps
 import itertools
 
+from utils import save_ndarray_hdf5
+
 import indexer
 import discretize
+
+def save_grid_params_hdf5(filename,grid):
+    low = [l for (l,h,n) in grid.grid_desc]
+    hi = [h for (l,h,n) in grid.grid_desc]
+    num = [n for (l,h,n) in grid.grid_desc]
+
+    D = len(low);
+    v = np.hstack([[D],low,hi,num])
+    assert((3*D+1) == v.size)
+    save_ndarray_hdf5(filename,v)
 
 class RegularGridInterpolator(object):
     def __init__(self,grid_desc):

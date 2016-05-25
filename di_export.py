@@ -2,6 +2,7 @@ from mdp import *
 from config.mdp import *
 from config.solver import *
 from utils import *
+from discrete import *
 
 # This file is for pushing V and flow vectors to C++ code for simulation
 
@@ -20,4 +21,5 @@ problem = make_di_problem()
 
 # Build value function
 S = block_solution(mdp,p)
-save_ndarray_hdf5(root + 'solver_data.h5',S)
+save_ndarray_hdf5(root + 'data.h5',S)
+save_grid_params_hdf5(root + 'grid.h5',disc)
