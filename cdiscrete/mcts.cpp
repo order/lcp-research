@@ -61,7 +61,7 @@ void MCTSNode::print_debug() const{
 	    << "\tChildren:" << std::endl;
   for(uint a_idx = 0; a_idx < _n_actions; a_idx++){
     std::cout << "\t\ta" << a_idx << ": [";
-    for(MCTSChildList::const_iterator it = _children[a_idx].begin();
+    for(NodeList::const_iterator it = _children[a_idx].begin();
 	it != _children[a_idx].end(); it++){
       if(it != _children[a_idx].begin()){
 	std::cout << ',';
@@ -170,7 +170,7 @@ MCTSNode * MCTSNode::add_child(uint a_idx, const vec & state){
 // See if state already exists as a child of the action,
 // or if a similar node exists
 MCTSNode * MCTSNode::find_child(uint a_idx, const vec & state, double thresh){
-  for(MCTSChildList::const_iterator it = _children[a_idx].begin();
+  for(NodeList::const_iterator it = _children[a_idx].begin();
       it != _children[a_idx].end(); ++it){
     double dst = norm(state - (*it)->_state);
     if(dst < thresh){
@@ -194,16 +194,52 @@ void set_stale() const{
 // Adds new nodes to tree until out of budget
 void grow_tree(MCTSNode * root, uint budget){
   for(uint b = 0; b < budget; b++){
-    MCTSPath path = expand_tree(root);
+    Path path = expand_tree(root);
     assert(path.size() > 0);
-    double G = simulate_leaf(path.back());
+    double G = simulate_leaf(path);
     update_path(path,G);
   }
 }
 
+Path expand_tree(MCTSNode * root){
+  Path path;  
+  path.append(root);
+  
+  MCTSNode * curr = root;
+  uint a_idx;
+  for(uint i = 0; i < 2500; i++){
+    a_idx = curr->get_best_action();
+    curr = curr->get_best_child();
+    path.second.append(a_idx);
+    path.first.append(curr);
+
+    // Check if the node was just created
+    if(curr.is_fresh()){
+      curr.set_stale();
+      return path;
+    }
+  }
+  // Should never get here
+  assert(false);
+}
+
+double simulate_leaf(Path & path){
+  //Use rollout policy to simulate from state.
+  // Count as a "visit"
+  // Add first action to path's action list
+  
+}
+void update_path(const MCTSPath & path, double gain){
+  NodeList nodes = path.first;
+  ActionList actions = path.second;
+  assert(nodes.size() = actions.size();
+  
+}
+
 // Add root to context
 void add_root(MCTSContext * context, MCTSNode * root){
- context->master_list.push_back(root);
+  root->set_stale(); // Root is "explored" already.
+  context->master_list.push_back(root);
 }
 
 // Delete all nodes (all nodes should be created by "new"
@@ -262,7 +298,7 @@ void write_dot_file(std::string filename, MCTSNode * root){
     // Build node
     fh << "\t" << node_name(curr_node->_id) << " [shape=box];" << std::endl;
     for(uint a_idx = 0; a_idx < A; a_idx++){
-      for(MCTSChildList::const_iterator it
+      for(NodeList::const_iterator it
 	    = curr_node->_children[a_idx].begin();
 	  it != curr_node->_children[a_idx].end(); it++){
 	if(it == curr_node->_children[a_idx].begin()){
