@@ -1,7 +1,11 @@
-
+#include <armadillo>
 #include <assert.h>
+
 #include "binding.h"
 #include "discrete.h"
+#include "function.h"
+#include "mcts.h"
+#include "value.h"
 
 namespace bp = boost::python;
 using namespace arma;
@@ -117,42 +121,51 @@ Object export_sim_results(const SimulationOutcome & res){
 //==================================================
 // IMPORTING
 
-mat import_mat(PyObject * Obj){
+mat import_mat(PyObject * py_mat){
   // Imports a matrix
-  assert(PyArray_Check(Obj));
-  assert(2 == PyArray_NDIM((PyArrayObject*)Obj)); // Is a matrix
-  assert(NPY_DOUBLE == PyArray_TYPE((PyArrayObject*)Obj)); // Double
+  assert(PyArray_Check(py_mat));
+  assert(2 == PyArray_NDIM((PyArrayObject*)py_mat)); // Is a matrix
+  assert(NPY_DOUBLE == PyArray_TYPE((PyArrayObject*)py_mat)); // Double
 
   // Weird; the matrix is transposed coming in; but works
   // as you'd expect during export...
-  return mat((const double *)PyArray_DATA((PyArrayObject*)Obj),
-	     PyArray_DIM((PyArrayObject*)Obj,1),
-	     PyArray_DIM((PyArrayObject*)Obj,0)).t();
+  return mat((const double *)PyArray_DATA((PyArrayObject*)py_mat),
+	     PyArray_DIM((PyArrayObject*)py_mat,1),
+	     PyArray_DIM((PyArrayObject*)py_mat,0)).t();
   
 }
 
-vec import_vec(PyObject * Obj){
+vec import_vec(PyObject * py_vec){
   // Imports an vector
-  assert(PyArray_Check(Obj));
-  assert(1 == PyArray_NDIM((PyArrayObject*)Obj)); // Is a vector
-  assert(NPY_DOUBLE == PyArray_TYPE((PyArrayObject*)Obj)); // Double
+  assert(PyArray_Check(py_vec));
+  assert(1 == PyArray_NDIM((PyArrayObject*)py_vec)); // Is a vector
+  assert(NPY_DOUBLE == PyArray_TYPE((PyArrayObject*)py_vec)); // Double
   
-  return vec((const double *)PyArray_DATA((PyArrayObject*)Obj),
-	     PyArray_DIM((PyArrayObject*)Obj,0)); // n_rows
+  return vec((const double *)PyArray_DATA((PyArrayObject*)py_vec),
+	     PyArray_DIM((PyArrayObject*)py_vec,0)); // n_rows
   
 }
 
-uvec import_uvec(PyObject * Obj){
+uvec import_uvec(PyObject * py_uvec){
   // Imports an vector
-  assert(PyArray_Check(Obj));
-  assert(1 == PyArray_NDIM((PyArrayObject*)Obj)); // Is a vector
-  assert(NPY_UINT64 == PyArray_TYPE((PyArrayObject*)Obj)); // Double
+  assert(PyArray_Check(py_uvec));
+  assert(1 == PyArray_NDIM((PyArrayObject*)py_uvec)); // Is a vector
+  assert(NPY_UINT64 == PyArray_TYPE((PyArrayObject*)py_uvec)); // Double
 
-  assert(sizeof(ullint) == PyArray_ITEMSIZE((PyArrayObject*)Obj));
+  assert(sizeof(ullint) == PyArray_ITEMSIZE((PyArrayObject*)py_uvec));
   
-  return uvec((const ullint *)PyArray_DATA((PyArrayObject*)Obj),
-	      PyArray_DIM((PyArrayObject*)Obj,0));
+  return uvec((const ullint *)PyArray_DATA((PyArrayObject*)py_uvec),
+	      PyArray_DIM((PyArrayObject*)py_uvec,0));
   
+}
+
+void import_reg_grid(PyObject * py_low,
+		    PyObject * py_high,
+		    PyObject * py_num_cells,
+		    RegGrid & grid){
+  grid.low      = import_vec(py_low);
+  grid.high     = import_vec(py_high);
+  grid.num_cells = import_uvec(py_num_cells);
 }
 
 //================================================
@@ -167,10 +180,7 @@ Object interpolate(PyObject * py_val,
   mat points = import_mat(py_points);
   
   RegGrid grid;
-
-  grid.low      = import_vec(py_low);
-  grid.high     = import_vec(py_high);
-  grid.num_cells = import_uvec(py_num_cells);
+  import_reg_grid(py_low,py_high,py_num_cells,grid);
   
   vec I = interp_fn(val,points,grid);
   return export_vec(I);
@@ -185,10 +195,7 @@ Object argmax_interpolate(PyObject * py_vals,
   mat points = import_mat(py_points);
   
   RegGrid grid;
-
-  grid.low      = import_vec(py_low);
-  grid.high     = import_vec(py_high);
-  grid.num_cells = import_uvec(py_num_cells);
+  import_reg_grid(py_low,py_high,py_num_cells,grid);
   
   uvec I = max_interp_fns(vals,points,grid);
   return export_uvec(I);
@@ -203,6 +210,72 @@ Object simulate_test_export(){
   simulate_test(res);
   return export_sim_results(res);
 }
+
+void mcts_test(PyObject * py_q,
+		 PyObject * py_flow,
+		 PyObject * py_actions,
+		 PyObject * py_low,
+		 PyObject * py_high,
+		 PyObject * py_num_cells){
+
+  // READ IN FROM PYTHON
+  mat q =       import_mat(py_q);
+  mat flow =    import_mat(py_flow);
+  mat actions = import_mat(py_actions);
+
+
+  RegGrid grid;
+  import_reg_grid(py_low,py_high,py_num_cells,grid);
+
+  // Q estimates
+  InterpMultiFunction q_fn = InterpMultiFunction(q,grid);
+
+  // INITIAL PROB
+  InterpMultiFunction flow_fn = InterpMultiFunction(flow,grid);
+  ProbFunction prob_fn = ProbFunction(&flow_fn);
+
+  // ROLLOUT
+  DIBangBangPolicy rollout = DIBangBangPolicy(actions);
+
+  // REST OF CONTEXT
+  DoubleIntegrator di_fn = DoubleIntegrator(0.01,5,1e-5,0); // TODO: pass in
+  BoundaryEnforcer bnd_di_fn = BoundaryEnforcer(&di_fn,grid);
+  BallCost cost_fn = BallCost(0.15,zeros<vec>(2));
+
+
+  MCTSContext context;
+
+  context.trans_fn = & bnd_di_fn;
+  context.cost_fn = & cost_fn;
+  context.discount = 0.997;
+  
+  context.q_fn = &q_fn;
+  context.prob_fn = &prob_fn;
+  context.rollout = &rollout;
+
+  context.actions = &actions;
+  context.n_actions = 3;
+
+  context.p_scale = 10;
+  context.ucb_scale = 2;
+
+  // Create root node
+
+  vec root_state = vec("-1,1");
+  MCTSNode root = MCTSNode(root_state, &context);
+  context.master_list.push_back(&root);
+
+  root._total_visits = 30;
+  root._child_visits = uvec("10,10,10");
+  
+  uint a_idx = root.get_best_action();
+  std::cout << "Best action: " << a_idx << std::endl;
+  root.pick_child(a_idx);
+  root.pick_child(a_idx);
+  print_nodes(context);
+  
+}
+
 
 //===============================================
 // DEBUG
@@ -231,7 +304,9 @@ BOOST_PYTHON_MODULE(cDiscrete){
    */
   
   bp::def ("interpolate",interpolate);
-  bp::def ("simulate_test",simulate_test_export);
   bp::def ("c_arange",c_arange);
   bp::def ("argmax_interpolate", argmax_interpolate);
+  bp::def ("simulate_test",simulate_test_export);
+  bp::def ("mcts_test", mcts_test);
+
 }

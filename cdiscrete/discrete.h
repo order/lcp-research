@@ -9,10 +9,17 @@ using namespace std;
 using namespace arma;
 
 #define OOB_COORD UINT_MAX // OOB "coordinate"
+#define OOB_STATE DOUBLE_MAX
 #define GRID_FUDGE 1e-12
 
 //=====================================
 // STRUCTURES
+
+uint num_actions(const mat & actions);
+uint action_dim(const mat &actions);
+
+uint num_states(const mat & states);
+uint state_dim(const mat & states);
 
 // Regular grid structure
 struct RegGrid {
@@ -22,6 +29,7 @@ uvec num_cells; // Number of CELLS per dimension;
 // Number of grid cuts per dimension is +1 this
 };
 
+uint grid_dim(const RegGrid & grid);
 uvec num_grid_points_per_dim(const RegGrid & grid);
 uint num_grid_points(const RegGrid & grid);
 uint oob_index(const RegGrid & grid);

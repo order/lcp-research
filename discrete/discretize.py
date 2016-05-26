@@ -113,5 +113,5 @@ def weighted_centroid(S,discretizer,indexer):
 
     return centroid
     
-
-
+def grid_desc_to_lhn(grid_desc):
+    (low,high,num) = zip(*grid_desc)

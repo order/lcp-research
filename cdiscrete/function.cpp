@@ -20,16 +20,22 @@ uint InterpFunction::dom_dim() const{
 InterpMultiFunction::InterpMultiFunction(const mat & val,
 					 const RegGrid & grid){
   _val = val;
-  _grid = grid;
+  _grid.low = grid.low;
+  _grid.high = grid.high;
+  _grid.num_cells = grid.num_cells;
+  
+  uint G = num_grid_points(grid);
+  assert(G == val.n_rows);
 }
 
 mat InterpMultiFunction::f(const mat & points) const{
   return interp_fns(_val,points,_grid);
 }
-vec InterpMultiFunction::f(const vec & points) const{
-  mat R = interp_fns(_val,points.t(),_grid);
-  assert(R.n_rows == 1);
-  return interp_fns(_val,points.t(),_grid).row(0);
+vec InterpMultiFunction::f(const vec & point) const{
+  mat points = conv_to<mat>::from(point.t());
+  mat R = interp_fns(_val,points,_grid);
+  assert(1 == R.n_rows);
+  return R.row(0).t();
 }
 uint InterpMultiFunction::dom_dim() const{
   return _grid.low.n_elem;

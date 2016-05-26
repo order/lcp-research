@@ -6,6 +6,25 @@
 
 using namespace arma;
 
+
+uint num_actions(const mat & actions){
+  return actions.n_rows;
+}
+uint action_dim(const mat &actions){
+  return actions.n_cols;
+}
+
+uint num_states(const mat & states){
+  return states.n_rows;
+}
+uint state_dim(const mat & states){
+  return states.n_cols;
+}
+
+uint grid_dim(const RegGrid & grid){
+  return grid.num_cells.n_elem;
+}
+
 uvec num_grid_points_per_dim(const RegGrid & grid){
   // Number of cells + 1: | * | * |
   return grid.num_cells + 1;
@@ -348,7 +367,9 @@ vec interp_fn(const vec & vals, const mat & points,const RegGrid & grid){
   return interp_fns(vals,points,grid); // Should cast appropriately
 }
 
-mat interp_fns(const mat & vals, const mat & points,const RegGrid & grid){
+mat interp_fns(const mat & vals,
+	       const mat & points,
+	       const RegGrid & grid){
   uint G = num_grid_points(grid);
   uint N = points.n_rows;
   uint D = points.n_cols;

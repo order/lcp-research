@@ -107,3 +107,13 @@ def simulate():
 
 def c_arange(N):
     return cd.c_arange(N)
+
+def mcts_test(q,flow,actions,low,high,num_cells):
+    assert(check_mat(q))
+    assert(check_mat(flow))
+    assert(check_mat(actions))
+    assert(check_vec(low))
+    assert(check_vec(high))
+    assert(check_uvec(num_cells))
+
+    cd.mcts_test(q,flow,actions,low,high,num_cells);

@@ -2,19 +2,30 @@
 #define __Z_TRANSFER_INCLUDED__
 
 #include <armadillo>
+#include "discrete.h"
 using namespace arma;
 
+
 //=================================================
-// TRANSFER FUNCTIONS
+// ABSTRACT TRANSFER FUNCTIONS
 
 // Abstract transfer function
 class TransferFunction{
  public:
   virtual mat get_next_states(const mat & points,
 			      const mat & actions) const = 0;
+
+  // Single point, single action
   vec get_next_state(const vec & points,
-			     const vec & action) const;
+		     const vec & action) const;
+
+  // Many points, single action
+  mat get_next_states(const mat & points,
+		      const vec & actions) const;
+
 };
+//=================================================
+// SPECIFIC TRANSFER FUNCTIONS
 
 class DoubleIntegrator : public TransferFunction{
  public:
@@ -23,7 +34,6 @@ class DoubleIntegrator : public TransferFunction{
 		   double damping,
 		   double jitter);
   mat get_next_states(const mat & points, const mat & actions) const;
-  vec get_next_state(const vec & point, const vec & action) const;
   
  private:
   double _step_size;
@@ -42,7 +52,8 @@ struct Boundary{
 
 class BoundaryEnforcer : public TransferFunction{
  public:
-  BoundaryEnforcer(TransferFunction * trans_fn_ptr, Boundary & boundary);
+  BoundaryEnforcer(TransferFunction * trans_fn_ptr, const Boundary & boundary);
+  BoundaryEnforcer(TransferFunction * trans_fn_ptr, const RegGrid & boundary);
   mat get_next_states(const mat & points, const mat & actions) const;
   vec get_next_state(const vec & point, const vec & action) const;
  protected:

@@ -1,17 +1,18 @@
-QPolicy::QPolicy(const mat & actions,
-		 const vec & values,
-		 const RegGrid & grid,
-		 const Problem & problem){
+#include "value.h"
+
+QPolicy::QPolicy(const mat & q,
+		 const mat & actions,
+		 const RegGrid & grid){
+  _q = q;
   _grid = grid;
-  _q_values = generate_q_values(values,grid,problem);
   _actions = actions;
 }
 
-uvec QPolicy::get_action_indicies(const mat & points) const{
-  return min_interp_fns(_q_values,points,_grid);
+uvec QPolicy::get_action_indices(const mat & points) const{
+  return min_interp_fns(_q,points,_grid);
 }
 
-vec QPolicy::get_actions(const mat & points) const{
+mat QPolicy::get_actions(const mat & points) const{
   // Converts indicies into actual acceleration number
   // Using provided action list
   uvec a_idx = get_action_indices(points);

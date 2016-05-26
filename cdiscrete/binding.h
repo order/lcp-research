@@ -34,9 +34,14 @@ Object export_sim_results(const SimulationOutcome & res);
 //===========================================================
 // Import
 // From python to C++ objects
-arma::mat import_mat(PyObject * Obj);
-arma::vec import_vec(PyObject * Obj);
-arma::uvec import_uvec(PyObject * Obj);
+arma::mat import_mat(PyObject * py_mat);
+arma::vec import_vec(PyObject * py_vec);
+arma::uvec import_uvec(PyObject * py_uvec);
+
+void import_reg_grid(PyObject * py_low,
+		     PyObject * py_high,
+		     PyObject * py_num_cells,
+		     RegGrid & grid);
 
 //===========================================================
 // Basic function interpolation
@@ -53,6 +58,13 @@ Object argmax_interpolate(PyObject * py_vals,
 			  PyObject * py_num_cells);
 
 Object simulate_test_export();
+void mcts_test(PyObject * py_q,
+		 PyObject * py_flow,
+		 PyObject * py_actions,
+		 PyObject * py_low,
+		 PyObject * py_high,
+		 PyObject * py_num_cells);
+
 
 Object c_arange(uint n);
 

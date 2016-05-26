@@ -1,30 +1,35 @@
-import numpy as np
+from mdp import *
+from config.mdp import *
+from config.solver import *
+from utils import *
+from discrete import *
+
 import cdiscrete as cd
-from discrete import make_points
-import matplotlib.pyplot as plt
 
+# This file is for pushing V and flow vectors to C++ code for simulation
 
-N = 10
-low = -np.ones(2,dtype='double')
-high = np.ones(2,dtype='double')
-num = N*np.ones(2,dtype='uint64')
+root = 'data/di/' # root filename
+disc_n = 20
+action_n = 3
 
+# Generate problem
+problem = make_di_problem()
 
-cuts = np.linspace(-1,1,N+1)
-P = make_points([cuts]*2)
-c = np.array([1,-0.2])
-v = np.array((P.dot(c)) < 0.5,dtype='double')
-v = np.hstack([v,-1])
+# Generate MDP
+(mdp,disc) = make_uniform_mdp(problem,disc_n,action_n)
 
+# Solve
+(p,d) = solve_with_kojima(mdp,1e-8,1000)
 
-E = 51
-cuts = np.linspace(-1.1,1.1,E)
-P = make_points([cuts]*2)
-XI,YI = np.meshgrid(cuts,cuts,indexing='ij')
+# Build value function
+(v,F) = split_solution(mdp,p)
+Q = q_vectors(mdp,v);
 
-I = cd.interpolate(v,P,low,high,num)
-Img = np.reshape(I,(E,E))
+(low,high,num) = zip(*disc.grid_desc)
+low = np.array(low,dtype=np.double);
+high = np.array(high,dtype=np.double);
+num = np.array(num,dtype=np.uint64);
+actions = mdp.actions.astype(np.double)
 
-plt.pcolor(XI,YI,Img)
-plt.scatter(P[:,0],P[:,1],c=I);
-plt.show()
+print 'Calling C++ function'
+cd.mcts_test(Q,F,actions,low,high,num)

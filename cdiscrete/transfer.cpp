@@ -3,11 +3,20 @@
 #include "misc.h"
 #include "transfer.h"
 
-vec TransferFunction::get_next_state(const vec & points,
+vec TransferFunction::get_next_state(const vec & point,
 				     const vec & action) const{
-  mat r = get_next_state(conv_to<mat>::from(points.t()),action);
+  mat points = conv_to<mat>::from(point.t());
+  mat actions = conv_to<mat>::from(action.t());
+  mat r = get_next_states(points,actions);
   assert(1 == r.n_rows);
-  return r.row(0);
+  return r.row(0).t();
+}
+
+mat TransferFunction::get_next_states(const mat & points,
+				      const vec & action) const{
+  uint N = num_states(points);
+  mat actions = repmat(action.t(),N,1);
+  return get_next_states(points,actions);
 }
 
 DoubleIntegrator::DoubleIntegrator(double step_size,
@@ -48,17 +57,26 @@ mat DoubleIntegrator::get_next_states(const mat & points,
 
   mat X = points;
   for(uint t = 0; t < _num_steps; t++){
-    X = X * Tt + actions * Ut; // TODO: jitter
+    mat noise = randn<mat>(N,1);
+    X = X * Tt + (actions + _jitter * noise) * Ut; // TODO: jitter
   }
   return X;
 }
 
-BoundaryEnforcer::BoundaryEnforcer(TransferFunction * trans_fn_ptr,
-				   Boundary & boundary){
+BoundaryEnforcer:: BoundaryEnforcer(TransferFunction * trans_fn_ptr,
+				    const Boundary & boundary){
   _trans_fn_ptr = trans_fn_ptr;
   _boundary.low = boundary.low;
   _boundary.high = boundary.high;
 }
+
+BoundaryEnforcer::BoundaryEnforcer(TransferFunction * trans_fn_ptr,
+				   const RegGrid & boundary){
+  _trans_fn_ptr = trans_fn_ptr;
+  _boundary.low = boundary.low;
+  _boundary.high = boundary.high;
+}
+
 
 mat BoundaryEnforcer::get_next_states(const mat & points,
 				      const mat & actions) const{  

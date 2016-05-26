@@ -4,18 +4,24 @@
 
 
 void import_data(std::string dirname,
-		   mat & data,
-		   RegGrid & grid){
+		 mat & q,
+		 mat & flow,
+		 RegGrid & grid){
   // Load the solver data
-  // G x (A+1) matrix, where the first column is the V vector
+  // G x (2*A) matrix, where the A columns are the Q vector
   // and the rest are flow vectors
   string solver_data_filename = dirname + "data.h5";
 
+  mat data;
   data.load(solver_data_filename,hdf5_binary);
   data = data.t();
   uint G = data.n_rows;
-  uint A = data.n_cols - 1;
+  uint A2 = data.n_cols;
+  assert(0 == A2 % 2);
+  uint A = A2 / 2;
 
+  q = data.head_cols(A);
+  flow = data.tail_cols(A);
 
   // Load the discretization data
   // <D,Lo[0],...,Lo[D-1],Hi[0],...,Hi[D-1],Num[0],...,Num[D-1]>

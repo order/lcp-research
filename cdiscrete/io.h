@@ -8,6 +8,9 @@
 
 using namespace arma;
 
-void import_data(std::string dirname, mat & data, RegGrid & grid);
+void import_data(std::string dirname,
+		 mat & q,
+		 mat & flow,
+		 RegGrid & grid);
 
 #endif

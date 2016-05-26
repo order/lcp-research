@@ -2,6 +2,13 @@
 
 #include "policy.h"
 
+vec Policy::get_action(const vec & point) const{
+  mat points = conv_to<mat>::from(point.t());
+  mat actions = get_actions(points);
+  assert(1 == actions.n_rows);
+  return actions.row(0);
+}
+
 //====================================================
 // Bang-bang policy for 2D (x,v) double integrator
 
@@ -43,7 +50,7 @@ uint DIBangBangPolicy::get_action_dim() const{
   return 1;
 }
 
-vec DIBangBangPolicy::get_actions(const mat & points) const{
+mat DIBangBangPolicy::get_actions(const mat & points) const{
   // Converts indicies into actual acceleration number
   // Using provided action list
   uvec a_idx = get_action_indices(points);

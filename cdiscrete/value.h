@@ -1,20 +1,22 @@
+#include <armadillo>
+
+#include "discrete.h"
+#include "policy.h"
 #include "simulate.h"
 
-mat generate_q_values(const vec & values,
-		      const RegGrid & grid,
-		      const Problem & problem);
+using namespace arma;
 
 class QPolicy : public DiscretePolicy{
  public:
-  QPolicy(const mat & actions,
-	  const vec & values,
-	  const RegGrid & grid,
-	  const Problem & problem);
-  mat get_next_states(const mat & points, const mat & actions) const;
-  mat get_next_states(const mat & points, const mat & actions) const;
-
+  QPolicy(const mat & q,
+	  const mat & actions,
+	  const RegGrid & grid);
+  mat get_actions(const mat & points) const;
+  uvec get_action_indices(const mat & points) const;
+  uint get_action_dim() const;
+  
  protected:
   RegGrid _grid;
-  mat _q_values;
+  mat _q;
   mat _actions;
-}
+};
