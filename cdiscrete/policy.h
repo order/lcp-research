@@ -18,6 +18,7 @@ class Policy{
 class DiscretePolicy : public Policy{
  public:
   virtual uvec get_action_indices(const mat & points) const = 0;
+  uint get_action_index(const vec & point) const;
 };
 
 // Bang-bang policy for 2D (x,v) double integrator

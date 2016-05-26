@@ -242,38 +242,8 @@ void mcts_test(PyObject * py_q,
   BoundaryEnforcer bnd_di_fn = BoundaryEnforcer(&di_fn,grid);
   BallCost cost_fn = BallCost(0.15,zeros<vec>(2));
 
-
-  MCTSContext context;
-
-  context.trans_fn = & bnd_di_fn;
-  context.cost_fn = & cost_fn;
-  context.discount = 0.997;
-  
-  context.q_fn = &q_fn;
-  context.prob_fn = &prob_fn;
-  context.rollout = &rollout;
-
-  context.actions = &actions;
-  context.n_actions = 3;
-
-  context.p_scale = 10;
-  context.ucb_scale = 2;
-
-  // Create root node
-
-  vec root_state = vec("-1,1");
-  MCTSNode root = MCTSNode(root_state, &context);
-  context.master_list.push_back(&root);
-
-  root._total_visits = 30;
-  root._child_visits = uvec("10,10,10");
-  
-  uint a_idx = root.get_best_action();
-  std::cout << "Best action: " << a_idx << std::endl;
-  root.pick_child(a_idx);
-  root.pick_child(a_idx);
-  print_nodes(context);
-  
+  // TODO: copy stuff form driver.cpp over here.
+  // e.g. build problem and context
 }
 
 

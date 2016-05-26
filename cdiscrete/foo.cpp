@@ -12,12 +12,7 @@ using namespace arma;
 
 int main(int argc, char** argv)
 {
-  mat data;
-  RegGrid grid;
-
-  import_data("../data/di/", data, grid);
-  vec v = data.col(0);
-
-  
-  
+  vec v = zeros<vec>(5);
+  v(2)++;
+  cout << v << endl;
 }

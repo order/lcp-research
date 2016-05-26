@@ -9,6 +9,14 @@ vec Policy::get_action(const vec & point) const{
   return actions.row(0);
 }
 
+uint DiscretePolicy::get_action_index(const vec & point) const{
+  mat points = conv_to<mat>::from(point.t());
+  uvec a_indices = get_action_indices(points);
+  assert(1 == a_indices.n_elem);
+  return a_indices(0);
+}
+
+
 //====================================================
 // Bang-bang policy for 2D (x,v) double integrator
 

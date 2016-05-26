@@ -34,28 +34,33 @@ int main(int argc, char ** argv){
   BallCost cost_fn = BallCost(0.15,zeros<vec>(2));
 
 
+  Problem problem;
+  problem.trans_fn = & bnd_di_fn;
+  problem.cost_fn  = & cost_fn;
+  problem.discount = 0.997;
+  problem.actions  = actions;
+  
   MCTSContext context;
-
-  context.trans_fn = & bnd_di_fn;
-  context.cost_fn = & cost_fn;
-  context.discount = 0.997;
+  context.problem_ptr = & problem;
+  context.n_actions = 3;
   
   context.q_fn = &q_fn;
   context.prob_fn = &prob_fn;
   context.rollout = &rollout;
 
-  context.actions = &actions;
-  context.n_actions = 3;
-
+  context.horizon = 50;
   context.p_scale = 1;
-  context.ucb_scale = 2;
+  context.ucb_scale = 5;
 
   // Create root node
   vec root_state = vec("-1,1");
-  MCTSNode * root = new MCTSNode(root_state, &context);
-  add_root(&context,root);
-  root->sample_new_node(0);
-  root->sample_new_node(0);
-  root->sample_new_node(0);
-  delete_tree(&context);
+  for(uint i = 0; i < 5; i++){
+    MCTSNode * root = new MCTSNode(root_state, &context);
+    add_root(&context,root);
+    
+    grow_tree(root,2500);
+    //write_dot_file("test.dot",root);
+    root->print_debug();
+    delete_tree(&context);
+  }
 }

@@ -15,8 +15,11 @@ MCTSNode::MCTSNode(const vec & state,
   // Store state and context information
   _id = context->_NODE_ID++;
   _state = state;
-  _context = context;
+  _context_ptr = context;
   _n_actions = context->n_actions;
+  _discount = context->problem_ptr->discount;
+
+  _q_stepsize = 0.1;
 
   _fresh = true;
 
@@ -27,9 +30,10 @@ MCTSNode::MCTSNode(const vec & state,
 
   // Init Q estimate and costs cache
   _q = context->q_fn->f(_state);
-  _v = max(_q);
-  mat costs = context->cost_fn->get_costs(_state.t(),
-					  *context->actions);
+  _v = min(_q);
+  mat costs = context->problem_ptr
+    ->cost_fn->get_costs(_state.t(),
+			 context->problem_ptr->actions);
   assert(1 == costs.n_rows);
   assert(_n_actions == costs.n_cols);
   _costs = costs.row(0).t();
@@ -42,6 +46,14 @@ MCTSNode::MCTSNode(const vec & state,
 
   _n_children = 0;
   _children.resize(_n_actions);
+}
+
+MCTSNode::~MCTSNode(){
+  for(vector<NodeList>::iterator it = _children.begin();
+      it != _children.end(); it++){
+    it->clear();
+  }
+  _children.clear();
 }
 
 void MCTSNode::print_debug() const{
@@ -72,8 +84,12 @@ void MCTSNode::print_debug() const{
   }
 }
 
-uint MCTSNode::id() const{
+uint MCTSNode::get_id() const{
   return _id;
+}
+
+vec MCTSNode::get_state() const{
+  return _state;
 }
 
 bool MCTSNode::is_leaf() const{
@@ -122,15 +138,11 @@ MCTSNode* MCTSNode::pick_child(uint a_idx){
     Pick a child. If the number of children is less than
     log_2(visits + 1) + 1, then draw a new child.
   */
-
-  created = false;
   
   uint n_nodes = _children[a_idx].size();
   uint n_visits = _child_visits[a_idx];
   // Use a log schedule
   bool new_node = (n_nodes < log2(n_visits + 1) + 1);
-  std::cout << log2(n_visits + 1) + 1
-	    << " " << new_node << std::endl;
   assert((n_nodes == 0) ? new_node : true);
 
   if(new_node){
@@ -149,8 +161,9 @@ MCTSNode* MCTSNode::get_best_child(){
 }
 
 MCTSNode * MCTSNode::sample_new_node(uint a_idx){
-  vec action = _context->actions->row(a_idx);
-  vec state =  _context->trans_fn->get_next_state(_state,action);
+  vec action = _context_ptr->problem_ptr->actions.row(a_idx);
+  vec state =  _context_ptr->problem_ptr
+    ->trans_fn->get_next_state(_state,action);
 
   return add_child(a_idx,state);
 }
@@ -161,15 +174,17 @@ MCTSNode * MCTSNode::add_child(uint a_idx, const vec & state){
   if(NULL != find_res){
     return find_res;
   }
-  MCTSNode * new_child = new MCTSNode(state,_context);
-  _context->master_list.push_back(new_child); // Add to master
+  MCTSNode * new_child = new MCTSNode(state,_context_ptr);
+  _context_ptr->master_list.push_back(new_child); // Add to master
   _children[a_idx].push_back(new_child); // Add to action list
   return new_child;
 }
 
 // See if state already exists as a child of the action,
 // or if a similar node exists
-MCTSNode * MCTSNode::find_child(uint a_idx, const vec & state, double thresh){
+MCTSNode * MCTSNode::find_child(uint a_idx,
+				const vec & state,
+				double thresh){
   for(NodeList::const_iterator it = _children[a_idx].begin();
       it != _children[a_idx].end(); ++it){
     double dst = norm(state - (*it)->_state);
@@ -180,45 +195,67 @@ MCTSNode * MCTSNode::find_child(uint a_idx, const vec & state, double thresh){
   return NULL;
 }
 
+double MCTSNode::update(uint a_idx,double gain){
+  assert(!_fresh);
+  _total_visits++;
+  _child_visits(a_idx)++;
+
+  // Child got G, so we got c[a] + d * G
+  gain = _costs(a_idx) + _discount * gain;
+
+  _q(a_idx) *= (1.0 - _q_stepsize);
+  _q(a_idx) += _q_stepsize * gain;
+
+  _v = min(_q);
+
+  return gain; // Return updated gain
+}
+
 // Whether just created or not.
 // Used primarily in expand_tree to determine if dive is over
-bool is_fresh() const{
+bool MCTSNode::is_fresh() const{
   return _fresh;
 }
 
 // Sets the fresh flag to false;
-void set_stale() const{
+void MCTSNode::set_stale(){
   _fresh = false;
 }
 
+//===========================================================
+// GROW TREE
 // Adds new nodes to tree until out of budget
 void grow_tree(MCTSNode * root, uint budget){
   for(uint b = 0; b < budget; b++){
-    Path path = expand_tree(root);
-    assert(path.size() > 0);
-    double G = simulate_leaf(path);
-    update_path(path,G);
+    Path path = find_path_and_make_leaf(root); //Find leaf and add node
+    double G = simulate_leaf(path); //Simulate out from the leaf
+    update_path(path,G); //Update stats on nodes in the path
   }
 }
 
-Path expand_tree(MCTSNode * root){
+// Follow path of best children until a new node is created
+Path find_path_and_make_leaf(MCTSNode * root){
   Path path;  
-  path.append(root);
+  path.first.push_back(root);
   
   MCTSNode * curr = root;
   uint a_idx;
   for(uint i = 0; i < 2500; i++){
-    a_idx = curr->get_best_action();
-    curr = curr->get_best_child();
-    path.second.append(a_idx);
-    path.first.append(curr);
+    a_idx = curr->get_best_action(); // From UCB+ score
+    curr = curr->get_best_child(); // Node may or may not be created
 
+    // Add to path
+    path.first.push_back(curr);
+    path.second.push_back(a_idx);
+    
     // Check if the node was just created
-    if(curr.is_fresh()){
-      curr.set_stale();
+    if(curr->is_fresh()){
+      // Fresh == just created
+      curr->set_stale();
       return path;
     }
   }
+  
   // Should never get here
   assert(false);
 }
@@ -227,13 +264,42 @@ double simulate_leaf(Path & path){
   //Use rollout policy to simulate from state.
   // Count as a "visit"
   // Add first action to path's action list
-  
-}
-void update_path(const MCTSPath & path, double gain){
   NodeList nodes = path.first;
   ActionList actions = path.second;
-  assert(nodes.size() = actions.size();
+  // Node->action->N-> ... -> a->N
+  assert(nodes.size() == actions.size()+1);
   
+  MCTSNode * leaf = nodes.back();
+  MCTSContext * context = leaf->_context_ptr;
+  
+  SimulationOutcome outcome;
+  mat points = conv_to<mat>::from(leaf->get_state().t());
+  assert(1 == points.n_rows);
+  
+  uint a_idx = context->rollout->get_action_index(leaf->get_state());
+  path.second.push_back(a_idx);
+  vec gain;
+  simulate_gain(points,
+		*context->problem_ptr,
+		*context->rollout,
+		context->horizon,
+		gain);
+  assert(1 == gain.n_elem);
+  double G = gain(0);
+	   
+  
+}
+void update_path(const Path & path, double gain){
+  NodeList nodes = path.first;
+  ActionList actions = path.second;
+  // Node->action->N-> ... -> a->N->a
+  assert(nodes.size() > 0);
+  assert(nodes.size() == actions.size());
+  uint L = nodes.size();
+  
+  for(int l = L-1; l >= 0; l--){
+    gain = nodes[l]->update(actions[l], gain);
+  }  
 }
 
 // Add root to context
@@ -247,10 +313,10 @@ void add_root(MCTSContext * context, MCTSNode * root){
 void delete_tree(MCTSContext * context){
   for(vector<MCTSNode*>::iterator it = context->master_list.begin();
       it != context->master_list.end(); it++){
-    std::cout << "Deleting: N" << (*it)->id() << std::endl;
     delete *it;
     *it = NULL;
   }
+  context->master_list.clear();
 }
 
 //===================================
@@ -277,7 +343,7 @@ void print_nodes(const MCTSContext & context){
 
 void write_dot_file(std::string filename, MCTSNode * root){
   uint max_depth = 3;
-  uint A = root->_context->n_actions;
+  uint A = root->_context_ptr->n_actions;
 
   typedef std::pair<MCTSNode*,uint> f_elem;
   vector<f_elem> fringe;
@@ -293,7 +359,11 @@ void write_dot_file(std::string filename, MCTSNode * root){
 
     MCTSNode * curr_node = curr_elem.first;
     uint depth = curr_elem.second;
-    if(depth > max_depth){continue;}
+    if(depth >= max_depth){
+      fh << "\t" << node_name(curr_node->_id)
+	 << " [shape=box,label=\"...\"];" << std::endl;
+      continue;
+    }
 
     // Build node
     fh << "\t" << node_name(curr_node->_id) << " [shape=box];" << std::endl;

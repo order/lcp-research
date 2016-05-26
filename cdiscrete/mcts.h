@@ -10,6 +10,7 @@
 #include "costs.h"
 #include "function.h"
 #include "policy.h"
+#include "simulate.h"
 #include "transfer.h"
 
 
@@ -26,17 +27,14 @@ struct MCTSContext{
   uint _NODE_ID = 0;
   std::vector<MCTSNode*> master_list;
 
-  TransferFunction * trans_fn;
-  CostFunction * cost_fn;
-  double discount;
+  Problem * problem_ptr;
+  uint n_actions;
 
   MultiFunction * q_fn;
   ProbFunction * prob_fn;
-  Policy * rollout;
-  
-  mat * actions;
-  uint n_actions;
+  DiscretePolicy * rollout;
 
+  uint horizon;
   double p_scale; // weight for initial probability
   double ucb_scale; // weight for UCB term
 };
@@ -45,9 +43,11 @@ class MCTSNode{
  public:
   MCTSNode(const vec & state,
 	   MCTSContext * context);
+  ~MCTSNode();
   void print_debug() const;
 
-  uint id() const;
+  uint get_id() const;
+  vec get_state() const;
   
   bool is_leaf() const;
   bool has_unexplored() const;
@@ -61,6 +61,7 @@ class MCTSNode{
   MCTSNode * sample_new_node(uint a_idx);
   MCTSNode * add_child(uint a_idx, const vec & state);
   MCTSNode * find_child(uint a_idx, const vec & state, double thresh=1e-15);
+  double update(uint a_idx, double gain);
 
   bool is_fresh() const;
   void set_stale();
@@ -69,16 +70,17 @@ class MCTSNode{
 
   friend void write_dot_file(std::string filename, MCTSNode * root);
   friend void grow_tree(MCTSNode * root, uint budget);
-  friend MCTSPath expand_tree(MCTSNode * root);
+  friend Path find_path_and_make_leaf(MCTSNode * root);
   friend double simulate_leaf(Path & path);
   friend void update_path(const Path & path, double gain);
 
  protected:
   // Identity
   uint _id; // Node ID
-  vec _state;
+  vec _state; 
+  MCTSContext * _context_ptr;
   uint _n_actions;
-  MCTSContext * _context;
+  double _discount;
 
   bool _fresh;
 
@@ -86,7 +88,6 @@ class MCTSNode{
   uint _total_visits;
   uvec _child_visits;
   double _ucb_scale;
-
 
   // Values and costs
   double _v;
@@ -96,6 +97,8 @@ class MCTSNode{
   // Initial probability
   double _p_scale;
   vec _prob;
+
+  double _q_stepsize;
 
   uint _n_children;
   std::vector<NodeList> _children;

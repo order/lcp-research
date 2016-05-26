@@ -28,7 +28,6 @@ void import_data(std::string dirname,
   string discrete_filename = dirname + "grid.h5";
   rowvec disc;
   disc.load(discrete_filename,hdf5_binary);
-  std::cout<<size(disc)<<std::endl;
   uint D = disc(0);
   assert(disc.n_elem == 1 + 3*D);
 
