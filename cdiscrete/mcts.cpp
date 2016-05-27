@@ -60,6 +60,7 @@ void MCTSNode::print_debug() const{
   // Basic debug information
 
   vec u = get_all_ucbs();
+  vec nudge = get_all_nudges();
   
   std::cout << "N" << _id << ":\n"
 	    << "\tState:"<< _state.t()
@@ -70,6 +71,7 @@ void MCTSNode::print_debug() const{
 	    << "\tVisits" << _child_visits.t()
 	    << "\t\tTotal: " << _total_visits << std::endl
 	    << "\tUCB:" << u.t()
+    	    << "\t\tNudges: " << nudge.t() << std::endl
 	    << "\tChildren:" << std::endl;
   for(uint a_idx = 0; a_idx < _n_actions; a_idx++){
     std::cout << "\t\ta" << a_idx << ": [";
@@ -106,6 +108,21 @@ vec MCTSNode::get_all_ucbs() const{
     u(a_idx) = get_action_ucb(a_idx);
   }
   return u;
+}
+
+vec MCTSNode::get_all_nudges() const{
+  vec u = vec(_n_actions);
+  for(uint a_idx = 0; a_idx < _n_actions; a_idx++){
+    u(a_idx) = get_nudge(a_idx);
+  }
+  return u;
+}
+
+double MCTSNode::get_nudge(uint a_idx) const{
+    uint total_v = _total_visits+1; // +1 to avoid nan
+    uint child_v = _child_visits(a_idx)+1;
+    return  -_ucb_scale * sqrt(2.0 * log(total_v) / child_v)
+      - _p_scale * _prob(a_idx) / child_v;
 }
 
 double MCTSNode::get_action_ucb(uint a_idx) const{
@@ -279,16 +296,34 @@ double simulate_leaf(Path & path){
   uint a_idx = context->rollout->get_action_index(leaf->get_state());
   path.second.push_back(a_idx);
   vec gain;
+  mat final_points;
   simulate_gain(points,
 		*context->problem_ptr,
 		*context->rollout,
 		context->horizon,
-		gain);
+		gain,
+		final_points);
   assert(1 == gain.n_elem);
-  double G = gain(0);
-	   
+  assert(1 == final_points.n_rows);
+  vec v = context->v_fn->f(final_points);
+  assert(1 == v.n_elem);
+
+  // Gain = [1,d,d^2,d^3,...,d^{H-1}].T * [c_0,c_1,...,c_{H-1}] 
+  double discount = context->problem_ptr->discount;
+  // Tail Estimate: d^H * v(final_state)
+  double v_discount = pow(discount,context->horizon);
+
+  /*
+  std::cout << "Found:\n"
+	    << "\tGain:\t" << gain(0)
+	    << "\n\tTail state:\t" << final_points.row(0)
+	    << "\n\tTail:\t" << v_discount << " * " << v(0)
+	    << "\n\tTotal:\t" << gain(0) + v_discount * v(0) << std::endl;
+  */
   
+  return gain(0) + v_discount * v(0);
 }
+
 void update_path(const Path & path, double gain){
   NodeList nodes = path.first;
   ActionList actions = path.second;

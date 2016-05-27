@@ -117,7 +117,7 @@ class RegularGridInterpolator(object):
 
         # Route all oob points to oob node
         cols[B:] = oob_idx
-        rows[B:] = np.full(num_oob,oob_node)
+        rows[B:] = np.full(num_oob,oob_node,dtype=np.int64)
         data[B:] = np.ones(num_oob)
         
         M = self.num_nodes

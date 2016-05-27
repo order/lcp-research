@@ -31,6 +31,30 @@ class InterpolatedFunction(StateSpaceFunction):
         assert((M,) == f.shape)
         return f
 
+class InterpolatedMultiFunction(StateSpaceFunction):
+    """
+    Take in a finite vector and a discretizer;
+    Enable evaluation at arbitrary points via interpolation
+    """
+    def __init__(self,discretizer,y):
+        self.target_values = y
+        self.discretizer = discretizer
+        
+    def evaluate(self,states):
+        if 1 == len(states.shape):
+            states = states[np.newaxis,:]
+
+        y = self.target_values
+        (N,A) = y.shape
+        (M,d) = states.shape
+        
+        # Convert state into node dist
+        P = self.discretizer.points_to_index_distributions(states)
+        assert((N,M) == P.shape)
+        f = (P.T).dot(y)
+        assert((M,A) == f.shape)
+        return f
+
 class ConstFn(StateSpaceFunction):
     def __init__(self,v):
         self.v = v

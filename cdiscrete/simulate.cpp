@@ -41,9 +41,14 @@ void simulate(const mat & X0,
 
   // Init recording structures
   if (flag & RECORD_OUTCOME){
+    assert(0 == (flag & RECORD_FINAL));
     outcome.points = cube(N,D,T);
     outcome.actions = cube(N,A,T);
     outcome.costs = mat(N,T);
+  }
+  if (flag & RECORD_FINAL){
+    assert(0 == (flag & RECORD_OUTCOME));
+    outcome.points = cube(N,D,1);
   }
   if (flag & RECORD_GAIN){
     gain = vec(N).fill(0);
@@ -54,18 +59,24 @@ void simulate(const mat & X0,
   for(uint t = 0; t < T; t++){
     actions = policy.get_actions(points);
     costs = problem.cost_fn->get_costs(points,actions);
-
     // Record
     if (flag & RECORD_OUTCOME){
+      // Record everything
       add_to_simout(points,actions,costs,t,outcome);
     }    
     if (flag & RECORD_GAIN){
+      // Aggregate gain
       add_to_gain(costs,discount,t,gain);
     }    
 
     if(t < T-1){
       points = problem.trans_fn->get_next_states(points,actions);
     }
+  }
+  if(flag & RECORD_FINAL){
+    // Only record final points
+    assert(1 == outcome.points.n_slices);
+    outcome.points.slice(0) == points;
   }
 }
 
@@ -82,9 +93,13 @@ void simulate_gain(const mat & x0,
 		   const Problem & problem,
 		   const Policy & policy,
 		   uint T,
-		   vec & gain){
-  SimulationOutcome dummy;
-  simulate(x0,problem,policy,T,dummy,gain,RECORD_GAIN);
+		   vec & gain,
+		   mat & final_x){
+  SimulationOutcome final_only_outcome;
+  simulate(x0,problem,policy,T,final_only_outcome,gain,
+	   RECORD_GAIN | RECORD_FINAL);
+  assert(1 == final_only_outcome.points.n_slices);
+  final_x = final_only_outcome.points.slice(0);
 }
 
 void simulate_test(SimulationOutcome & res){

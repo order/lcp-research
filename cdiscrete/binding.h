@@ -58,12 +58,14 @@ Object argmax_interpolate(PyObject * py_vals,
 			  PyObject * py_num_cells);
 
 Object simulate_test_export();
-void mcts_test(PyObject * py_q,
-		 PyObject * py_flow,
-		 PyObject * py_actions,
-		 PyObject * py_low,
-		 PyObject * py_high,
-		 PyObject * py_num_cells);
+void mcts_test(PyObject * py_v,
+	       PyObject * py_q,
+	       PyObject * py_flow,
+	       PyObject * py_actions,
+	       PyObject * py_low,
+	       PyObject * py_high,
+	       PyObject * py_num_cells,
+	       PyObject * py_start_state);
 
 
 Object c_arange(uint n);

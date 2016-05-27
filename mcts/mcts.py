@@ -28,7 +28,7 @@ class MCTSNode(object):
         self.total_visits=0 # Total visits
 
         self.children = defaultdict(list) # a_id -> Node list
-        self.costs = np.full(A,np.nan) # Costs
+        self.costs = np.full(A,np.nan,dtype=np.double) # Costs
         
         self.Q = None
         
@@ -43,7 +43,7 @@ class MCTSNode(object):
                    p_scale):
         V = v_fn.evaluate(self.state)
         self.V = V
-        self.Q = np.full(self.num_actions,V)
+        self.Q = np.full(self.num_actions,V,dtype=np.double)
         self.P = p_fn.get_single_prob(self.state)
         self.B = p_scale
 

@@ -211,22 +211,29 @@ Object simulate_test_export(){
   return export_sim_results(res);
 }
 
-void mcts_test(PyObject * py_q,
-		 PyObject * py_flow,
-		 PyObject * py_actions,
-		 PyObject * py_low,
-		 PyObject * py_high,
-		 PyObject * py_num_cells){
+void mcts_test(PyObject * py_v,
+	       PyObject * py_q,
+	       PyObject * py_flow,
+	       PyObject * py_actions,
+	       PyObject * py_low,
+	       PyObject * py_high,
+	       PyObject * py_num_cells,
+	       PyObject * py_start_state){
 
   // READ IN FROM PYTHON
+  vec v =       import_vec(py_v);
   mat q =       import_mat(py_q);
   mat flow =    import_mat(py_flow);
   mat actions = import_mat(py_actions);
 
+  vec start_state = import_vec(py_start_state);
 
   RegGrid grid;
   import_reg_grid(py_low,py_high,py_num_cells,grid);
 
+  // V estimate
+  InterpFunction v_fn = InterpFunction(v,grid);
+  
   // Q estimates
   InterpMultiFunction q_fn = InterpMultiFunction(q,grid);
 
@@ -238,13 +245,46 @@ void mcts_test(PyObject * py_q,
   DIBangBangPolicy rollout = DIBangBangPolicy(actions);
 
   // REST OF CONTEXT
-  DoubleIntegrator di_fn = DoubleIntegrator(0.01,5,1e-5,0); // TODO: pass in
+  DoubleIntegrator di_fn = DoubleIntegrator(0.01,
+					    5,0,0); // TODO: pass in
   BoundaryEnforcer bnd_di_fn = BoundaryEnforcer(&di_fn,grid);
-  BallCost cost_fn = BallCost(0.15,zeros<vec>(2));
+  BallCost cost_fn = BallCost(0.25,zeros<vec>(2));
 
   // TODO: copy stuff form driver.cpp over here.
   // e.g. build problem and context
+
+  Problem problem;
+  problem.trans_fn = & bnd_di_fn;
+  problem.cost_fn  = & cost_fn;
+  problem.discount = 0.998;
+  problem.actions  = actions;
+  
+  MCTSContext context;
+  context.problem_ptr = & problem;
+  context.n_actions = 3;
+
+  context.v_fn = &v_fn;
+  context.q_fn = &q_fn;
+  context.prob_fn = &prob_fn;
+  context.rollout = &rollout;
+
+  context.horizon = 250;
+  context.p_scale = 0;
+  context.ucb_scale = 10;
+
+    // Create root node
+  for(uint i = 0; i < 1; i++){
+    MCTSNode * root = new MCTSNode(start_state, &context);
+    add_root(&context,root);
+    root->print_debug();
+   
+    grow_tree(root,10000);
+    //write_dot_file("test.dot",root);
+    root->print_debug();
+    delete_tree(&context);
+  }
 }
+
 
 
 //===============================================
@@ -278,5 +318,4 @@ BOOST_PYTHON_MODULE(cDiscrete){
   bp::def ("argmax_interpolate", argmax_interpolate);
   bp::def ("simulate_test",simulate_test_export);
   bp::def ("mcts_test", mcts_test);
-
 }

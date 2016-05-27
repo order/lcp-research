@@ -27,6 +27,6 @@ setup(name="PackageName",
                   include_dirs=["/usr/include/hdf5/serial/"],
                   library_dirs=["/usr/lib/x86_64-linux-gnu/hdf5/serial"],
                   libraries = ["boost_python","armadillo","hdf5"],
-                  undef_macros = [ "NDEBUG" ],
+                  #undef_macros = [ "NDEBUG" ],
                   extra_compile_args=['-std=c++11'])
     ])

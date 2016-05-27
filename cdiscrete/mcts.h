@@ -30,6 +30,7 @@ struct MCTSContext{
   Problem * problem_ptr;
   uint n_actions;
 
+  RealFunction * v_fn;
   MultiFunction * q_fn;
   ProbFunction * prob_fn;
   DiscretePolicy * rollout;
@@ -52,6 +53,8 @@ class MCTSNode{
   bool is_leaf() const;
   bool has_unexplored() const;
 
+  double get_nudge(uint a_idx) const;
+  vec get_all_nudges() const;
   vec get_all_ucbs() const;
   double get_action_ucb(uint a_idx) const;
   uint get_best_action() const;

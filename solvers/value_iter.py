@@ -13,7 +13,8 @@ class ValueIterator(MDPIterator):
         
         self.v = kwargs.get('v0',np.ones(N))
         self.costs = mdp_obj.costs
-        self.PT = [mdp_obj.discount * x.transpose(True) for x in mdp_obj.transitions]
+        self.PT = [mdp_obj.discount * x.transpose(True)
+                   for x in mdp_obj.transitions]
         
         #self.pool = multiprocessing.Pool(processes=4)
         

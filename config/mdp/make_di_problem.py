@@ -24,7 +24,7 @@ def make_di_problem():
     
     # Set up parameters for the DI problem
     trans_params = utils.kwargify(step=0.01,
-                                  num_steps=5,
+                                  num_steps=10,
                                   dampening=0,
                                   control_jitter=0)
     trans_fn = DoubleIntegratorTransitionFunction(
@@ -43,7 +43,7 @@ def make_di_problem():
                                 action_dim)
 
     action_boundary = [(-1,1)]
-    discount = 0.999
+    discount = 0.998
 
     problem = Problem(gen_model,
                       action_boundary,

@@ -106,7 +106,7 @@ def weighted_centroid(S,discretizer,indexer):
 
     unique = np.unique(indices)
 
-    centroid = np.full((M,D),np.nan)
+    centroid = np.full((M,D),np.nan,dtype=np.double)
     for idx in unique:
         mask = (indices == idx)
         centroid[idx,:] = np.mean(S[mask,:],axis=0)

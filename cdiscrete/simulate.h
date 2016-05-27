@@ -7,7 +7,8 @@
 #include "policy.h"
 
 #define RECORD_GAIN    1
-#define RECORD_OUTCOME 2
+#define RECORD_FINAL   2
+#define RECORD_OUTCOME 4
 
 using namespace arma;
 
@@ -58,7 +59,8 @@ void simulate_gain(const mat & x0,
 		   const Problem & problem,
 		   const Policy & policy,
 		   uint T,
-		   vec & gain);
+		   vec & gain,
+		   mat & final_x);
 
 void simulate_test(SimulationOutcome & res);
 

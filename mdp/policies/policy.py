@@ -36,7 +36,7 @@ class ConstantDiscretePolicy(IndexPolicy):
         self.action_index = action_index
     def get_decision_indices(self,points):
         N = points.shape[0]
-        actions = np.full((N,1),self.action_index)
+        actions = np.full((N,1),self.action_index,dtype=np.int64)
         return actions
 
 class UniformDiscretePolicy(IndexPolicy):

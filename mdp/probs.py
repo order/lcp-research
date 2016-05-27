@@ -18,7 +18,7 @@ class UniformProbability(ActionProbability):
         self.A = A
     def get_prob(self,states):
         (N,d) = states.shape
-        return np.full((N,self.A),1.0 / float(self.A))
+        return np.full((N,self.A),1.0 / float(self.A),dtype=np.double)
     
 class FunctionProbability(ActionProbability):
     def __init__(self,fns):
