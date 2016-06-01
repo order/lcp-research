@@ -167,8 +167,6 @@ def scatter_knn(y,X,K,G):
     (N,D) = X.shape
     assert(2 == D)
     assert(N == y.size)
-
-    print G
     
     # Make mesh
     cuts = []
@@ -182,5 +180,4 @@ def scatter_knn(y,X,K,G):
     Z = knn.fit(X,y).predict(P)
     Z = np.reshape(Z,(G,G),order='F')
 
-    plt.pcolor(XI,YI,Z)
-    plt.show()
+    return (XI,YI,Z)

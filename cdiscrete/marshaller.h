@@ -22,7 +22,7 @@ class Marshaller{
   void save(const std::string & filename) const;
   void clear();
  
-  vec _header;
+  uvec _header;
   uint h_idx; // Header index
   
   vec _data;
@@ -39,11 +39,18 @@ class Demarshaller{
   void set_pos(uint idx);
   void clear();
 
+  uint get_num_objs() const;
+
   double get_scalar();
   vec get_vec();
   mat get_mat();
+
+  //Verbose versions
+  double get_scalar(const std::string & field);
+  vec get_vec(const std::string & field);
+  mat get_mat(const std::string & field);
   
-  vec _header;
+  uvec _header;
   uint h_idx; // Header index
   
   vec _data;

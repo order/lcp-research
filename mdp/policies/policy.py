@@ -1,4 +1,5 @@
 import numpy as np
+from mdp.state_functions import MultiFunction
 
 class Policy(object):
     def get_decisions(self,points):
@@ -88,42 +89,38 @@ class EpsilonFuzzedPolicy(IndexPolicy):
         return self.A
     
 class MinFunPolicy(IndexPolicy):
-    def __init__(self,fns):
-        self.fns = fns
+    def __init__(self,fn):
+        assert(isinstance(fn,MultiFunction))
+        self.fn = fn
         
     def get_decision_indices(self,points):
         (N,d) = points.shape
-        A = len(self.fns)
-               
-        F = np.empty((N,A))
-        for a in xrange(A):
-            F[:,a] = self.fns[a].evaluate(points)
+        F = self.fn.evaluate(points)
+        (n,a) = F.shape
+        assert(N == n)
         return np.argmin(F,axis=1)
     
 class MaxFunPolicy(IndexPolicy):
-    def __init__(self,fns):
-        self.fns = fns
+    def __init__(self,fn):
+        assert(isinstance(fn,MultiFunction))
+        self.fn = fn
         
     def get_decision_indices(self,points):
         (N,d) = points.shape
-        A = len(self.fns)
-               
-        F = np.empty((N,A))
-        for a in xrange(A):
-            F[:,a] = self.fns[a].evaluate(points)
-        return np.argmax(F,axis=1)
+        F = self.fn.evaluate(points)
+        (n,A) = F.shape
+        assert(N == n)
+        return np.armax(F,axis=1)
 
 class SoftMaxFunPolicy(IndexPolicy):
-    def __init__(self,fns):
-        self.fns = fns
+    def __init__(self,fn):
+        assert(isinstance(fn,MultiFunction))
+        self.fn = fn
         
     def get_decision_indices(self,points):
         (N,d) = points.shape
-        A = len(self.fns)
-               
-        F = np.empty((N,A))
-        for a in xrange(A):
-            F[:,a] = self.fns[a].evaluate(points)
+        (n,A) = F.shape
+        assert(N == n)
 
         F = F - np.max(F)
         Z = np.sum(F,axis=1)

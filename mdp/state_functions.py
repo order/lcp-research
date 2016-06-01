@@ -1,11 +1,15 @@
 import numpy as np
 from utils.parsers import KwargParser
 
-class StateSpaceFunction(object):
+class RealFunction(object):
     def evaluate(self,points,**kwargs):
         raise NotImplementedError()
 
-class InterpolatedFunction(StateSpaceFunction):
+class MultiFunction(object):
+    def evaluate(self,points,**kwargs):
+        raise NotImplementedError()
+
+class InterpolatedFunction(RealFunction):
     """
     Take in a finite vector and a discretizer;
     Enable evaluation at arbitrary points via interpolation
@@ -31,7 +35,7 @@ class InterpolatedFunction(StateSpaceFunction):
         assert((M,) == f.shape)
         return f
 
-class InterpolatedMultiFunction(StateSpaceFunction):
+class InterpolatedMultiFunction(MultiFunction):
     """
     Take in a finite vector and a discretizer;
     Enable evaluation at arbitrary points via interpolation
@@ -55,14 +59,14 @@ class InterpolatedMultiFunction(StateSpaceFunction):
         assert((M,A) == f.shape)
         return f
 
-class ConstFn(StateSpaceFunction):
+class ConstFn(RealFunction):
     def __init__(self,v):
         self.v = v
     def evaluate(self,points):
         (N,D) = points.shape 
         return self.v * np.ones(N)
 
-class FixedVectorFn(StateSpaceFunction):
+class FixedVectorFn(RealFunction):
     def __init__(self,x):
         assert(1 == len(x.shape))
         self.x = x
@@ -72,7 +76,7 @@ class FixedVectorFn(StateSpaceFunction):
         assert((N,) == self.x.shape)
         return self.x    
 
-class GaussianFn(StateSpaceFunction):
+class GaussianFn(RealFunction):
     def __init__(self,bandwidth,
                  setpoint,
                  non_physical):
@@ -96,7 +100,7 @@ class GaussianFn(StateSpaceFunction):
         
         return costs
         
-class BallSetFn(StateSpaceFunction):
+class BallSetFn(RealFunction):
 
     def __init__(self,center,radius):
         
@@ -122,7 +126,7 @@ class BallSetFn(StateSpaceFunction):
         
         return costs
         
-class TargetZoneFn(StateSpaceFunction):
+class TargetZoneFn(RealFunction):
 
     def __init__(self,targets):
         (D,_) = targets.shape

@@ -4,8 +4,9 @@ IDIR=-I/usr/include/hdf5/serial/ -I/usr/include/python2.7/
 LIBS=-larmadillo -lhdf5 -lpython2.7 -lboost_python -lboost_system
 LDIR=-L/usr/lib/x86_64-linux-gnu/hdf5/serial
 
-SOURCES= driver.cpp io.cpp policy.cpp value.cpp costs.cpp mcts.cpp simulate.cpp\
-discrete.cpp function.cpp misc.cpp transfer.cpp
+SOURCES= costs.cpp discrete.cpp driver.cpp function.cpp io.cpp\
+marshaller.cpp mcts.cpp misc.cpp policy.cpp simulate.cpp transfer.cpp\
+value.cpp
 
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=driver

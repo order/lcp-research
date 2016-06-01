@@ -300,7 +300,7 @@ double simulate_leaf(Path & path){
   simulate_gain(points,
 		*context->problem_ptr,
 		*context->rollout,
-		context->horizon,
+		context->rollout_horizon,
 		gain,
 		final_points);
   assert(1 == gain.n_elem);
@@ -311,7 +311,7 @@ double simulate_leaf(Path & path){
   // Gain = [1,d,d^2,d^3,...,d^{H-1}].T * [c_0,c_1,...,c_{H-1}] 
   double discount = context->problem_ptr->discount;
   // Tail Estimate: d^H * v(final_state)
-  double v_discount = pow(discount,context->horizon);
+  double v_discount = pow(discount,context->rollout_horizon);
 
   /*
   std::cout << "Found:\n"

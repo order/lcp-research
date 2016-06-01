@@ -14,25 +14,37 @@ import discrete
 import matplotlib.pyplot as plt
 
 
-def make_di_problem():
+def make_di_problem(step_len,
+                    n_steps,
+                    damp,
+                    jitter,
+                    discount,
+                    bounds,
+                    cost_radius,
+                    actions):
     """
     Makes a double integrator problem
     TODO: take in parameters
     """
+    (A,action_dim) = actions.shape
+    assert(A == 3)
+    assert(action_dim == 1)
+    assert(actions[0] == -actions[-1])
+    assert(actions[1] == 0)
+    
     state_dim = 2
-    action_dim = 1
     
     # Set up parameters for the DI problem
-    trans_params = utils.kwargify(step=0.01,
-                                  num_steps=10,
-                                  dampening=0,
-                                  control_jitter=0)
+    trans_params = utils.kwargify(step=step_len,
+                                  num_steps=n_steps,
+                                  dampening=damp,
+                                  control_jitter=jitter)
     trans_fn = DoubleIntegratorTransitionFunction(
         **trans_params)
     
-    boundary = SaturationBoundary([(-6,6),(-5,5)])
+    boundary = SaturationBoundary(bounds)
     
-    cost_state_fn = BallSetFn(np.zeros(2), 0.25)
+    cost_state_fn = BallSetFn(np.zeros(2), cost_radius)
     #cost_state_fn = TargetZoneFn(np.array([[-0.5,0.5],[-0.5,0.5]]))
     cost_fn = CostWrapper(cost_state_fn)
     
@@ -42,8 +54,7 @@ def make_di_problem():
                                 state_dim,
                                 action_dim)
 
-    action_boundary = [(-1,1)]
-    discount = 0.998
+    action_boundary = [(actions[0],actions[-1])]
 
     problem = Problem(gen_model,
                       action_boundary,

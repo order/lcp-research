@@ -14,9 +14,9 @@ using namespace arma;
 
 //=====================================
 // STRUCTURES
-
+// Aliases for rows and col dims. 
 uint num_actions(const mat & actions);
-uint action_dim(const mat &actions);
+uint action_dim(const mat & actions);
 
 uint num_states(const mat & states);
 uint state_dim(const mat & states);

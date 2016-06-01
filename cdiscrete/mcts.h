@@ -35,7 +35,7 @@ struct MCTSContext{
   ProbFunction * prob_fn;
   DiscretePolicy * rollout;
 
-  uint horizon;
+  uint rollout_horizon;
   double p_scale; // weight for initial probability
   double ucb_scale; // weight for UCB term
 };

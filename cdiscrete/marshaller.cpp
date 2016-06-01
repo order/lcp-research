@@ -7,8 +7,9 @@ Marshaller::Marshaller(){
 
 void Marshaller::clear(){
     // Set up structures for writing
-    _header = zeros<vec>(3);
+    _header = zeros<uvec>(3);
     _header(H_HEADER_SZ) = 3;
+    _data.clear();
     h_idx = 3;
     d_idx = 0;
 }
@@ -65,7 +66,7 @@ void Marshaller::add_mat(const mat & A){
 
 void Marshaller::save(const std::string & filename) const{
   vec output = vec(_header.n_elem + _data.n_elem);
-  output.head(_header.n_elem) = _header;
+  output.head(_header.n_elem) = conv_to<vec>::from(_header);
   output.tail(_data.n_elem) = _data;
 
   output.save(filename);
@@ -80,8 +81,10 @@ void Demarshaller::load(const std::string & filename){
   input.load(filename);
   uint H = input(H_HEADER_SZ);
   uint D = input(H_DATA_SZ);
+
+  
   assert(input.n_elem == H + D);
-  _header = input.head(H);
+  _header = conv_to<uvec>::from(input.head(H));
   _data = input.tail(D);
   h_idx = 3;
   d_idx = 0;
@@ -113,6 +116,10 @@ void Demarshaller::set_pos(uint idx){
   }
 }
 
+uint Demarshaller::get_num_objs() const{
+  return _header(H_NUM_OBJS);
+}
+
 void Demarshaller::clear(){
   _header.clear();
   h_idx = 0;
@@ -121,6 +128,7 @@ void Demarshaller::clear(){
 }
 
 double Demarshaller::get_scalar(){
+  std::cout << "Reading scalar..." << std::endl;
   assert(0 == _header[h_idx]);
   h_idx++;
   
@@ -131,7 +139,9 @@ vec Demarshaller::get_vec(){
   assert(1 == _header[h_idx]); // Should start on dim
   uint N = _header[++h_idx]; // Get len
   h_idx++; // Increment to next start
-  
+
+  std::cout << "Reading (" << N << ",) vector..." << std::endl;
+
   vec v = _data(span(d_idx,d_idx+N-1)); // Read in span
   assert(N == v.n_elem);
   d_idx += N;
@@ -144,6 +154,9 @@ mat Demarshaller::get_mat(){
   uint R = _header[++h_idx]; // Row
   uint C = _header[++h_idx]; // Col
   h_idx++; // Increment to next start
+
+  std::cout << "Reading (" << R << ","
+	    << C << ") matrix..." << std::endl;
 
   vec v = _data(span(d_idx,d_idx+R*C-1));
   assert(R*C == v.n_elem);
