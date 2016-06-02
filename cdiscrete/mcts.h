@@ -49,6 +49,9 @@ struct MCTSContext{
   uint q_update_mode;
   double q_stepsize; // Multiplier if Q_EXP_AVG is true
   uint update_ret_mode;
+  
+  uint action_select_mode;
+  uint mcts_budget;
 };
 
 class MCTSNode{

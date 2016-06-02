@@ -17,6 +17,9 @@ UPDATE_RET_V = 1
 UPDATE_RET_Q = 2
 UPDATE_RET_GAIN = 4
 
+ACTION_BEST = 1
+ACTION_FREQ = 2
+
 #####################################
 # Problem parameters
 
@@ -46,12 +49,15 @@ q_update_mode = Q_EXP_AVG
 q_stepsize = 0.1
 update_ret_mode = UPDATE_RET_GAIN
 
-mcts_budget = 1250
+mcts_budget = 1500
 tail_error = 1
 sim_horizon = bounded_tail(discount,tail_error)
 
+
 # Uniform start states
-start_states = (2*np.random.rand(100,2) - 1)
+start_states = (2*np.random.rand(10,2) - 1)
+
+action_select_mode = ACTION_BEST
 
 #########################################
 # Generate stuff
@@ -115,6 +121,7 @@ marsh.add(mcts_budget)
 # Simulation
 marsh.add(sim_horizon)
 marsh.add(start_states)
+marsh.add(action_select_mode)
 
 print "Marshalling", len(marsh.objects),"objects"
 

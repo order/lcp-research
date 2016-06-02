@@ -14,6 +14,9 @@ class Marshaller(object):
             assert(1<= len(obj.shape) <= 3)
         self.objects.append(obj)
 
+    def extend(self,objs):
+        [self.add(obj) for obj in objs]
+
     def save(self,filename):
         num_objs = len(self.objects)
         data_size = 0

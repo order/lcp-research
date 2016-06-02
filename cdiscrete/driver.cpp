@@ -8,7 +8,9 @@
 #include "policy.h"
 #include "transfer.h"
 
-#define EARLY_TERM_THRESH 0.1
+#define EARLY_TERM_THRESH 0.15
+#define ACTION_BEST 1
+#define ACTION_FREQ 2
 
 using namespace std;
 
@@ -50,13 +52,20 @@ void read_problem(Demarshaller & demarsh,
 }
 
 void read_mcts_context(Demarshaller & demarsh,
-			 RegGrid & grid,
-			 Problem & problem,
-			 MCTSContext & context){
-
+		       RegGrid & grid,
+		       Problem & problem,
+		       mat & start_states,
+		       uint & sim_horizon,
+		       MCTSContext & context){
+  
   vec v = demarsh.get_vec("Value");
   mat q = demarsh.get_mat("Q");
   mat flow = demarsh.get_mat("Flow");
+
+  uint mcts_budget = (uint)demarsh.get_scalar("MCTS growth budget");
+  sim_horizon = (uint)demarsh.get_scalar("Simulation horizon");
+  start_states = demarsh.get_mat("Start states");
+
 
   double p_scale = demarsh.get_scalar("P term scale");
   double ucb_scale = demarsh.get_scalar("UCB term scale");
@@ -66,7 +75,8 @@ void read_mcts_context(Demarshaller & demarsh,
   uint q_update_mode = (uint) demarsh.get_scalar("Q update mode");
   double q_stepsize = demarsh.get_scalar("Q exp average stepsize");
   uint update_ret_mode = (uint) demarsh.get_scalar("Update mode");
-  
+  uint action_select_mode = (uint)demarsh.get_scalar("Action select mode");
+
   // Q estimates
   InterpFunction * v_fn = new InterpFunction(v,grid);
   InterpMultiFunction * q_fn = new InterpMultiFunction(q,grid);
@@ -94,6 +104,9 @@ void read_mcts_context(Demarshaller & demarsh,
   context.q_update_mode = q_update_mode;
   context.q_stepsize = q_stepsize;
   context.update_ret_mode = update_ret_mode;
+
+  context.action_select_mode = action_select_mode;
+  context.mcts_budget = mcts_budget;
 }
 
 int main(int argc, char ** argv){
@@ -107,7 +120,7 @@ int main(int argc, char ** argv){
   std::cout << "Loading " << filename << std::endl;
 
   Demarshaller demarsh = Demarshaller(filename);
-  assert( 23 == demarsh.get_num_objs());
+  assert(24 == demarsh.get_num_objs());
 
   RegGrid grid;
   read_grid(demarsh,grid);
@@ -116,45 +129,68 @@ int main(int argc, char ** argv){
   read_problem(demarsh,grid,problem);
   
   MCTSContext context;
-  read_mcts_context(demarsh,grid,problem,context);
-
-  uint mcts_budget = (uint)demarsh.get_scalar("MCTS growth budget");
-
-  uint sim_horizon = (uint)demarsh.get_scalar("Simulation horizon");
-  mat start_states = demarsh.get_mat("Start states");
-  
+  mat start_states;
+  uint sim_horizon;
+  read_mcts_context(demarsh,
+		    grid,
+		    problem,
+		    start_states,
+		    sim_horizon,
+		    context);
 
   uint N = start_states.n_rows;
   TransferFunction * t_fn = problem.trans_fn;
   mat actions = problem.actions;
-  
+
+  vec gains = zeros<vec>(N);
   for(uint i = 0; i < N; i++){
-    //for(uint i =0; i<1; i++){
     // Pick state
     std::cout << i << '/' << N << std::endl;
-    //vec curr_state = ones<vec>(2);
     vec curr_state = start_states.row(i).t();
-
-    for(uint t = 0; t < sim_horizon; t++){
-    //for(uint t = 0; t < 5; t++){
-
+    vec last_state = 10*ones<vec>(2);
+    uint t;
+    for(t = 0; t < sim_horizon; t++){
       //Build tree
       MCTSNode * root = new MCTSNode(curr_state, &context);
       add_root(&context,root);
-      grow_tree(root,mcts_budget);
+      grow_tree(root,context.mcts_budget);
       //root->print_debug();
 
-      // Move to next action
-      vec action = actions.row(root->get_best_action()).t();
+      //Get action
+      vec action;
+      if(context.action_select_mode == ACTION_BEST){
+	action = actions.row(root->get_best_action()).t();
+      }
+      else{
+	assert(context.action_select_mode == ACTION_FREQ);
+	action = actions.row(root->get_freq_action()).t();
+      }
+
+      // Record the cost and gain
+      double cost = problem.cost_fn->get_cost(curr_state,action);
+      
+      gains(i) += pow(problem.discount,t) * cost;
+
+      // Transition
+      last_state = curr_state;
       curr_state = t_fn->get_next_state(curr_state,
 					action);
+
+      // Scrap tree.
       delete_tree(&context);
-      //std::cout<< "\t" << t << ": " << curr_state.t() << std::endl;
-      if(norm(curr_state) < EARLY_TERM_THRESH){
+      if(norm(curr_state) < EARLY_TERM_THRESH
+	 && norm(last_state) < EARLY_TERM_THRESH){
 	break;
       }
     }
+    if(t == sim_horizon){
+      double tail = pow(problem.discount,sim_horizon)
+	/ (1.0 - problem.discount);
+      gains(i) += tail;
+    }
   }
   delete_context(&context);
+  std::cout << gains << std::endl;
+  gains.save(filename + ".res",raw_binary);
   return 0;
 }
