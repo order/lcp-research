@@ -14,7 +14,7 @@ using namespace arma;
 
 //=====================================
 // STRUCTURES
-// Aliases for rows and col dims. 
+// Aliases for rows and col dims.
 uint num_actions(const mat & actions);
 uint action_dim(const mat & actions);
 
@@ -29,12 +29,15 @@ uvec num_cells; // Number of CELLS per dimension;
 // Number of grid cuts per dimension is +1 this
 };
 
+void print_grid(const RegGrid & grid);
+
 uint grid_dim(const RegGrid & grid);
 uvec num_grid_points_per_dim(const RegGrid & grid);
 uint num_grid_points(const RegGrid & grid);
 uint oob_index(const RegGrid & grid);
 uint oob_index(const uvec & points_per_dim);
 vec width(const RegGrid & grid);
+bool verify(const RegGrid & grid);
 bool check_dim(const RegGrid & grid, uint D);
 
 //=======================================

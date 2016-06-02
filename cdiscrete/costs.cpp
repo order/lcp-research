@@ -21,3 +21,10 @@ mat BallCost::get_costs(const mat & points, const mat & actions) const{
   c.rows(find(in_ball == 0)).fill(1);
   return c;
 }
+
+double BallCost::get_cost(const vec & point, const vec & action) const{
+  assert(point.n_elem == 2);
+  assert(_center.n_elem == 2);
+  bool in_ball = (norm(point.t() - _center) <= _radius);
+  return in_ball ? 0 : 1;
+}

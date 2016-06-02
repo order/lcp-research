@@ -16,12 +16,8 @@ class TransferFunction{
 			      const mat & actions) const = 0;
 
   // Single point, single action
-  vec get_next_state(const vec & points,
-		     const vec & action) const;
-
-  // Many points, single action
-  mat get_next_states(const mat & points,
-		      const vec & actions) const;
+  virtual vec get_next_state(const vec & points,
+		     const vec & action) const = 0;
 
 };
 //=================================================
@@ -34,12 +30,16 @@ class DoubleIntegrator : public TransferFunction{
 		   double damping,
 		   double jitter);
   mat get_next_states(const mat & points, const mat & actions) const;
+  vec get_next_state(const vec & point, const vec & action) const;
   
  private:
   double _step_size;
+  double _sss;
   uint _num_steps;
   double _damping;
   double _jitter;
+  mat _Tt; // Dynamics matrix
+  mat _Ut; // Action effect matrix;
 };
 
 //=================================================
@@ -54,6 +54,7 @@ class BoundaryEnforcer : public TransferFunction{
  public:
   BoundaryEnforcer(TransferFunction * trans_fn_ptr, const Boundary & boundary);
   BoundaryEnforcer(TransferFunction * trans_fn_ptr, const RegGrid & boundary);
+  ~BoundaryEnforcer();
   mat get_next_states(const mat & points, const mat & actions) const;
   vec get_next_state(const vec & point, const vec & action) const;
  protected:

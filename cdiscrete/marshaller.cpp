@@ -128,7 +128,6 @@ void Demarshaller::clear(){
 }
 
 double Demarshaller::get_scalar(){
-  std::cout << "Reading scalar..." << std::endl;
   assert(0 == _header[h_idx]);
   h_idx++;
   
@@ -139,8 +138,6 @@ vec Demarshaller::get_vec(){
   assert(1 == _header[h_idx]); // Should start on dim
   uint N = _header[++h_idx]; // Get len
   h_idx++; // Increment to next start
-
-  std::cout << "Reading (" << N << ",) vector..." << std::endl;
 
   vec v = _data(span(d_idx,d_idx+N-1)); // Read in span
   assert(N == v.n_elem);
@@ -155,12 +152,26 @@ mat Demarshaller::get_mat(){
   uint C = _header[++h_idx]; // Col
   h_idx++; // Increment to next start
 
-  std::cout << "Reading (" << R << ","
-	    << C << ") matrix..." << std::endl;
-
   vec v = _data(span(d_idx,d_idx+R*C-1));
   assert(R*C == v.n_elem);
   d_idx += R*C;
   
   return reshape(v,R,C);
+}
+
+
+double Demarshaller::get_scalar(const std::string & field){
+  double x = get_scalar();
+  std::cout << field << ": " << x << std::endl;
+  return x;
+}
+vec Demarshaller::get_vec(const std::string & field){
+  vec x = get_vec();
+  std::cout << field << ": " << size(x) << std::endl;
+  return x;
+}
+mat Demarshaller::get_mat(const std::string & field){
+  mat x = get_mat();
+  std::cout << field << ": " << size(x) << std::endl;
+  return x;
 }

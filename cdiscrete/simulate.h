@@ -20,7 +20,7 @@ struct Problem{
   CostFunction * cost_fn;
   double discount;
 };
-
+void delete_problem(Problem * problem);
 
 //==================================================
 // SIMULATOR
@@ -40,6 +40,11 @@ void add_to_gain(const vec & costs,
 		 double discount,
 		 uint t,
 		 vec & gain);
+double simulate_single(const vec & x0,
+	      const Problem & problem,
+	      const Policy & policy,
+	      uint T,
+	      vec & final_point);
 
 void simulate(const mat & x0,
 	      const Problem & problem,

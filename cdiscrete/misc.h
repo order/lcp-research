@@ -50,8 +50,14 @@ mat row_min(const mat & A, const rowvec & b);
 mat row_max(const mat & A, const rowvec & b);
 void row_min_inplace(mat & A, const rowvec & b);
 void row_max_inplace(mat & A, const rowvec & b);
+void min_inplace(vec & u, const vec & b);
+void max_inplace(vec & u, const vec & b);
 
 // Index of maximum column for each row in V
+uint argmax(const vec & v);
+uint argmin(const vec & v);
+uint argmax(const uvec & v);
+uint argmin(const uvec & v);
 uvec col_argmax(const mat & V);
 uvec col_argmin(const mat & V);
 

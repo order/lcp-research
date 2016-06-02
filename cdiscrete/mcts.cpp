@@ -29,7 +29,7 @@ MCTSNode::MCTSNode(const vec & state,
   _ucb_scale = context->ucb_scale;
 
   // Init Q estimate and costs cache
-  _q = context->q_fn->f(_state);
+  _q = 0.1*context->q_fn->f(_state);
   _v = min(_q);
   mat costs = context->problem_ptr
     ->cost_fn->get_costs(_state.t(),
@@ -136,17 +136,13 @@ double MCTSNode::get_action_ucb(uint a_idx) const{
 }
 
 uint MCTSNode::get_best_action() const{
-  assert(_n_actions > 0);
-  uint a_idx = 0;
-  double best_score = get_action_ucb(0);
-  for(uint i = 1; i < _n_actions; i++){
-    double score = get_action_ucb(i);
-    if(score < best_score){
-      best_score = score;
-      a_idx = i;
-    }
-  }
-  assert(isfinite(best_score));
+  uint a_idx = argmin(_q);
+  assert(isfinite(_q(a_idx)));
+  return a_idx;
+}
+
+uint MCTSNode::get_freq_action() const{
+  uint a_idx = argmax(_child_visits);
   return a_idx;
 }
 
@@ -159,7 +155,7 @@ MCTSNode* MCTSNode::pick_child(uint a_idx){
   uint n_nodes = _children[a_idx].size();
   uint n_visits = _child_visits[a_idx];
   // Use a log schedule
-  bool new_node = (n_nodes < log2(n_visits + 1) + 1);
+  bool new_node = (n_nodes < log2(n_visits + 1) / 2 + 1);
   assert((n_nodes == 0) ? new_node : true);
 
   if(new_node){
@@ -181,7 +177,6 @@ MCTSNode * MCTSNode::sample_new_node(uint a_idx){
   vec action = _context_ptr->problem_ptr->actions.row(a_idx);
   vec state =  _context_ptr->problem_ptr
     ->trans_fn->get_next_state(_state,action);
-
   return add_child(a_idx,state);
 }
 
@@ -290,23 +285,17 @@ double simulate_leaf(Path & path){
   MCTSContext * context = leaf->_context_ptr;
   
   SimulationOutcome outcome;
-  mat points = conv_to<mat>::from(leaf->get_state().t());
-  assert(1 == points.n_rows);
+  vec point = leaf->get_state();
   
-  uint a_idx = context->rollout->get_action_index(leaf->get_state());
+  uint a_idx = context->rollout->get_action_index(point);
   path.second.push_back(a_idx);
-  vec gain;
-  mat final_points;
-  simulate_gain(points,
-		*context->problem_ptr,
-		*context->rollout,
-		context->rollout_horizon,
-		gain,
-		final_points);
-  assert(1 == gain.n_elem);
-  assert(1 == final_points.n_rows);
-  vec v = context->v_fn->f(final_points);
-  assert(1 == v.n_elem);
+  vec final_point;
+  double gain = simulate_single(point,
+				*context->problem_ptr,
+				*context->rollout,
+				context->rollout_horizon,
+				final_point);
+  double v = context->v_fn->f(final_point);
 
   // Gain = [1,d,d^2,d^3,...,d^{H-1}].T * [c_0,c_1,...,c_{H-1}] 
   double discount = context->problem_ptr->discount;
@@ -321,7 +310,7 @@ double simulate_leaf(Path & path){
 	    << "\n\tTotal:\t" << gain(0) + v_discount * v(0) << std::endl;
   */
   
-  return gain(0) + v_discount * v(0);
+  return gain + v_discount * v;
 }
 
 void update_path(const Path & path, double gain){
@@ -352,6 +341,17 @@ void delete_tree(MCTSContext * context){
     *it = NULL;
   }
   context->master_list.clear();
+}
+
+// Delete all nodes (all nodes should be created by "new"
+// e.g. from add_child
+void delete_context(MCTSContext * context){
+  delete_tree(context);
+  delete context->v_fn;
+  delete context->q_fn;
+  delete context->prob_fn;
+  delete context->rollout;
+
 }
 
 //===================================

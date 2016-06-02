@@ -58,6 +58,7 @@ class MCTSNode{
   vec get_all_ucbs() const;
   double get_action_ucb(uint a_idx) const;
   uint get_best_action() const;
+  uint get_freq_action() const;
   
   MCTSNode * pick_child(uint a_idx);
   MCTSNode * get_best_child();
@@ -108,6 +109,7 @@ class MCTSNode{
 };
 void add_root(MCTSContext * context, MCTSNode * root);
 void delete_tree(MCTSContext * context);
+void delete_context(MCTSContext * context);
 
 
 void print_nodes(const MCTSContext & context);

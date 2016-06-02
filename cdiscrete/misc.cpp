@@ -90,6 +90,33 @@ void row_max_inplace(mat & A, const rowvec & b){
   }
 }
 
+void min_inplace(vec & u, const vec & b){
+  uvec idx = find(u > b);
+  u(idx) = b(idx);
+}
+void max_inplace(vec & u, const vec & b){
+  uvec idx = find(u < b);
+  u(idx) = b(idx);
+}
+
+uint argmax(const vec & v){
+  assert(v.n_elem > 0);
+  uvec res = find(v == max(v),1);
+  return res(0);
+}
+
+uint argmin(const vec & v){
+  return argmax(-v);
+}
+
+uint argmax(const uvec & v){
+  return argmax(conv_to<vec>::from(v));
+}
+
+uint argmin(const uvec & v){
+  return argmax(-conv_to<vec>::from(v));
+}
+
 uvec col_argmax(const mat & V){
   uint N = V.n_rows;
   vec m = max(V,1);

@@ -6,6 +6,10 @@
 #include "simulate.h"
 
 using namespace arma;
+void delete_problem(Problem * problem){
+  delete problem->trans_fn;
+  delete problem->cost_fn;
+}
 
 void add_to_simout(const mat & points,
 		   const mat & actions,
@@ -22,6 +26,38 @@ void add_to_gain(const vec & costs,
 		 uint t,
 		 vec & gain){
   gain += pow(discount,t) * costs;
+}
+double simulate_single(const vec & x0,
+		       const Problem & problem,
+		       const Policy & policy,
+		       uint T,
+		       vec & point){
+
+  point = x0;
+
+  double discount = problem.discount;
+
+  double gain = 0;
+  double curr_dis = 1.0;
+
+  
+  vec action;
+  double cost;
+  for(uint t = 0; t < T; t++){
+    action = policy.get_action(point);
+    assert(action.n_elem == 1);
+    assert(point.n_elem == 2);
+
+    cost = problem.cost_fn->get_cost(point,action);
+    
+    gain = curr_dis * cost;
+    curr_dis *= discount;
+
+    if(t < T-1){
+      point = problem.trans_fn->get_next_state(point,action);
+    }
+  }
+  return gain;
 }
 
 void simulate(const mat & X0,

@@ -66,6 +66,9 @@ uint ConstMultiFunction::range_dim() const{
 ProbFunction::ProbFunction(MultiFunction * base_fn){
   _base = base_fn;
 }
+ProbFunction::~ProbFunction(){
+  delete _base;
+}
 
 mat ProbFunction::f(const mat & points) const{
   uint N = points.n_rows;

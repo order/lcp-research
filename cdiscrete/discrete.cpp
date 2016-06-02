@@ -6,6 +6,11 @@
 
 using namespace arma;
 
+void print_grid(const RegGrid & grid){
+  std::cout << grid.low << std::endl;
+  std::cout << grid.high << std::endl;
+  std::cout << grid.num_cells << std::endl;
+}
 
 uint num_actions(const mat & actions){
   return actions.n_rows;
@@ -45,6 +50,15 @@ uint oob_index(const uvec& points_per_dim){
 vec width(const RegGrid & grid){
   // The width of the hyperrectangle
   return (grid.high - grid.low) / grid.num_cells;
+}
+
+bool verify(const RegGrid & grid){
+  uint D = grid.low.n_elem;
+  assert(check_dim(grid,D));
+  for(uint d = 0; d < D; d++){
+    assert(grid.low(d) < grid.high(d));
+  }
+  return true;
 }
 
 bool check_dim(const RegGrid & grid, uint D){

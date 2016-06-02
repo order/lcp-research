@@ -63,6 +63,7 @@ class ConstMultiFunction : public MultiFunction{
 class ProbFunction : public MultiFunction{
  public:
   ProbFunction(MultiFunction * base_fn);
+  ~ProbFunction();
   mat f(const mat & points) const;
   vec f(const vec & points) const;
   uint dom_dim() const;
