@@ -6,9 +6,16 @@ from discrete import *
 
 import math
 
-# This file is for pushing V and flow vectors to C++ code for simulation
-
 root = 'data/di/' # root filename
+
+#########################################
+# Modes
+Q_AVG = 1
+Q_EXP_AVG = 2
+
+UPDATE_RET_V = 1
+UPDATE_RET_Q = 2
+UPDATE_RET_GAIN = 4
 
 #####################################
 # Problem parameters
@@ -32,13 +39,19 @@ assert(actions.shape[0] == action_n)
 
 p_scale = 1
 ucb_scale = 1
-rollout_horizon = 75
-mcts_budget = 2500
+rollout_horizon = 25
+
+init_q_mult = 0.5
+q_update_mode = Q_EXP_AVG
+q_stepsize = 0.1
+update_ret_mode = UPDATE_RET_GAIN
+
+mcts_budget = 1250
 tail_error = 1
-sim_horizon = int(math.log(tail_error*(1.0 - discount)) / math.log(discount))
+sim_horizon = bounded_tail(discount,tail_error)
 
 # Uniform start states
-start_states = B*(2*np.random.rand(10000,2) - 1)
+start_states = (2*np.random.rand(100,2) - 1)
 
 #########################################
 # Generate stuff
@@ -91,6 +104,11 @@ marsh.add(flow)
 marsh.add(p_scale)
 marsh.add(ucb_scale)
 marsh.add(rollout_horizon)
+
+marsh.add(init_q_mult);
+marsh.add(q_update_mode);
+marsh.add(q_stepsize);
+marsh.add(update_ret_mode);
 
 marsh.add(mcts_budget)
 

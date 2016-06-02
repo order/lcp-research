@@ -12,6 +12,14 @@ import matplotlib.pyplot as plt
 import h5py
 import importlib
 
+def tail_max(discount,T):
+    return np.power(discount,T) / (1.0 - discount)
+
+def bounded_tail(discount,bound):
+    T = np.ceil(np.log((1.0 - discount)*bound) / np.log(discount))
+    assert(bound > tail_max(discount,T))
+    return int(T)
+
 def save_ndarray_hdf5(filename,A):
     f = h5py.File(filename,'w')
     dset = f.create_dataset("dataset", data=A)

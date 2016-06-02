@@ -13,6 +13,12 @@
 #include "simulate.h"
 #include "transfer.h"
 
+#define Q_AVG     1
+#define Q_EXP_AVG 2
+
+#define UPDATE_RET_V    1
+#define UPDATE_RET_Q    2
+#define UPDATE_RET_GAIN 4
 
 using namespace arma;
 
@@ -35,9 +41,14 @@ struct MCTSContext{
   ProbFunction * prob_fn;
   DiscretePolicy * rollout;
 
-  uint rollout_horizon;
   double p_scale; // weight for initial probability
   double ucb_scale; // weight for UCB term
+  uint rollout_horizon;
+
+  double init_q_mult; // Multiplier for init Q estimates
+  uint q_update_mode;
+  double q_stepsize; // Multiplier if Q_EXP_AVG is true
+  uint update_ret_mode;
 };
 
 class MCTSNode{

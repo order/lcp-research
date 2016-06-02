@@ -8,7 +8,7 @@
 #include "policy.h"
 #include "transfer.h"
 
-#define EARLY_TERM_THRESH 0.01
+#define EARLY_TERM_THRESH 0.1
 
 using namespace std;
 
@@ -62,6 +62,11 @@ void read_mcts_context(Demarshaller & demarsh,
   double ucb_scale = demarsh.get_scalar("UCB term scale");
   uint rollout_horizon = (uint) demarsh.get_scalar("Rollout horizon");
   
+  double init_q_mult = demarsh.get_scalar("Initial Q multiplier");
+  uint q_update_mode = (uint) demarsh.get_scalar("Q update mode");
+  double q_stepsize = demarsh.get_scalar("Q exp average stepsize");
+  uint update_ret_mode = (uint) demarsh.get_scalar("Update mode");
+  
   // Q estimates
   InterpFunction * v_fn = new InterpFunction(v,grid);
   InterpMultiFunction * q_fn = new InterpMultiFunction(q,grid);
@@ -84,6 +89,11 @@ void read_mcts_context(Demarshaller & demarsh,
   context.p_scale = p_scale;
   context.ucb_scale = ucb_scale;
   context.rollout_horizon = rollout_horizon;
+
+  context.init_q_mult = init_q_mult;
+  context.q_update_mode = q_update_mode;
+  context.q_stepsize = q_stepsize;
+  context.update_ret_mode = update_ret_mode;
 }
 
 int main(int argc, char ** argv){
@@ -97,7 +107,7 @@ int main(int argc, char ** argv){
   std::cout << "Loading " << filename << std::endl;
 
   Demarshaller demarsh = Demarshaller(filename);
-  assert( 19 == demarsh.get_num_objs());
+  assert( 23 == demarsh.get_num_objs());
 
   RegGrid grid;
   read_grid(demarsh,grid);

@@ -19,7 +19,7 @@ MCTSNode::MCTSNode(const vec & state,
   _n_actions = context->n_actions;
   _discount = context->problem_ptr->discount;
 
-  _q_stepsize = 0.1;
+  _q_stepsize = context->q_stepsize;
 
   _fresh = true;
 
@@ -29,7 +29,7 @@ MCTSNode::MCTSNode(const vec & state,
   _ucb_scale = context->ucb_scale;
 
   // Init Q estimate and costs cache
-  _q = 0.1*context->q_fn->f(_state);
+  _q = context->init_q_mult*context->q_fn->f(_state);
   _v = min(_q);
   mat costs = context->problem_ptr
     ->cost_fn->get_costs(_state.t(),
@@ -215,11 +215,32 @@ double MCTSNode::update(uint a_idx,double gain){
   // Child got G, so we got c[a] + d * G
   gain = _costs(a_idx) + _discount * gain;
 
-  _q(a_idx) *= (1.0 - _q_stepsize);
-  _q(a_idx) += _q_stepsize * gain;
-
+  double alpha;
+  uint q_update_mode = _context_ptr->q_update_mode;
+  if(q_update_mode == Q_EXP_AVG){
+    // Exponential moving average
+    alpha = _context_ptr->q_stepsize;
+  }
+  else{
+    // Normal average
+    assert(q_update_mode == Q_AVG);
+    alpha = 1.0 / _child_visits(a_idx);
+  }
+  _q(a_idx) *= (1.0 - alpha);
+  _q(a_idx) += alpha * gain;  
   _v = min(_q);
 
+  uint update_ret_mode = _context_ptr->update_ret_mode;
+  if(update_ret_mode == UPDATE_RET_V){
+    return _v;
+  }
+  if(update_ret_mode == UPDATE_RET_Q){
+    return _q(a_idx);
+  }
+  if (update_ret_mode == UPDATE_RET_GAIN){
+    return gain;
+  }
+  assert(false);
   return gain; // Return updated gain
 }
 
