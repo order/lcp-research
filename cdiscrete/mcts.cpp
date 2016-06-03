@@ -19,8 +19,6 @@ MCTSNode::MCTSNode(const vec & state,
   _n_actions = context->n_actions;
   _discount = context->problem_ptr->discount;
 
-  _q_stepsize = context->q_stepsize;
-
   _fresh = true;
 
   // Init visits
@@ -215,17 +213,8 @@ double MCTSNode::update(uint a_idx,double gain){
   // Child got G, so we got c[a] + d * G
   gain = _costs(a_idx) + _discount * gain;
 
-  double alpha;
-  uint q_update_mode = _context_ptr->q_update_mode;
-  if(q_update_mode == Q_EXP_AVG){
-    // Exponential moving average
-    alpha = _context_ptr->q_stepsize;
-  }
-  else{
-    // Normal average
-    assert(q_update_mode == Q_AVG);
-    alpha = 1.0 / _child_visits(a_idx);
-  }
+  double alpha = max(1.0 / _child_visits(a_idx),
+		     _context_ptr->q_min_step);
   _q(a_idx) *= (1.0 - alpha);
   _q(a_idx) += alpha * gain;  
   _v = min(_q);

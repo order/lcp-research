@@ -13,9 +13,6 @@
 #include "simulate.h"
 #include "transfer.h"
 
-#define Q_AVG     1
-#define Q_EXP_AVG 2
-
 #define UPDATE_RET_V    1
 #define UPDATE_RET_Q    2
 #define UPDATE_RET_GAIN 4
@@ -46,8 +43,7 @@ struct MCTSContext{
   uint rollout_horizon;
 
   double init_q_mult; // Multiplier for init Q estimates
-  uint q_update_mode;
-  double q_stepsize; // Multiplier if Q_EXP_AVG is true
+  double q_min_step;
   uint update_ret_mode;
   
   uint action_select_mode;
@@ -115,8 +111,6 @@ class MCTSNode{
   // Initial probability
   double _p_scale;
   vec _prob;
-
-  double _q_stepsize;
 
   uint _n_children;
   std::vector<NodeList> _children;

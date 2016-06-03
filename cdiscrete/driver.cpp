@@ -72,8 +72,7 @@ void read_mcts_context(Demarshaller & demarsh,
   uint rollout_horizon = (uint) demarsh.get_scalar("Rollout horizon");
   
   double init_q_mult = demarsh.get_scalar("Initial Q multiplier");
-  uint q_update_mode = (uint) demarsh.get_scalar("Q update mode");
-  double q_stepsize = demarsh.get_scalar("Q exp average stepsize");
+  double q_min_step = demarsh.get_scalar("Q min update stepsize");
   uint update_ret_mode = (uint) demarsh.get_scalar("Update mode");
   uint action_select_mode = (uint)demarsh.get_scalar("Action select mode");
 
@@ -101,8 +100,7 @@ void read_mcts_context(Demarshaller & demarsh,
   context.rollout_horizon = rollout_horizon;
 
   context.init_q_mult = init_q_mult;
-  context.q_update_mode = q_update_mode;
-  context.q_stepsize = q_stepsize;
+  context.q_min_step = q_min_step;
   context.update_ret_mode = update_ret_mode;
 
   context.action_select_mode = action_select_mode;
@@ -117,10 +115,9 @@ int main(int argc, char ** argv){
   }
   
   string filename = string(argv[1]);
-  std::cout << "Loading " << filename << std::endl;
 
   Demarshaller demarsh = Demarshaller(filename);
-  assert(24 == demarsh.get_num_objs());
+  assert(23 == demarsh.get_num_objs());
 
   RegGrid grid;
   read_grid(demarsh,grid);
@@ -145,7 +142,7 @@ int main(int argc, char ** argv){
   vec gains = zeros<vec>(N);
   for(uint i = 0; i < N; i++){
     // Pick state
-    std::cout << i << '/' << N << std::endl;
+    //std::cout << i << '/' << N << std::endl;
     vec curr_state = start_states.row(i).t();
     vec last_state = 10*ones<vec>(2);
     uint t;
@@ -185,12 +182,13 @@ int main(int argc, char ** argv){
     }
     if(t == sim_horizon){
       double tail = pow(problem.discount,sim_horizon)
-	/ (1.0 - problem.discount);
+	* context.v_fn->f(curr_state);
       gains(i) += tail;
     }
   }
   delete_context(&context);
-  std::cout << gains << std::endl;
+  //std::cout << gains << std::endl;
+  std::cout << sum(gains) / N << std::endl;
   gains.save(filename + ".res",raw_binary);
   return 0;
 }

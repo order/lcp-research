@@ -3,7 +3,7 @@ import numpy as np
 class Marshaller(object):
     def __init__(self):
         self.objects = []
-        self.scalars = tuple([int,float])
+        self.scalars = tuple([int,float,np.int64])
         self.types = tuple(list(self.scalars) + [np.ndarray])
 
     def add(self,obj):

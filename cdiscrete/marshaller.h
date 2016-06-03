@@ -8,6 +8,8 @@
 #define H_HEADER_SZ 1
 #define H_DATA_SZ 2
 
+#define MARSHAL_VERBOSE false
+
 using namespace arma;
 
 // Bundles stuff up into a single vector and

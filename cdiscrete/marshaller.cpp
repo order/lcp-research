@@ -162,16 +162,19 @@ mat Demarshaller::get_mat(){
 
 double Demarshaller::get_scalar(const std::string & field){
   double x = get_scalar();
-  std::cout << field << ": " << x << std::endl;
+  if(MARSHAL_VERBOSE)
+    std::cout << field << ": " << x << std::endl;
   return x;
 }
 vec Demarshaller::get_vec(const std::string & field){
   vec x = get_vec();
-  std::cout << field << ": " << size(x) << std::endl;
+  if(MARSHAL_VERBOSE)
+    std::cout << field << ": " << size(x) << std::endl;
   return x;
 }
 mat Demarshaller::get_mat(const std::string & field){
   mat x = get_mat();
-  std::cout << field << ": " << size(x) << std::endl;
+  if(MARSHAL_VERBOSE)
+    std::cout << field << ": " << size(x) << std::endl;
   return x;
 }
