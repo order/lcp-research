@@ -13,6 +13,12 @@ import math
 
 import matplotlib.pyplot as plt
 
+MCTS_BUDGET = 2000
+WORKERS = multiprocessing.cpu_count()-1
+BATCHES_PER_WORKER = 2
+STATES_PER_BATCH = 5
+TOTAL_ITER = 720
+
 root = os.path.expanduser('~/data/di') # root filename
 driver = os.path.expanduser('~/repo/lcp-research/cdiscrete/driver')
 #########################################
@@ -128,7 +134,7 @@ def create_static_params():
     action_n = 3
     assert(actions.shape[0] == action_n)
 
-    mcts_budget = 1000
+    mcts_budget = MCTS_BUDGET
 
     # Uniform start states
     tail_error = 5
@@ -204,9 +210,10 @@ if __name__ == "__main__":
 
     best_params = Params()
     best_return = np.inf
-    total_iter = 5
-    batches = num_workers*5
-    points_per_batch = 10
+    total_iter = TOTAL_ITER
+    num_workers = WORKERS
+    batches = WORKERS * BATCHES_PER_WORKER
+    points_per_batch = STATES_PER_BATCH
     
     best_params_mat = np.empty((total_iter,7))
     params_mat = np.empty((total_iter,7))
@@ -244,6 +251,7 @@ if __name__ == "__main__":
             print '\tAccepted parameters'
             best_params = curr_params
             best_return = avg_gain
+            np.save("best_found",best_params.to_array())
         else:
             print '\tRejected parameters'
         best_params_mat[i,:] = best_params.to_array()
@@ -251,11 +259,13 @@ if __name__ == "__main__":
         params_mat[i,:] = curr_params.to_array()
         gain_vec[i] = avg_gain
 
-    fig = plt.figure()
-    ax = fig.add_subplot('211')
-    ax.plot(params_mat)
-    ax.plot(best_params_mat,lw=2)
-    ax = fig.add_subplot('212')    
-    plt.plot(gain_vec)
-    plt.plot(best_gain_vec,lw=2)
-    plt.show()
+    
+    if False:
+        fig = plt.figure()
+        ax = fig.add_subplot('211')
+        ax.plot(params_mat)
+        ax.plot(best_params_mat,lw=2)
+        ax = fig.add_subplot('212')    
+        plt.plot(gain_vec)
+        plt.plot(best_gain_vec,lw=2)
+        plt.show()
