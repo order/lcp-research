@@ -133,6 +133,19 @@ double MCTSNode::get_action_ucb(uint a_idx) const{
     - _p_scale * _prob(a_idx) / child_v;
 }
 
+uint MCTSNode::get_action(uint mode) const{
+  if(mode == ACTION_BEST){
+    return get_best_action();
+  }
+  if(mode == ACTION_FREQ){
+    return get_freq_action();
+  }
+  if(mode == ACTION_ROLLOUT){
+    return _context_ptr->rollout->get_action_index(_state);
+  }
+  assert(false);
+}
+
 uint MCTSNode::get_best_action() const{
   uint a_idx = argmin(_q);
   assert(isfinite(_q(a_idx)));

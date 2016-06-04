@@ -49,8 +49,8 @@ class Marshaller(object):
         (N,) = A.shape
         
         num_objs =   int(A[0])
-        data_size =  int(A[1])
-        header_size = int(A[2])
+        header_size = int(A[1])
+        data_size =  int(A[2])
         assert(data_size + header_size == N)
 
         objs = []

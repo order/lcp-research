@@ -13,11 +13,12 @@ import math
 
 import matplotlib.pyplot as plt
 
-MCTS_BUDGET = 2000
+MCTS_BUDGET = 500
 WORKERS = multiprocessing.cpu_count()-1
-BATCHES_PER_WORKER = 2
-STATES_PER_BATCH = 5
-TOTAL_ITER = 720
+BATCHES_PER_WORKER = 5
+STATES_PER_BATCH = 1
+TOTAL_ITER = 500
+SIM_HORIZON = 100
 
 root = os.path.expanduser('~/data/di') # root filename
 driver = os.path.expanduser('~/repo/lcp-research/cdiscrete/driver')
@@ -83,9 +84,9 @@ class Params(object):
 
     def perturb(self):
         if 0.5 > np.random.rand():
-            self.p_scale = max(0,self.p_scale + 0.05*np.random.randn())
+            self.p_scale = max(0,self.p_scale + 0.1*np.random.randn())
         if 0.5 > np.random.rand():
-            self.ucb_scale = max(0,self.ucb_scale + 0.05*np.random.randn())
+            self.ucb_scale = max(0,self.ucb_scale + 0.1*np.random.randn())
         if 0.5 > np.random.rand():
             if 0.5 > np.random.rand():
                 self.rollout_horizon += 1
@@ -93,10 +94,10 @@ class Params(object):
                 self.rollout_horizon -= 1
             self.rollout_horizon = min(max(5,self.rollout_horizon),100)
         if 0.5 > np.random.rand():
-            pert = self.init_q_mult + 0.01*np.random.randn()
+            pert = self.init_q_mult + 0.1*np.random.randn()
             self.init_q_mult = max(0.0,min(1.0,pert))
         if 0.5 > np.random.rand():
-            self.q_min_step = max(0,self.q_min_step + 0.01*np.random.randn())
+            self.q_min_step = max(0,self.q_min_step + 0.1*np.random.randn())
         if 0.05 > np.random.rand():
             self.update_ret_mode = np.random.choice([UPDATE_RET_V,
                                                      UPDATE_RET_Q,
@@ -137,9 +138,8 @@ def create_static_params():
     mcts_budget = MCTS_BUDGET
 
     # Uniform start states
-    tail_error = 5
-    sim_horizon = bounded_tail(discount,tail_error)
-    start_states = (2*np.random.rand(10,2) - 1)
+    sim_horizon = SIM_HORIZON
+    start_states = (np.random.rand(10,2) - 1)
     
     problem = make_di_problem(step_len,
                               n_steps,
@@ -209,7 +209,7 @@ if __name__ == "__main__":
     static_params = create_static_params()
 
     best_params = Params()
-    best_return = np.inf
+    best_gain = np.inf
     total_iter = TOTAL_ITER
     num_workers = WORKERS
     batches = WORKERS * BATCHES_PER_WORKER
@@ -247,18 +247,20 @@ if __name__ == "__main__":
                                      dtype=np.double))
         avg_gain = np.mean(np.hstack(gains))        
 
-        if avg_gain < best_return:
+        if avg_gain <= best_gain:
             print '\tAccepted parameters'
             best_params = curr_params
-            best_return = avg_gain
+            best_gain = avg_gain
             np.save("best_found",best_params.to_array())
         else:
             print '\tRejected parameters'
         best_params_mat[i,:] = best_params.to_array()
-        best_gain_vec[i] = best_return
+        best_gain_vec[i] = best_gain
         params_mat[i,:] = curr_params.to_array()
         gain_vec[i] = avg_gain
 
+    np.save('params',params_mat)
+    np.save('gain',gain_vec)
     
     if False:
         fig = plt.figure()

@@ -8,9 +8,7 @@
 #include "policy.h"
 #include "transfer.h"
 
-#define EARLY_TERM_THRESH 0.15
-#define ACTION_BEST 1
-#define ACTION_FREQ 2
+#define EARLY_TERM_THRESH 0.1
 
 using namespace std;
 
@@ -109,12 +107,23 @@ void read_mcts_context(Demarshaller & demarsh,
 
 int main(int argc, char ** argv){
 
-  if(2 != argc){
+  if(argc < 2 or argc > 3){
     std::cerr << "Usage: driver <mcts input file>" << std::endl;
     return -1;
   }
-  
   string filename = string(argv[1]);
+  bool save_sim = false;
+  if(1 == atoi(argv[2])){
+    save_sim = true;
+    std::cout << "Saving." << std::endl;
+  }
+  else{
+    std::cout << "Not saving." << std::endl;
+  }
+ 
+
+  arma_rng::set_seed_random();
+  
 
   Demarshaller demarsh = Demarshaller(filename);
   assert(23 == demarsh.get_num_objs());
@@ -139,6 +148,15 @@ int main(int argc, char ** argv){
   TransferFunction * t_fn = problem.trans_fn;
   mat actions = problem.actions;
 
+  cube traj;
+  cube decisions;
+  mat costs;
+  if(save_sim){
+    traj = cube(N,2,sim_horizon).fill(0);
+    decisions = cube(N,1,sim_horizon).fill(0);
+    costs = mat(N,sim_horizon).fill(0);
+  }
+  
   vec gains = zeros<vec>(N);
   for(uint i = 0; i < N; i++){
     // Pick state
@@ -151,22 +169,22 @@ int main(int argc, char ** argv){
       MCTSNode * root = new MCTSNode(curr_state, &context);
       add_root(&context,root);
       grow_tree(root,context.mcts_budget);
-      //root->print_debug();
+      root->print_debug();
 
       //Get action
       vec action;
-      if(context.action_select_mode == ACTION_BEST){
-	action = actions.row(root->get_best_action()).t();
-      }
-      else{
-	assert(context.action_select_mode == ACTION_FREQ);
-	action = actions.row(root->get_freq_action()).t();
-      }
+      action = actions.row(root->get_action(context.action_select_mode)).t();
 
       // Record the cost and gain
       double cost = problem.cost_fn->get_cost(curr_state,action);
       
       gains(i) += pow(problem.discount,t) * cost;
+
+      if(save_sim){
+	traj.slice(t).row(i) = curr_state.t();
+	decisions.slice(t).row(i) = action.t();
+	costs(i,t) = cost;
+      }
 
       // Transition
       last_state = curr_state;
@@ -187,8 +205,13 @@ int main(int argc, char ** argv){
     }
   }
   delete_context(&context);
-  //std::cout << gains << std::endl;
-  std::cout << sum(gains) / N << std::endl;
-  gains.save(filename + ".res",raw_binary);
+  Marshaller marsh;
+  marsh.add_vec(gains);
+  if(save_sim){
+    marsh.add_cube(traj);
+    marsh.add_cube(decisions);
+    marsh.add_mat(costs);
+  }
+  marsh.save(filename + ".sim");
   return 0;
 }

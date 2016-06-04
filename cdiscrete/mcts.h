@@ -13,6 +13,10 @@
 #include "simulate.h"
 #include "transfer.h"
 
+#define ACTION_BEST     1
+#define ACTION_FREQ     2
+#define ACTION_ROLLOUT  3
+
 #define UPDATE_RET_V    1
 #define UPDATE_RET_Q    2
 #define UPDATE_RET_GAIN 4
@@ -67,6 +71,8 @@ class MCTSNode{
   vec get_all_nudges() const;
   vec get_all_ucbs() const;
   double get_action_ucb(uint a_idx) const;
+
+  uint get_action(uint mode) const;
   uint get_best_action() const;
   uint get_freq_action() const;
   

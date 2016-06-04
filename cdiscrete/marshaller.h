@@ -20,6 +20,7 @@ class Marshaller{
   void add_scalar(double s);
   void add_vec(const vec & v);
   void add_mat(const mat & A);
+  void add_cube(const cube & C);
   
   void save(const std::string & filename) const;
   void clear();
@@ -46,11 +47,13 @@ class Demarshaller{
   double get_scalar();
   vec get_vec();
   mat get_mat();
+  cube get_cube();
 
   //Verbose versions
-  double get_scalar(const std::string & field);
-  vec get_vec(const std::string & field);
-  mat get_mat(const std::string & field);
+  double get_scalar(const std::string & field,bool verbose=MARSHAL_VERBOSE);
+  vec get_vec(const std::string & field,bool verbose=MARSHAL_VERBOSE);
+  mat get_mat(const std::string & field,bool verbose=MARSHAL_VERBOSE);
+  cube get_cube(const std::string & field,bool verbose=MARSHAL_VERBOSE);
   
   uvec _header;
   uint h_idx; // Header index
