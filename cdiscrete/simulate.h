@@ -6,6 +6,9 @@
 #include "costs.h"
 #include "policy.h"
 
+// Threshold for components to stop simulating
+#define SIMTHRESH 0.075
+
 #define RECORD_GAIN    1
 #define RECORD_FINAL   2
 #define RECORD_OUTCOME 4

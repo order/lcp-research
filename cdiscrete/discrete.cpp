@@ -278,8 +278,9 @@ void out_of_bounds(Mask & oob_mask,
   generate_mask(oob_mask,mask);
 }
 
-sp_mat point_to_idx_dist(const mat & points,
-			  const RegGrid & grid){
+void point_to_idx_dist(const mat & points,
+			 const RegGrid & grid,
+			 sp_mat & out_spmat){
 
 
   uint N = points.n_rows;
@@ -349,8 +350,10 @@ sp_mat point_to_idx_dist(const mat & points,
   uint I = 0;
   
   // Fill in data and locations
-  for(uint j = 0; j < V; j++){
-    for(uint i = 0; i < N; i++){
+  uvec sort_idx = sort_index(shift); // Done to avoid sorting in SP creation
+  uint J;
+  for(uint i = 0; i < N; i++){ // Iterate over states
+    for(uint j = 0; j < V; j++){ // Iterate over vertices
       if (oob_mask.mask(i) == 1 && j > 0){
 	// Already filled in oob entry
 	continue;
@@ -360,21 +363,20 @@ sp_mat point_to_idx_dist(const mat & points,
 	// OOB and first occurance
 	data(I) = 1.0;
 	loc(0,I) = oob_idx;
-	loc(1,I) = i;
+	loc(1,I++) = i;
       }
       if(oob_mask.mask(i) == 0){
 	// In bounds
-	data(I) = W(i,j);
-	loc(0,I) = low_indices(i) + shift(j);
-	loc(1,I) = i;
+	J = sort_idx(j);
+	data(I) = W(i,J);
+	loc(0,I) = low_indices(i) + shift(J);
+	loc(1,I++) = i;
       }      
-      I++;
     }
   }
   uint G = num_grid_points(grid);
   assert(G == oob_idx + 1);
-  sp_mat dist = sp_mat(loc,data,G,N);
-  return dist;
+  out_spmat = sp_mat(loc,data,G,N,false);
 }
 
 vec interp_fn(const vec & vals, const mat & points,const RegGrid & grid){
@@ -392,11 +394,12 @@ mat interp_fns(const mat & vals,
   assert(check_dim(grid,D));
   assert(G == vals.n_rows);
 
-  sp_mat point_dist = point_to_idx_dist(points,grid);
+  sp_mat point_dist;
+  point_to_idx_dist(points,grid,point_dist);
   assert(G == point_dist.n_rows);
   assert(N == point_dist.n_cols);  
   
-  mat I = point_dist.t() * vals;
+  mat I = (vals.t() * point_dist).t();
   assert(N == I.n_rows);
   assert(M == I.n_cols);
 

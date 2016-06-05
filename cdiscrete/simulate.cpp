@@ -40,18 +40,28 @@ double simulate_single(const vec & x0,
   double gain = 0;
   double curr_dis = 1.0;
 
+  assert(2 == point.n_elem);
   
   vec action;
   double cost;
   for(uint t = 0; t < T; t++){
+    if(norm(point) < SIMTHRESH){
+      return gain;
+    }
+    
     action = policy.get_action(point);
     assert(action.n_elem == 1);
     assert(point.n_elem == 2);
 
     cost = problem.cost_fn->get_cost(point,action);
-    
-    gain = curr_dis * cost;
+    gain += curr_dis * cost;
     curr_dis *= discount;
+    /*
+    std::cout << "State: " << point.t()
+	      << "\nCost: " << cost
+	      <<"\nGain: " << gain
+	      <<"\nCur Dis: " << curr_dis << std::endl;
+    */
 
     if(t < T-1){
       point = problem.trans_fn->get_next_state(point,action);

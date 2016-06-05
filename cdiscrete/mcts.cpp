@@ -27,7 +27,8 @@ MCTSNode::MCTSNode(const vec & state,
   _ucb_scale = context->ucb_scale;
 
   // Init Q estimate and costs cache
-  _q = context->init_q_mult*context->q_fn->f(_state);
+  //_q = context->init_q_mult*context->q_fn->f(_state);
+  _q = zeros<vec>(_n_actions);
   _v = min(_q);
   mat costs = context->problem_ptr
     ->cost_fn->get_costs(_state.t(),
@@ -57,7 +58,7 @@ MCTSNode::~MCTSNode(){
 void MCTSNode::print_debug() const{
   // Basic debug information
 
-  vec u = get_all_ucbs();
+  vec u = get_all_ucb_scores();
   vec nudge = get_all_nudges();
   
   std::cout << "N" << _id << ":\n"
@@ -100,10 +101,10 @@ bool MCTSNode::has_unexplored() const{
   return _n_actions > _n_children;
 }
 
-vec MCTSNode::get_all_ucbs() const{
+vec MCTSNode::get_all_ucb_scores() const{
   vec u = vec(_n_actions);
   for(uint a_idx = 0; a_idx < _n_actions; a_idx++){
-    u(a_idx) = get_action_ucb(a_idx);
+    u(a_idx) = get_ucb_score(a_idx);
   }
   return u;
 }
@@ -123,7 +124,7 @@ double MCTSNode::get_nudge(uint a_idx) const{
       - _p_scale * _prob(a_idx) / child_v;
 }
 
-double MCTSNode::get_action_ucb(uint a_idx) const{
+double MCTSNode::get_ucb_score(uint a_idx) const{
   // Actually the "lower confidence bound" because we're minimizing cost
 
   uint total_v = _total_visits+1; // +1 to avoid nan
@@ -134,8 +135,8 @@ double MCTSNode::get_action_ucb(uint a_idx) const{
 }
 
 uint MCTSNode::get_action(uint mode) const{
-  if(mode == ACTION_BEST){
-    return get_best_action();
+  if(mode == ACTION_Q){
+    return get_q_action();
   }
   if(mode == ACTION_FREQ){
     return get_freq_action();
@@ -143,12 +144,22 @@ uint MCTSNode::get_action(uint mode) const{
   if(mode == ACTION_ROLLOUT){
     return _context_ptr->rollout->get_action_index(_state);
   }
+  if(mode == ACTION_UCB){
+    return get_ucb_action();
+  }
   assert(false);
 }
 
-uint MCTSNode::get_best_action() const{
+uint MCTSNode::get_q_action() const{
   uint a_idx = argmin(_q);
   assert(isfinite(_q(a_idx)));
+  return a_idx;
+}
+
+uint MCTSNode::get_ucb_action() const{
+  vec u = get_all_ucb_scores();
+  uint a_idx = argmin(u);
+  assert(isfinite(u(a_idx)));
   return a_idx;
 }
 
@@ -166,7 +177,8 @@ MCTSNode* MCTSNode::pick_child(uint a_idx){
   uint n_nodes = _children[a_idx].size();
   uint n_visits = _child_visits[a_idx];
   // Use a log schedule
-  bool new_node = (n_nodes < log2(n_visits + 1) / 2 + 1);
+  bool new_node = (n_nodes < log(n_visits + 1) / log(10) + 1);
+  
   assert((n_nodes == 0) ? new_node : true);
 
   if(new_node){
@@ -177,11 +189,6 @@ MCTSNode* MCTSNode::pick_child(uint a_idx){
     uint c_idx = c_dist(MT_GEN);
     return _children[a_idx][c_idx];
   }  
-}
-
-MCTSNode* MCTSNode::get_best_child(){
-  uint a_idx = get_best_action();
-  return pick_child(a_idx);
 }
 
 MCTSNode * MCTSNode::sample_new_node(uint a_idx){
@@ -276,8 +283,8 @@ Path find_path_and_make_leaf(MCTSNode * root){
   MCTSNode * curr = root;
   uint a_idx;
   for(uint i = 0; i < 2500; i++){
-    a_idx = curr->get_best_action(); // From UCB+ score
-    curr = curr->get_best_child(); // Node may or may not be created
+    a_idx = curr->get_ucb_action(); // From UCB+ score
+    curr = curr->pick_child(a_idx); // Node may or may not be created
 
     // Add to path
     path.first.push_back(curr);
@@ -327,10 +334,10 @@ double simulate_leaf(Path & path){
 
   /*
   std::cout << "Found:\n"
-	    << "\tGain:\t" << gain(0)
-	    << "\n\tTail state:\t" << final_points.row(0)
-	    << "\n\tTail:\t" << v_discount << " * " << v(0)
-	    << "\n\tTotal:\t" << gain(0) + v_discount * v(0) << std::endl;
+	    << "\tGain:\t" << gain
+	    << "\n\tTail state:\t" << final_point
+	    << "\n\tTail:\t" << v_discount << " * " << v
+	    << "\n\tTotal:\t" << gain + v_discount * v << std::endl;
   */
   
   return gain + v_discount * v;

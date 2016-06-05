@@ -15,7 +15,7 @@ Z = (np.sqrt(X*X + Y*Y) < 0.25)
 plt.pcolor(X,Y,Z,alpha=0.15)
 
 for i in xrange(N):
-    plt.plot(traj[i,0,:],traj[i,1,:],'x-k')
+    plt.plot(traj[i,0,:],traj[i,1,:],'.-k',alpha=0.25)
 
 plt.show()
 

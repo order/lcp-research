@@ -16,22 +16,19 @@ import matplotlib.pyplot as plt
 MCTS_BUDGET = 500
 WORKERS = multiprocessing.cpu_count()-1
 BATCHES_PER_WORKER = 5
-STATES_PER_BATCH = 1
-TOTAL_ITER = 500
+STATES_PER_BATCH = 5
+TOTAL_ITER = 5
 SIM_HORIZON = 100
 
 root = os.path.expanduser('~/data/di') # root filename
 driver = os.path.expanduser('~/repo/lcp-research/cdiscrete/driver')
 #########################################
 # Modes
-Q_AVG = 1
-Q_EXP_AVG = 2
-
 UPDATE_RET_V = 1
 UPDATE_RET_Q = 2
 UPDATE_RET_GAIN = 4
 
-ACTION_BEST = 1
+ACTION_Q = 1
 ACTION_FREQ = 2
 
 #########################################
@@ -44,22 +41,20 @@ class Params(object):
             self.copy(other)
         
     def default(self):
-        self.p_scale = 1
-        self.ucb_scale = 1
-        self.rollout_horizon = 50
+        self.p_scale = 5
+        self.ucb_scale = 5
+        self.rollout_horizon = 25
         
-        self.init_q_mult = 0.75
         self.q_min_step = 0.1
         self.update_ret_mode = UPDATE_RET_GAIN
         
-        self.action_select_mode = ACTION_BEST
+        self.action_select_mode = ACTION_Q
 
     def copy(self,param):
         self.p_scale = param.p_scale
         self.ucb_scale = param.ucb_scale
         self.rollout_horizon = param.rollout_horizon
         
-        self.init_q_mult = param.init_q_mult
         self.q_min_step = param.q_min_step
         self.update_ret_mode = param.update_ret_mode
         
@@ -71,7 +66,6 @@ class Params(object):
         L.append(self.ucb_scale)
         L.append(self.rollout_horizon)
         
-        L.append(self.init_q_mult);
         L.append(self.q_min_step);
         L.append(self.update_ret_mode);
 
@@ -84,9 +78,9 @@ class Params(object):
 
     def perturb(self):
         if 0.5 > np.random.rand():
-            self.p_scale = max(0,self.p_scale + 0.1*np.random.randn())
+            self.p_scale = max(0,self.p_scale + 0.5*np.random.randn())
         if 0.5 > np.random.rand():
-            self.ucb_scale = max(0,self.ucb_scale + 0.1*np.random.randn())
+            self.ucb_scale = max(0,self.ucb_scale + 0.5*np.random.randn())
         if 0.5 > np.random.rand():
             if 0.5 > np.random.rand():
                 self.rollout_horizon += 1
@@ -94,16 +88,13 @@ class Params(object):
                 self.rollout_horizon -= 1
             self.rollout_horizon = min(max(5,self.rollout_horizon),100)
         if 0.5 > np.random.rand():
-            pert = self.init_q_mult + 0.1*np.random.randn()
-            self.init_q_mult = max(0.0,min(1.0,pert))
-        if 0.5 > np.random.rand():
-            self.q_min_step = max(0,self.q_min_step + 0.1*np.random.randn())
+            self.q_min_step = max(0,self.q_min_step + 0.05*np.random.randn())
         if 0.05 > np.random.rand():
             self.update_ret_mode = np.random.choice([UPDATE_RET_V,
                                                      UPDATE_RET_Q,
                                                      UPDATE_RET_GAIN])
         if 0.05 > np.random.rand():
-            self.action_select_mode = np.random.choice([ACTION_BEST,
+            self.action_select_mode = np.random.choice([ACTION_Q,
                                                         ACTION_FREQ])
 
     def __str__(self):
@@ -117,7 +108,7 @@ def marshal(static_params,starts,params,filename):
     marsh.extend(static_params);
     marsh.add(starts)
     marsh.extend(params.to_list())
-    assert(23 == len(marsh.objects))
+    assert(21 == len(marsh.objects))
     marsh.save(filename)
 
 def create_static_params():
@@ -139,7 +130,6 @@ def create_static_params():
 
     # Uniform start states
     sim_horizon = SIM_HORIZON
-    start_states = (np.random.rand(10,2) - 1)
     
     problem = make_di_problem(step_len,
                               n_steps,
@@ -179,7 +169,6 @@ def create_static_params():
 
     # MCTS context
     static_params.append(v)
-    static_params.append(q)
     static_params.append(flow)
     
     static_params.append(mcts_budget)
@@ -189,7 +178,7 @@ def create_static_params():
 
 def create_start_states(N,Batches):
     starts = []
-    return [np.random.uniform(-1,1,size=(N,2)) for _ in xrange(Batches)]
+    return [np.random.uniform(-5,5,size=(N,2)) for _ in xrange(Batches)]
 
 def run_driver(filename):
     curproc = multiprocessing.current_process()
@@ -215,13 +204,14 @@ if __name__ == "__main__":
     batches = WORKERS * BATCHES_PER_WORKER
     points_per_batch = STATES_PER_BATCH
     
-    best_params_mat = np.empty((total_iter,7))
-    params_mat = np.empty((total_iter,7))
+    best_params_mat = np.empty((total_iter,6))
+    params_mat = np.empty((total_iter,6))
     best_gain_vec = np.empty(total_iter)
     gain_vec = np.empty(total_iter)
 
     start_states = create_start_states(points_per_batch,batches)
 
+    marsh = Marshaller()
     for i in xrange(total_iter):
         curr_params = Params(best_params)
         curr_params.perturb()
@@ -243,26 +233,27 @@ if __name__ == "__main__":
 
         gains = [];
         for filename in files:
-            gains.append(np.fromfile(filename + '.res',
-                                     dtype=np.double))
-        avg_gain = np.mean(np.hstack(gains))        
-
-        if avg_gain <= best_gain:
+            (gain,) = marsh.load(filename + '.sim')
+            gains.append(gain)
+        gains = np.hstack(gains)
+        med_gain = np.median(gains);
+        print 'Median gain:',med_gain
+        if med_gain <= best_gain:
             print '\tAccepted parameters'
             best_params = curr_params
-            best_gain = avg_gain
+            best_gain = med_gain
             np.save("best_found",best_params.to_array())
         else:
             print '\tRejected parameters'
         best_params_mat[i,:] = best_params.to_array()
         best_gain_vec[i] = best_gain
         params_mat[i,:] = curr_params.to_array()
-        gain_vec[i] = avg_gain
+        gain_vec[i] = med_gain
 
     np.save('params',params_mat)
     np.save('gain',gain_vec)
     
-    if False:
+    if True:
         fig = plt.figure()
         ax = fig.add_subplot('211')
         ax.plot(params_mat)

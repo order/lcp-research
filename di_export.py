@@ -13,13 +13,13 @@ import math
 
 import matplotlib.pyplot as plt
 
-MCTS_BUDGET = 1
-NUM_STATES = 1
+MCTS_BUDGET = 1000
+NUM_STATES = 25
 SIM_HORIZON = 100
 
 #########################################
 # Modes
-ACTION_BEST = 1
+ACTION_Q = 1
 ACTION_FREQ = 2
 ACTION_ROLLOUT = 3
 
@@ -38,21 +38,19 @@ class Params(object):
         
     def default(self):
         self.p_scale = 1
-        self.ucb_scale = 1
-        self.rollout_horizon = 50
+        self.ucb_scale = 5
+        self.rollout_horizon = 25
         
-        self.init_q_mult = 0.1
         self.q_min_step = 0.0
         self.update_ret_mode = UPDATE_RET_GAIN
         
-        self.action_select_mode = ACTION_ROLLOUT
+        self.action_select_mode = ACTION_Q
 
     def copy(self,param):
         self.p_scale = param.p_scale
         self.ucb_scale = param.ucb_scale
         self.rollout_horizon = param.rollout_horizon
         
-        self.init_q_mult = param.init_q_mult
         self.q_min_step = param.q_min_step
         self.update_ret_mode = param.update_ret_mode
         
@@ -64,7 +62,6 @@ class Params(object):
         L.append(self.ucb_scale)
         L.append(self.rollout_horizon)
         
-        L.append(self.init_q_mult);
         L.append(self.q_min_step);
         L.append(self.update_ret_mode);
 
@@ -77,9 +74,9 @@ class Params(object):
 
     def perturb(self):
         if 0.5 > np.random.rand():
-            self.p_scale = max(0,self.p_scale + 0.1*np.random.randn())
+            self.p_scale = max(0,self.p_scale + 0.5*np.random.randn())
         if 0.5 > np.random.rand():
-            self.ucb_scale = max(0,self.ucb_scale + 0.1*np.random.randn())
+            self.ucb_scale = max(0,self.ucb_scale + 0.5*np.random.randn())
         if 0.5 > np.random.rand():
             if 0.5 > np.random.rand():
                 self.rollout_horizon += 1
@@ -87,16 +84,13 @@ class Params(object):
                 self.rollout_horizon -= 1
             self.rollout_horizon = min(max(5,self.rollout_horizon),100)
         if 0.5 > np.random.rand():
-            pert = self.init_q_mult + 0.1*np.random.randn()
-            self.init_q_mult = max(0.0,min(1.0,pert))
-        if 0.5 > np.random.rand():
-            self.q_min_step = max(0,self.q_min_step + 0.1*np.random.randn())
+            self.q_min_step = max(0,self.q_min_step + 0.05*np.random.randn())
         if 0.05 > np.random.rand():
             self.update_ret_mode = np.random.choice([UPDATE_RET_V,
                                                      UPDATE_RET_Q,
                                                      UPDATE_RET_GAIN])
         if 0.05 > np.random.rand():
-            self.action_select_mode = np.random.choice([ACTION_BEST,
+            self.action_select_mode = np.random.choice([ACTION_Q,
                                                         ACTION_FREQ])
 
     def __str__(self):
@@ -110,15 +104,15 @@ def marshal(static_params,starts,params,filename):
     marsh.extend(static_params);
     marsh.add(starts)
     marsh.extend(params.to_list())
-    assert(23 == len(marsh.objects))
+    assert(21 == len(marsh.objects))
     marsh.save(filename)
 
 def create_static_params():
-    disc_n = 40 # Number of cells per dimension
+    disc_n = 20 # Number of cells per dimension
     step_len = 0.01           # Step length
     n_steps = 5               # Steps per iteration
     damp = 0.01               # Dampening
-    jitter = 0.01            # Control jitter 
+    jitter = 0.1              # Control jitter 
     discount = 0.99           # Discount (\gamma)
     B = 5
     bounds = [[-B,B],[-B,B]]  # Square bounds, 
@@ -146,7 +140,7 @@ def create_static_params():
     (mdp,disc) = make_uniform_mdp(problem,disc_n,action_n)
 
     # Solve
-    (p,d) = solve_with_kojima(mdp,1e-12,1000)
+    (p,d) = solve_with_kojima(mdp,1e-8,1000)
 
     # Build value function
     (v,flow) = split_solution(mdp,p)
@@ -171,8 +165,7 @@ def create_static_params():
     static_params.append(actions)
 
     # MCTS context
-    static_params.append(v)
-    static_params.append(q)
+    static_params.append(v + 10*np.random.randn(*v.shape))
     static_params.append(flow)
     
     static_params.append(mcts_budget)
@@ -184,8 +177,8 @@ if __name__ == "__main__":
     params = Params()
     static_params = create_static_params()
 
-    #start_states = 2*np.random.rand(NUM_STATES,2)-1
-    start_states = np.tile([0.4,0.1],(5,1)) 
+    start_states = 2*(2*np.random.rand(NUM_STATES,2)-1)
+    #start_states = np.tile([1.4,0.5],(NUM_STATES,1)) 
     marshal(static_params,
             start_states,
             params,

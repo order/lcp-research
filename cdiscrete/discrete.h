@@ -86,7 +86,9 @@ void out_of_bounds(Mask & oob_mask,
 // e.g. If given an NxD matrix of points, returns a GxN matrix
 // where at most 2**D elements of each column is non-zero
 // and G is the number of mesh point (+1 for oob)
-sp_mat point_to_idx_dist(const mat & points,const RegGrid & grid);
+void point_to_idx_dist(const mat & points,
+		       const RegGrid & grid,
+		       sp_mat & out_mat);
 
 
 //===========================================
