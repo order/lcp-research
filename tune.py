@@ -10,14 +10,13 @@ import os
 import subprocess
 
 import math
-
 import matplotlib.pyplot as plt
 
 MCTS_BUDGET = 500
 WORKERS = multiprocessing.cpu_count()-1
 BATCHES_PER_WORKER = 5
-STATES_PER_BATCH = 5
-TOTAL_ITER = 5
+STATES_PER_BATCH = 3
+TOTAL_ITER = 2
 SIM_HORIZON = 100
 
 root = os.path.expanduser('~/data/di') # root filename
@@ -30,7 +29,6 @@ UPDATE_RET_GAIN = 4
 
 ACTION_Q = 1
 ACTION_FREQ = 2
-
 #########################################
 
 class Params(object):
@@ -41,65 +39,56 @@ class Params(object):
             self.copy(other)
         
     def default(self):
-        self.p_scale = 5
-        self.ucb_scale = 5
-        self.rollout_horizon = 25
-        
-        self.q_min_step = 0.1
-        self.update_ret_mode = UPDATE_RET_GAIN
-        
-        self.action_select_mode = ACTION_Q
+        self.names = ['p_scale',
+                      'ucb_scale',
+                      'rollout_horizon',
+                      'q_min_step',
+                      'update_ret_mode',
+                      'action_select_mode']
+        self.x = np.array([5,
+                           5,
+                           25,
+                           0.1,
+                           UPDATE_RET_GAIN,
+                           ACTION_Q])
 
     def copy(self,param):
-        self.p_scale = param.p_scale
-        self.ucb_scale = param.ucb_scale
-        self.rollout_horizon = param.rollout_horizon
-        
-        self.q_min_step = param.q_min_step
-        self.update_ret_mode = param.update_ret_mode
-        
-        self.action_select_mode = param.action_select_mode 
-
-    def to_list(self):
-        L = []
-        L.append(self.p_scale)
-        L.append(self.ucb_scale)
-        L.append(self.rollout_horizon)
-        
-        L.append(self.q_min_step);
-        L.append(self.update_ret_mode);
-
-        L.append(self.action_select_mode)
-        return L
+        self.x = np.array(param.x)
 
     def to_array(self):
-        L = self.to_list()
-        return np.array(L)
+        return self.x
+
+    def to_list(self):
+        return [float(x) for x in self.x]
+
+    def restart(self):
+        self.x = np.array([np.random.uniform(0,50),
+                           np.random.uniform(0,50),
+                           np.random.randint(5,100),
+                           np.random.uniform(0,0.25),
+                           np.random.choice([UPDATE_RET_V,
+                                             UPDATE_RET_Q,
+                                             UPDATE_RET_GAIN]),
+                           np.random.choice([ACTION_Q,
+                                             ACTION_FREQ])])
 
     def perturb(self):
-        if 0.5 > np.random.rand():
-            self.p_scale = max(0,self.p_scale + 0.5*np.random.randn())
-        if 0.5 > np.random.rand():
-            self.ucb_scale = max(0,self.ucb_scale + 0.5*np.random.randn())
-        if 0.5 > np.random.rand():
-            if 0.5 > np.random.rand():
-                self.rollout_horizon += 1
-            else:
-                self.rollout_horizon -= 1
-            self.rollout_horizon = min(max(5,self.rollout_horizon),100)
-        if 0.5 > np.random.rand():
-            self.q_min_step = max(0,self.q_min_step + 0.05*np.random.randn())
-        if 0.05 > np.random.rand():
-            self.update_ret_mode = np.random.choice([UPDATE_RET_V,
-                                                     UPDATE_RET_Q,
-                                                     UPDATE_RET_GAIN])
-        if 0.05 > np.random.rand():
-            self.action_select_mode = np.random.choice([ACTION_Q,
-                                                        ACTION_FREQ])
+        self.x += np.array([0.2*np.random.randn(),
+                            0.2*np.random.randn(),
+                            np.random.choice([-1,0,1]),
+                            0.01*np.random.randn(),
+                            0,
+                            0])
+        self.x[-2] = np.random.choice([UPDATE_RET_V,
+                                       UPDATE_RET_Q,
+                                       UPDATE_RET_GAIN])
+        self.x[-1] =  np.random.choice([ACTION_Q,
+                                        ACTION_FREQ])                      
+        self.x = np.maximum(0,self.x)
 
-    def __str__(self):
-        return'\n'.join(['{0}:{1}'.format(k,v)
-                         for (k,v) in self.__dict__.items()])
+    def add_grad(self,grad):
+        self.x -= grad
+        self.x = np.maximum(0,self.x)
         
 
 def marshal(static_params,starts,params,filename):
@@ -191,14 +180,83 @@ def run_driver(filename):
     except:
         quit()
 
-if __name__ == "__main__":
-    num_workers = multiprocessing.cpu_count()-1
+def get_median_return(static_params,
+                      start_states,
+                      curr_params,
+                      num_workers):
+    # Init filenumber
+    if not hasattr(get_median_return,'FILE_NUMBER'):
+        get_median_return.FILE_NUMBER = 0
+        
+    # Write out config files
+    files = []
+    for start in start_states:
+        filename = root + '/test.mcts.{0}'.format(
+            get_median_return.FILE_NUMBER)
+        get_median_return.FILE_NUMBER += 1
+        marshal(static_params,
+                start,
+                curr_params,
+                filename)
+        files.append(filename)
+    print 'Running {0} jobs on {1} workers'.format(len(start_states),
+                                                   num_workers)
 
+    # Simulate from config files
+    pool = multiprocessing.Pool(num_workers)
+    ret = pool.map(run_driver,files)
+    pool.close()
+    pool.join()
+
+    returns = np.array([float(x) for x in ret])
+    return np.median(returns);
+
+def fake_median_return(static_params,
+                      start_states,
+                      curr_params,
+                      num_workers):
+    return np.linalg.norm(curr_params.to_array())
+
+def get_gradient(static_params,
+                 start_states,
+                 ref_params,
+                 ref_return,
+                 num_workers,
+                 num_samples):
+    S = num_samples
+    x = ref_params.to_array()
+    (D,) = x.shape
+
+    Y = np.empty((S,D))
+    b = np.empty(S)
+    pert_params = Params()
+    for s in xrange(num_samples):
+        pert_params.copy(ref_params)
+        pert_params.perturb()
+
+        y = pert_params.to_array()
+
+        Y[s,:] = y - x
+        b[s] = get_median_return(static_params,
+                                 start_states,
+                                 pert_params,
+                                 num_workers) - ref_return
+    ret = np.linalg.lstsq(Y,b)
+    return ret[0]
+
+def accept(last_return,curr_return):
+    if last_return > curr_return:
+        return True
+    signed_error = (curr_return - last_return) / last_return
+    perc = 0.1 * np.sqrt(signed_error)
+
+    return perc > np.random.rand()
     
-    static_params = create_static_params()
+        
 
-    best_params = Params()
-    best_gain = np.inf
+if __name__ == "__main__":
+    static_params = create_static_params()
+    
     total_iter = TOTAL_ITER
     num_workers = WORKERS
     batches = WORKERS * BATCHES_PER_WORKER
@@ -206,59 +264,64 @@ if __name__ == "__main__":
     
     best_params_mat = np.empty((total_iter,6))
     params_mat = np.empty((total_iter,6))
-    best_gain_vec = np.empty(total_iter)
-    gain_vec = np.empty(total_iter)
+    best_return_vec = np.empty(total_iter)
+    return_vec = np.empty(total_iter)
 
     start_states = create_start_states(points_per_batch,batches)
 
-    marsh = Marshaller()
+    best_params = Params()
+    best_return = np.inf
+    curr_params = Params()
+    curr_return = get_median_return(static_params,
+                                    start_states,
+                                    curr_params,
+                                    num_workers)
     for i in xrange(total_iter):
-        curr_params = Params(best_params)
-        curr_params.perturb()
+        print '-'*5,i,'-'*5
+        last_params = Params(curr_params)
+        last_return = curr_return
 
-        files = []
-        for (j,start) in enumerate(start_states):
-            filename = root + '/test.mcts.{0}.{1}'.format(i,j)
-            marshal(static_params,
-                    start,
-                    curr_params,
-                    filename)
-            files.append(filename)
-        print 'Running {0} jobs on {1} workers'.format(len(start_states),
-                                                       num_workers)
-        pool = multiprocessing.Pool(num_workers)
-        pool.map(run_driver, files)
-        pool.close()
-        pool.join()
-
-        gains = [];
-        for filename in files:
-            (gain,) = marsh.load(filename + '.sim')
-            gains.append(gain)
-        gains = np.hstack(gains)
-        med_gain = np.median(gains);
-        print 'Median gain:',med_gain
-        if med_gain <= best_gain:
-            print '\tAccepted parameters'
-            best_params = curr_params
-            best_gain = med_gain
-            np.save("best_found",best_params.to_array())
+        # Occasionally restart to a random point
+        if 0.001 > np.random.rand():
+            print 'RESTART'
+            curr_params.restart()
+        elif 0.001 > np.random.rand():
+            print 'RESET TO BEST'
+            curr_params.copy(best_params)
         else:
-            print '\tRejected parameters'
-        best_params_mat[i,:] = best_params.to_array()
-        best_gain_vec[i] = best_gain
-        params_mat[i,:] = curr_params.to_array()
-        gain_vec[i] = med_gain
+            curr_params.perturb()
 
-    np.save('params',params_mat)
-    np.save('gain',gain_vec)
+        curr_return = get_median_return(static_params,
+                                        start_states,
+                                        curr_params,
+                                        num_workers)
+        print 'Params:\n',curr_params.to_array()
+        print 'Return:',curr_return
+        if not accept(last_return,curr_return):
+            curr_params.copy(last_params)
+            curr_return = last_return
+
+        # Always record best found so far.
+        if curr_return <= best_return:
+            best_params.copy(curr_params)
+            best_return = curr_return
+            np.save("best_found",best_params.to_array())
+        best_params_mat[i,:] = best_params.to_array()
+        best_return_vec[i] = best_return
+        params_mat[i,:] = curr_params.to_array()
+        return_vec[i] = curr_return
+
+    print best_params.to_array()
     
-    if True:
+    np.save('params',params_mat)
+    np.save('return',return_vec)
+    
+    if False:
         fig = plt.figure()
         ax = fig.add_subplot('211')
-        ax.plot(params_mat)
+        ax.plot(params_mat,alpha=0.25)
         ax.plot(best_params_mat,lw=2)
         ax = fig.add_subplot('212')    
-        plt.plot(gain_vec)
-        plt.plot(best_gain_vec,lw=2)
+        plt.plot(return_vec,alpha=0.25)
+        plt.plot(best_return_vec,lw=2)
         plt.show()

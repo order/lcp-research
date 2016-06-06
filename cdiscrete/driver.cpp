@@ -108,10 +108,6 @@ int main(int argc, char ** argv){
   bool save_sim = false;
   if(argc ==3 and 1 == atoi(argv[2])){
     save_sim = true;
-    std::cout << "Saving." << std::endl;
-  }
-  else{
-    std::cout << "Not saving." << std::endl;
   }
  
 
@@ -202,15 +198,16 @@ int main(int argc, char ** argv){
   std::cout << "Median: " << median(gains) << std::endl;
   std::cout << "S.D.: " << stddev(gains) << std::endl;
   */
+  std::cout << median(gains) << std::endl;
 
   delete_context(&context);
-  Marshaller marsh;
-  marsh.add_vec(gains);
   if(save_sim){
+    Marshaller marsh;
+    marsh.add_vec(gains);
     marsh.add_cube(traj);
     marsh.add_cube(decisions);
     marsh.add_mat(costs);
+    marsh.save(filename + ".sim");
   }
-  marsh.save(filename + ".sim");
   return 0;
 }
