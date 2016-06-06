@@ -15,9 +15,9 @@ import matplotlib.pyplot as plt
 MCTS_BUDGET = 500
 WORKERS = multiprocessing.cpu_count()-1
 BATCHES_PER_WORKER = 5
-STATES_PER_BATCH = 3
+STATES_PER_BATCH = 5
 TOTAL_ITER = 1200
-SIM_HORIZON = 75
+SIM_HORIZON = 100
 
 root = os.path.expanduser('~/data/di') # root filename
 driver = os.path.expanduser('~/repo/lcp-research/cdiscrete/driver')
@@ -73,18 +73,24 @@ class Params(object):
                                              ACTION_FREQ])])
 
     def perturb(self):
-        self.x += np.array([0.2*np.random.randn(),
-                            0.2*np.random.randn(),
-                            np.random.choice([-1,0,1]),
-                            0.01*np.random.randn(),
-                            0,
-                            0])
-        self.x[-2] = np.random.choice([UPDATE_RET_V,
-                                       UPDATE_RET_Q,
-                                       UPDATE_RET_GAIN])
-        self.x[-1] =  np.random.choice([ACTION_Q,
-                                        ACTION_FREQ])                      
-        self.x = np.maximum(0,self.x)
+        D = self.x.size
+        p = np.array([0.2*np.random.randn(),
+                      0.2*np.random.randn(),
+                      np.random.choice([-1,0,1]),
+                      0.01*np.random.randn(),
+                      0,
+                      0])
+        x_new = self.x + p
+        x_new[-2] = np.random.choice([UPDATE_RET_V,
+                                      UPDATE_RET_Q,
+                                      UPDATE_RET_GAIN])
+        x_new[-1] =  np.random.choice([ACTION_Q,
+                                       ACTION_FREQ])
+        x_new = np.maximum(0,x_new)
+
+        idx = np.random.randint(D)
+        self.x[idx] = x_new[idx]
+        
 
     def add_grad(self,grad):
         self.x -= grad
@@ -261,21 +267,22 @@ if __name__ == "__main__":
     num_workers = WORKERS
     batches = WORKERS * BATCHES_PER_WORKER
     points_per_batch = STATES_PER_BATCH
-    
-    best_params_mat = np.empty((total_iter,6))
-    params_mat = np.empty((total_iter,6))
-    best_return_vec = np.empty(total_iter)
-    return_vec = np.empty(total_iter)
 
     start_states = create_start_states(points_per_batch,batches)
 
-    best_params = Params()
-    best_return = np.inf
+
     curr_params = Params()
     curr_return = get_median_return(static_params,
                                     start_states,
                                     curr_params,
                                     num_workers)
+    best_params = Params(curr_params)
+    best_return = curr_return
+
+    D = curr_params.to_array().size
+    P = np.empty((total_iter,D))
+    R = np.empty(total_iter)
+    B = np.empty(total_iter)
     for i in xrange(total_iter):
         print '-'*5,i,'-'*5
         last_params = Params(curr_params)
@@ -291,40 +298,34 @@ if __name__ == "__main__":
         else:
             curr_params.perturb()
 
+        P[i,:] = curr_params.to_array()
         curr_return = get_median_return(static_params,
                                         start_states,
                                         curr_params,
                                         num_workers)
+        R[i] = curr_return
+        B[i] = min(curr_return,best_return)
+        
         print 'Params:\n',curr_params.to_array()
         print 'Return:',curr_return
         if not accept(last_return,curr_return):
             print '\tRejected'
             curr_params.copy(last_params)
             curr_return = last_return
+            continue
         else:
             print '\tAccepted'
         # Always record best found so far.
-        if curr_return <= best_return:
+        if curr_return < best_return:
             print 'Best so far!'
             best_params.copy(curr_params)
             best_return = curr_return
             np.save("best_found",best_params.to_array())
-        best_params_mat[i,:] = best_params.to_array()
-        best_return_vec[i] = best_return
-        params_mat[i,:] = curr_params.to_array()
-        return_vec[i] = curr_return
+
+        assert(best_return == min(best_return,curr_return))
 
     print 'Final best:', best_params.to_array()
-    
-    np.save('params',params_mat)
-    np.save('return',return_vec)
-    
-    if False:
-        fig = plt.figure()
-        ax = fig.add_subplot('211')
-        ax.plot(params_mat,alpha=0.25)
-        ax.plot(best_params_mat,lw=2)
-        ax = fig.add_subplot('212')    
-        plt.plot(return_vec,alpha=0.25)
-        plt.plot(best_return_vec,lw=2)
-        plt.show()
+
+    plt.plot(B,'-b',lw=2)
+    plt.plot(R,':r')
+    plt.show()
