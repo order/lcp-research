@@ -16,8 +16,8 @@ MCTS_BUDGET = 500
 WORKERS = multiprocessing.cpu_count()-1
 BATCHES_PER_WORKER = 5
 STATES_PER_BATCH = 3
-TOTAL_ITER = 2
-SIM_HORIZON = 100
+TOTAL_ITER = 1200
+SIM_HORIZON = 75
 
 root = os.path.expanduser('~/data/di') # root filename
 driver = os.path.expanduser('~/repo/lcp-research/cdiscrete/driver')
@@ -298,11 +298,14 @@ if __name__ == "__main__":
         print 'Params:\n',curr_params.to_array()
         print 'Return:',curr_return
         if not accept(last_return,curr_return):
+            print '\tRejected'
             curr_params.copy(last_params)
             curr_return = last_return
-
+        else:
+            print '\tAccepted'
         # Always record best found so far.
         if curr_return <= best_return:
+            print 'Best so far!'
             best_params.copy(curr_params)
             best_return = curr_return
             np.save("best_found",best_params.to_array())
@@ -311,7 +314,7 @@ if __name__ == "__main__":
         params_mat[i,:] = curr_params.to_array()
         return_vec[i] = curr_return
 
-    print best_params.to_array()
+    print 'Final best:', best_params.to_array()
     
     np.save('params',params_mat)
     np.save('return',return_vec)
