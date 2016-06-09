@@ -1,98 +1,89 @@
 import numpy as np
-from math import pi,sqrt
-import matplotlib.pyplot as plt
-from state_remapper import StateRemapper
-
-import types
-
-import scipy.stats
+import math
 from utils.parsers import KwargParser
+from transition import TransitionFunction
 
-class HillcarRemapper(StateRemapper):
+class HillcarTransitionFunction(TransitionFunction):
     def __init__(self,**kwargs):
         parser = KwargParser()
-        parser.add('mass',1.0,[int,float])
-        parser.add('step',0.01,float)
-        parser.add('slope',basic_slope,types.FunctionType)
+        parser.add('mass')
+        parser.add('step')
+        parser.add('num_steps')
         args = parser.parse(kwargs)
         
         self.g = 9.806
-        self.mass = args['mass']
-        self.step = args['step']
-        self.slope = args['slope']
+        self.m = 1
+
+        self.__dict__.update(args)
         
-    def remap(self,points,**kwargs):
+    def multisample_transition(self,points,actions,samples=1):
         """
         Physics step for hill car based on slope.
         """
         [N,d] = points.shape
         assert(d == 2)
+
+        # Handling different action inputs
+        if isinstance(actions,np.ndarray):
+            if 2 == len(actions.shape):
+                assert((N,1) == actions.shape)
+                u = actions[:,0]
+            else:
+                assert((1,) == actions.shape)
+                u = actions[0]
+        else:
+            assert(type(actions) in [int,float])
+            u = actions
         
-        Mass = kwargs.get('mass',1)
-        G = kwargs.get('gravity',9.806)
-        step = kwargs.get('step',0.01)
+        t = self.step
+        n_step = self.num_steps
+
+        res = np.empty((samples,N,d))
+        for s in xrange(samples):
+            curr = points
+            for _ in xrange(n_step):
+                q = classic_slope(curr[:,0])
+                p = 1 + (q * q)
+                a = (u / (self.m * np.sqrt(p)))\
+                    -(self.g * q / p)
+            
+                curr[:,0] += t * points[:,1] + 0.5*t*t*a
+                curr[:,1] += t * a
+            res[s,:,:] = curr
+        return res
+
+
+def classic_hill(x):
+    A = 1.0
+    B = 5.0
+    C = 0.0
+    def f1(x):
+        return x * (x + 1)
+    def f2(x):
+        return (A * x) / np.sqrt(1 + B * x * x)
         
-        u = kwargs['action']
-        
-        theta = np.arctan(self.slope(points[:,0]))
-        F_grav = -Mass*G*np.sin(theta)
-        F_cont = u*np.cos(theta)
-        
-        x_next = points[:,0] + step * points[:,1]
-        v_next = points[:,1] + step * (F_grav + F_cont)
-        return np.column_stack((x_next,v_next))
+    (N,) = x.shape
+    ret = np.empty(N)
+    mask = x < C
+    ret[mask] = f1(x[mask])
+    ret[~mask] = f2(x[~mask])
+    return ret
     
-# Simple two hill terrain
-def sample_hill_slope(x):
-    """
-    A sample two hill terrain slope
-    """
-    a1 = 0.5
-    mu1 = -1.25
-    sigma1 = 0.25
-    a2 = 1
-    mu2 = 1.1
-    sigma2 = 0.85
-    return a1*derv_normpdf(x,mu1,sigma1) + a2*derv_normpdf(x,mu2,sigma2)
+def classic_slope(x):
+    A = 1.0
+    B = 5.0
+    C = 0.0
+    def f1_dashed2(x):
+        return (2.0 * x + 1.0)
+    def f2_dashed2(x):
+        a = np.sqrt(1 + B * x * x)
+        return A / (a * a * a)
+    (N,) = x.shape
+    ret = np.empty(N)
+    mask = x < C
+    ret[mask] = f1_dashed2(x[mask])
+    ret[~mask] = f2_dashed2(x[~mask])
+    return ret
 
-def normpdf(x,mu,sigma):
-    return scipy.stats.norm.pdf(x,loc=mu,scale=sigma)
-
-def derv_normpdf(x,mu,sigma):
-    """
-    Derivative of the normal function
-    """
-    return (mu - x) / (sqrt(2*pi) * sigma**3) \
-        * np.exp(-(x - mu)**2 / (2*sigma**2))
-
-def basic_slope(x,**kwargs):
-    """
-    Basic slope; looks like a big 'W' with smoothed transitions
-    """
-    parser = KwargParser()
-    parser.add('grade',0.15,[int,float])
-    parser.add('bowl',1.0,[int,float])
-    parser.add('hill',5.0,[int,float])
-    args = parser.parse(kwargs)
-
-    grade = args['grade']
-    bowl = args['bowl']
-    hill = args['hill']
-    
-    assert(1 == len(x.shape))
-    theta = np.zeros(x.shape)
-
-    mask = np.abs(x) <= bowl
-    theta[mask] = -grade/bowl*x[mask]
-
-    mask = np.logical_and(np.abs(x) > bowl,np.abs(x) <= bowl+hill)
-    theta[mask] = -grade * np.sign(x[mask])
-
-    mask = np.logical_and(np.abs(x) > bowl+hill,np.abs(x) <= 3*bowl+hill)
-    theta[mask] = np.sign(x[mask])*\
-                  (grade/bowl*(np.abs(x[mask]) - bowl - hill) - grade)
-
-    mask = np.abs(x) > 3*bowl+hill
-    theta[mask] = grade *np.sign(x[mask])
-    
-    return theta
+def new_slope(x):
+    pass

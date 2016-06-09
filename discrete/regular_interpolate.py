@@ -3,20 +3,8 @@ import scipy as sp
 import scipy.sparse as sps
 import itertools
 
-from utils import save_ndarray_hdf5
-
 import indexer
 import discretize
-
-def save_grid_params_hdf5(filename,grid):
-    low = [l for (l,h,n) in grid.grid_desc]
-    hi = [h for (l,h,n) in grid.grid_desc]
-    num = [n for (l,h,n) in grid.grid_desc]
-
-    D = len(low);
-    v = np.hstack([[D],low,hi,num])
-    assert((3*D+1) == v.size)
-    save_ndarray_hdf5(filename,v)
 
 class RegularGridInterpolator(object):
     def __init__(self,grid_desc):
@@ -36,11 +24,11 @@ class RegularGridInterpolator(object):
         self.delta = np.array([float(h-l) / float(n)
                                for (l,h,n) in self.grid_desc])
 
-        # One for every cutpoint, plus an oob
-        self.num_nodes = np.prod(self.lengths) + 1
-
         # Initialize the indexer
         self.indexer = indexer.Indexer(self.lengths)
+
+        # One for every cutpoint, plus an oob
+        self.num_nodes = self.indexer.max_index+1
 
         # Fuzz to convert [low,high) to [low,high]
         self.fuzz = 1e-15
@@ -63,11 +51,7 @@ class RegularGridInterpolator(object):
             # Fuzz top boundary to get [low,high]
             fuzz_mask = np.logical_and(high <= points[:,d],
                                      points[:,d] < high + self.fuzz)
-            Coords[fuzz_mask,d] = n-1
-
-            oob_mask = np.logical_or(low > points[:,d],
-                                     points[:,d] > high + self.fuzz)
-            Coords[oob_mask,d] = np.nan            
+            Coords[fuzz_mask,d] = n-1         
         return Coords
         
     def points_to_index_distributions(self,points):
@@ -97,8 +81,10 @@ class RegularGridInterpolator(object):
         assert((N,2**D) == vertices.shape)
 
         # Set up some masks and indices
-        oob_node = self.indexer.max_index
-        oob_mask = (indices == oob_node)
+        big_physical = self.indexer.physical_max_index
+        big_oob = self.indexer.max_index
+       
+        oob_mask = (indices > big_physical)
         normal_idx = np.arange(N)[~oob_mask]
         oob_idx = np.arange(N)[oob_mask]
         num_oob = np.sum(oob_mask)
@@ -117,7 +103,7 @@ class RegularGridInterpolator(object):
 
         # Route all oob points to oob node
         cols[B:] = oob_idx
-        rows[B:] = np.full(num_oob,oob_node,dtype=np.int64)
+        rows[B:] = indices[oob_idx]
         data[B:] = np.ones(num_oob)
         
         M = self.num_nodes
@@ -127,10 +113,11 @@ class RegularGridInterpolator(object):
         linspaces = [np.linspace(l,h,n+1) for (l,h,n)
                      in self.grid_desc]
         N = self.num_nodes
+        n = self.indexer.physical_max_index+1
         D = self.D
         points = np.empty((N,D))
-        points[:-1,:] = discretize.make_points(linspaces)
-        points[-1,:] = np.nan
+        points[:n,:] = discretize.make_points(linspaces)
+        points[n:,:] = np.nan
         return points
 
     def has_point(self,target):

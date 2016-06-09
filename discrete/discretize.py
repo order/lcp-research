@@ -51,8 +51,7 @@ class TrivialDiscretizer(object):
     def has_point(self,target):
         assert((1,) == target)
         return 0 <= target[0] < self.num_nodes\
-           and (target[0] % 1) < 1e-15
-    
+           and (target[0] % 1) < 1e-15    
 
 #######################################
 # AUX functions    
@@ -60,7 +59,7 @@ class TrivialDiscretizer(object):
 def is_int(x):
     return x.dtype.kind in 'ui'
 
-def make_points(gens,order='C'):
+def make_points(gens,ret_mesh=False,order='C'):
     """
     Makes the mesh in the order you would expect for
     np.reshape after.
@@ -79,6 +78,8 @@ def make_points(gens,order='C'):
     points = np.column_stack([M.flatten() for M in meshes])
     if 'F' == order:
         return np.fliplr(points)
+    if ret_mesh:
+        return points,meshes
     return points
 
 def partition_samples(S,K):

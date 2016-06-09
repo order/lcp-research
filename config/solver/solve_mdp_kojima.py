@@ -8,7 +8,7 @@ from solvers import IterativeSolver,\
     MaxIterTerminationCondition,\
     PrimalChangeAnnounce
 
-def solve_with_kojima(mdp,thresh,max_iter):
+def solve_with_kojima(mdp,thresh,max_iter,value_reg=1e-12,flow_reg=1e-12):
     lcp = mdp.build_lcp(1e-12,1e-8)
     iterator = KojimaIPIterator(lcp)
     solver = IterativeSolver(iterator)

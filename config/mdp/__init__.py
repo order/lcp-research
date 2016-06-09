@@ -7,3 +7,4 @@ from generate_mdp import *
 
 from make_di_problem import *
 from make_hallway_problem import *
+from make_hillcar_problem import *

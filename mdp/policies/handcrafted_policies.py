@@ -49,3 +49,18 @@ class BangBangPolicy(Policy,IndexPolicy):
 
     def get_action_dim(self):
         return 1   
+
+class HillcarPolicy(Policy,IndexPolicy):
+    def __init__(self,actions):
+        self.actions = actions
+        
+    def get_decisions(self,points):
+        I = self.get_decision_indices(points)
+        return self.actions[I,:]
+
+    def get_decision_indices(self,points):
+        # Assuming we're using simple_slope
+        pass
+
+    def get_action_dim(self):
+        return 1   

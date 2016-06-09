@@ -10,9 +10,23 @@ class CostFunction(object):
 
 class CostWrapper(CostFunction):
     def __init__(self,state_fn):
+        self.favored = np.empty(0)
         self.state_fn = state_fn
+        self.nudge = 1e-4
+        
     def cost(self,states,action):
-        return self.state_fn.evaluate(states)
+        c = self.state_fn.evaluate(states)
+        if self.favored.size == 0:
+            return c
+
+
+        if (2 == len(action.shape)):
+            mask = np.any(action != self.favored,axis=1)
+        else:
+            assert(1 == len(action.shape))
+            mask = np.any(action != self.favored)
+        return c + self.nudge * mask
+                
 
 class DiscreteCostWrapper(CostFunction):
     def __init__(self,costs):

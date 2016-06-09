@@ -7,8 +7,13 @@ class Indexer(object):
         lens = np.array(lens)
         (D,) = lens.shape
         self.dim = D
-        
-        self.max_index = np.product(lens)
+
+        # There are 2 oob nodes for every dimension.
+        # Too small, and too big.
+        # If a point is oob in several dimensions, it's assigned to the oob node in the
+        # first dimension that it violates
+        self.physical_max_index = np.product(lens) - 1
+        self.max_index = self.physical_max_index + 2*D
         self.lens = np.array(lens)
         
         """
@@ -31,22 +36,39 @@ class Indexer(object):
             coef[0] = 1.0
             coef = np.flipud(coef)            
         self.coef = coef
+
+    def get_oob_indices(self):
+        ret =  range(np.self.physical_max_index+1,
+                     self.max_index)
+        assert(2*self.dim == len(ret))
+        return ret
+
+    def get_oob_index(self,d,sign):
+        assert(sign in [-1,1])
+        assert(0 <= d < self.dim)
         
+        return int(self.physical_max_index + 2*(d+1) + (sign - 1)/2)
+    
     def coords_to_indices(self,coords):
         """
         Turn D dimensional coords into indices
         """
         (N,D) = coords.shape
-        nan_mask = np.any(np.isnan(coords),axis=1)
-        assert(discretize.is_int(coords)
-               or 0 == np.sum(np.mod(coords[~nan_mask,:],1.0)))
-        
         assert(D == self.dim) # Dimension right
-        assert(not np.any(coords[~nan_mask,:] < 0))
-        assert(np.all(coords[~nan_mask,:] < self.lens))
+        assert(not np.any(np.isnan(coords)))
         
         indices = coords.dot(self.coef)
-        indices[nan_mask] = self.max_index
+        for d in xrange(D-1,-1,-1):
+            # Reverse order so higher violations are masked by lower ones.
+            # Too small
+            oob_idx = self.get_oob_index(d,-1)
+            mask = coords[:,d] < 0
+            indices[mask] = oob_idx
+
+            # Too large
+            oob_idx = self.get_oob_index(d,1)
+            mask = coords[:,d] >= self.lens[d]
+            indices[mask] = oob_idx 
         return indices
     
     def indices_to_coords(self,indices):
@@ -64,7 +86,7 @@ class Indexer(object):
             (coord,res) = divmod(res,self.coef[d])
             coords[:,d] = coord
         oob_mask = np.logical_or(indices < 0,
-                                 indices >= self.max_index)
+                                 indices >= self.physical_max_index)
         coords[oob_mask] = np.nan
         return coords.astype('i')
 
