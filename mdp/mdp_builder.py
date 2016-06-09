@@ -43,9 +43,11 @@ class MDPBuilder(object):
             action = actions[a,:]
             (samples,cost) = model.multisample_next(points,
                                                     action,S)
-            print cost.shape
+            #plt.pcolormesh(np.reshape(cost,(17,17)))
+            #plt.show()
             assert((S,n,state_dim) == samples.shape)
             assert((n,) == cost.shape)
+            
             exp_cost = np.empty(N)
             exp_cost[:n] = cost
             exp_cost[n:] = model.oob_costs

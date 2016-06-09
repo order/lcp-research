@@ -1,9 +1,9 @@
 import numpy as np
 import utils
 from mdp.transitions import HillcarTransitionFunction
-from mdp.boundary import SaturationBoundary
+from mdp.boundary import *
 from mdp.state_functions import BallSetFn
-from mdp.costs import CostWrapper
+from mdp.costs import *
 from mdp.generative_model import GenerativeModel
 from mdp.problem import Problem
 
@@ -34,21 +34,22 @@ def make_hillcar_problem(step_len,
     trans_params = utils.kwargify(
         mass=1.0,
         step=step_len,
-        num_steps=n_steps)
+        num_steps=n_steps,
+        jitter=jitter)
     
     trans_fn = HillcarTransitionFunction(
         **trans_params)
 
-    raise NotImplementedError() # Turn of saturation on x; allow boundary exit
-    boundary = SaturationBoundary(bounds)
+    #boundary = SaturationBoundary(bounds)
+    boundary = HillcarBoundary(bounds)
     
     cost_state_fn = BallSetFn(goal, cost_radius)
     cost_fn = CostWrapper(cost_state_fn)
     cost_fn.favored=np.array([0.0])
     
     #If we see 100 leaking in, there is a problem with v saturation
-    with the boundary containment.
-    oob_costs = np.array([0,0,100,100])
+    #with the boundary containment.
+    oob_costs = np.array([0,0,0,0])
     # otherwise we will pay a penalty at the boundary, but be 0 after.
     
     gen_model = GenerativeModel(trans_fn,
@@ -56,7 +57,7 @@ def make_hillcar_problem(step_len,
                                 cost_fn,
                                 state_dim,
                                 action_dim,
-    )
+                                oob_costs)
 
     action_boundary = [(actions[0],actions[-1])]
 

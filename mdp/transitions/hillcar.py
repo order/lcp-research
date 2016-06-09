@@ -9,6 +9,7 @@ class HillcarTransitionFunction(TransitionFunction):
         parser.add('mass')
         parser.add('step')
         parser.add('num_steps')
+        parser.add('jitter')
         args = parser.parse(kwargs)
         
         self.g = 9.806
@@ -40,11 +41,12 @@ class HillcarTransitionFunction(TransitionFunction):
 
         res = np.empty((samples,N,d))
         for s in xrange(samples):
-            curr = points
+            curr = np.array(points)
             for _ in xrange(n_step):
-                q = classic_slope(curr[:,0])
+                noise = self.jitter * np.random.randn(*u.shape)
+                q = new_slope(curr[:,0])
                 p = 1 + (q * q)
-                a = (u / (self.m * np.sqrt(p)))\
+                a = ((u+noise) / (self.m * np.sqrt(p)))\
                     -(self.g * q / p)
             
                 curr[:,0] += t * points[:,1] + 0.5*t*t*a
@@ -85,5 +87,16 @@ def classic_slope(x):
     ret[~mask] = f2_dashed2(x[~mask])
     return ret
 
+def triangle_wave(x,a,s):
+    x = x/a
+    return s*(2 * np.abs(2* (x - np.floor(x+0.5))) - 1)
+
 def new_slope(x):
-    pass
+    a = 8
+    th = 0.05
+    s = 1
+    
+    sig = triangle_wave(x - a/4,a,s)
+    sig = np.sign(sig) * np.maximum(0,np.abs(sig)-th)
+    return sig
+

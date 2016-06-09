@@ -39,6 +39,9 @@ class RegularGridInterpolator(object):
 
     def num_oob(self):
         return self.num_nodes() - self.num_real_nodes()
+
+    def is_oob(self,idx):
+        return idx > self.indexer.physical_max_index
         
     def to_cell_coord(self,points):
         """
@@ -58,8 +61,12 @@ class RegularGridInterpolator(object):
             # Fuzz top boundary to get [low,high]
             fuzz_mask = np.logical_and(high <= points[:,d],
                                      points[:,d] < high + self.fuzz)
-            Coords[fuzz_mask,d] = n-1         
+            Coords[fuzz_mask,d] = n-1
         return Coords
+
+    def to_indices(self,points):
+        coords = self.to_cell_coord(points)
+        return self.indexer.coords_to_indices(coords)
         
     def points_to_index_distributions(self,points):
         (N,D) = points.shape

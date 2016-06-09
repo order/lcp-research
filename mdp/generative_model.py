@@ -26,7 +26,7 @@ class GenerativeModel(object):
 
         next_states = self.trans_fn.multisample_transition(states,
                                                            action,
-                                                           S)
+                                                          S)
         assert((S,N,D) == next_states.shape)
         next_states = self.boundary.enforce(next_states)
 

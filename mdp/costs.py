@@ -7,8 +7,6 @@ class CostFunction(object):
     def single_cost(self,state,action):
         assert(1 == len(state.shape))
         return self.cost(state[np.newaxis,:],action)[0]
-    def get_oob_costs(self):
-        raise NotImplementedError()
 
 class CostWrapper(CostFunction):
     def __init__(self,state_fn):
@@ -27,9 +25,6 @@ class CostWrapper(CostFunction):
             assert(1 == len(action.shape))
             mask = np.any(action != self.favored)
         return c + self.nudge * mask
-
-    def get_oob_costs(self):
-        return self.oob_costs
                 
 
 class DiscreteCostWrapper(CostFunction):
@@ -55,3 +50,14 @@ class DiscreteMatchCost(CostFunction):
         costs = np.ones(N)
         costs[states[:,0] == self.state] = 0
         return costs
+
+
+class HillcarCost(CostFunction):
+    def __init__(self):
+        pass
+        
+    def cost(self,states,action):
+        return np.linalg.norm(states,axis=1)
+
+    def get_oob_costs(self):
+        return self.oob_costs

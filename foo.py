@@ -1,8 +1,17 @@
-def foo(d,sign):
-        assert(sign in [-1,1])
-        
-        return int(2*(d+1) + (sign - 1)/2)
+import numpy as np
+from mdp import *
 
-for d in xrange(3):
-    for s in [-1,1]:
-        print foo(d,s)
+import matplotlib.pyplot as plt
+
+boundary = HillcarBoundary([(-1,1),(-1,1)])
+
+N = 50
+P = np.random.randn(N,2)
+
+Q = boundary.enforce(P)
+
+for i in xrange(N):
+    plt.plot([P[i,0],Q[i,0]],
+             [P[i,1],Q[i,1]],'-o')
+plt.show()
+

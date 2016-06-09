@@ -15,7 +15,7 @@ class InterpolatedFunction(RealFunction):
     Enable evaluation at arbitrary points via interpolation
     """
     def __init__(self,discretizer,y):
-        N = discretizer.num_nodes
+        N = discretizer.num_nodes()
         assert((N,) == y.shape)
         self.target_values = y
         self.discretizer = discretizer

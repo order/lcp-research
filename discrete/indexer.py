@@ -67,7 +67,7 @@ class Indexer(object):
 
             # Too large
             oob_idx = self.get_oob_index(d,1)
-            mask = coords[:,d] >= self.lens[d]
+            mask = (coords[:,d] >= self.lens[d]-1)
             indices[mask] = oob_idx 
         return indices
     
