@@ -6,13 +6,17 @@ class GenerativeModel(object):
                  boundary,
                  cost_fn,
                  state_dim,
-                 action_dim):
+                 action_dim,
+                 oob_costs):
+
+        assert(2*state_dim == oob_costs.size)
 
         self.trans_fn = trans_fn
         self.boundary = boundary
         self.cost_fn = cost_fn
         self.state_dim = state_dim
         self.action_dim = action_dim
+        self.oob_costs = oob_costs
 
     def multisample_next(self,states,action,S):
         (N,D) = states.shape

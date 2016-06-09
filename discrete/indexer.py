@@ -38,8 +38,8 @@ class Indexer(object):
         self.coef = coef
 
     def get_oob_indices(self):
-        ret =  range(np.self.physical_max_index+1,
-                     self.max_index)
+        ret =  range(self.physical_max_index+1,
+                     self.max_index+1)
         assert(2*self.dim == len(ret))
         return ret
 

@@ -12,7 +12,7 @@ import math
 
 root = 'data/hillcar/' # root filename
 
-disc_n = 160
+disc_n = 10
 step_len = 0.01           # Step length
 n_steps = 1               # Steps per iteration
 jitter = 0.1              # Control jitter 

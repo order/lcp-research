@@ -7,6 +7,8 @@ class CostFunction(object):
     def single_cost(self,state,action):
         assert(1 == len(state.shape))
         return self.cost(state[np.newaxis,:],action)[0]
+    def get_oob_costs(self):
+        raise NotImplementedError()
 
 class CostWrapper(CostFunction):
     def __init__(self,state_fn):
@@ -19,13 +21,15 @@ class CostWrapper(CostFunction):
         if self.favored.size == 0:
             return c
 
-
         if (2 == len(action.shape)):
             mask = np.any(action != self.favored,axis=1)
         else:
             assert(1 == len(action.shape))
             mask = np.any(action != self.favored)
         return c + self.nudge * mask
+
+    def get_oob_costs(self):
+        return self.oob_costs
                 
 
 class DiscreteCostWrapper(CostFunction):

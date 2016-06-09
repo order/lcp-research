@@ -27,11 +27,18 @@ class RegularGridInterpolator(object):
         # Initialize the indexer
         self.indexer = indexer.Indexer(self.lengths)
 
-        # One for every cutpoint, plus an oob
-        self.num_nodes = self.indexer.max_index+1
-
         # Fuzz to convert [low,high) to [low,high]
         self.fuzz = 1e-15
+
+    def num_nodes(self):
+        # Include oob
+        return self.indexer.max_index+1
+    def num_real_nodes(self):
+        # Exclude oob
+        return self.indexer.physical_max_index+1
+
+    def num_oob(self):
+        return self.num_nodes() - self.num_real_nodes()
         
     def to_cell_coord(self,points):
         """
@@ -106,19 +113,19 @@ class RegularGridInterpolator(object):
         rows[B:] = indices[oob_idx]
         data[B:] = np.ones(num_oob)
         
-        M = self.num_nodes
+        M = self.num_nodes()
         return sps.coo_matrix((data,(rows,cols)),shape=(M,N))    
 
     def get_cutpoints(self):
         linspaces = [np.linspace(l,h,n+1) for (l,h,n)
                      in self.grid_desc]
-        N = self.num_nodes
-        n = self.indexer.physical_max_index+1
+        n = self.num_real_nodes()
         D = self.D
-        points = np.empty((N,D))
-        points[:n,:] = discretize.make_points(linspaces)
-        points[n:,:] = np.nan
-        return points
+        points = np.empty((n,D))
+        return discretize.make_points(linspaces)
+
+    def get_oob_indices(self):
+        return self.indexer.get_oob_indices()
 
     def has_point(self,target):
         (N,) = target.shape
@@ -128,7 +135,6 @@ class RegularGridInterpolator(object):
                 return False
         return True
         
-    
     def indices_to_points(self,indices):
         (N,) = indices.shape
         D = self.D

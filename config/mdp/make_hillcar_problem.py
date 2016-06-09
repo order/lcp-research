@@ -38,18 +38,25 @@ def make_hillcar_problem(step_len,
     
     trans_fn = HillcarTransitionFunction(
         **trans_params)
-    
+
+    raise NotImplementedError() # Turn of saturation on x; allow boundary exit
     boundary = SaturationBoundary(bounds)
     
     cost_state_fn = BallSetFn(goal, cost_radius)
     cost_fn = CostWrapper(cost_state_fn)
     cost_fn.favored=np.array([0.0])
     
+    #If we see 100 leaking in, there is a problem with v saturation
+    with the boundary containment.
+    oob_costs = np.array([0,0,100,100])
+    # otherwise we will pay a penalty at the boundary, but be 0 after.
+    
     gen_model = GenerativeModel(trans_fn,
                                 boundary,
                                 cost_fn,
                                 state_dim,
-                                action_dim)
+                                action_dim,
+    )
 
     action_boundary = [(actions[0],actions[-1])]
 
