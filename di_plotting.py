@@ -2,41 +2,37 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import neighbors
 
-import discrete
-import utils.plotting
-from utils.pickle import dump, load
+from utils import *
+from discrete import make_points
 
-results = load('data/di.sim.pickle')
-returns = load('data/di.returns.pickle')
-states = load('data/di.start_states.pickle')
+marsh = Marshaller()
+setup = marsh.load('cdiscrete/test.mcts')
 
-(N,D) = states.shape
-assert(D == 2)
 
-Grid = 500
-for (name,result) in results.items():
-    actions = result.actions
-    (n,d,t) = actions.shape
-    assert(N == n)
-    assert(d == 1)
-    F = actions[:,0,0] # First action
+sim = marsh.load('cdiscrete/test.mcts.sim')
+(ret,traj,dec,costs) = sim
 
-    cuts = [np.linspace(-2,2,Grid),
-            np.linspace(-2,2,Grid)]
-    X,Y = np.meshgrid(*cuts)
-    P = discrete.make_points(cuts)
-    
-    K = 1 # Knumber of Knearest Kneighbors
-    knn = neighbors.KNeighborsRegressor(K,weights='distance')
-    Z = knn.fit(states,F).predict(P)
-    Z = np.reshape(Z,(Grid,Grid),order='F')
+(N,D,T) = traj.shape
 
-    
-    plt.pcolor(X,Y,Z)
-    plt.scatter(states[:,0],
-                states[:,1],
-                c=F,s=10,lw=1)
-    plt.title(name)
+xl = np.min(traj[:,0,:])
+xh = np.max(traj[:,0,:])
+vl = np.min(traj[:,1,:])
+vh = np.max(traj[:,1,:])
 
+knn = neighbors.KNeighborsRegressor(n_neighbors=1)
+X = np.array([traj[:,0,0], traj[:,1,0]]).T
+knn.fit(X,ret)
+
+G = 150
+(P,(X,Y)) = make_points([np.linspace(xl,xh,G),
+                         np.linspace(vl,vh,G)],True)
+
+Z = knn.predict(P)
+
+plt.pcolormesh(X,Y,np.reshape(Z,(G,G)))
+
+for i in xrange(N):
+    plt.plot(traj[i,0,:],
+             traj[i,1,:],
+             'x-k')
 plt.show()
-

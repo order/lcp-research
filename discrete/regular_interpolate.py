@@ -121,7 +121,7 @@ class RegularGridInterpolator(object):
         data[B:] = np.ones(num_oob)
         
         M = self.num_nodes()
-        return sps.coo_matrix((data,(rows,cols)),shape=(M,N))    
+        return sps.coo_matrix((data,(rows,cols)),shape=(M,N)).tocsc()   
 
     def get_cutpoints(self):
         linspaces = [np.linspace(l,h,n+1) for (l,h,n)

@@ -4,18 +4,22 @@ IDIR=-I/usr/include/hdf5/serial/ -I/usr/include/python2.7/
 LIBS=-larmadillo -lhdf5 -lpython2.7 -lboost_python -lboost_system
 LDIR=-L/usr/lib/x86_64-linux-gnu/hdf5/serial
 
-SOURCES= costs.cpp discrete.cpp driver.cpp function.cpp\
+SOURCES= costs.cpp discrete.cpp function.cpp\
 marshaller.cpp mcts.cpp misc.cpp policy.cpp simulate.cpp transfer.cpp\
 value.cpp
 
 OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=driver
+EXEC=driver
+TEST=discrete_tests
 
-$(EXECUTABLE): $(OBJECTS) 
-	$(CC) $(OBJECTS) -o $@ $(LIBS) $(LDIR)
+$(EXEC): $(OBJECTS) $(EXEC).o
+	$(CC) $(OBJECTS) $(EXEC).o -o $@ $(LIBS) $(LDIR)
+
+$(TEST): $(OBJECTS) $(TEST).o
+	$(CC) $(OBJECTS) $(TEST).o -o $@ $(LIBS) $(LDIR)
 
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@ $(IDIR)
 
 clean:
-	rm $(EXECUTABLE) *.o *.so *~ *.pyc callgrind.out.* test.mcts.*
+	rm $(EXEC) $(TEST) *.o *.so *~ *.pyc callgrind.out.* test.mcts.*

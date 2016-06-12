@@ -35,16 +35,24 @@ uvec num_grid_points_per_dim(const RegGrid & grid){
   return grid.num_cells + 1;
 }
 uint num_grid_points(const RegGrid & grid){
-  // Product, plus an additional point for oob
-  return prod(grid.num_cells + 1) + 1;
+  return last_oob_index(grid) + 1;
 }
 
-uint oob_index(const RegGrid& grid){
+uint first_oob_index(const RegGrid& grid){
   // Out of bound index is the last valid index
-  return oob_index(num_grid_points_per_dim(grid));
+  return first_oob_index(num_grid_points_per_dim(grid));
 }
-uint oob_index(const uvec& points_per_dim){
+uint first_oob_index(const uvec& points_per_dim){
   return prod(points_per_dim);
+}
+
+uint last_oob_index(const RegGrid& grid){
+  // Out of bound index is the last valid index
+  return last_oob_index(num_grid_points_per_dim(grid));
+}
+uint last_oob_index(const uvec& points_per_dim){
+  uint D = points_per_dim.n_elem;
+  return first_oob_index(points_per_dim) + 2*D - 1;
 }
 
 vec width(const RegGrid & grid){
@@ -68,15 +76,71 @@ bool check_dim(const RegGrid & grid, uint D){
     && grid.num_cells.n_elem == D;
 }
 
-void generate_mask(Mask & M, bvec & source){
-  M.mask = source;
-  M.pos = find(source == 1);
-  M.neg = find(source == 0);
-  M.n_pos = M.pos.n_elem;
-  M.n_neg = M.neg.n_elem;
+
+void build_oob(OOBInfo & oob, const mat & points, const RegGrid & grid){
+  uint lo_oob = first_oob_index(grid);
+
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  assert(check_dim(grid,D));
+  
+  oob.mask = zeros<bvec>(N);
+  int idx;
+  for(uint i = 0; i < N; i++){
+    //std::cout << "Point: " << points.row(i);
+    idx = find_oob_index(points.row(i).t(),grid);
+    //std::cout << "\tIdx: " << idx << std::endl;;
+    if(idx > 0){
+      oob.mask(i) = 1;
+      oob.partial_map[i] = idx;
+    }
+  }
+  //std::cout << "Mask:" << oob.mask << std::endl;
+  oob.oob_idx = find(oob.mask == 1);
+  oob.inb_idx = find(oob.mask == 0);
+  
+  oob.n_oob = oob.oob_idx.n_elem;
+  oob.n_inb = oob.inb_idx.n_elem;
+
+  //std::cout << "OOB (" << oob.n_oob << "): " << oob.oob_idx;
+  //std::cout << "INB (" << oob.n_inb << "): " << oob.inb_idx;
+
+}
+int find_oob_index(const vec & state, const RegGrid & grid){
+  uint D = state.n_elem;
+  uint lo_oob = first_oob_index(grid);
+
+  for(uint d = 0; d < D; d++){
+    if(state(d) < grid.low(d)){
+      return lo_oob + 2*d;
+    }
+    if(state(d) > grid.high(d) + GRID_FUDGE){
+      return lo_oob + 2*d + 1;
+    }
+  }
+  return -1;
+}
+vec get_oob_state(uint oob_idx, const RegGrid & grid){
+  assert(oob_idx >= first_oob_index(grid));
+  assert(oob_idx <= last_oob_index(grid));  
+
+  vec state = 0.5 * (grid.high + grid.low); // Midpoint
+  uint d = (oob_idx - first_oob_index(grid)) / 2;
+  assert(d <= state.n_elem);
+
+  if(0 == oob_idx % 2){
+    state(d) = grid.low(d) - 0.1 * (grid.high(d) - grid.low(d));
+  }
+  else{
+    state(d) = grid.high(d) + 0.1 * (grid.high(d) - grid.low(d));
+  }
+  assert(oob_idx == find_oob_index(state,grid));
+  return state;
 }
 
 vector<vec> vectorize(const RegGrid & grid){
+  // Convert grid description (lo,hi,num) into
+  // actual points [low,low+delta,...,hi]
   vector<vec> grids;
   uint D = grid.low.n_elem;
   for(uint d = 0; d < D; d++){
@@ -132,7 +196,30 @@ uvec c_order_coef(const RegGrid & grid){
 }
 
 uvec c_order_coef(const uvec & points_per_dim){
-  // Coeffs to converts from point grid coords to node indicies
+  /* Coeffs to converts from point grid coords to node indicies
+   These are also called "strides"
+   E.g. if the mesh is 3x2, then the indices are:
+
+   4 - 5
+   |   |
+   2 - 3
+   |   |
+   0 - 1
+
+   So, to figure out the index of grid coord (x,y), we just multiply
+   it by the coefficients [2,1].
+
+   Not the other ordering is "Fortran order":
+
+   2 - 5
+   |   |
+   1 - 4
+   |   |
+   0 - 3
+
+   define by coefficients [1,3]. We're not using these.
+  */
+  
   uint D = points_per_dim.n_elem;
   uvec coef = uvec(D);
 
@@ -149,9 +236,18 @@ uvec cell_shift_coef(const RegGrid & grid){
 }
 
 uvec cell_shift_coef(const uvec & points_per_dim){
-  // The index shift for the vertices of the hyper rectangle
-  // Basically, Hamming distance, but using c_order_coefs rather
-  // than ones(D) as the `weight' of each dimension.
+  /* The index shift for the other vertices of the hyper rectangle
+     So if the cell shift coef are [9 3 1] (from a (? x 3 x 3) grid)
+
+     4----13
+    /|   /|
+   3-+--12|
+   | |  | |
+   | 1--+-10
+   |/   |/
+   0----9
+
+  */
   
   uint D = points_per_dim.n_elem;
   uvec coef = c_order_coef(points_per_dim);
@@ -166,47 +262,25 @@ uvec cell_shift_coef(const uvec & points_per_dim){
   return shift;
 }
 
-bool coords_in_bound(const umat & coords,
-		      const uvec & points_per_dim,
-		      const Mask & oob){
-  // Check to make sure everything is in bounds
-  // or is marked as oob correctly
-  uint N = coords.n_rows;
-  uint D = coords.n_cols;
-  for(uint d = 0; d < D; d++){
-    uint n_max = points_per_dim(d);
-    for(uint i = 0; i < N; i++){
-      if(oob.mask(i) == 1 && coords(i,d) !=  OOB_COORD){
-	// Marked as out-of-bounds in mask, but doesn't have the
-	// OOB coordinate
-	return false;
-      }
-      if(oob.mask(i) == 0 && coords(i,d) >=  n_max){
-	return false;
-      }
-    }
-  }
-  return true;
-}
 uvec coords_to_indices(const umat & coords,
 		       const RegGrid & grid,
-		       const Mask & oob){
+		       const OOBInfo & oob){
   return coords_to_indices(coords,
 			   num_grid_points_per_dim(grid),
 			   oob);
 }
 uvec coords_to_indices(const umat & coords,
 		       const uvec & points_per_dim,
-		       const Mask & oob){
+		       const OOBInfo & oob){
   // Converts a matrix of coordinates to indices
-
-  assert(coords_in_bound(coords,points_per_dim,oob));
   
   uvec coef = c_order_coef(points_per_dim);
   uvec idx = uvec(coords.n_rows);
-  idx.rows(oob.neg) = coords.rows(oob.neg) * coef;
-  idx.rows(oob.pos).fill(oob_index(points_per_dim));
-  
+  idx.rows(oob.inb_idx) = coords.rows(oob.inb_idx) * coef;
+  for(oob_map::const_iterator it = oob.partial_map.begin();
+      it != oob.partial_map.end(); it++){
+    idx(it->first) = it->second;
+  }  
   return idx;
 }
 
@@ -223,19 +297,16 @@ umat indices_to_coords(const uvec & idx, const uvec & points_per_dim){
     curr_idx = vec_mod(curr_idx, coef(d));
   }
 
-  // Deal with oob index
-  uvec oob = find(idx >= prod(points_per_dim));
-  for(uvec::const_iterator it = oob.begin();
-      it != oob.end(); ++it){
-    crd.row(*it) = conv_to<urowvec>::from(points_per_dim);
-  }
+  // Ignore OOB indicies; will map directly
+  uvec oob_idx = find(idx >= first_oob_index(points_per_dim));
+  crd.rows(oob_idx).fill(OOB_COORD);
   
   return crd;
 }
 
 umat least_coord(const mat & points,
 		 const RegGrid & grid,
-		 const Mask & oob_mask){
+		 const OOBInfo & oob){
   /*
     Returns the actual coordinate of the least cutpoint in
     the hypercube that the point is in.
@@ -245,37 +316,26 @@ umat least_coord(const mat & points,
   assert(N > 0);
   assert(check_dim(grid,D));
 
+  // Do mat as doubles then convert to umat
   mat scaled = mat(N,D);
-  if(oob_mask.n_neg > 0){
+  
+  if(oob.n_inb > 0){
     // Shift by l
-    mat diff = row_diff(points.rows(oob_mask.neg),grid.low.t());
+    mat diff = row_diff(points.rows(oob.inb_idx),grid.low.t());
     
-    // Scale by n / (h - l)
+    // Scale by n / (h - l) (inverse width)
     rowvec scale = conv_to<rowvec>::from(grid.num_cells)
       / (grid.high.t() - grid.low.t());    
-    scaled.rows(oob_mask.neg) = row_mult(diff,scale);
+    scaled.rows(oob.inb_idx) = row_mult(diff,scale);
   }
-  if(oob_mask.n_pos > 0){
-    scaled.rows(oob_mask.pos).fill(OOB_COORD);
+  if(oob.n_oob > 0){
+    // Ignore oob points
+    scaled.rows(oob.oob_idx).fill(OOB_COORD);
   }
 
+  // Take floor; rounds down to least coord
   umat cuts = conv_to<umat>::from(floor(scaled));
   return cuts;
-}
-
-void out_of_bounds(Mask & oob_mask,
-		   const mat & points,
-		   const RegGrid & grid){
-  uint N = points.n_rows;
-  bvec mask = zeros<bvec>(N);
-
-  mat T = (points.each_row() - grid.low.t());
-  mask(find(any(T < 0,1))).fill(1);
-  
-  T = (grid.high.t() - points.each_row());
-  mask(find(any(T < -GRID_FUDGE,1))).fill(1);
-  
-  generate_mask(oob_mask,mask);
 }
 
 void point_to_idx_dist(const mat & points,
@@ -293,11 +353,11 @@ void point_to_idx_dist(const mat & points,
   // Get the oob points; deal with seperately
   // Assumption: there aren't enough of these to make handling them
   // cleverly worth it.
-  Mask oob_mask;  
-  out_of_bounds(oob_mask,points,grid);
+  OOBInfo oob;  
+  build_oob(oob,points,grid);
 
   // Get the least vertex for the cell enclosing each point
-  umat low_coords = least_coord(points,grid,oob_mask);
+  umat low_coords = least_coord(points,grid,oob);
   
   /*
     Want to get  distance from least cell cut points (denoted by the @ below):
@@ -334,19 +394,17 @@ void point_to_idx_dist(const mat & points,
   }
 
   // Calculate the index of the low grid point
-  uvec low_indices = coords_to_indices(low_coords,grid,oob_mask);
+  uvec low_indices = coords_to_indices(low_coords,grid,oob);
   
   // Calculate the shift for the regular grid cells
   uvec shift = cell_shift_coef(grid);
 
   // Build the sparse matrix
-  uint sp_nnz = oob_mask.n_neg * V
-    + oob_mask.n_pos; // Number of nnz in sp_matrix
+  uint sp_nnz = oob.n_inb * V + oob.n_oob; // Number of nnz in sp_matrix
   vec data = vec(sp_nnz);
   umat loc = umat(2,sp_nnz); // Location pairs (i,j)
 
   // Fill in loc matrix
-  uint oob_idx = oob_index(grid);
   uint I = 0;
   
   // Fill in data and locations
@@ -354,18 +412,18 @@ void point_to_idx_dist(const mat & points,
   uint J;
   for(uint i = 0; i < N; i++){ // Iterate over states
     for(uint j = 0; j < V; j++){ // Iterate over vertices
-      if (oob_mask.mask(i) == 1 && j > 0){
+      if (oob.mask(i) == 1 && j > 0){
 	// Already filled in oob entry
 	continue;
       }
       assert(I < sp_nnz);
-      if(oob_mask.mask(i) == 1 && j == 0){
+      if(oob.mask(i) == 1 && j == 0){
 	// OOB and first occurance
 	data(I) = 1.0;
-	loc(0,I) = oob_idx;
+	loc(0,I) = oob.partial_map[i];
 	loc(1,I++) = i;
       }
-      if(oob_mask.mask(i) == 0){
+      if(oob.mask(i) == 0){
 	// In bounds
 	J = sort_idx(j);
 	data(I) = W(i,J);
@@ -375,7 +433,13 @@ void point_to_idx_dist(const mat & points,
     }
   }
   uint G = num_grid_points(grid);
-  assert(G == oob_idx + 1);
+  //std::cout << "Low indices:" << low_indices.t();
+  //std::cout << "Shift:" << shift.t();
+  
+  //std::cout << "Dimensions (" <<G << ',' << N << ")\n";
+  //std::cout << "Loc:\n" << loc.t();
+  //std::cout << "Data:\n" << data;
+  
   out_spmat = sp_mat(loc,data,G,N,false);
 }
 

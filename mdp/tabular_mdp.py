@@ -13,7 +13,7 @@ class TabularMDP(object):
                  costs,
                  actions,
                  discount):
-        self.transitions = transitions
+        self.transitions = [T.tocsc() for T in transitions]
         self.costs = costs
         self.actions = actions
         self.discount = discount
@@ -32,7 +32,8 @@ class TabularMDP(object):
         for i in xrange(A):
             assert((N,) == costs[i].shape)
             assert(not np.any(np.isnan(costs[i])))            
-            assert((N,N) == transitions[i].shape)
+            assert((N,N) == self.transitions[i].shape)
+            assert(isinstance(self.transitions[i],sps.csc_matrix))
             
     def get_E_matrix(self,a):
         """
@@ -96,3 +97,33 @@ class TabularMDP(object):
 
         name = 'LCP from {0} MDP'.format(self.name)
         return lcp.LCPObj(M,q,name=name)
+
+def add_drain(mdp,disc,state,cost):
+
+    (N,) = state.shape
+        
+    dist = disc.points_to_index_distributions(state[np.newaxis,:])
+    (G,n) = dist.shape
+    assert(n == 1)
+
+    max_prob = -1
+    node_id = -1
+
+    assert(2 == len(dist.indptr))
+    for i in xrange(dist.nnz):
+        if dist.data[i] > max_prob:
+            max_prob = dist.data[i]
+            node_id = dist.indices[i]
+    assert(max_prob > 1 - 1e-6)
+
+    elem = sps.dok_matrix((G,1))
+    elem[node_id,0] = 1
+
+    for i in xrange(mdp.num_actions):
+        T = mdp.transitions[i]
+        assert(isinstance(T,sps.csc_matrix))
+        T.data[T.indptr[node_id]:T.indptr[node_id+1]] = 0
+        T.eliminate_zeros()
+        mdp.costs[i][node_id] += cost / (1.0 - mdp.discount)
+
+        assert(mdp.transitions[i].dot(elem).sum() < 1e-12)

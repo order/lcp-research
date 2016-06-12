@@ -13,7 +13,7 @@ import math
 
 import matplotlib.pyplot as plt
 
-MCTS_BUDGET = 1000
+MCTS_BUDGET = 2500
 NUM_STATES = 25
 SIM_HORIZON = 100
 
@@ -108,7 +108,7 @@ def marshal(static_params,starts,params,filename):
     marsh.save(filename)
 
 def create_static_params():
-    disc_n = 20 # Number of cells per dimension
+    disc_n = 30 # Number of cells per dimension
     step_len = 0.01           # Step length
     n_steps = 5               # Steps per iteration
     damp = 0.01               # Dampening
@@ -138,12 +138,37 @@ def create_static_params():
                               actions)
     # Generate MDP
     (mdp,disc) = make_uniform_mdp(problem,disc_n,action_n)
+    add_drain(mdp,disc,np.zeros(2),0)
 
     # Solve
-    (p,d) = solve_with_kojima(mdp,1e-8,1000)
+    if True:
+        start = time.time()
+        (p,d) = solve_with_kojima(mdp,1e-12,1000)
+        print 'Kojima ran for:', time.time() - start, 's'
+        # Build value function
+        (v,flow) = split_solution(mdp,p)
+    else:
+        v = solve_with_value_iter(mdp,1e-12,10000)
 
-    # Build value function
-    (v,flow) = split_solution(mdp,p)
+    if True:
+        I = 1
+        G = 250
+        (P,(X,Y)) = make_points([np.linspace(-B,B,G)]*2,True)
+        vects = [v, flow[:,0], flow[:,1], flow[:,2]]
+        for w in vects:
+            print np.max(w)
+            fn = InterpolatedFunction(disc,w)
+            Z = np.reshape(fn.evaluate(P),(G,G))
+            plt.subplot(len(vects),2,I)
+            plt.pcolormesh(X,Y,Z)
+            plt.subplot(len(vects),2,I+1)
+            fZ = np.fft.fftshift(np.angle(np.fft.fft2(Z)))
+            #fZ = np.fft.fftshift(np.log(np.abs(np.fft.fft2(Z)) + 1e-22))
+            plt.pcolormesh(fZ)
+            I += 2
+        plt.show()
+        quit()
+    
     assert(np.all(flow > 0))
     q = q_vectors(mdp,v)
     assert(np.all(q > 0))

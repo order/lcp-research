@@ -47,12 +47,14 @@ def make_di_problem(step_len,
     cost_state_fn = BallSetFn(np.zeros(2), cost_radius)
     #cost_state_fn = TargetZoneFn(np.array([[-0.5,0.5],[-0.5,0.5]]))
     cost_fn = CostWrapper(cost_state_fn)
-    
+
+    oob_costs = np.array([100]*2*state_dim)
     gen_model = GenerativeModel(trans_fn,
                                 boundary,
                                 cost_fn,
                                 state_dim,
-                                action_dim)
+                                action_dim,
+                                oob_costs)
 
     action_boundary = [(actions[0],actions[-1])]
 
