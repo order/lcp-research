@@ -149,6 +149,29 @@ def create_static_params():
         (v,flow) = split_solution(mdp,p)
     else:
         v = solve_with_value_iter(mdp,1e-12,10000)
+
+    if True:
+        I = 1
+        G = 250
+        (P,(X,Y)) = make_points([np.linspace(-B,B,G)]*2,True)
+        vects = [v, flow[:,0], flow[:,1], flow[:,2]]
+        for w in vects:
+            print np.max(w)
+            fn = InterpolatedFunction(disc,w)
+            Z = np.reshape(fn.evaluate(P),(G,G))
+            plt.subplot(len(vects),3,I)
+            plt.pcolormesh(X,Y,Z)
+            plt.subplot(len(vects),3,I+1)
+            #fZ = np.fft.fftshift(np.angle(np.fft.fft2(Z)))
+            fZ = np.fft.fft2(Z)
+            f_img = np.fft.fftshift(np.log(np.abs(fZ) + 1e-22))
+            plt.pcolormesh(f_img)
+            plt.subplot(len(vects),3,I+2)
+            (x,F) = cdf_points(np.abs(fZ.flatten()))
+            plt.loglog(x,F,lw=2)
+            I += 3
+        plt.show()
+        quit()
     
     assert(np.all(flow > 0))
     q = q_vectors(mdp,v)
