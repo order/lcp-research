@@ -112,7 +112,7 @@ def marshal(static_params,starts,params,filename):
     marsh.save(filename)
 
 def create_static_params():
-    disc_n = 30 # Number of cells per dimension
+    disc_n = 80 # Number of cells per dimension
     step_len = 0.01           # Step length
     n_steps = 5               # Steps per iteration
     damp = 0.01               # Dampening
@@ -142,7 +142,7 @@ def create_static_params():
                               actions)
     # Generate MDP
     (mdp,disc) = make_uniform_mdp(problem,disc_n,action_n)
-    add_drain(mdp,disc,np.zeros(2),0)
+    #add_drain(mdp,disc,np.zeros(2),0)
 
     # Solve
     if True:
@@ -152,13 +152,14 @@ def create_static_params():
         # Build value function
         (v,flow) = split_solution(mdp,p)
     else:
-        v = solve_with_value_iter(mdp,1e-12,10000)
+        v = solve_with_value_iter(mdp,1e-15,25000)
 
     if True:
         I = 1
         G = 250
         (P,(X,Y)) = make_points([np.linspace(-B,B,G)]*2,True)
-        vects = [flow[:,0], flow[:,1], flow[:,2]]
+        vects = [v,flow[:,0], flow[:,1], flow[:,2]]
+        #vects = [v]
         O = []
         R = []
         for w in vects:
@@ -166,21 +167,37 @@ def create_static_params():
             Z = np.reshape(fn.evaluate(P),(G,G))
             O.append(Z)
             
-            #plt.subplot(len(vects),2,I)
-            #plt.pcolormesh(X,Y,Z)
-            
-            fZ = fft.dct(Z,norm='ortho')
+            plt.subplot(len(vects),4,I)
+            plt.pcolormesh(X,Y,Z)
+            plt.colorbar()
 
-            q = np.percentile(fZ,50)
-            fZ[fZ < q] = 0
             
-            rZ = fft.idct(fZ,norm='ortho')
+            fZ = np.fft.fft2(Z)
+            K = 100.0 * (1.0 - 1000.0 / float(fZ.size))
+            print K
+            q = np.percentile(fZ,K)
+            fZ[np.abs(fZ) < q] = 0
+
+            plt.subplot(len(vects),4,I+1)
+            plt.pcolormesh(np.fft.fftshift(np.log(np.abs(fZ) + 1e-22)))
+            
+            plt.subplot(len(vects),4,I+2)
+            plt.pcolormesh(np.fft.fftshift(np.angle(fZ)))
+            
+
+            
+            rZ = np.fft.ifft2(fZ)
+            print np.linalg.norm(np.imag(rZ))
             R.append(rZ)
-            #plt.subplot(len(vects),2,I+1)
-            #plt.pcolormesh(X,Y,rZ)
+            plt.subplot(len(vects),4,I+3)
+            plt.pcolormesh(X,Y,rZ)
+            plt.colorbar()
 
-            I += 2
 
+            I += 4
+
+        plt.show()
+        quit()
         O = np.array(O)
         R = np.array(R)
 

@@ -26,7 +26,7 @@ class ValueChangeAnnounce(Notification):
         new_diff = np.linalg.norm(self.old_v - v)
         self.old_v = v
         
-        if math.log(new_diff) <= math.log(self.diff) - 1:
+        if new_diff == 0 or math.log(new_diff) <= math.log(self.diff) - 1:
             print 'Value iteration diff {0:.3g} at iteration {1}'.format(new_diff,iterator.get_iteration())
             self.diff = new_diff
 

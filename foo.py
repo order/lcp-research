@@ -2,28 +2,57 @@ import numpy as np
 import scipy as sp
 import scipy.fftpack as fft
 import scipy.sparse as sps
+from mpl_toolkits.mplot3d import Axes3D
+
+
+from discrete import make_points
+from mdp import *
 
 import matplotlib.pyplot as plt
 
-N = 256
-sigma = 1
-x = np.linspace(-10,10,N)
-g = np.exp(-x*x / sigma)
-g = g / np.sum(g)
+# Build the model
+N = 16
+D = 3
+P = make_points([np.linspace(0,1,N+1)[:-1]]*D)
 
-h = np.convolve(np.random.randn(N),g,mode='same')
+f = np.empty(N**D)
+for _ in xrange(12):
+    freq = np.random.randint(N,size=(D,))
+    shift = np.random.randint(2)
+    f += np.sin(2*np.pi * P.dot(freq) + np.pi / 2.0 * shift) \
+         * np.exp(-np.linalg.norm(freq)/10)
+#f = np.sin(2*np.pi*P[:,1])
+f = f.reshape(*[N]*D)
 
-f = fft.fft(h)
+freq,shift,amp = top_trig_features(f,N**D)
 
-r = np.zeros(N)
-for i in xrange(N/2+1):
-    if i == 0 or i == N/2:
-        Re = np.real(f[i])/N
-    else:
-        Re = 2*np.real(f[i])/N
-    Im = -2 * np.imag(f[i]) / N
-    
-    r += Re*np.cos(2*np.pi*i*np.arange(N)/N)
-    r += Im*np.sin(2*np.pi*i*np.arange(N)/N)
-plt.plot(x,h,x,r)
-plt.show()
+print freq.shape
+
+# Eval
+approx_f = TrigFunction(freq,shift,amp[:,np.newaxis])
+r = approx_f.evaluate(P).reshape(*[N]*D)
+
+print 'Error: ', np.linalg.norm(r - f) / np.linalg.norm(f)
+
+if D == 2:
+
+    plt.subplot(2,2,1)
+    plt.imshow(f,interpolation='none')
+    plt.colorbar()
+
+    plt.subplot(2,2,2)
+    plt.imshow(r,interpolation='none')
+    plt.colorbar()
+
+    F = np.fft.fftn(f)
+    plt.subplot(2,2,3)
+    plt.imshow(np.abs(F),interpolation='none')
+    plt.colorbar()
+
+    R = np.fft.fftn(r)
+    plt.subplot(2,2,4)
+    plt.imshow(np.abs(R),interpolation='none')
+    plt.colorbar()
+
+    plt.show()
+   
