@@ -1,3 +1,7 @@
+import numpy as np
+import scipy as sp
+import scipy.fftpack as fft
+
 from mdp import *
 from config.mdp import *
 from config.solver import *
@@ -154,22 +158,36 @@ def create_static_params():
         I = 1
         G = 250
         (P,(X,Y)) = make_points([np.linspace(-B,B,G)]*2,True)
-        vects = [v, flow[:,0], flow[:,1], flow[:,2]]
+        vects = [flow[:,0], flow[:,1], flow[:,2]]
+        O = []
+        R = []
         for w in vects:
-            print np.max(w)
             fn = InterpolatedFunction(disc,w)
             Z = np.reshape(fn.evaluate(P),(G,G))
-            plt.subplot(len(vects),3,I)
-            plt.pcolormesh(X,Y,Z)
-            plt.subplot(len(vects),3,I+1)
-            #fZ = np.fft.fftshift(np.angle(np.fft.fft2(Z)))
-            fZ = np.fft.fft2(Z)
-            f_img = np.fft.fftshift(np.log(np.abs(fZ) + 1e-22))
-            plt.pcolormesh(f_img)
-            plt.subplot(len(vects),3,I+2)
-            (x,F) = cdf_points(np.abs(fZ.flatten()))
-            plt.loglog(x,F,lw=2)
-            I += 3
+            O.append(Z)
+            
+            #plt.subplot(len(vects),2,I)
+            #plt.pcolormesh(X,Y,Z)
+            
+            fZ = fft.dct(Z,norm='ortho')
+
+            q = np.percentile(fZ,50)
+            fZ[fZ < q] = 0
+            
+            rZ = fft.idct(fZ,norm='ortho')
+            R.append(rZ)
+            #plt.subplot(len(vects),2,I+1)
+            #plt.pcolormesh(X,Y,rZ)
+
+            I += 2
+
+        O = np.array(O)
+        R = np.array(R)
+
+        plt.subplot(1,2,1)
+        plt.pcolormesh(X,Y,np.argmax(O,axis=0))
+        plt.subplot(1,2,2)
+        plt.pcolormesh(X,Y,np.argmax(R,axis=0))
         plt.show()
         quit()
     

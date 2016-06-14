@@ -1,17 +1,29 @@
 import numpy as np
-from mdp import *
+import scipy as sp
+import scipy.fftpack as fft
+import scipy.sparse as sps
 
 import matplotlib.pyplot as plt
 
-boundary = HillcarBoundary([(-1,1),(-1,1)])
+N = 256
+sigma = 1
+x = np.linspace(-10,10,N)
+g = np.exp(-x*x / sigma)
+g = g / np.sum(g)
 
-N = 50
-P = np.random.randn(N,2)
+h = np.convolve(np.random.randn(N),g,mode='same')
 
-Q = boundary.enforce(P)
+f = fft.fft(h)
 
-for i in xrange(N):
-    plt.plot([P[i,0],Q[i,0]],
-             [P[i,1],Q[i,1]],'-o')
+r = np.zeros(N)
+for i in xrange(N/2+1):
+    if i == 0 or i == N/2:
+        Re = np.real(f[i])/N
+    else:
+        Re = 2*np.real(f[i])/N
+    Im = -2 * np.imag(f[i]) / N
+    
+    r += Re*np.cos(2*np.pi*i*np.arange(N)/N)
+    r += Im*np.sin(2*np.pi*i*np.arange(N)/N)
+plt.plot(x,h,x,r)
 plt.show()
-
