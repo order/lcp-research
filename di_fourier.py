@@ -147,7 +147,7 @@ def create_static_params():
     # Solve
     if True:
         start = time.time()
-        (p,d) = solve_with_kojima(mdp,1e-12,1000)
+        (p,d) = solve_with_kojima(mdp,1e-15,1000)
         print 'Kojima ran for:', time.time() - start, 's'
         # Build value function
         (v,flow) = split_solution(mdp,p)
@@ -156,9 +156,9 @@ def create_static_params():
 
     if True:
         I = 1
-        G = 250
+        G = 256
         (P,(X,Y)) = make_points([np.linspace(-B,B,G)]*2,True)
-        vects = [v,flow[:,0], flow[:,1], flow[:,2]]
+        vects = [flow[:,0], flow[:,1], flow[:,2]]
         #vects = [v]
         O = []
         R = []
@@ -167,37 +167,33 @@ def create_static_params():
             Z = np.reshape(fn.evaluate(P),(G,G))
             O.append(Z)
             
-            plt.subplot(len(vects),4,I)
+            plt.subplot(len(vects),3,I)
             plt.pcolormesh(X,Y,Z)
+            plt.colorbar()            
+
+            H = sp.linalg.hadamard(G)
+            hZ = H.dot(Z)
+            
+            plt.subplot(len(vects),3,I+1)
+            plt.imshow(hZ,interpolation='none')
             plt.colorbar()
 
-            
-            fZ = np.fft.fft2(Z)
-            K = 100.0 * (1.0 - 1000.0 / float(fZ.size))
-            print K
-            q = np.percentile(fZ,K)
-            fZ[np.abs(fZ) < q] = 0
+            print 'Sparsity', np.sum(hZ > 1e-15) / float(hZ.size)
 
-            plt.subplot(len(vects),4,I+1)
-            plt.pcolormesh(np.fft.fftshift(np.log(np.abs(fZ) + 1e-22)))
-            
-            plt.subplot(len(vects),4,I+2)
-            plt.pcolormesh(np.fft.fftshift(np.angle(fZ)))
-            
+            Q = np.percentile(hZ,98)
+            hZ[np.abs(hZ) < Q] = 0
 
-            
-            rZ = np.fft.ifft2(fZ)
-            print np.linalg.norm(np.imag(rZ))
-            R.append(rZ)
-            plt.subplot(len(vects),4,I+3)
+            print '\t', np.sum(hZ > 1e-15) / float(hZ.size)
+
+            rZ = H.T.dot(hZ)
+            plt.subplot(len(vects),3,I+2)
             plt.pcolormesh(X,Y,rZ)
             plt.colorbar()
-
-
-            I += 4
+            R.append(rZ)
+            
+            I += 3
 
         plt.show()
-        quit()
         O = np.array(O)
         R = np.array(R)
 

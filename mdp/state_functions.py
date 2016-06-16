@@ -11,37 +11,44 @@ class MultiFunction(object):
         raise NotImplementedError()
 
 class Basis(object):
-    def evaluate(self,points):
+    def get_basis(self,points):
+        raise NotImplementedError()
+    def get_orth_basis(self,points):
         raise NotImplementedError()
 
-
 def top_trig_features(f,k):
-    Ns = np.array(f.shape)
-    Niprod = 1.0 / np.product(Ns)
-    F = fft.fftn(f)
-    
+    Ns = np.array(f.shape) # Get dimensions
+    print Ns
+    F = fft.fftn(f) # Take DFT
+
+    # Get the threshold we need to filter at to get around k
+    # basis functions
     p = max(0,min(100.0, 100.0 * (1.0 - float(k) / float(f.size))))
     Q = np.percentile(np.abs(F),p)
 
+    # Some of the entries are redundant because of FFT symmetry
     half = Ns[0] / 2
-    subF = F[:(half+1),...]
-    it = np.nditer(subF, flags=['multi_index'])
+    subF = F[:(half),...]
+    
     freq = []
     shift = []
     amp = []
-    while not it.finished:
-        if np.abs(F[it.multi_index]) < Q:
-            it.iternext()
-            continue
 
-        coords = np.array(it.multi_index)
-        R = np.real(F[it.multi_index])
-        I = np.imag(F[it.multi_index])
+    # Iterate over entries. Better way of doing this?
+    Niprod = 1.0 / np.product(Ns)
+    it = np.nditer(subF, flags=['multi_index'])
+    coords = np.argwhere(np.abs(subF) >= Q)
+    (n,d) = coords.shape
+    for i in xrange(n):
+        coord = coords[i,:]
+        tcoord = tuple(coord)
+        R = np.real(F[tcoord])
+        I = np.imag(F[tcoord])
         if np.abs(R) > 1e-12:
             #print 'Real', coords
-            freq.append(2*np.pi*coords)
+            freq.append(2*np.pi*coord)
             shift.append(np.pi/2)
-            if coords[0] == 0 or coords[0] == half:
+            if coord[0] == 0 or coord[0] == half:
                 amp.append(R*Niprod)
             else:
                 amp.append(2*R*Niprod)
@@ -49,9 +56,9 @@ def top_trig_features(f,k):
             
         if np.abs(I) > 1e-12:
             #print 'Imag', coords
-            freq.append(2*np.pi*coords)
+            freq.append(2*np.pi*coord)
             shift.append(0)
-            if coords[0] == 0 or coords[0] == half:
+            if coord[0] == 0 or coord[0] == half:
                 amp.append(-I*Niprod)
             else:
                 amp.append(-2*I*Niprod)
@@ -63,6 +70,11 @@ def top_trig_features(f,k):
     amp = np.array(amp)
         
     return freq,shift,amp
+
+def full_basis(lens):
+    F = make_points([np.arange(N) for N in lens])
+    return 
+    
     
 class TrigBasis(Basis):
     def __init__(self,freq,shift):
@@ -74,7 +86,7 @@ class TrigBasis(Basis):
         self.shift = shift
 
         
-    def evaluate(self,points,**kwargs):
+    def get_basis(self,points,**kwargs):
         (N,D) = points.shape
         (d,M) = self.freq.shape
         assert(D == d)
@@ -82,6 +94,9 @@ class TrigBasis(Basis):
         B = np.sin(points.dot(self.freq) + self.shift[np.newaxis,:])
         assert((N,M) == B.shape)
         return B
+
+    def get_orth_basis(self,points):
+        raise NotImplementedError()
 
 class TrigFunction(MultiFunction):
     def __init__(self,freq,shift,amps):
@@ -93,7 +108,7 @@ class TrigFunction(MultiFunction):
         self.amps = amps
 
     def evaluate(self,points):
-        B = self.basis.evaluate(points)
+        B = self.basis.get_basis(points)
         (N,M) = B.shape
         (m,K) = self.amps.shape
         assert(M==m)
