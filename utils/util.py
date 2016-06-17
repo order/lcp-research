@@ -12,6 +12,17 @@ import matplotlib.pyplot as plt
 import h5py
 import importlib
 
+def top_k_value(q,k,thresh):
+    assert(q.size > k > 0)
+    sq = np.sort(q.flatten())
+    N = len(sq)
+    assert(N == q.size)
+    
+    for i in xrange(N-k-1,N):
+        if sq[i] >= thresh:
+            return sq[i]
+    return sq[-1]
+
 def tail_max(discount,T):
     return np.power(discount,T) / (1.0 - discount)
 

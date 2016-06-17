@@ -54,3 +54,16 @@ def build_functions(mdp_obj,
         fn = InterpolatedFunction(disc,matrix[:,a])
         flow_fns.append(fn)
     return flow_fns
+
+def reshape_physical(f,disc):
+    (N,) = f.shape
+    assert(N == disc.num_real_nodes())
+
+    return f.reshape(*[n for n in disc.lengths])
+
+def reshape_full(f,disc):
+    (N,) = f.shape
+    assert(N == disc.num_nodes())
+    physical_f = f[:disc.num_real_nodes()]
+    return reshape_physical(physical_f,disc)
+    

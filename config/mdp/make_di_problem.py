@@ -2,7 +2,7 @@ import numpy as np
 import utils
 from mdp.transitions.double_integrator\
     import DoubleIntegratorTransitionFunction
-from mdp.boundary import SaturationBoundary
+from mdp.boundary import *
 from mdp.state_functions import BallSetFn,TargetZoneFn
 from mdp.costs import CostWrapper
 from mdp.generative_model import GenerativeModel
@@ -27,10 +27,8 @@ def make_di_problem(step_len,
     TODO: take in parameters
     """
     (A,action_dim) = actions.shape
-    assert(A == 3)
     assert(action_dim == 1)
     assert(actions[0] == -actions[-1])
-    assert(actions[1] == 0)
     
     state_dim = 2
     
@@ -42,7 +40,8 @@ def make_di_problem(step_len,
     trans_fn = DoubleIntegratorTransitionFunction(
         **trans_params)
     
-    boundary = SaturationBoundary(bounds)
+    boundary = DoubleIntBoundary(bounds)
+    #boundary = SaturationBoundary(bounds)
     
     cost_state_fn = BallSetFn(np.zeros(2), cost_radius)
     #cost_state_fn = TargetZoneFn(np.array([[-0.5,0.5],[-0.5,0.5]]))

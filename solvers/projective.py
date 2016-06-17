@@ -1,4 +1,4 @@
-from solvers import LCPIterator,IPIterator,BasisIterator
+from solvers import *
 
 import numpy as np
 import scipy as sp
@@ -7,14 +7,14 @@ import scipy.sparse as sps
 import utils
 import matplotlib.pyplot as plt
 
+import time
+
 def form_Gh_dense(x,y,w,g,p,q,Phi,PtPUP,PtPU_P):
     """
     Form the G matrix and h vector from DENSE 
     matices.
-
-    TODO: what if some of the matrices are sparse?
-    PtP is likely dense, though.
     """
+    start = time.time()
     for v in [Phi,PtPUP,PtPU_P]:
         assert(type(v) == np.ndarray)
         
@@ -28,6 +28,32 @@ def form_Gh_dense(x,y,w,g,p,q,Phi,PtPUP,PtPU_P):
     
     h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
     assert((k,) == h.shape)
+    print '\t(G,h) dense construction time:',time.time() - start
+    return (G,h)
+
+def form_Gh_sparse(x,y,w,g,p,q,Phi,PtPUP,PtPU_P):
+    """
+    Form the G matrix and h vector from SPARSE 
+    matices.
+    """
+    start = time.time()
+
+    for A in [Phi,PtPUP,PtPU_P]:
+        assert(isinstance(A,sps.spmatrix))
+    (k,N) = PtPU_P.shape
+
+    # Eliminate both the x and y blocks
+    Y = sps.spdiags(y,0,N,N)
+    iXY = sps.spdiags(1.0 / (x+y),0,N,N)
+    A = PtPU_P.dot(iXY)
+    assert((k,N) == A.shape)
+    G = ((A.dot(Y)).dot(Phi) - PtPUP)
+    assert((k,k) == G.shape)
+    
+    h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
+    assert((k,) == h.shape)
+    print '\t(G,h) sparse construction time:',time.time() - start
+
     return (G,h)
     
 
@@ -104,41 +130,31 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         assert((N,) == p.shape)
         
         # Step 4: Form the reduced system G dw = h
-        X = sps.diags(x,0)
-        Y = sps.diags(y,0)
-        Z = sps.lil_matrix((N,k))
-        I = sps.eye(N)
-        
         if False:
-            #M = Phi.dot(U)
-            # Un-reduced system
-            NewtonSystem = sps.bmat([[Y, X ,Z],\
-                [-M,I,Z],\
-                [-I,I,Phi]])
-            print 'NewtonSystem: '
-            print '\tShape:',NewtonSystem.shape
-            cond = np.linalg.cond(NewtonSystem.todense())
-            print '\tCond: {0:.3g}'.format(cond)         
-            # Eliminate the x block
-            ReductedNewtonSystem = sps.bmat([[X+Y,Y.dot(Phi)],\
-                [I - M, -M.dot(Phi)]])
-                
-            print 'ReductedNewtonSystem: '
-            print '\tShape:',ReductedNewtonSystem.shape
-            cond = np.linalg.cond(ReductedNewtonSystem.todense())
-            print '\tCond: {0:.3g}'.format(cond)      
-            
-        (G,h) =  form_Gh_dense(x,y,w,g,p,q,self.Phi_dense,
-                               self.PtPUP_dense,
-                               self.PtPU_P_dense)
+            (G,h) =  form_Gh_dense(x,y,w,g,p,q,self.Phi_dense,
+                                   self.PtPUP_dense,
+                                   self.PtPU_P_dense)
+        else:
+            (G,h) =  form_Gh_sparse(x,y,w,g,p,q,self.Phi,
+                                   self.PtPUP,
+                                   self.PtPU_P)        
+
+        if isinstance(G,sps.spmatrix):
+            fillin = float(G.nnz) / float(G.size)
+        else:
+            fillin = 1.0
+        print 'Fill in:',fillin
 
         # Step 5: Solve for del_w
-        # G is essentially dense
-        if True:
-            del_w = np.linalg.lstsq(G,h)[0]
+        start = time.time()
+        if fillin > 0.1:
+            if isinstance(G,sps.spmatrix):
+                G = G.toarray()
+            del_w = np.linalg.solve(G,h)
         else:
             del_w = sps.linalg.spsolve(G,h)
         assert((k,) == del_w.shape)
+        print 'Solve time:',time.time() - start
             
             # Step 6
         Phidw= Phi.dot(del_w)

@@ -1,12 +1,6 @@
 import numpy as np
-from argparse import ArgumentParser
-from utils.pickle import dump, load
 
-from solvers.kojima import KojimaIPIterator
-from solvers import IterativeSolver,\
-    PrimalChangeTerminationCondition,\
-    MaxIterTerminationCondition,\
-    PrimalChangeAnnounce
+from solvers import *
 
 def solve_with_kojima(mdp,thresh,max_iter,value_reg=1e-12,flow_reg=1e-12):
     lcp = mdp.build_lcp(1e-12,1e-8)
@@ -22,18 +16,3 @@ def solve_with_kojima(mdp,thresh,max_iter,value_reg=1e-12,flow_reg=1e-12):
     solver.solve()
     return (iterator.get_primal_vector(),
             iterator.get_dual_vector())
-
-if __name__ == '__main__':
-    parser = ArgumentParser(__file__,\
-        'Generates an MDP from continuous problem')
-    parser.add_argument('mdp_in_file',
-                        metavar='FILE',
-                        help='mdp file')
-    parser.add_argument('sol_out_file',
-                        metavar='FILE',
-                        help='solution out file')
-    args = parser.parse_args()
-
-    mdp = load(args.mdp_in_file)
-    sol = solve_with_kojima(mdp,1e-9,1e4)
-    dump(p, args.sol_out_file)

@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.fftpack as fft
-from utils.parsers import KwargParser
+from utils import KwargParser,top_k_value
 
 class RealFunction(object):
     def evaluate(self,points,**kwargs):
@@ -16,89 +16,151 @@ class Basis(object):
     def get_orth_basis(self,points):
         raise NotImplementedError()
 
-def top_trig_features(f,k):
+def add_oob_nodes(B,k):
+    # Adds columns and rows for oob nodes
+    (N,K) = B.shape
+    ExpandedB = np.zeros((N+k,K+k))
+    ExpandedB[:N,:K] = B
+    ExpandedB[N:,K:] = np.eye(k)
+
+    #[[B 0]
+    # [0 I]]
+    return ExpandedB
+    
+
+
+def top_trig_features(f,k,thresh):
     Ns = np.array(f.shape) # Get dimensions
-    print Ns
-    F = fft.fftn(f) # Take DFT
+    F = np.fft.rfftn(f) # Take real DFT
 
     # Get the threshold we need to filter at to get around k
     # basis functions
-    p = max(0,min(100.0, 100.0 * (1.0 - float(k) / float(f.size))))
-    Q = np.percentile(np.abs(F),p)
-
-    # Some of the entries are redundant because of FFT symmetry
-    half = Ns[0] / 2
-    subF = F[:(half),...]
-    
-    freq = []
-    shift = []
-    amp = []
+    Q = top_k_value(np.abs(F), min(k,F.size-1),thresh)
 
     # Iterate over entries. Better way of doing this?
     Niprod = 1.0 / np.product(Ns)
-    it = np.nditer(subF, flags=['multi_index'])
-    coords = np.argwhere(np.abs(subF) >= Q)
+    coords = np.argwhere(np.abs(F) >= Q)
     (n,d) = coords.shape
+
+    freq = []
+    shift = []
+    amp = []
+    
     for i in xrange(n):
         coord = coords[i,:]
         tcoord = tuple(coord)
         R = np.real(F[tcoord])
         I = np.imag(F[tcoord])
-        if np.abs(R) > 1e-12:
-            #print 'Real', coords
+        
+        if np.abs(R) > thresh:
             freq.append(2*np.pi*coord)
-            shift.append(np.pi/2)
-            if coord[0] == 0 or coord[0] == half:
-                amp.append(R*Niprod)
+            shift.append(0.5 * np.pi)
+            if coord[0] == 0:
+                a = R*Niprod
             else:
-                amp.append(2*R*Niprod)
+                a = 2*R*Niprod
+            amp.append(a)
 
+        if len(freq) >= k:
+            break
             
         if np.abs(I) > 1e-12:
-            #print 'Imag', coords
             freq.append(2*np.pi*coord)
             shift.append(0)
-            if coord[0] == 0 or coord[0] == half:
-                amp.append(-I*Niprod)
+            if coord[0] == 0:
+                a = -I*Niprod
             else:
-                amp.append(-2*I*Niprod)
-        it.iternext()
+                a = -2*I*Niprod
+            amp.append(a)
 
-    freq = np.vstack(freq)
-    assert(freq.shape[1] == len(f.shape))
+        if len(freq) >= k:
+            break
+
+    freq  = np.array(freq)
     shift = np.array(shift)
-    amp = np.array(amp)
-        
+    amp   = np.array(amp)
+
     return freq,shift,amp
 
-def full_basis(lens):
-    F = make_points([np.arange(N) for N in lens])
-    return 
-    
     
 class TrigBasis(Basis):
     def __init__(self,freq,shift):
-        (M,d) = freq.shape
+        (M,D) = freq.shape
         (m,) = shift.shape
-        assert(m==M)
+        assert(m==M)        
 
+        self.offset = np.zeros(D)
         self.freq = freq.T
         self.shift = shift
+
+    def rescale(self,grid_desc):
+        # Assume frequencies are scaled and shifted
+        # to be on [0,1]*D
+        # Modify so that they're periodic over the grid
+        (D,M) = self.freq.shape
+        assert(D == len(grid_desc))
+
+        
+        self.offset = np.empty(D)        
+        for (d,(l,u,n)) in enumerate(grid_desc):
+            # Shift so l is the 0
+            self.offset[d] = l
+
+            # Points run in (l,u) over N cells
+            # There are N+1 distinct points in these cells
+            # Therefore, we're periodic so that:
+            # l = [u + (u - l) / n]
+            # So the period is (u - l) + (u-l)/n
+            period = (1.0 + 1.0 / float(n))*(u - l)
+            self.freq[d,:] /= period
 
         
     def get_basis(self,points,**kwargs):
         (N,D) = points.shape
         (d,M) = self.freq.shape
         assert(D == d)
-        
-        B = np.sin(points.dot(self.freq) + self.shift[np.newaxis,:])
+
+        # Shift points
+        P = points - self.offset[np.newaxis,:]
+        B = np.sin((P).dot(self.freq) + self.shift[np.newaxis,:])
         assert((N,M) == B.shape)
         return B
 
     def get_orth_basis(self,points):
-        raise NotImplementedError()
+        B = self.get_basis(points)
 
+        # Eliminate dependant columns (multi-dimensional aliasing...)
+        [Q,R] = np.linalg.qr(B)
+        indep = (np.abs(np.diag(R)) > 1e-8)
+        B = B[:,indep]
+
+        # Normalize
+        for i in xrange(B.shape[1]):
+            B[:,i] /= np.linalg.norm(B[:,i])
+
+        return B
+    
 class TrigFunction(MultiFunction):
+    def __init__(self,freq,shift,amps):
+        (M,D) = freq.shape
+        (m,) = amps.shape
+        assert(M == m)
+        
+        self.basis = TrigBasis(freq,shift)
+        self.amps = amps
+
+    def evaluate(self,points):
+        B = self.basis.get_basis(points)
+        (N,M) = B.shape
+        (m,) = self.amps.shape
+        assert(M==m)
+        
+        R = B.dot(self.amps)
+        assert((N,) == R.shape)
+        return R
+
+    
+class TrigMultiFunction(MultiFunction):
     def __init__(self,freq,shift,amps):
         (M,D) = freq.shape
         (m,K) = amps.shape

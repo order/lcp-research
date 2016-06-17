@@ -13,6 +13,14 @@ from discrete import make_points
 ##########################
 # Animate a rank 3 tensor along the first dimension
 
+def imshow(X,**kwargs):
+    # Hate specifying no interpolation each time.
+    ax = plt.gca()
+    if 'interpolation' in kwargs:
+        ax.imshow(X,**kwargs)
+    else:
+        ax.imshow(X,interpolation='none',**kwargs)
+
 def cdf_points(X):
     (N,) = X.shape    
     S = np.sort(X)
