@@ -70,7 +70,7 @@ class PrimalChangeAnnounce(Notification):
         new_diff = np.linalg.norm(self.old_x - x)
         self.old_x = x
         
-        if math.log(new_diff) <= math.log(self.diff) - 1:
+        if new_diff == 0 or  math.log(new_diff) <= math.log(self.diff) - 1:
             print 'Primal iteration diff {0:.3g} at iteration {1}'.format(new_diff,iterator.get_iteration())
             self.diff = new_diff
 
@@ -147,15 +147,20 @@ class PotentialAnnounce(Notification):
     """
     Broadcast potential every iteration
     """
-    def __init__(self):
-        pass
+    def __init__(self,k):
+        self.k = k
         
     def announce(self,iterator):
         x = iterator.get_primal_vector()
-        w = iterator.get_dual_vector()
+        y = iterator.get_dual_vector()
         
         N = x.size
-        P = (N + np.sqrt(N)) * np.log(x.dot(w)) - np.sum(np.log(x)) - np.sum(np.log(w))
+        k = self.k
+              
+        P = (N + k) * np.log(x.dot(y))\
+            - np.sum(np.log(x)) - np.sum(np.log(y))
         
         print 'Potential {0:.3g} at iteration {1}'\
             .format(P,iterator.get_iteration())
+        
+        print x.dot(y),np.sum(x),np.sum(y)

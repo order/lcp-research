@@ -1,6 +1,4 @@
 import numpy as np
-import scipy.fftpack as fft
-from utils import KwargParser,top_k_value
 
 class RealFunction(object):
     def evaluate(self,points,**kwargs):
@@ -15,73 +13,6 @@ class Basis(object):
         raise NotImplementedError()
     def get_orth_basis(self,points):
         raise NotImplementedError()
-
-def add_oob_nodes(B,k):
-    # Adds columns and rows for oob nodes
-    (N,K) = B.shape
-    ExpandedB = np.zeros((N+k,K+k))
-    ExpandedB[:N,:K] = B
-    ExpandedB[N:,K:] = np.eye(k)
-
-    #[[B 0]
-    # [0 I]]
-    return ExpandedB
-    
-
-
-def top_trig_features(f,k,thresh):
-    Ns = np.array(f.shape) # Get dimensions
-    F = np.fft.rfftn(f) # Take real DFT
-
-    # Get the threshold we need to filter at to get around k
-    # basis functions
-    Q = top_k_value(np.abs(F), min(k,F.size-1),thresh)
-
-    # Iterate over entries. Better way of doing this?
-    Niprod = 1.0 / np.product(Ns)
-    coords = np.argwhere(np.abs(F) >= Q)
-    (n,d) = coords.shape
-
-    freq = []
-    shift = []
-    amp = []
-    
-    for i in xrange(n):
-        coord = coords[i,:]
-        tcoord = tuple(coord)
-        R = np.real(F[tcoord])
-        I = np.imag(F[tcoord])
-        
-        if np.abs(R) > thresh:
-            freq.append(2*np.pi*coord)
-            shift.append(0.5 * np.pi)
-            if coord[0] == 0:
-                a = R*Niprod
-            else:
-                a = 2*R*Niprod
-            amp.append(a)
-
-        if len(freq) >= k:
-            break
-            
-        if np.abs(I) > 1e-12:
-            freq.append(2*np.pi*coord)
-            shift.append(0)
-            if coord[0] == 0:
-                a = -I*Niprod
-            else:
-                a = -2*I*Niprod
-            amp.append(a)
-
-        if len(freq) >= k:
-            break
-
-    freq  = np.array(freq)
-    shift = np.array(shift)
-    amp   = np.array(amp)
-
-    return freq,shift,amp
-
     
 class TrigBasis(Basis):
     def __init__(self,freq,shift):

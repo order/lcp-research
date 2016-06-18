@@ -28,7 +28,7 @@ def form_Gh_dense(x,y,w,g,p,q,Phi,PtPUP,PtPU_P):
     
     h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
     assert((k,) == h.shape)
-    print '\t(G,h) dense construction time:',time.time() - start
+    #print '\t(G,h) dense construction time:',time.time() - start
     return (G,h)
 
 def form_Gh_sparse(x,y,w,g,p,q,Phi,PtPUP,PtPU_P):
@@ -52,7 +52,7 @@ def form_Gh_sparse(x,y,w,g,p,q,Phi,PtPUP,PtPU_P):
     
     h = A.dot(g + y*p) - PtPU_P.dot(q - y) + PtPUP.dot(w)
     assert((k,) == h.shape)
-    print '\t(G,h) sparse construction time:',time.time() - start
+    #print '\t(G,h) sparse construction time:',time.time() - start
 
     return (G,h)
     
@@ -143,18 +143,18 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
             fillin = float(G.nnz) / float(G.size)
         else:
             fillin = 1.0
-        print 'Fill in:',fillin
+        #print 'Fill in:',fillin
 
         # Step 5: Solve for del_w
         start = time.time()
         if fillin > 0.1:
             if isinstance(G,sps.spmatrix):
                 G = G.toarray()
-            del_w = np.linalg.solve(G,h)
+            del_w = np.linalg.solve(G + 1e-8*np.eye(G.shape[0]),h)
         else:
-            del_w = sps.linalg.spsolve(G,h)
+            del_w = sps.linalg.spsolve(G + 1e-8*sps.eye(G.shape[0]),h)
         assert((k,) == del_w.shape)
-        print 'Solve time:',time.time() - start
+        #print 'Solve time:',time.time() - start
             
             # Step 6
         Phidw= Phi.dot(del_w)
@@ -166,21 +166,25 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         # Step 7
         del_x = del_y+Phidw-p
         assert((N,) == del_x.shape)
-        
-            
+
+        print '||dx||:',np.linalg.norm(del_x)
+        print '||dy||:',np.linalg.norm(del_y)
+           
         # Step 8 Step length
-        steplen = max(np.amax(-del_x/x),np.amax(-del_y/y))
+        steplen = max(np.max(-del_x/x),np.amax(-del_y/y))
         if steplen <= 0:
             steplen = float('inf')
         else:
             steplen = 1.0 / steplen
         steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
-            
+
+        print 'Steplen', steplen
         # Sigma is beta in Geoff's code
         if(steplen > 0.95):
             sigma = 0.05 # Long step
         else:
             sigma = 0.5 # Short step
+        #sigma = 0.99
 
         # Update point and fields
         self.steplen = steplen

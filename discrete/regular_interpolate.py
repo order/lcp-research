@@ -30,6 +30,14 @@ class RegularGridInterpolator(object):
         # Fuzz to convert [low,high) to [low,high]
         self.fuzz = 1e-15
 
+    def get_lower_boundary(self):
+        return [l for (l,h,n) in self.grid_desc]
+    def get_upper_boundary(self):
+        return [h for (l,h,n) in self.grid_desc]
+    def get_num_cells(self):
+        return [n for (l,h,n) in self.grid_desc]
+    
+    
     def num_nodes(self):
         # Include oob
         return self.indexer.max_index+1

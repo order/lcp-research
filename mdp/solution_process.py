@@ -1,5 +1,4 @@
 import numpy as np
-from state_functions import InterpolatedFunction
 
 def block_solution(mdp_obj,sol):
     """
@@ -39,21 +38,6 @@ def q_vectors(mdp_obj,V):
         Q[:,a] = c[a] + g * (P[a].T).dot(V)
 
     return Q
-
-
-def build_functions(mdp_obj,
-                    disc,
-                    matrix):
-    """
-    Build interpolated functions from the columns of a matrix
-    """
-    (N,M) = matrix.shape
-    assert(N == mdp_obj.num_states)
-    flow_fns = []
-    for a in xrange(M):
-        fn = InterpolatedFunction(disc,matrix[:,a])
-        flow_fns.append(fn)
-    return flow_fns
 
 def reshape_physical(f,disc):
     (N,) = f.shape

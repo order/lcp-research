@@ -3,11 +3,9 @@ from config.mdp import *
 from config.solver import *
 from utils import *
 from discrete import *
-
-import glob
 import multiprocessing
+
 import os
-import subprocess
 
 import math
 import matplotlib.pyplot as plt
@@ -21,15 +19,7 @@ SIM_HORIZON = 100
 
 root = os.path.expanduser('~/data/di') # root filename
 driver = os.path.expanduser('~/repo/lcp-research/cdiscrete/driver')
-#########################################
-# Modes
-UPDATE_RET_V = 1
-UPDATE_RET_Q = 2
-UPDATE_RET_GAIN = 4
 
-ACTION_Q = 1
-ACTION_FREQ = 2
-#########################################
 
 class Params(object):
     def __init__(self,other=None):

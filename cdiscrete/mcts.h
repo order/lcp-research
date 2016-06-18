@@ -1,5 +1,5 @@
-#ifndef __MCTS_INCLUDED__
-#define __MCTS_INCLUDED__
+#ifndef __Z_MCTS_INCLUDED__
+#define __Z_MCTS_INCLUDED__
 
 #include <armadillo>
 #include <vector>

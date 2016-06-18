@@ -8,6 +8,8 @@ class Marshaller(object):
 
     def add(self,obj):
         # Is a number-y type
+        if(isinstance(obj,list)):
+            obj = np.array(obj)
         assert(type(obj) in self.types)
         if isinstance(obj,np.ndarray):
             # Is a vector,array, or cube
