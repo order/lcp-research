@@ -18,20 +18,21 @@ from experiment import *
 
 WORKERS = multiprocessing.cpu_count()-1
 BATCHES_PER_WORKER = 5
-STATES_PER_BATCH = 25
-SIM_HORIZON = 150
-MCTS_BUDGET = 1000
+STATES_PER_BATCH = 20
+SIM_HORIZON = 500
+MCTS_BUDGET = 1
+ACTION_SELECT_MODE = ACTION_ROLLOUT
 
 ROOT = os.path.expanduser('~/data/di') # root filename
 DRIVER = os.path.expanduser('~/repo/lcp-research/cdiscrete/driver')
-
+SAVE_FILE = os.path.expanduser('~/data/di_rollout.py')
 def build_problem(disc_n):
     # disc_n = number of cells per dimension
     step_len = 0.01           # Step length
     n_steps = 5               # Steps per iteration
     damp = 0.01               # Dampening
     jitter = 0.1              # Control jitter 
-    discount = 0.99           # Discount (\gamma)
+    discount = 0.995          # Discount (\gamma)
     B = 5
     bounds = [[-B,B],[-B,B]]  # Square bounds, 
     cost_radius = 0.25        # Goal region radius
@@ -66,11 +67,11 @@ def solve_mdp_with_kojima(mdp):
 
 # Build the MDP and discretizer
 (mdp,disc,problem) = build_problem(16)
-(ref_mdp,ref_disc,ref_problem) = build_problem(32)
+(ref_mdp,ref_disc,ref_problem) = build_problem(64)
 
 # Solve, initially, using Kojima
 
-if False:
+if True:
     (ref_p,_) = solve_mdp_with_kojima(ref_mdp)
     (ref_v,_) = split_solution(ref_mdp,ref_p)
     
@@ -84,9 +85,9 @@ else:
     ref_v = np.load('ref_v.npy')   
 
 mcts_params = MCTSParams(MCTS_BUDGET)
-mcts_params.action_select_mode = ACTION_Q
+mcts_params.action_select_mode = ACTION_SELECT_MODE
 fileroot = ROOT + '/di.mcts'
-if False:
+if True:
     start_states = create_start_states(STATES_PER_BATCH,
                                        problem,
                                        WORKERS * BATCHES_PER_WORKER)
@@ -102,7 +103,7 @@ if False:
                                start_states,
                                SIM_HORIZON,
                                WORKERS)
-    np.save('mcts_{0}.npy'.format(MCTS_BUDGET),returns)        
+    np.save(SAVE_FILE,returns)        
 
 else:
     start_states = 4 * (2 * np.random.rand(25,2) - 1)
