@@ -6,6 +6,7 @@
 #include "marshaller.h"
 #include "mcts.h"
 #include "policy.h"
+#include "reader.h"
 #include "transfer.h"
 
 using namespace std;
@@ -30,15 +31,17 @@ int main(int argc, char ** argv){
   MCTSContext context;
   mat start_states;
   uint sim_horizon;
+  RegGrid ref_grid;
   vec ref_v;
   read_mcts_config_file(demarsh,
 			grid,
 			problem,
 			context,
 			sim_horizon,
-			start_states
+			start_states,
+			ref_grid,
 			ref_v);
-  InterpFunction ref_v_fn = InterpFunction(ref_v,grid);
+  InterpFunction ref_v_fn = InterpFunction(ref_v,ref_grid);
 
   
   uint N = start_states.n_rows;
@@ -60,6 +63,8 @@ int main(int argc, char ** argv){
   for(uint i = 0; i < N; i++){
     // Pick state
     vec curr_state = start_states.row(i).t();
+    //std::cout << "Start state: " << curr_state.t()
+    //	      << "\tVal estimate: " << ref_v_fn.f(curr_state) << std::endl;
     vec last_state = 10*ones<vec>(2);
     uint t;
     for(t = 0; t < sim_horizon; t++){
@@ -96,20 +101,28 @@ int main(int argc, char ** argv){
       // Scrap tree.
       delete_tree(&context);
     }
+
+    // Report what happened
+    /*std::cout << "Terminated after " << t << " iterations.\n"
+	      << "\tState:" << curr_state.t()
+	      << "\tGain:" << gains(i) << std::endl
+	      << "\tTail:" <<  pow(problem.discount,sim_horizon)
+	      << " * " << ref_v_fn.f(curr_state) << std::endl;*/
     
     if(t == sim_horizon){
       // Add tail cost if didn't terminate early.
       double tail = pow(problem.discount,sim_horizon)
-	* ref_v_fn->f(curr_state);
+	* ref_v_fn.f(curr_state);
       gains(i) += tail;
     }
+    //std::cout << "Total return: " << gains(i) << std::endl;
   }
   /*
   std::cout << "Mean: " << mean(gains) << std::endl;
   std::cout << "Median: " << median(gains) << std::endl;
   std::cout << "S.D.: " << stddev(gains) << std::endl;
   */
-  std::cout << gains << std::endl;
+  std::cout << gains.t() << std::endl;
 
   delete_context(&context);
   if(save_sim){

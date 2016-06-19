@@ -2,9 +2,12 @@ import numpy as np
 import scipy.sparse as sps
 
 import multiprocessing
+import subprocess
 from mdp import *
 from mdp.transitions import DoubleIntegratorTransitionFunction
 from utils import Marshaller
+
+import os
 
 #########################################
 # Modes
@@ -14,47 +17,20 @@ UPDATE_RET_GAIN = 4
 
 ACTION_Q = 1
 ACTION_FREQ = 2
+ACTION_ROLLOUT = 3
+ACTION_UCB = 4
 
 ########################################
 # MCTS Parameter object
 class MCTSParams(object):
-    def __init__(self,other=None):
-        if other==None:
-           self.default()
-        else:
-            self.copy(other)
-        
-    def default(self):
-        self.names = ['budget',
-                      'p_scale',
-                      'ucb_scale',
-                      'rollout_horizon',
-                      'q_min_step',
-                      'update_return_mode',
-                      'action_select_mode']
-        self.x = [500,
-                  5,
-                  5,
-                  25,
-                  0.1,
-                  UPDATE_RET_GAIN,
-                  ACTION_Q]
-
-        self.update()
-        
-    def update(self):
-        # Update fields
-        self.__dict__.update(zip(self.names,self.x))
-
-    def copy(self,param):
-        self.x = np.array(param.x)
-        self.update()
-
-    def to_array(self):
-        return np.array(self.x,dtype=np.double)
-
-    def to_list(self):
-        return [float(x) for x in self.x]
+    def __init__(self,budget):
+        self.budget = budget
+        self.p_scale = 5
+        self.ucb_scale = 5
+        self.rollout_horizon = 25
+        self.q_min_step = 0.05
+        self.update_return_mode = UPDATE_RET_Q
+        self.action_select_mode = ACTION_Q
 
 ######################################################
 # Use n-dim RFFT to extract good features
@@ -198,6 +174,7 @@ def build_di_mcts_file(filename,
                        mdp_obj,
                        disc,
                        mcts_sol,
+                       ref_disc,
                        ref_v,
                        mcts_params,
                        start_states,
@@ -243,8 +220,12 @@ def build_di_mcts_file(filename,
 
     # Simulation parameters
     marsh.add(simulation_horizon)
-    marsh.add(ref_v)
     marsh.add(start_states)
+
+    marsh.add(ref_disc.get_lower_boundary())
+    marsh.add(ref_disc.get_upper_boundary())
+    marsh.add(ref_disc.get_num_cells())
+    marsh.add(ref_v)
 
     marsh.save(filename)
 
@@ -252,15 +233,32 @@ def build_di_mcts_file(filename,
 ##################################################
 # From problem objects start a number of C++ MCTS
 # solves using a multi-threaded pool.
-def get_mcts_returns(root_filename,
+def run_command(cmd):
+    curproc = multiprocessing.current_process()
+    devnull = open(os.devnull, 'w')
+    try:
+        ret = subprocess.check_output(
+            cmd, shell=False)
+            #stderr=devnull)
+        return ret
+    except Exception as e:
+        print e
+        quit()
+
+def get_mcts_returns(driver,
+                     root_filename,
                      problem,
                      mdp_obj,
                      disc,
                      mcts_sol,
+                     ref_disc,
                      ref_v,
                      mcts_params,
                      start_states,
+                     sim_horizon,
                      num_workers):
+
+
 
     if not hasattr(get_mcts_returns, 'FILE_NUMBER'):
         get_mcts_returns.FILE_NUMBER = 0
@@ -274,18 +272,23 @@ def get_mcts_returns(root_filename,
                            problem,
                            mdp_obj,
                            disc,
-                           sol,
+                           mcts_sol,
+                           ref_disc,
+                           ref_v,
                            mcts_params,
-                           start)
+                           start,
+                           sim_horizon)
         files.append(filename)
     print 'Running {0} jobs on {1} workers'.format(len(start_states),
                                                    num_workers)
 
     # Simulate from config files
     pool = multiprocessing.Pool(num_workers)
-    ret = pool.map(run_driver,files)
+    commands = zip([driver]*len(files),
+                   files)
+    ret = pool.map(run_command,commands)
     pool.close()
     pool.join()
 
-    returns = np.array([float(x) for x in ret])
+    returns = np.array([map(float,x.split()) for x in ret]).flatten()
     return returns

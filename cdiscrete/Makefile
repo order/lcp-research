@@ -5,8 +5,8 @@ LIBS=-larmadillo -lhdf5 -lpython2.7 -lboost_python -lboost_system
 LDIR=-L/usr/lib/x86_64-linux-gnu/hdf5/serial
 
 SOURCES= costs.cpp discrete.cpp function.cpp\
-marshaller.cpp mcts.cpp misc.cpp policy.cpp simulate.cpp transfer.cpp\
-value.cpp
+marshaller.cpp mcts.cpp misc.cpp policy.cpp reader.cpp simulate.cpp\
+transfer.cpp value.cpp
 
 OBJECTS=$(SOURCES:.cpp=.o)
 EXEC=driver

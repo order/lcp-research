@@ -24,7 +24,7 @@ def bounded_tail(discount,bound):
 def save_ndarray_hdf5(filename,A):
     f = h5py.File(filename,'w')
     dset = f.create_dataset("dataset", data=A)
-    f.close()s
+    f.close()
 
 def banner(msg):
     """
