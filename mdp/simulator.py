@@ -83,11 +83,10 @@ def simulate(problem,
     action_dim = policy.get_action_dim()
     (N,Sdim) = start_states.shape
 
-    states = np.empty((N,Sdim,H))
-    actions = np.empty((N,action_dim,H))
-    costs = np.empty((N,H))
+    states = np.full((N,Sdim,H),np.nan,dtype=np.double)
+    actions = np.full((N,action_dim,H),np.nan,dtype=np.double)
+    costs = np.full((N,H),np.nan,dtype=np.double)
 
-    internal_state = []
     
     curr = start_states
     for t in xrange(H):
@@ -100,15 +99,32 @@ def simulate(problem,
         states[:,:,t] = curr
         actions[:,:,t] = u
         costs[:,t] = cost
-
-        if hasattr(policy,'get_internal_state'):
-            # Right now just for MCTS
-            internal_state.append(policy.get_internal_state())
         
     return SimulationResults(actions,
                              states,
-                             costs,
-                             internal_state)
+                             costs)
+
+def discounted_return_with_tail_estimate(problem,
+                                         costs,
+                                         states,
+                                         discount,
+                                         ref_v_fn):
+    H = costs.shape[-1]
+    assert(H == states.shape[-1])
+    final_states = states[:,:,-1]
+    (N,d) = final_states.shape
+    
+    returns = discounted_return(costs,problem.discount)
+    assert((N,) == returns.shape)
+    
+    tail_v = ref_v_fn.evaluate(final_states)
+    assert((N,) == tail_v.shape)
+
+    ret = returns + (discount**H) * tail_v
+    assert((N,) == ret.shape)
+
+    return ret
+    
 
 
 def discounted_return(cost,discount):

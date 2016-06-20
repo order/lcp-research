@@ -4,7 +4,8 @@ import scipy.sparse as sps
 import multiprocessing
 import subprocess
 from mdp import *
-from mdp.transitions import DoubleIntegratorTransitionFunction
+from mdp.policies import *
+from mdp.transitions import *
 from utils import Marshaller
 
 import os
@@ -229,6 +230,53 @@ def build_di_mcts_file(filename,
 
     marsh.save(filename)
 
+################################################
+# Basic simulation
+def get_returns(problem,
+                policy,
+                ref_v_fn,
+                start_states,
+                sim_horizon):
+
+    sim_res = simulate(problem,
+                       policy,
+                       start_states,
+                       sim_horizon)
+    # Get total return using reference v function
+    ret = discounted_return_with_tail_estimate(problem,
+                                               sim_res.costs,
+                                               sim_res.states,
+                                               problem.discount,
+                                               ref_v_fn)
+    return ret
+
+#################################################
+# Simulate Q policy
+
+def build_q_policy(q_mdp,q_disc,v):
+    q = q_vectors(q_mdp,v)
+    q_fns = InterpolatedMultiFunction(q_disc,q)
+    q_idx_policy = MinFunPolicy(q_fns)
+    q_policy = IndexPolicyWrapper(q_idx_policy,
+                                  q_mdp.actions)
+    return q_policy
+
+def get_q_returns(problem,
+                  q_mdp,
+                  q_disc,
+                  v,
+                  ref_v_fn,
+                  start_states,
+                  sim_horizon):
+    # Build the Q policy
+    q_policy = build_q_policy(q_mdp,q_disc,v)
+    return get_returns(problem,
+                       q_policy,
+                       ref_v_fn,
+                       start_states,
+                       sim_horizon)
+
+
 
 ##################################################
 # From problem objects start a number of C++ MCTS
@@ -257,11 +305,11 @@ def get_mcts_returns(driver,
                      start_states,
                      sim_horizon,
                      num_workers):
-
-
-
     if not hasattr(get_mcts_returns, 'FILE_NUMBER'):
         get_mcts_returns.FILE_NUMBER = 0
+
+    # Should be a list of np.ndarray
+    assert(isinstance(start_states,list))
     
     # Write out config files
     files = []

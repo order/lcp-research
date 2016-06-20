@@ -10,5 +10,5 @@ if __name__ == '__main__':
         data = np.load(filename)
         (x,F) = cdf_points(data)
         plt.plot(x,F)
-plt.legend(files)
+plt.legend(files,loc='best')
 plt.show()

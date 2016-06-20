@@ -60,6 +60,9 @@ void read_mcts_config_file(Demarshaller & demarsh,
 
   // Assemble objects for MCTS context
   InterpFunction * v_fn = new InterpFunction(v,grid);
+
+  // flow = [flow]_+
+  flow(find(flow < 0)).fill(0);
   InterpMultiFunction * flow_fn = new InterpMultiFunction(flow,grid);
   ProbFunction * prob_fn = new ProbFunction(flow_fn);
   //DIBangBangPolicy * rollout = new DIBangBangPolicy(problem.actions);
