@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.sparse as sps
 
+import matplotlib.pyplot as plt
+
 import multiprocessing
 import subprocess
 from mdp import *
@@ -238,17 +240,19 @@ def get_returns(problem,
                 start_states,
                 sim_horizon):
 
+    (N,d) = start_states.shape
     sim_res = simulate(problem,
                        policy,
                        start_states,
                        sim_horizon)
+
     # Get total return using reference v function
     ret = discounted_return_with_tail_estimate(problem,
                                                sim_res.costs,
                                                sim_res.states,
                                                problem.discount,
                                                ref_v_fn)
-    return ret
+    return (ret,sim_res)
 
 #################################################
 # Simulate Q policy
@@ -337,6 +341,5 @@ def get_mcts_returns(driver,
     ret = pool.map(run_command,commands)
     pool.close()
     pool.join()
-
     returns = np.array([map(float,x.split()) for x in ret]).flatten()
     return returns

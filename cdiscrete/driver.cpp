@@ -82,6 +82,9 @@ int main(int argc, char ** argv){
       double cost = problem.cost_fn->get_cost(curr_state,action);
       
       gains(i) += pow(problem.discount,t) * cost;
+      //std::cout << "C Iteration" << t << std::endl;
+      //std::cout << "C State:" << curr_state.t();
+      //std::cout << "C Cost:" << cost << std::endl;;
 
       if(save_sim){
 	traj.slice(t).row(i) = curr_state.t();
@@ -101,7 +104,6 @@ int main(int argc, char ** argv){
       // Scrap tree.
       delete_tree(&context);
     }
-
     // Report what happened
     /*std::cout << "Terminated after " << t << " iterations.\n"
 	      << "\tState:" << curr_state.t()
@@ -125,6 +127,7 @@ int main(int argc, char ** argv){
   std::cout << gains.t() << std::endl;
 
   delete_context(&context);
+  
   if(save_sim){
     Marshaller marsh;
     marsh.add_vec(gains);
@@ -133,5 +136,6 @@ int main(int argc, char ** argv){
     marsh.add_mat(costs);
     marsh.save(filename + ".sim");
   }
+  
   return 0;
 }

@@ -19,6 +19,7 @@ mat TransferFunction::get_next_states(const mat & points,
   return get_next_states(points,actions);
 }
 */
+TransferFunction::~TransferFunction(){}
 
 DoubleIntegrator::DoubleIntegrator(double step_size,
 				   uint num_steps,
@@ -60,7 +61,7 @@ mat DoubleIntegrator::get_next_states(const mat & points,
     pert_acts = actions.col(0) + _jitter * noise;
     X += _step_size * V + _sss*pert_acts;
     V *= (1.0 - _damping);
-    V += _step_size * pert_acts;
+    V += _step_size * pert_acts;   
   }
   mat R = mat(N,2);
   R.col(0) = X;

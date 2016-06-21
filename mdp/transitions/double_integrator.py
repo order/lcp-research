@@ -34,14 +34,19 @@ class DoubleIntegratorTransitionFunction(TransitionFunction):
         
         u = actions # Could be either a num, or vector
         damp = self.dampening
+        h = self.step
 
         Samples = np.empty((samples,N,2))
-        T = np.array([[1,self.step],[0,(1-damp)]])
         for s in xrange(samples):
-            curr = points
+            x = np.array(points[:,0])
+            v = np.array(points[:,1])
             for i in xrange(self.num_steps):
-                curr = points.dot(T.T)
-                noise = self.control_jitter*np.random.randn(N)
-                curr[:,1] += self.step * (u + noise)
-            Samples[s,:,:] = curr        
+                noise = np.random.randn(N);
+                pert_acts = u + self.control_jitter * noise
+                x += h * v + 0.5*h*h*pert_acts
+                v *= (1.0 - damp)
+                v += h * pert_acts
+                
+            Samples[s,:,0] = x
+            Samples[s,:,1] = v
         return Samples

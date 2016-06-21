@@ -63,8 +63,7 @@ void read_mcts_config_file(Demarshaller & demarsh,
 
   // flow = [flow]_+
   flow(find(flow < 0)).fill(0);
-  InterpMultiFunction * flow_fn = new InterpMultiFunction(flow,grid);
-  ProbFunction * prob_fn = new ProbFunction(flow_fn);
+  ProbFunction * prob_fn = new ProbFunction(flow,grid);
   //DIBangBangPolicy * rollout = new DIBangBangPolicy(problem.actions);
   DILinearPolicy * rollout = new DILinearPolicy(problem.actions);
 

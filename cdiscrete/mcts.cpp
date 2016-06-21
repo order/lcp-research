@@ -126,7 +126,6 @@ double MCTSNode::get_nudge(uint a_idx) const{
 
 double MCTSNode::get_ucb_score(uint a_idx) const{
   // Actually the "lower confidence bound" because we're minimizing cost
-
   uint total_v = _total_visits+1; // +1 to avoid nan
   uint child_v = _child_visits(a_idx)+1;
   return _q(a_idx)
@@ -377,11 +376,21 @@ void delete_tree(MCTSContext * context){
 // e.g. from add_child
 void delete_context(MCTSContext * context){
   delete_tree(context);
+  delete_problem(context->problem_ptr);
+  
+  context->problem_ptr = NULL;
+  
   delete context->v_fn;
+  context->v_fn = NULL;
+  
   delete context->q_fn;
+  context->q_fn = NULL;
+  
   delete context->prob_fn;
+  context->prob_fn = NULL;
+  
   delete context->rollout;
-
+  context->rollout = NULL;
 }
 
 //===================================

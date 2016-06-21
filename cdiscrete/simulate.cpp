@@ -8,7 +8,9 @@
 using namespace arma;
 void delete_problem(Problem * problem){
   delete problem->trans_fn;
+  problem->trans_fn = NULL;
   delete problem->cost_fn;
+  problem->cost_fn = NULL;
 }
 
 void add_to_simout(const mat & points,

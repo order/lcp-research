@@ -7,6 +7,7 @@ using namespace arma;
 
 class RealFunction{
  public:
+  virtual ~RealFunction();
   virtual vec f(const mat & points) const = 0;
   virtual double f(const vec & points) const = 0;
   virtual uint dom_dim() const = 0;
@@ -14,6 +15,7 @@ class RealFunction{
 
 class MultiFunction{
  public:
+  virtual ~MultiFunction();
   virtual mat f(const mat & points) const = 0;
   virtual vec f(const vec & points) const = 0;
   virtual uint dom_dim() const = 0;
@@ -24,6 +26,7 @@ class InterpFunction : public RealFunction{
  public:
   InterpFunction(const vec & val,
 		 const RegGrid & grid);
+  ~InterpFunction();
   vec f(const mat & points) const;
   double f(const vec & points) const;
   uint dom_dim() const;
@@ -37,6 +40,7 @@ class InterpMultiFunction : public MultiFunction{
  public:
   InterpMultiFunction(const mat & val,
 		 const RegGrid & grid);
+  ~InterpMultiFunction();
   mat f(const mat & points) const;
   vec f(const vec & points) const;
   uint dom_dim() const;
@@ -60,16 +64,12 @@ class ConstMultiFunction : public MultiFunction{
   double _val;
 };
 
-class ProbFunction : public MultiFunction{
+class ProbFunction : public InterpMultiFunction{
  public:
-  ProbFunction(MultiFunction * base_fn);
-  ~ProbFunction();
+  ProbFunction(const mat & val,
+	       const RegGrid & grid);
   mat f(const mat & points) const;
   vec f(const vec & points) const;
-  uint dom_dim() const;
-  uint range_dim() const;
- protected:
-  MultiFunction * _base;
 };
 
 #endif

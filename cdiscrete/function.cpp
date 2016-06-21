@@ -1,10 +1,15 @@
 #include "function.h"
 #include <assert.h>
+RealFunction::~RealFunction(){};
+
+MultiFunction::~MultiFunction(){};
 
 InterpFunction::InterpFunction(const vec & val,
 			       const RegGrid & grid){
-  _val = val;
+  _val = vec(val);
   _grid = grid;
+}
+InterpFunction::~InterpFunction(){
 }
 
 vec InterpFunction::f(const mat & points) const{
@@ -19,13 +24,16 @@ uint InterpFunction::dom_dim() const{
 
 InterpMultiFunction::InterpMultiFunction(const mat & val,
 					 const RegGrid & grid){
-  _val = val;
+  _val = mat(val);
   _grid.low = grid.low;
   _grid.high = grid.high;
   _grid.num_cells = grid.num_cells;
   
   uint G = num_grid_points(grid);
   assert(G == val.n_rows);
+}
+
+InterpMultiFunction::~InterpMultiFunction(){
 }
 
 mat InterpMultiFunction::f(const mat & points) const{
@@ -63,39 +71,28 @@ uint ConstMultiFunction::range_dim() const{
   return _n;
 }
 
-ProbFunction::ProbFunction(MultiFunction * base_fn){
-  _base = base_fn;
-}
-ProbFunction::~ProbFunction(){
-  delete _base;
-}
+ProbFunction::ProbFunction(const mat & val,
+			   const RegGrid & grid) : InterpMultiFunction(val,grid)
+{}
 
 mat ProbFunction::f(const mat & points) const{
-  uint N = points.n_rows;
-  mat unnorm = _base->f(points);
-  assert(all(all(unnorm >= 0)));
-  
-  vec Z = sum(unnorm,1);
-  assert(N == Z.n_elem);
+  mat Z = interp_fns(_val,points,_grid);
+  uint N = Z.n_rows;
+  uint d = Z.n_cols;
   for(uint i = 0; i < N; i++){
-    unnorm.row(i) /= Z(i);
+    double norm = sum(Z.row(i));
+    if(norm > 0){
+      Z.row(i) /= sum(Z.row(i));
+    }
+    else{
+      Z.row(i).fill(1.0 / d);
+    }
   }
-  return unnorm;
-  
+  return Z;
 }
 vec ProbFunction::f(const vec & point) const{
   mat points = conv_to<mat>::from(point.t());
-  assert(1 == points.n_rows);
-  assert(point.n_elem == points.n_cols);
-  
-  mat res = f(points);
-  assert(1 == res.n_rows);
-  assert(res.n_cols == range_dim());
-  return res.row(0).t();
-}
-uint ProbFunction::dom_dim() const{
-  return _base->dom_dim(); // Not sure; doesn't matter
-}
-uint ProbFunction::range_dim() const{
-  return _base->range_dim();
+  mat r = f(points);
+  assert(1 == r.n_rows);
+  return r.row(0).t();
 }

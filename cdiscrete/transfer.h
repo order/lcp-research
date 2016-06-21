@@ -12,6 +12,8 @@ using namespace arma;
 // Abstract transfer function
 class TransferFunction{
  public:
+  virtual ~TransferFunction();
+
   virtual mat get_next_states(const mat & points,
 			      const mat & actions) const = 0;
 

@@ -23,14 +23,13 @@ class GenerativeModel(object):
         assert(D == self.state_dim)
         assert((self.action_dim,) == action.shape
                or (N,self.action_dim) == action.shape)
-
+        cost = self.cost_fn.cost(states,action)
         next_states = self.trans_fn.multisample_transition(states,
                                                            action,
-                                                          S)
+                                                           S)
         assert((S,N,D) == next_states.shape)
         next_states = self.boundary.enforce(next_states)
 
-        cost = self.cost_fn.cost(states,action)
         assert((N,) == cost.shape)
         return (next_states,cost)
 

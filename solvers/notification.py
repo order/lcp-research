@@ -160,7 +160,5 @@ class PotentialAnnounce(Notification):
         P = (N + k) * np.log(x.dot(y))\
             - np.sum(np.log(x)) - np.sum(np.log(y))
         
-        print 'Potential {0:.3g} at iteration {1}'\
-            .format(P,iterator.get_iteration())
-        
-        print x.dot(y),np.sum(x),np.sum(y)
+        print 'Potential {0:.3g} at iteration {1} ({2:.3g} {3:.3g} {4:.3g})'\
+            .format(P,iterator.get_iteration(),x.dot(y),np.sum(x),np.sum(y))

@@ -11,7 +11,7 @@
 void read_mcts_config_file(Demarshaller & demarsh,
 			   RegGrid & grid,
 			   Problem & problem,
-			   MCTSContext & context,
+			   MCTSContext &context,
 			   uint & sim_horizon,
 			   mat & start_states,
 			   RegGrid & ref_grid,

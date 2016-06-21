@@ -16,16 +16,20 @@ from utils import *
 
 from experiment import *
 
+#WORKERS = 1
 WORKERS = multiprocessing.cpu_count()-1
 BATCHES_PER_WORKER = 5
-STATES_PER_BATCH = 30
+STATES_PER_BATCH = 25
 SIM_HORIZON = 500
 BUILD_MODE = 'load'
 BUILD_MODE = 'build'
 
+low_dim = 16
+ref_dim = 64
+
 
 BUDGETS = [4,8,16,32,64,128,256]
-#BUDGETS = [32]
+#BUDGETS = [8]
 
 
 ROOT = os.path.expanduser('~/data/di') # root filename
@@ -36,7 +40,7 @@ def build_problem(disc_n):
     step_len = 0.01           # Step length
     n_steps = 5               # Steps per iteration
     damp = 0.01               # Dampening
-    jitter = 0.25             # Control jitter 
+    jitter = 0.05             # Control jitter 
     discount = 0.995          # Discount (\gamma)
     B = 5
     bounds = [[-B,B],[-B,B]]  # Square bounds, 
@@ -63,7 +67,7 @@ def build_problem(disc_n):
 def solve_mdp_with_kojima(mdp):
     # Solve
     start = time.time()
-    (p,d) = solve_with_kojima(mdp,1e-8,1000)
+    (p,d) = solve_with_kojima(mdp,1e-8,1000,1e-8,1e-6)
     print 'Kojima ran for:', time.time() - start, 's'
     return (p,d)
 
@@ -71,8 +75,8 @@ if __name__ == '__main__':
 
     ####################################################
     # Build the MDP and discretizer
-    (low_mdp,low_disc,problem) = build_problem(16)
-    (ref_mdp,ref_disc,_) = build_problem(32)
+    (low_mdp,low_disc,problem) = build_problem(low_dim)
+    (ref_mdp,ref_disc,_) = build_problem(ref_dim)
     
     ####################################################
     # Solve, initially, using Kojima
@@ -90,15 +94,17 @@ if __name__ == '__main__':
         assert(BUILD_MODE == 'load')
         low_sol = np.load('low_sol.npy')
         ref_sol = np.load('ref_sol.npy')
+
     ref_v = ref_sol[:,0]
     ref_v_fn = InterpolatedFunction(ref_disc,ref_v)
 
     ref_p = ref_sol.reshape(-1,order='F')
     low_v = low_sol[:,0]
 
+
     ####################################################
     # Form the Fourier projection (both value and flow)
-    B = get_basis_from_solution(ref_mdp,ref_disc,ref_sol,16*16)
+    B = get_basis_from_solution(ref_mdp,ref_disc,ref_sol,low_dim**2)
     (N,K) = B.shape
     assert((N,) == ref_p.shape)
 
@@ -114,21 +120,66 @@ if __name__ == '__main__':
                                                WORKERS * BATCHES_PER_WORKER)
     start_states = np.vstack(batched_start_states)
 
+    #start_states = np.array([[0.26,0.27]])
+    #batched_start_states = [start_states]
+
     #####################################################
-    # Run Q-policy with 16x16 values
-    q_ret = get_q_returns(problem,
-                          low_mdp,
-                          low_disc,
-                          low_v,
+    # Rollout
+    rollout_policy = LinearPolicy(ref_mdp.actions,np.array([1,1]))
+    (rollout_ret,sim) = get_returns(problem,
+                                    rollout_policy,
+                                    ref_v_fn,
+                                    start_states,
+                                    SIM_HORIZON)
+    print 'Rollout policy:', np.percentile(rollout_ret,[25,50,75])
+    np.save(SAVE_FILE + 'rollout',rollout_ret)
+
+    """
+    (N,d,T) = sim.states.shape
+    for i in xrange(N):
+        plt.plot(sim.states[i,0,:],
+                 sim.states[i,1,:],
+                 'x-k',alpha=0.5)
+    plt.show()
+    """
+    
+    #####################################################
+    # Run Q-policy with coarse grid values
+    (q_ret,sim) = get_q_returns(problem,
+                                low_mdp,
+                                low_disc,
+                                low_v,
+                                ref_v_fn,
+                                start_states,
+                                SIM_HORIZON)
+    print 'Coarse Q-policy:',np.percentile(q_ret,[25,50,75])
+    np.save(SAVE_FILE + 'q_low',q_ret)
+
+    """"
+    (N,d,T) = sim.states.shape
+    for i in xrange(N):
+        plt.plot(sim.states[i,0,:],
+                 sim.states[i,1,:],
+                 'x-k',alpha=0.5)
+    plt.show()
+    """
+
+
+    #####################################################
+    # Run Q-policy with fine grid values
+    q_ret,_ = get_q_returns(problem,
+                          ref_mdp,
+                          ref_disc,
+                          ref_v,
                           ref_v_fn,
                           start_states,
                           SIM_HORIZON)
-    print '16x16 Q-policy:',np.percentile(q_ret,[25,50,75])
-    np.save(SAVE_FILE + 'q_low',q_ret)
+    print 'Fine Q-policy:',np.percentile(q_ret,[25,50,75])
+    np.save(SAVE_FILE + 'q_ref',q_ret)
     
     #####################################################
     # Run Q-policy with fourier values   
-    q_ret = get_q_returns(problem,
+    q_ret,_ = get_q_returns(problem,
                           ref_mdp,
                           ref_disc,
                           proj_v,
@@ -138,21 +189,9 @@ if __name__ == '__main__':
     print 'Fourier Q-policy:',np.percentile(q_ret,[25,50,75])
 
     np.save(SAVE_FILE + 'q_proj',q_ret)
-
-    #####################################################
-    # Rollout
-    rollout_policy = LinearPolicy(ref_mdp.actions,np.array([1,1]))
-    rollout_ret = get_returns(problem,
-                              rollout_policy,
-                              ref_v_fn,
-                              start_states,
-                              SIM_HORIZON)
-    print 'Rollout policy:', np.percentile(rollout_ret,[25,50,75])
-
-    np.save(SAVE_FILE + 'rollout',rollout_ret)
-
+        
     ####################################################
-    # MCTS with 16x16 Q
+    # MCTS with Coarse Q
     for budget in BUDGETS:
         mcts_params = MCTSParams(budget)
         mcts_params.action_select_mode = ACTION_Q
@@ -169,7 +208,7 @@ if __name__ == '__main__':
                                     batched_start_states,
                                     SIM_HORIZON,
                                     WORKERS)
-        print 'MCTS 16x16 policy ({0}):'.format(budget),\
+        print 'MCTS Coarse policy ({0}):'.format(budget),\
             np.percentile(mcts_ret,[25,50,75])
         np.save(SAVE_FILE + 'mcts_low_{0}'.format(budget), mcts_ret)
 
@@ -215,7 +254,7 @@ if __name__ == '__main__':
                                     batched_start_states,
                                     SIM_HORIZON,
                                     WORKERS)
-        print 'MCTS 16x16 no Q policy ({0}):'.format(budget),\
+        print 'MCTS Coarse no Q policy ({0}):'.format(budget),\
             np.percentile(mcts_ret,[25,50,75])
         np.save(SAVE_FILE + 'mcts_noq_{0}'.format(budget), mcts_ret)
         
@@ -239,7 +278,7 @@ if __name__ == '__main__':
                                     batched_start_states,
                                     SIM_HORIZON,
                                     WORKERS)
-        print 'MCTS 16x16 no flow policy ({0}):'.format(budget),\
+        print 'MCTS Coarse no flow policy ({0}):'.format(budget),\
             np.percentile(mcts_ret,[25,50,75])
         np.save(SAVE_FILE + 'mcts_noflow_{0}'.format(budget), mcts_ret)
 
@@ -264,6 +303,6 @@ if __name__ == '__main__':
                                     batched_start_states,
                                     SIM_HORIZON,
                                     WORKERS)
-        print 'MCTS 16x16 no mpd information policy ({0}):'.format(budget),\
+        print 'MCTS Coarse no mpd information policy ({0}):'.format(budget),\
             np.percentile(mcts_ret,[25,50,75])
         np.save(SAVE_FILE + 'mcts_noflow_{0}'.format(budget), mcts_ret)
