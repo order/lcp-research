@@ -22,7 +22,7 @@ BATCHES_PER_WORKER = 4
 STATES_PER_BATCH = 20
 SIM_HORIZON = 1000
 BUILD_MODE = 'load'
-BUILD_MODE = 'build'
+#BUILD_MODE = 'build'
 
 low_dim = 16
 ref_dim = 64
@@ -107,8 +107,9 @@ if __name__ == '__main__':
     """
     ####################################################
     # Form the Fourier projection (both value and flow)
-    B = get_basis_from_solution(ref_mdp,ref_disc,ref_sol,100)
+    B = get_basis_from_solution(ref_mdp,ref_disc,ref_sol,17*17)
     (N,K) = B.shape
+    print 'Projected basis shape', B.shape
     assert((N,) == ref_p.shape)
 
     proj_p = B.dot(B.T.dot(ref_p))
@@ -199,7 +200,6 @@ if __name__ == '__main__':
     print 'Fourier Q-policy:',np.percentile(q_ret,[25,50,75])
 
     np.save(SAVE_FILE + 'q_proj',q_ret)
-    
     ####################################################
     # MCTS with Coarse Q
     # Implement the hillcar rollout policy in C++
@@ -223,7 +223,6 @@ if __name__ == '__main__':
             np.percentile(mcts_ret,[25,50,75])
         np.save(SAVE_FILE + 'mcts_low_{0}'.format(budget), mcts_ret)
 
-    quit()
     ####################################################
     # MCTS with Projected Q
     for budget in BUDGETS:

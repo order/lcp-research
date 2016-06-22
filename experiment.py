@@ -152,7 +152,7 @@ def get_basis_from_solution(mdp_obj,disc,sol,num_bases):
     total_bases = 0
     for i in xrange(Ap):
         A = reshape_full(sol[:,i],disc)
-        if False or i != 0:
+        if True or i != 0:
             B = get_basis_from_array(mdp_obj,disc,A,num_bases)
         else:
             B = sps.eye(N)
