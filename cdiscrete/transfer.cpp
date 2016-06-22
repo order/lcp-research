@@ -184,3 +184,44 @@ vec triangle_slope(vec x){
     
   return soft_threshold(triangle_wave(x - P/4,P,A),T);
 }
+
+HillcarBoundaryEnforcer:: HillcarBoundaryEnforcer(TransferFunction * trans_fn_ptr,
+				    const Boundary & boundary){
+  _trans_fn_ptr = trans_fn_ptr;
+  _boundary.low = boundary.low;
+  _boundary.high = boundary.high;
+}
+
+HillcarBoundaryEnforcer::HillcarBoundaryEnforcer(TransferFunction * trans_fn_ptr,
+				   const RegGrid & boundary){
+  _trans_fn_ptr = trans_fn_ptr;
+  _boundary.low = boundary.low;
+  _boundary.high = boundary.high;
+}
+
+HillcarBoundaryEnforcer::~HillcarBoundaryEnforcer(){
+  delete _trans_fn_ptr;
+}
+
+vec HillcarBoundaryEnforcer::get_next_state(const vec & points,
+				      const vec & actions) const{  
+  vec next_state = _trans_fn_ptr->get_next_state(points,actions);
+  uint D = points.n_elem;
+  assert(D == _boundary.low.n_elem);
+  assert(D == _boundary.high.n_elem);
+  assert(2 == D);
+
+  assert(2 == next_state.n_elem);
+
+  if(next_state(0) < _boundary.low(0)){
+    next_state(0) = _boundary.low(0) + GRID_FUDGE;
+    next_state(1) = 0;
+  }
+  if(next_state(0) > _boundary.high(0)){
+    next_state(0) = _boundary.high(0) - GRID_FUDGE;
+    next_state(1) = 0;
+  }
+  next_state(1) = max(_boundary.low(1),min(_boundary.high(1),next_state(1)));
+ 
+  return next_state;
+}

@@ -126,7 +126,7 @@ class HillcarBoundary(Boundary):
         assert(states.shape == T.shape)
         T = np.minimum(T,self.upper_bound)
 
-        mask = (T[...,0] - states[...,0] > 1e-12)
+        mask = (np.abs(T[...,0] - states[...,0]) > 1e-12)
         T[mask,1] = 0 # boundary
         
         if vec:

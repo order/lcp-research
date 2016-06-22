@@ -18,18 +18,18 @@ from experiment import *
 
 #WORKERS = 1
 WORKERS = multiprocessing.cpu_count()-1
-BATCHES_PER_WORKER = 5
+BATCHES_PER_WORKER = 4
 STATES_PER_BATCH = 20
-SIM_HORIZON = 1500
+SIM_HORIZON = 1000
 BUILD_MODE = 'load'
-BUILD_MODE = 'build'
+#BUILD_MODE = 'build'
 
 low_dim = 16
 ref_dim = 64
 
 
-BUDGETS = [4,8,16,32,64,128,256,512,1024]
-#BUDGETS = [256]
+BUDGETS = [4,8,16,32,64,128,256,512]
+#BUDGETS = [32]
 
 
 ROOT = os.path.expanduser('~/data/hillcar') # root filename
@@ -41,7 +41,7 @@ def build_problem(disc_n):
     n_steps = 2               # Steps per iteration
     damp = 1e-4               # Dampening
     jitter = 0.05             # Control jitter 
-    discount = 0.999          # Discount (\gamma)
+    discount = 0.997          # Discount (\gamma)
     bounds = [[-2,6],[-4,4]]  # Square bounds, 
     cost_radius = 0.25        # Goal region radius
     
@@ -123,7 +123,7 @@ if __name__ == '__main__':
                                                WORKERS * BATCHES_PER_WORKER)
     start_states = np.vstack(batched_start_states)
 
-    #start_states = np.array([[4.0,0.0]])
+    #start_states = np.array([[4.0,3.0]])
     #batched_start_states = [start_states]
 
     #####################################################

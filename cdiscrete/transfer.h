@@ -91,4 +91,18 @@ class BoundaryEnforcer : public TransferFunction{
   Boundary _boundary;
 };
 
+class HillcarBoundaryEnforcer : public TransferFunction{
+ public:
+ HillcarBoundaryEnforcer(TransferFunction * trans_fn_ptr,
+			 const Boundary & boundary);
+ HillcarBoundaryEnforcer(TransferFunction * trans_fn_ptr,
+			 const RegGrid & boundary);
+ ~HillcarBoundaryEnforcer();
+ //mat get_next_states(const mat & points, const mat & actions) const;
+ vec get_next_state(const vec & point, const vec & action) const;
+ protected:
+ TransferFunction * _trans_fn_ptr;
+ Boundary _boundary;
+};
+
 #endif

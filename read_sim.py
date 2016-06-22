@@ -7,10 +7,6 @@ marsh = Marshaller()
 
 (N,D,T) = traj.shape
 
-print traj.T
-
-quit()
-
 B = np.max(np.abs(traj[:]))*1.1
 (X,Y) = np.meshgrid(*[np.linspace(-B,B,33)]*2)
 Z = (np.sqrt(X*X + Y*Y) < 0.25)

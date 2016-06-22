@@ -162,7 +162,8 @@ void read_hillcar_config_file(Demarshaller & demarsh,
 								     n_steps,
 								     damp,
 								     jitter);
-  BoundaryEnforcer * bnd_hillcar_fn = new BoundaryEnforcer(hillcar_fn,grid);
+  HillcarBoundaryEnforcer * bnd_hillcar_fn
+    = new HillcarBoundaryEnforcer(hillcar_fn,grid);
   BallCost * cost_fn = new BallCost(cost_radius,zeros<vec>(2));
   problem.trans_fn = bnd_hillcar_fn;
   problem.cost_fn  = cost_fn;
@@ -186,8 +187,7 @@ void read_hillcar_config_file(Demarshaller & demarsh,
   // flow = [flow]_+
   flow(find(flow < 0)).fill(0);
   ProbFunction * prob_fn = new ProbFunction(flow,grid);
-  //DIBangBangPolicy * rollout = new DIBangBangPolicy(problem.actions);
-  DILinearPolicy * rollout = new DILinearPolicy(problem.actions);
+  HillcarPolicy * rollout = new HillcarPolicy(problem.actions);
 
   // Build MCTS context
   context.problem_ptr = & problem;
