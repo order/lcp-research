@@ -19,7 +19,7 @@ from experiment import *
 #WORKERS = 1
 WORKERS = multiprocessing.cpu_count()-1
 BATCHES_PER_WORKER = 5
-STATES_PER_BATCH = 25
+STATES_PER_BATCH = 20
 SIM_HORIZON = 1500
 BUILD_MODE = 'load'
 BUILD_MODE = 'build'
@@ -247,9 +247,9 @@ if __name__ == '__main__':
         np.save(SAVE_FILE + 'mcts_proj_{0}'.format(budget), mcts_ret)
 
     ####################################################
-    # MCTS with No Q
+    # MCTS with No Q pessimistic
     noq_sol = np.array(low_sol)
-    noq_sol[:,0] = 1.0/ (1.0 - problem.discount)
+    noq_sol[:,0] = 1.0/ (1.0 - problem.discount) # HOPELESS.
     for budget in BUDGETS:
         mcts_params = MCTSParams(budget)
         mcts_params.action_select_mode = ACTION_Q
@@ -268,7 +268,31 @@ if __name__ == '__main__':
                                     WORKERS)
         print 'MCTS Coarse no Q policy ({0}):'.format(budget),\
             np.percentile(mcts_ret,[25,50,75])
-        np.save(SAVE_FILE + 'mcts_noq_{0}'.format(budget), mcts_ret)
+        np.save(SAVE_FILE + 'mcts_noq_pes_{0}'.format(budget), mcts_ret)
+
+    ####################################################
+    # MCTS with No Q Optimistic
+    noq_sol = np.array(low_sol)
+    noq_sol[:,0] = 0 # Hey! We're done!
+    for budget in BUDGETS:
+        mcts_params = MCTSParams(budget)
+        mcts_params.action_select_mode = ACTION_Q
+        fileroot = ROOT + '/hillcar.mcts'
+        mcts_ret = get_mcts_returns(DRIVER,
+                                    fileroot,
+                                    problem,
+                                    low_mdp,
+                                    low_disc,
+                                    noq_sol,
+                                    ref_disc,
+                                    ref_v,
+                                    mcts_params,
+                                    batched_start_states,
+                                    SIM_HORIZON,
+                                    WORKERS)
+        print 'MCTS Coarse no Q policy ({0}):'.format(budget),\
+            np.percentile(mcts_ret,[25,50,75])
+        np.save(SAVE_FILE + 'mcts_noq_opt_{0}'.format(budget), mcts_ret)        
         
     ####################################################
     # MCTS with No Flow
