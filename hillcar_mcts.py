@@ -22,7 +22,7 @@ BATCHES_PER_WORKER = 4
 STATES_PER_BATCH = 20
 SIM_HORIZON = 1000
 BUILD_MODE = 'load'
-#BUILD_MODE = 'build'
+BUILD_MODE = 'build'
 
 low_dim = 16
 ref_dim = 64
