@@ -20,9 +20,9 @@ from experiment import *
 WORKERS = multiprocessing.cpu_count()-1
 BATCHES_PER_WORKER = 5
 STATES_PER_BATCH = 5
-SIM_HORIZON = 1000
+SIM_HORIZON = 1200
 BUILD_MODE = 'load'
-BUILD_MODE = 'build'
+#BUILD_MODE = 'build'
 
 low_dim = 16
 ref_dim = 64
@@ -39,13 +39,13 @@ def build_problem(disc_n):
     # disc_n = number of cells per dimension
     step_len = 0.01           # Step length
     n_steps = 2               # Steps per iteration
-    damp = 0.01               # Dampening
+    damp = 5e-4               # Dampening
     jitter = 0.05             # Control jitter 
     discount = 0.997          # Discount (\gamma)
     bounds = [[-2,6],[-4,4]]  # Square bounds, 
     cost_radius = 0.25        # Goal region radius
     
-    actions = np.array([[-5],[0],[5]]) # Actions
+    actions = np.array([[-4],[0],[4]]) # Actions
     action_n = 3
     assert(actions.shape[0] == action_n)
     
@@ -100,13 +100,14 @@ if __name__ == '__main__':
     ref_p = ref_sol.reshape(-1,order='F')
     low_v = low_sol[:,0]
 
+    """
     img = reshape_full(ref_v,ref_disc)
     imshow(img)
     plt.show()
-    
+    """
     ####################################################
     # Form the Fourier projection (both value and flow)
-    B = get_basis_from_solution(ref_mdp,ref_disc,ref_sol,low_dim**2)
+    B = get_basis_from_solution(ref_mdp,ref_disc,ref_sol,100)
     (N,K) = B.shape
     assert((N,) == ref_p.shape)
 
@@ -122,12 +123,12 @@ if __name__ == '__main__':
                                                WORKERS * BATCHES_PER_WORKER)
     start_states = np.vstack(batched_start_states)
 
-    start_states = np.array([[4.0,0.0]])
-    batched_start_states = [start_states]
+    #start_states = np.array([[4.0,0.0]])
+    #batched_start_states = [start_states]
 
     #####################################################
     # Rollout
-    rollout_policy = LinearPolicy(ref_mdp.actions,np.array([1,1]))
+    rollout_policy = HillcarPolicy(ref_mdp.actions)
     (rollout_ret,sim) = get_returns(problem,
                                     rollout_policy,
                                     ref_v_fn,
@@ -178,14 +179,14 @@ if __name__ == '__main__':
     print 'Fine Q-policy:',np.percentile(q_ret,[25,50,75])
     np.save(SAVE_FILE + 'q_ref',q_ret)
 
+    """
     (N,d,T) = sim.states.shape
     for i in xrange(N):
         plt.plot(sim.states[i,0,:],
                  sim.states[i,1,:],
                  'x-k',alpha=0.5)
     plt.show()
-    quit()
-    
+    """
     #####################################################
     # Run Q-policy with fourier values   
     q_ret,_ = get_q_returns(problem,
@@ -199,9 +200,10 @@ if __name__ == '__main__':
 
     np.save(SAVE_FILE + 'q_proj',q_ret)
     
-        
     ####################################################
     # MCTS with Coarse Q
+    assert(False);
+    # Implement the hillcar rollout policy in C++
     for budget in BUDGETS:
         mcts_params = MCTSParams(budget)
         mcts_params.action_select_mode = ACTION_Q

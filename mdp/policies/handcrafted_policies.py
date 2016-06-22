@@ -95,8 +95,33 @@ class HillcarPolicy(Policy,IndexPolicy):
         return self.actions[I,:]
 
     def get_decision_indices(self,points):
-        # Assuming we're using simple_slope
-        pass
+        (N,d) = points.shape
+        assert(2 == d)
+
+        x = points[:,0]
+        v = points[:,1]
+
+        left_park_point  = 0.9 # Left of this point we try to park the car
+        right_break_point = 5.5 # Try to accelerate left past this point
+
+        I = np.ones(N,dtype=np.int) # Default to coasting
+
+        # If between the two critical points match signs of acceleration
+        # and velocity
+        mask = np.logical_and(left_park_point < x, x < right_break_point)
+        I[mask] = np.sign(v[mask]-1e-4) + 1
+
+        # Too far right; accelerate left
+        mask = (x >= right_break_point)
+        I[mask] = 0
+
+        # Nearly there; bring it in to park.
+        mask = np.logical_and(x < left_park_point, np.sum(points,axis=1) > 1e-3)
+        I[mask] = 0
+        mask = np.logical_and(x < left_park_point, np.sum(points,axis=1) < 1e-3)
+        I[mask] = 2        
+
+        return I
 
     def get_action_dim(self):
         return 1   
