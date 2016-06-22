@@ -45,4 +45,18 @@ class DILinearPolicy : public DiscretePolicy{
   uint _n_actions;
 };
 
+// Bang-bang policy for 2D (x,v) double integrator
+class HillcarPolicy : public DiscretePolicy{
+ public:
+  HillcarPolicy(const mat & actions);
+  uvec get_action_indices(const mat & points) const;
+  mat get_actions(const mat & points) const;
+  uint get_action_dim() const;
+ private:
+  mat _actions;
+  double _A,_B;
+  uint _n_actions;
+};
+
+
 #endif

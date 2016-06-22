@@ -28,6 +28,13 @@ uvec vec_mod(const uvec & a, uint n){
   return a - (a / n) * n;
 }
 
+uvec land(const uvec & a, const uvec & b){
+  return min(a,b);
+}
+uvec lor(const uvec & a, const uvec & b){
+  return max(a,b);
+}
+
 mat row_mult(const mat & A, const rowvec & b){
   return A.each_row() % b;
 }

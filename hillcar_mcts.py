@@ -19,17 +19,17 @@ from experiment import *
 #WORKERS = 1
 WORKERS = multiprocessing.cpu_count()-1
 BATCHES_PER_WORKER = 5
-STATES_PER_BATCH = 5
-SIM_HORIZON = 1200
+STATES_PER_BATCH = 25
+SIM_HORIZON = 1500
 BUILD_MODE = 'load'
-#BUILD_MODE = 'build'
+BUILD_MODE = 'build'
 
 low_dim = 16
 ref_dim = 64
 
 
-BUDGETS = [4,8,16,32,64,128,256,512,1024,2048]
-#BUDGETS = [8]
+BUDGETS = [4,8,16,32,64,128,256,512,1024]
+#BUDGETS = [256]
 
 
 ROOT = os.path.expanduser('~/data/hillcar') # root filename
@@ -39,9 +39,9 @@ def build_problem(disc_n):
     # disc_n = number of cells per dimension
     step_len = 0.01           # Step length
     n_steps = 2               # Steps per iteration
-    damp = 5e-4               # Dampening
+    damp = 1e-4               # Dampening
     jitter = 0.05             # Control jitter 
-    discount = 0.997          # Discount (\gamma)
+    discount = 0.999          # Discount (\gamma)
     bounds = [[-2,6],[-4,4]]  # Square bounds, 
     cost_radius = 0.25        # Goal region radius
     
@@ -202,12 +202,11 @@ if __name__ == '__main__':
     
     ####################################################
     # MCTS with Coarse Q
-    assert(False);
     # Implement the hillcar rollout policy in C++
     for budget in BUDGETS:
         mcts_params = MCTSParams(budget)
         mcts_params.action_select_mode = ACTION_Q
-        fileroot = ROOT + '/di.mcts'
+        fileroot = ROOT + '/hillcar.mcts'
         mcts_ret = get_mcts_returns(DRIVER,
                                     fileroot,
                                     problem,
@@ -223,12 +222,14 @@ if __name__ == '__main__':
         print 'MCTS Coarse policy ({0}):'.format(budget),\
             np.percentile(mcts_ret,[25,50,75])
         np.save(SAVE_FILE + 'mcts_low_{0}'.format(budget), mcts_ret)
+
+    quit()
     ####################################################
     # MCTS with Projected Q
     for budget in BUDGETS:
         mcts_params = MCTSParams(budget)
         mcts_params.action_select_mode = ACTION_Q
-        fileroot = ROOT + '/di.mcts'
+        fileroot = ROOT + '/hillcar.mcts'
         mcts_ret = get_mcts_returns(DRIVER,
                                     fileroot,
                                     problem,
@@ -252,7 +253,7 @@ if __name__ == '__main__':
     for budget in BUDGETS:
         mcts_params = MCTSParams(budget)
         mcts_params.action_select_mode = ACTION_Q
-        fileroot = ROOT + '/di.mcts'
+        fileroot = ROOT + '/hillcar.mcts'
         mcts_ret = get_mcts_returns(DRIVER,
                                     fileroot,
                                     problem,
@@ -276,7 +277,7 @@ if __name__ == '__main__':
     for budget in BUDGETS:
         mcts_params = MCTSParams(budget)
         mcts_params.action_select_mode = ACTION_Q
-        fileroot = ROOT + '/di.mcts'
+        fileroot = ROOT + '/hillcar.mcts'
         mcts_ret = get_mcts_returns(DRIVER,
                                     fileroot,
                                     problem,
@@ -301,7 +302,7 @@ if __name__ == '__main__':
     for budget in BUDGETS:
         mcts_params = MCTSParams(budget)
         mcts_params.action_select_mode = ACTION_Q
-        fileroot = ROOT + '/di.mcts'
+        fileroot = ROOT + '/hillcar.mcts'
         mcts_ret = get_mcts_returns(DRIVER,
                                     fileroot,
                                     problem,

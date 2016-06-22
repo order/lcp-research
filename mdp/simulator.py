@@ -120,7 +120,7 @@ def discounted_return_with_tail_estimate(problem,
     tail_v = ref_v_fn.evaluate(final_states)
     assert((N,) == tail_v.shape)
 
-    ret = returns + (discount**(H+1)) * tail_v
+    ret = returns + (discount**(H)) * tail_v
     assert((N,) == ret.shape)
 
     return ret

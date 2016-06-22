@@ -141,12 +141,14 @@ vec HillcarTransferFunction::get_next_state(const vec & point,
     noise.randn();
     slope = triangle_slope(x);
     hypo2 = 1.0 + slope*slope;
-    accel = ((action[0] + noise[0]) / sqrt(hypo2))
+    accel = ((action[0] + _jitter*noise[0]) / sqrt(hypo2))
       - (GRAVITY*slope / hypo2);
+    //std::cout << accel << std::endl;
 
     x += _step_size * v + _sss*accel;
     v *= (1.0 - _dampening);
     v += _step_size * accel;
+    //std::cout << "(" << x << "," << v << ")\n";
   }
   vec X = vec::fixed<2>();
   X[0] = x;

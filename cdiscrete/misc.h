@@ -36,6 +36,10 @@ void generate_mask(Mask & mask, bvec & source);
 // Element-wise modulus
 uvec vec_mod(const uvec & a, uint n);
 
+// Logical operations
+uvec land(const uvec & a, const uvec & b);
+uvec lor(const uvec & a, const uvec & b);
+
 // Row-wise operation
 mat row_mult(const mat & A, const rowvec & b);
 mat row_diff(const mat & A, const rowvec & b);
