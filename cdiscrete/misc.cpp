@@ -2,6 +2,8 @@
 #include <assert.h>
 #include "misc.h"
 
+#include <boost/math/special_functions/sign.hpp>
+
 using namespace arma;
 
 unsigned SEED = std::chrono::system_clock::now().time_since_epoch().count();
@@ -51,6 +53,26 @@ vec dist(const mat & A, const rowvec & b){
 double dist(const vec & v, const vec & u){
   return norm(v - u);
 };
+
+double rectify(double x){
+  return std::max(0.0,x);
+}
+
+vec rectify(vec & x){
+  vec t = x;
+  t(find(t < 0.0)).fill(0.0);
+  return t;
+}
+
+double soft_threshold(double x, double thresh){
+  return boost::math::sign(x) * std::max(0.0,std::abs(x) - thresh);
+}
+
+vec soft_threshold(vec x, double thresh){
+  vec t = abs(x) - thresh;
+  t(find(t < 0)).fill(0);
+  return sign(x) % t;
+}
 
 mat row_min(const mat & A, const rowvec & b){
   uint D = A.n_cols;

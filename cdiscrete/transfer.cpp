@@ -2,47 +2,23 @@
 
 #include "misc.h"
 #include "transfer.h"
-/*
-vec TransferFunction::get_next_state(const vec & point,
-				     const vec & action) const{
-  mat points = conv_to<mat>::from(point.t());
-  mat actions = conv_to<mat>::from(action.t());
-  mat r = get_next_states(points,actions);
-  assert(1 == r.n_rows);
-  return r.row(0).t();
-}
 
-mat TransferFunction::get_next_states(const mat & points,
-				      const vec & action) const{
-  uint N = num_states(points);
-  mat actions = repmat(action.t(),N,1);
-  return get_next_states(points,actions);
-}
-*/
+#include <boost/math/special_functions/sign.hpp>
+
 TransferFunction::~TransferFunction(){}
 
 DoubleIntegrator::DoubleIntegrator(double step_size,
 				   uint num_steps,
-				   double damping,
+				   double dampening,
 				   double jitter){
   _step_size = step_size;
   _sss = 0.5*step_size * step_size;
   _num_steps = num_steps;
-  _damping = damping;
+  _dampening = dampening;
   _jitter = jitter;
-
-  // Dynamics
-  _Tt = mat(2,2); // <- Defining the transpose
-  _Tt(0,0) = 1;
-  _Tt(1,0) = _step_size;
-  _Tt(0,1) = 0;
-  _Tt(1,1) = 1 - _damping;
-
-  _Ut = mat(1,2); // <- Transpose
-  _Ut(0,0) = 0.5 * _step_size * _step_size;
-  _Ut(0,1) = _step_size;
 }
 
+/*
 mat DoubleIntegrator::get_next_states(const mat & points,
 				      const mat & actions) const{
   // Points are (N,D), actions (N,1)
@@ -60,26 +36,26 @@ mat DoubleIntegrator::get_next_states(const mat & points,
     noise.randn();
     pert_acts = actions.col(0) + _jitter * noise;
     X += _step_size * V + _sss*pert_acts;
-    V *= (1.0 - _damping);
+    V *= (1.0 - _dampening);
     V += _step_size * pert_acts;   
   }
   mat R = mat(N,2);
   R.col(0) = X;
   R.col(1) = V;
   return R;
-}
+  }*/
 vec DoubleIntegrator::get_next_state(const vec & point,
 				     const vec & action) const{
   double x = point[0];
   double v = point[1];
-  mat noise = vec(1);
+  vec noise = vec(1);
 
   double pert_acts;
   for(uint t = 0; t < _num_steps; t++){
     noise.randn();
     pert_acts = action[0] + _jitter * noise[0];
     x += _step_size * v + _sss*pert_acts;
-    v *= (1.0 - _damping);
+    v *= (1.0 - _dampening);
     v += _step_size * pert_acts;
   }
   vec X = vec::fixed<2>();
@@ -105,7 +81,7 @@ BoundaryEnforcer::BoundaryEnforcer(TransferFunction * trans_fn_ptr,
 BoundaryEnforcer::~BoundaryEnforcer(){
   delete _trans_fn_ptr;
 }
-
+/*
 mat BoundaryEnforcer::get_next_states(const mat & points,
 				      const mat & actions) const{  
   mat next_states = _trans_fn_ptr->get_next_states(points,actions);
@@ -117,7 +93,7 @@ mat BoundaryEnforcer::get_next_states(const mat & points,
   row_min_inplace(next_states,_boundary.high.t());
  
   return next_states;
-}
+  }*/
 
 vec BoundaryEnforcer::get_next_state(const vec & points,
 				      const vec & actions) const{  
@@ -131,4 +107,78 @@ vec BoundaryEnforcer::get_next_state(const vec & points,
   min_inplace(next_state,_boundary.high);
  
   return next_state;
+}
+
+
+//======================================================
+// HILLCAR
+
+
+HillcarTransferFunction::HillcarTransferFunction(double step_size,
+						 double num_steps,
+						 double dampening,
+						 double jitter){
+    _step_size = step_size;
+    _sss = 0.5 * step_size * step_size;
+    _num_steps = num_steps;
+    _dampening = dampening;
+    _jitter = jitter;
+  }
+
+vec HillcarTransferFunction::get_next_state(const vec & point,
+					    const vec & action) const{
+  assert(2 == point.n_elem);
+  assert(1 == action.n_elem);
+  
+  double x = point[0];
+  double v = point[1];
+  vec noise = vec(1);
+
+  double slope;
+  double hypo2;
+  double accel;
+  for(uint t = 0; t < _num_steps; t++){
+    noise.randn();
+    slope = triangle_slope(x);
+    hypo2 = 1.0 + slope*slope;
+    accel = ((action[0] + noise[0]) / sqrt(hypo2))
+      - (GRAVITY*slope / hypo2);
+
+    x += _step_size * v + _sss*accel;
+    v *= (1.0 - _dampening);
+    v += _step_size * accel;
+  }
+  vec X = vec::fixed<2>();
+  X[0] = x;
+  X[1] = v;
+  return X;
+}
+
+double triangle_wave(double x, double P, double A){
+  x /= P;
+  return A * ( 2* abs(2 * (x - floor(x + 0.5))) - 1);
+}
+
+double triangle_slope(double x){
+  double P = 8.0; // Period
+  double A = 1.0; // Amplitude
+
+  double T = 0.05; // Threshold for soft thresh
+    
+  return soft_threshold(triangle_wave(x - P/4,P,A),T);
+}
+
+vec triangle_wave(vec x, double P, double A){
+  x /= P;
+  return A * ( 2* abs(2 * (x - floor(x + 0.5))) - 1);
+}
+
+
+vec triangle_slope(vec x){
+  double P = 8.0; // Period
+  double A = 1.0; // Amplitude
+
+  double T = 0.05; // Threshold for soft thresh
+    
+  return soft_threshold(triangle_wave(x - P/4,P,A),T);
 }

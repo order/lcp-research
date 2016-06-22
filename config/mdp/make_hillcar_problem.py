@@ -15,10 +15,10 @@ import matplotlib.pyplot as plt
 
 def make_hillcar_problem(step_len,
                          n_steps,
+                         damp,
                          jitter,
                          discount,
                          bounds,
-                         goal,
                          cost_radius,
                          actions):
     """
@@ -35,6 +35,7 @@ def make_hillcar_problem(step_len,
         mass=1.0,
         step=step_len,
         num_steps=n_steps,
+        dampening=damp,
         jitter=jitter)
     
     trans_fn = HillcarTransitionFunction(
@@ -43,7 +44,7 @@ def make_hillcar_problem(step_len,
     #boundary = SaturationBoundary(bounds)
     boundary = HillcarBoundary(bounds)
     
-    cost_state_fn = BallSetFn(goal, cost_radius)
+    cost_state_fn = BallSetFn(np.zeros(2), cost_radius)
     cost_fn = CostWrapper(cost_state_fn)
     cost_fn.favored=np.array([0.0])
     

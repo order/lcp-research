@@ -45,6 +45,11 @@ vec row_2_norm(const mat & A);
 vec dist(const mat & A, const mat & B);
 vec dist(const mat & A, const rowvec & b);
 
+double rectify(double x);
+vec rectify(vec & x);
+double soft_threshold(double x, double thresh);
+vec soft_threshold(vec x, double thresh);
+
 // Return B(i,j) = min(A(i,j),b(j))
 mat row_min(const mat & A, const rowvec & b);
 mat row_max(const mat & A, const rowvec & b);

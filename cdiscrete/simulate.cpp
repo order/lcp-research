@@ -72,6 +72,7 @@ double simulate_single(const vec & x0,
   return gain;
 }
 
+/*
 void simulate(const mat & X0,
 	      const Problem & problem,
 	      const Policy & policy,
@@ -126,8 +127,9 @@ void simulate(const mat & X0,
     assert(1 == outcome.points.n_slices);
     outcome.points.slice(0) == points;
   }
-}
+  }*/
 
+/*
 void simulate_outcome(const mat & x0,
 		      const Problem & problem,
 		      const Policy & policy,
@@ -135,8 +137,9 @@ void simulate_outcome(const mat & x0,
 		      SimulationOutcome & outcome){
   vec dummy;
   simulate(x0,problem,policy,T,outcome,dummy,RECORD_OUTCOME);
-}
+  }*/
 
+/*
 void simulate_gain(const mat & x0,
 		   const Problem & problem,
 		   const Policy & policy,
@@ -148,12 +151,10 @@ void simulate_gain(const mat & x0,
 	   RECORD_GAIN | RECORD_FINAL);
   assert(1 == final_only_outcome.points.n_slices);
   final_x = final_only_outcome.points.slice(0);
-}
+  }*/
 
+/*
 void simulate_test(SimulationOutcome & res){
-  /*
-    Basic DI simulation with no arguments
-   */
   uint T = 100;
   arma_rng::set_seed_random();
   mat x0 = 100*ones<mat>(1,2);
@@ -176,4 +177,4 @@ void simulate_test(SimulationOutcome & res){
   DIBangBangPolicy policy = DIBangBangPolicy(actions);
 
   simulate_outcome(x0,problem,policy,T,res);  
-}
+  }*/

@@ -9,6 +9,7 @@ class HillcarTransitionFunction(TransitionFunction):
         parser.add('mass')
         parser.add('step')
         parser.add('num_steps')
+        parser.add('dampening')
         parser.add('jitter')
         args = parser.parse(kwargs)
         
@@ -50,6 +51,7 @@ class HillcarTransitionFunction(TransitionFunction):
                     -(self.g * q / p)
             
                 curr[:,0] += t * points[:,1] + 0.5*t*t*a
+                curr[:,1] *= (1 - self.dampening)
                 curr[:,1] += t * a
             res[s,:,:] = curr
         return res

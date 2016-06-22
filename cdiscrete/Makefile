@@ -18,6 +18,9 @@ $(EXEC): $(OBJECTS) $(EXEC).o
 $(TEST): $(OBJECTS) $(TEST).o
 	$(CC) $(OBJECTS) $(TEST).o -o $@ $(LIBS) $(LDIR)
 
+foo: $(OBJECTS) foo.o
+	$(CC) $(OBJECTS) foo.o -o foo $(LIBS) $(LDIR)
+
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@ $(IDIR)
 

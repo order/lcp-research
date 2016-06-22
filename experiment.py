@@ -23,6 +23,9 @@ ACTION_FREQ = 2
 ACTION_ROLLOUT = 3
 ACTION_UCB = 4
 
+PROBLEM_DI = 1
+PROBLEM_HILLCAR = 2
+
 ########################################
 # MCTS Parameter object
 class MCTSParams(object):
@@ -169,8 +172,45 @@ def create_start_states(N,problem,Batches):
     bound = problem.gen_model.boundary
     return [bound.random_points(N) for _ in xrange(Batches)]
 
+def build_mcts_file(filename,
+                    problem,
+                    mdp_obj,
+                    disc,
+                    mcts_sol,
+                    ref_disc,
+                    ref_v,
+                    mcts_params,
+                    start_states,
+                    simulation_horizon):
+    t_fn = problem.gen_model.trans_fn
+    if isinstance(t_fn,DoubleIntegratorTransitionFunction):
+        build_di_mcts_file(filename,
+                           problem,
+                           mdp_obj,
+                           disc,
+                           mcts_sol,
+                           ref_disc,
+                           ref_v,
+                           mcts_params,
+                           start_states,
+                           simulation_horizon)
+    elif isinstance(t_fn,HillcarTransitionFunction):
+        build_hillcar_mcts_file(filename,
+                                problem,
+                                mdp_obj,
+                                disc,
+                                mcts_sol,
+                                ref_disc,
+                                ref_v,
+                                mcts_params,
+                                start_states,
+                                simulation_horizon)
+    else:
+        raise NotImplementedError()
+        
+
 ###############################################################
-# Build a file for C++ MCTS solver.
+# Build a file for C++ MCTS with double integrator.
 # NB: changes here need to be synchronized with C++ code.
 def build_di_mcts_file(filename,
                        problem,
@@ -184,7 +224,8 @@ def build_di_mcts_file(filename,
                        simulation_horizon):
     
     marsh = Marshaller()
-
+    marsh.add(PROBLEM_DI)
+    
     # Boundary and discretization
     marsh.add(disc.get_lower_boundary())
     marsh.add(disc.get_upper_boundary())
@@ -198,6 +239,70 @@ def build_di_mcts_file(filename,
     marsh.add(trans_fn.num_steps)
     marsh.add(trans_fn.dampening)
     marsh.add(trans_fn.control_jitter)
+
+    # Other problem parameters
+    cost_fn = gen_model.cost_fn
+    assert(isinstance(cost_fn,CostWrapper))
+    cost_state_fn = cost_fn.state_fn
+    assert(isinstance(cost_state_fn,BallSetFn))
+    marsh.add(cost_state_fn.radius)
+    marsh.add(problem.discount)
+    marsh.add(mdp_obj.actions)
+
+    # Value and flow to use within MCTS
+    marsh.add(mcts_sol[:,0])  # Value
+    marsh.add(mcts_sol[:,1:]) # Flow
+
+    # MCTS parameters
+    marsh.add(mcts_params.budget)
+    marsh.add(mcts_params.p_scale)
+    marsh.add(mcts_params.ucb_scale)
+    marsh.add(mcts_params.rollout_horizon)
+    marsh.add(mcts_params.q_min_step)
+    marsh.add(mcts_params.update_return_mode)
+    marsh.add(mcts_params.action_select_mode)
+
+    # Simulation parameters
+    marsh.add(simulation_horizon)
+    marsh.add(start_states)
+
+    marsh.add(ref_disc.get_lower_boundary())
+    marsh.add(ref_disc.get_upper_boundary())
+    marsh.add(ref_disc.get_num_cells())
+    marsh.add(ref_v)
+
+    marsh.save(filename)
+
+###############################################################
+# Build a file for C++ MCTS solver with HILLCAR transfer function
+# NB: changes here need to be synchronized with C++ code.
+def build_hillcar_mcts_file(filename,
+                            problem,
+                            mdp_obj,
+                            disc,
+                            mcts_sol,
+                            ref_disc,
+                            ref_v,
+                            mcts_params,
+                            start_states,
+                            simulation_horizon):
+    
+    marsh = Marshaller()
+    marsh.add(PROBLEM_HILLCAR)
+    
+    # Boundary and discretization
+    marsh.add(disc.get_lower_boundary())
+    marsh.add(disc.get_upper_boundary())
+    marsh.add(disc.get_num_cells())
+
+    # Transition function parameters
+    gen_model = problem.gen_model
+    trans_fn = gen_model.trans_fn
+    assert(isinstance(trans_fn,HillcarTransitionFunction))
+    marsh.add(trans_fn.step)
+    marsh.add(trans_fn.num_steps)
+    marsh.add(trans_fn.dampening)
+    marsh.add(trans_fn.jitter)
 
     # Other problem parameters
     cost_fn = gen_model.cost_fn
@@ -320,16 +425,16 @@ def get_mcts_returns(driver,
     for start in start_states:
         filename = root_filename + '.' + str(get_mcts_returns.FILE_NUMBER)
         get_mcts_returns.FILE_NUMBER += 1
-        build_di_mcts_file(filename,
-                           problem,
-                           mdp_obj,
-                           disc,
-                           mcts_sol,
-                           ref_disc,
-                           ref_v,
-                           mcts_params,
-                           start,
-                           sim_horizon)
+        build_mcts_file(filename,
+                        problem,
+                        mdp_obj,
+                        disc,
+                        mcts_sol,
+                        ref_disc,
+                        ref_v,
+                        mcts_params,
+                        start,
+                        sim_horizon)
         files.append(filename)
     print 'Running {0} jobs on {1} workers'.format(len(start_states),
                                                    num_workers)

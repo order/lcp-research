@@ -49,6 +49,7 @@ double simulate_single(const vec & x0,
 	      uint T,
 	      vec & final_point);
 
+/*
 void simulate(const mat & x0,
 	      const Problem & problem,
 	      const Policy & policy,
@@ -56,20 +57,22 @@ void simulate(const mat & x0,
 	      SimulationOutcome & outcome,
 	      vec & gain,
 	      uint flag);
-
+*/
+/*
 void simulate_outcome(const mat & x0,
 	      const Problem & problem,
 	      const Policy & policy,
 	      uint T,
 	      SimulationOutcome & outcome);
-
+*/
+/*
 void simulate_gain(const mat & x0,
 		   const Problem & problem,
 		   const Policy & policy,
 		   uint T,
 		   vec & gain,
 		   mat & final_x);
-
-void simulate_test(SimulationOutcome & res);
+*/
+//void simulate_test(SimulationOutcome & res);
 
 #endif
