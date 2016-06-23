@@ -156,9 +156,15 @@ class PotentialAnnounce(Notification):
         
         N = x.size
         k = self.k
-              
-        P = (N + k) * np.log(x.dot(y))\
-            - np.sum(np.log(x)) - np.sum(np.log(y))
+
+        ip_term = (N + k) * np.log(x.dot(y))
+        x_term = np.sum(np.log(x))
+        y_term = np.sum(np.log(y))
+        
+        P = ip_term - x_term - y_term
         
         print 'Potential {0:.3g} at iteration {1} ({2:.3g} {3:.3g} {4:.3g})'\
-            .format(P,iterator.get_iteration(),x.dot(y),np.sum(x),np.sum(y))
+            .format(P,iterator.get_iteration(),
+                    ip_term,
+                    x_term,
+                    y_term)

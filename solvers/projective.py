@@ -56,7 +56,8 @@ def form_Gh_sparse(x,y,w,g,p,q,Phi,PtPUP,PtPU_P):
 
     return (G,h)
     
-
+###################################################################
+# Start of the iterator
 class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
     def __init__(self,proj_lcp_obj,**kwargs):
         self.centering_coeff = kwargs.get('centering_coeff',0.99)
@@ -66,13 +67,15 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         self.mdp_obj = kwargs.get('mdp_obj',None)
         self.lcp_obj = kwargs.get('lcp_obj',None)
         
-        
         self.proj_lcp_obj = proj_lcp_obj
         self.q = proj_lcp_obj.q
         Phi = proj_lcp_obj.Phi
         PtPU = proj_lcp_obj.PtPU
         (N,K) = Phi.shape
         assert((K,N) == PtPU.shape)
+        
+        self.nonneg_mask = kwargs.get('nonneg_mask',
+                                      np.arange(N))
 
         self.update_P_PtPU(Phi,PtPU)
 
@@ -159,7 +162,13 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
             # Step 6
         Phidw= Phi.dot(del_w)
         assert((N,) == Phidw.shape)
-        inv_XY = sps.diags(1.0/(x + y),0)
+        S = x+y
+        print 'min(S):',np.min(S)
+        print 'max(S):',np.max(S)
+        print 'argmin(S)',np.argmin(S)
+        print 'argmax(S)',np.argmax(S)
+       
+        inv_XY = sps.diags(1.0/S,0)
         del_y = inv_XY.dot(g + y*p - y*Phidw)
         assert((N,) == del_y.shape)
         
@@ -171,7 +180,9 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         print '||dy||:',np.linalg.norm(del_y)
            
         # Step 8 Step length
-        steplen = max(np.max(-del_x/x),np.amax(-del_y/y))
+        nnm = self.nonneg_mask
+        steplen = max(np.max(-del_x[nnm]/x[nnm]),
+                      np.max(-del_y[nnm]/y[nnm]))
         if steplen <= 0:
             steplen = float('inf')
         else:
@@ -181,10 +192,11 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         print 'Steplen', steplen
         # Sigma is beta in Geoff's code
         if(steplen > 0.95):
-            sigma = 0.05 # Long step
-        else:
-            sigma = 0.5 # Short step
-        #sigma = 0.99
+            sigma *= 0.9 # Long step
+        elif (steplen < 0.05):
+            sigma = 0.99 # Short step
+
+        print 'sigma:',sigma
 
         # Update point and fields
         self.steplen = steplen
