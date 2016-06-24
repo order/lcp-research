@@ -1,4 +1,5 @@
 import numpy as np
+import linalg
 
 class RealFunction(object):
     def evaluate(self,points,**kwargs):
@@ -59,15 +60,7 @@ class TrigBasis(Basis):
 
     def get_orth_basis(self,points):
         B = self.get_basis(points)
-
-        # Eliminate dependant columns (multi-dimensional aliasing...)
-        [Q,R] = np.linalg.qr(B)
-        indep = (np.abs(np.diag(R)) > 1e-8)
-        B = B[:,indep]
-
-        # Normalize
-        for i in xrange(B.shape[1]):
-            B[:,i] /= np.linalg.norm(B[:,i])
+        linalg.orthonorm(B)
 
         return B
     

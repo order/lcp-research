@@ -147,7 +147,7 @@ class PotentialAnnounce(Notification):
     """
     Broadcast potential every iteration
     """
-    def __init__(self,k):
+    def __init__(self,k=None):
         self.k = k
         
     def announce(self,iterator):
@@ -155,7 +155,10 @@ class PotentialAnnounce(Notification):
         y = iterator.get_dual_vector()
         
         N = x.size
-        k = self.k
+        if self.k:
+            k = self.k
+        else:
+            k = np.sqrt(N)
 
         ip_term = (N + k) * np.log(x.dot(y))
         x_term = np.sum(np.log(x))

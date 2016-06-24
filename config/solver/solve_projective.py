@@ -7,7 +7,7 @@ def solve_with_projective(plcp,thresh,max_iter,x0,y0,w0):
     solver = IterativeSolver(iterator)
 
     term_conds = [MaxIterTerminationCondition(max_iter)]
-    announce = [PotentialAnnounce(2),PrimalDiffAnnounce()]
+    announce = [IterAnnounce(),PotentialAnnounce(),PrimalDiffAnnounce()]
     solver.termination_conditions.extend(term_conds)
     solver.notifications.extend(announce)
 

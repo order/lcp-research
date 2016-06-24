@@ -115,7 +115,8 @@ def add_oob_nodes(B,k):
     #[[B 0]
     # [0 I]]
     return ExpandedB
-
+##################################################
+# Build a trig basis that explains f well
 def get_basis_from_array(mdp_obj,disc,f,num_bases):
     # Use the real FFT to find some reasonable bases
     (freq,shift,_) = top_trig_features(f,num_bases,1e-8)
@@ -141,8 +142,9 @@ def get_basis_from_array(mdp_obj,disc,f,num_bases):
   
     return B
 
-# Use the above routine to build a basis
-def get_basis_from_solution(mdp_obj,disc,sol,num_bases):
+###############################################################
+# Use the above routine to build a basis for the entire problem
+def get_basis_from_solution(mdp_obj,disc,indices,sol,num_bases):
     (N,Ap) = sol.shape
     assert(N == mdp_obj.num_states)
     assert(Ap == mdp_obj.num_actions+1)
@@ -160,7 +162,7 @@ def get_basis_from_solution(mdp_obj,disc,sol,num_bases):
         assert(n == N)
         #assert(k <= num_bases + disc.num_oob())
         total_bases += k
-        Bases.append(B)
+        Bases.append(B[indices,:])
 
     # Stitch together
     BigB = sps.block_diag(Bases)

@@ -9,7 +9,8 @@ def solve_with_kojima(mdp,thresh,max_iter,value_reg=1e-12,flow_reg=1e-12):
 
     term_conds = [PrimalChangeTerminationCondition(thresh),
                   MaxIterTerminationCondition(max_iter)]
-    announce = [IterAnnounce()]
+    announce = [IterAnnounce(),
+                PotentialAnnounce()]
     solver.termination_conditions.extend(term_conds)
     solver.notifications.extend(announce)
 

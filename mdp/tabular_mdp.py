@@ -61,32 +61,44 @@ class TabularMDP(object):
     def build_lcp(self,
                   val_reg=0.0,
                   flow_reg=1e-15,
-                  state_weights=None):
-        n = self.num_states
+                  **kwargs):
+        num_states = self.num_states
         A = self.num_actions
-        N = (A + 1) * n
+        
+        state_weights = kwargs.get('state_weights',np.ones(num_states))
 
-        if not state_weights:
-            state_weights = np.ones(n)
+        """
+        The next two arrays specify what states are to be included
+        in the model.
+        They're dropped by omission.
+        """
+        indices = kwargs.get('indices',np.arange(num_states))
 
+        n = indices.size # Number of states used in LCP
+        N = (A+1)*n        
+        
         # Build the LCP
-        use_lil = True # COO method faster
         q = np.empty(N)
-        q[0:n] = -state_weights
+        q[0:n] = -state_weights[indices]
 
         row = []
         col = []
         data = []
         for a in xrange(A):
             shift = (a+1)*n
-            E = self.get_E_matrix(a).tocoo()
+            E = self.get_E_matrix(a)
+            assert(isinstance(E,sps.csr_matrix))
+            E = ((E[indices,:]).tocsc()[:,indices]).tocoo()
+            assert((n,n) == E.shape)
+            
             row.extend([E.row,E.col + shift])
             col.extend([E.col + shift,E.row])
             data.extend([E.data,-E.data])
-            q[shift:(shift+n)] = self.costs[a]
+            
+            q[shift:(shift+n)] = self.costs[a][indices]
 
-        row.extend([np.arange(n),np.arange(n,N)])
-        col.extend([np.arange(n),np.arange(n,N)])
+        row.append(np.arange(N))
+        col.append(np.arange(N))
         data.extend([val_reg*np.ones(n),
                      flow_reg*np.ones(A*n)])
         row = np.concatenate(row)
@@ -94,12 +106,10 @@ class TabularMDP(object):
         data = np.concatenate(data)
         M = sps.coo_matrix((data,(row,col)),
                            shape=(N,N))
-
         name = 'LCP from {0} MDP'.format(self.name)
         return lcp.LCPObj(M,q,name=name)
 
 def add_drain(mdp,disc,state,cost):
-
     (N,) = state.shape
         
     dist = disc.points_to_index_distributions(state[np.newaxis,:])
@@ -127,3 +137,100 @@ def add_drain(mdp,disc,state,cost):
         mdp.costs[i][node_id] += cost / (1.0 - mdp.discount)
 
         assert(mdp.transitions[i].dot(elem).sum() < 1e-12)
+
+def aggregate_transitions(mdp):
+    N = mdp.num_states
+    T = sps.csr_matrix((N,N))
+    A = len(mdp.transitions)
+    for M in mdp.transitions:
+        T +=  1.0/float(A) * M
+    return T
+
+def find_sinks(transition_matrix):
+    T = transition_matrix
+    (N,n) = T.shape
+    assert(N == n)
+
+    # Get the diagonal
+    d = T.diagonal()
+    
+    # Find those super close to 1.0
+    # I.e. only self-transition
+    idx = np.where(np.abs(d - 1.0) < 1e-15)[0]
+    return idx
+
+def find_unreachable(transition_matrix):
+    T = transition_matrix
+    (N,n) = T.shape
+    assert(N == n)
+
+    # Remove all diagonal entries
+    d = T.diagonal()
+    D = sps.diags(d,0)
+    T -= D
+
+    agg = np.array(T.sum(axis=1)).reshape(-1)
+    idx = np.where(np.abs(agg.reshape(-1)) < 1e-15)[0]
+    return idx    
+    
+
+def find_isolated(mdp,disc):
+    cutpoints = disc.get_cutpoints()
+    T = aggregate_transitions(mdp)
+
+    if False:
+        sinks = find_sinks(T)
+        print 'Sinks:'
+        for idx in sinks:
+            if idx >= disc.num_real_nodes():
+                print '[{0}] OOB'.format(idx)
+            else:
+                print '[{0}] {1}'.format(idx,cutpoints[idx,:])
+            
+    unreach = find_unreachable(T)
+    if False:
+        print 'Unreachable:'
+        for idx in unreach:
+            if idx >= disc.num_real_nodes():
+                print '[{0}] OOB'.format(idx)
+            else:
+                print '[{0}] {1}'.format(idx,cutpoints[idx,:])
+
+    return unreach
+
+def expand_states(mdp,p,d,included_states):
+    idx = included_states
+    I = idx.size
+
+    # Full shapes    
+    n = mdp.num_states
+    A = mdp.num_actions
+    N = n * (A+1)
+
+    K = I*(A+1)
+
+    print 'p shape',p.shape,(K,)
+    assert((K,) == p.shape)
+    assert((K,) == d.shape)
+    
+    block_p = p.reshape((I,(A+1)),order='F')
+    block_d = d.reshape((I,(A+1)),order='F')
+
+    idx = included_states
+
+    
+    out_mask = np.ones(N)
+    out_mask[idx] = 0.0
+    nidx = np.where(out_mask == 1.0)[0]
+    
+    P = np.empty((n,(A+1)))
+    P[idx,:] = block_p
+    P[nidx,:] = np.nan
+    P = P.reshape(-1,order='F')
+
+    D = np.empty((n,(A+1)))
+    D[idx,:] = block_d
+    D[nidx,:] = np.nan
+    D = D.reshape(-1,order='F')
+
+    return (P,D)

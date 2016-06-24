@@ -16,14 +16,14 @@ from utils import *
 
 from experiment import *
 
-DIM = 32
+DIM = 16
 
 def build_problem(disc_n):
     # disc_n = number of cells per dimension
     step_len = 0.01           # Step length
-    n_steps = 5               # Steps per iteration
+    n_steps = 1               # Steps per iteration
     damp = 0.01               # Dampening
-    jitter = 0.05             # Control jitter 
+    jitter = 0.1             # Control jitter 
     discount = 0.995          # Discount (\gamma)
     B = 5
     bounds = [[-B,B],[-B,B]]  # Square bounds, 
@@ -54,37 +54,53 @@ def solve_mdp_with_kojima(mdp):
     print 'Kojima ran for:', time.time() - start, 's'
     return (p,d)
 
-def build_projective_lcp(mdp,basis):
+def build_projective_lcp(mdp,disc,basis):
+    n = mdp.num_states
+    A = mdp.num_actions
+
+    unreach = find_isolated(mdp,disc)
+    index_mask = np.ones(n)
+    index_mask[unreach] = 0
+    indices = np.where(index_mask == 1.0)[0]
+    
     start = time.time()
     # Build the LCP
-    lcp = mdp.build_lcp()
+    lcp = mdp.build_lcp(indices=indices,
+                        val_reg = 1e-6,
+                        flow_reg = 1e-6)
+
+    print 'LCP shape:',lcp.M.shape
+    print 'Anticipated:',(n-unreach.size)*(A+1)
+
+    B = linalg.orthonorm(basis.toarray()[indices,:])
 
     # Convert matrices to sparse and elim zeros
-    B = sps.csr_matrix(basis)
+    B = sps.csr_matrix(B)
     B.eliminate_zeros()
-    M = sps.csr_matrix(lcp.M)
+    M = linalg.spsubmat(lcp.M,indices,indices)
     M.eliminate_zeros()
 
     # Project MDP onto basis
     PtPU = B.T.dot(M)
-    plcp = ProjectiveLCPObj(B, PtPU, lcp.q)    
+    plcp = ProjectiveLCPObj(B, PtPU, lcp.q[indices])    
     print 'Building projective LCP: {0}s'.format(time.time() - start)
-    return plcp
+    return (plcp,indices)
 
-def solve_mdp_with_projective(mdp,basis,p,d):
-    lcp = mdp.build_lcp()
-    plcp = build_projective_lcp(mdp,basis)
+def solve_mdp_with_projective(mdp,disc,basis,p,d):
+    (plcp,included_states) = build_projective_lcp(mdp,disc,basis)
     start = time.time()
+    (N,k) = plcp.Phi.shape
 
-    (N,k) = basis.shape
-    x0 = np.ones(N)
-    y0 = np.maximum(lcp.M.dot(x0) + lcp.q,1e-2)
-    
-    w0 = np.maximum(basis.T.dot(x0 - y0 + plcp.q),1e-2)
-    assert((k,) == w0.shape)
+    print 'q', plcp.q.shape
+    print 'PtPU', plcp.PtPU.shape
+    print 'Phi', plcp.Phi.shape
+    x0 = (1e-6)*np.ones(N)    
+    y0 = np.maximum(plcp.q,1e-6)
+    w0 = np.zeros(k)
         
-    (p,d) = solve_with_projective(plcp,1e-12,250,x0,y0,w0)
+    (p,d) = solve_with_projective(plcp,1e-12,100,x0,y0,w0)
     print 'Projective ran for:', time.time() - start, 's'
+    (p,d) = expand_states(mdp,p,d,included_states)
     return block_solution(mdp,p)
 
 if __name__ == '__main__':
@@ -96,21 +112,32 @@ if __name__ == '__main__':
     ####################################################
     # Solve, initially, using Kojima
         # Build / load
-    (p,d) = solve_mdp_with_kojima(mdp)
+    if False:
+        (p,d) = solve_mdp_with_kojima(mdp)
+        np.save('p.npy',p)
+        np.save('d.npy',d)
+    else:
+        p = np.load('p.npy')
+        d = np.load('d.npy')         
     sol = block_solution(mdp,p)
 
     ####################################################
+    # Only use nodes that are reachable
+    unreach = find_isolated(mdp,disc)
+    index_mask = np.ones(mdp.num_states)
+    index_mask[unreach] = 0
+    indices = np.where(index_mask == 1.0)[0]
+    # These are the indicies of active nodes
+
+    ####################################################
     # Form the Fourier projection (both value and flow)
-    B = get_basis_from_solution(mdp,disc,sol,150)
+    B = get_basis_from_solution(mdp,disc,indices,sol,100)
     #B = np.eye(p.size)
     print 'Basis shape:',B.shape
-
-    
     # Solve with projective method
     start = time.time()
-    p_sol = solve_mdp_with_projective(mdp,B,p,d)
+    p_sol = solve_mdp_with_projective(mdp,disc,B,p,d)
     ptime = time.time() - start
-
     for i in xrange(4):
         plt.subplot(2,2,i+1)
         img = reshape_full(p_sol[:,i],disc)
