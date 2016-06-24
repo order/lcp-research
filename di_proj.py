@@ -62,6 +62,7 @@ def build_projective_lcp(mdp,disc,basis):
     index_mask = np.ones(n)
     index_mask[unreach] = 0
     indices = np.where(index_mask == 1.0)[0]
+    I = indices.size
     
     start = time.time()
     # Build the LCP
@@ -72,8 +73,10 @@ def build_projective_lcp(mdp,disc,basis):
     print 'LCP shape:',lcp.M.shape
     print 'Anticipated:',(n-unreach.size)*(A+1)
 
+    # TODO: indices need to be repeated "per block"
     B = linalg.orthonorm(basis.toarray()[indices,:])
-
+    assert(I*(A+1) == B.shape[0])
+    
     # Convert matrices to sparse and elim zeros
     B = sps.csr_matrix(B)
     B.eliminate_zeros()
@@ -97,6 +100,7 @@ def solve_mdp_with_projective(mdp,disc,basis,p,d):
     x0 = (1e-6)*np.ones(N)    
     y0 = np.maximum(plcp.q,1e-6)
     w0 = np.zeros(k)
+
         
     (p,d) = solve_with_projective(plcp,1e-12,100,x0,y0,w0)
     print 'Projective ran for:', time.time() - start, 's'
@@ -131,12 +135,13 @@ if __name__ == '__main__':
 
     ####################################################
     # Form the Fourier projection (both value and flow)
-    B = get_basis_from_solution(mdp,disc,indices,sol,100)
+    basis = get_basis_from_solution(mdp,disc,indices,sol,100)
+    
     #B = np.eye(p.size)
-    print 'Basis shape:',B.shape
+    print 'Basis shape:',basis.shape
     # Solve with projective method
     start = time.time()
-    p_sol = solve_mdp_with_projective(mdp,disc,B,p,d)
+    p_sol = solve_mdp_with_projective(mdp,disc,basis,p,d)
     ptime = time.time() - start
     for i in xrange(4):
         plt.subplot(2,2,i+1)
