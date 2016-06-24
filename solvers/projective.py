@@ -183,6 +183,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         nnm = self.nonneg_mask
         steplen = max(np.max(-del_x[nnm]/x[nnm]),
                       np.max(-del_y[nnm]/y[nnm]))
+        
         if steplen <= 0:
             steplen = float('inf')
         else:

@@ -35,8 +35,7 @@ class RegularGridInterpolator(object):
     def get_upper_boundary(self):
         return [h for (l,h,n) in self.grid_desc]
     def get_num_cells(self):
-        return [n for (l,h,n) in self.grid_desc]
-    
+        return [n for (l,h,n) in self.grid_desc]    
     
     def num_nodes(self):
         # Include oob
@@ -74,7 +73,7 @@ class RegularGridInterpolator(object):
 
     def to_indices(self,points):
         coords = self.to_cell_coord(points)
-        return self.indexer.coords_to_indices(coords)
+        return self.indexer.coords_to_indices(coords)        
         
     def points_to_index_distributions(self,points):
         (N,D) = points.shape
