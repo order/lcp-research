@@ -47,6 +47,9 @@ class RegularGridInterpolator(object):
     def num_oob(self):
         return self.num_nodes() - self.num_real_nodes()
 
+    def oob_range(self):
+        return xrange(self.num_real_nodes(),self.num_nodes())
+
     def is_oob(self,idx):
         return idx > self.indexer.physical_max_index
         

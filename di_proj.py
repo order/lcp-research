@@ -16,21 +16,21 @@ from utils import *
 
 from experiment import *
 
-DIM = 16
+DIM = 32
 
 def build_problem(disc_n):
     # disc_n = number of cells per dimension
     step_len = 0.01           # Step length
     n_steps = 1               # Steps per iteration
     damp = 0.01               # Dampening
-    jitter = 0.1             # Control jitter 
+    jitter = 0.1              # Control jitter 
     discount = 0.995          # Discount (\gamma)
     B = 5
     bounds = [[-B,B],[-B,B]]  # Square bounds, 
     cost_radius = 0.25        # Goal region radius
     
-    actions = np.array([[-1],[0],[1]]) # Actions
-    action_n = 3
+    actions = np.array([[-1],[1]]) # Actions
+    action_n = actions.shape[0]
     assert(actions.shape[0] == action_n)
     
     problem = make_di_problem(step_len,
@@ -47,12 +47,16 @@ def build_problem(disc_n):
     #add_drain(mdp,disc,np.zeros(2),0)
     return (mdp,disc,problem)
 
-def solve_mdp_with_kojima(mdp):
+def kojima_solve(mdp,disc):
     # Solve
     start = time.time()
-    (p,d) = solve_with_kojima(mdp,1e-8,1000,1e-8,1e-6)
+    (p,d,lcp_builder) = solve_with_kojima(mdp,disc,
+                                          thresh=1e-8,
+                                          max_iter=100,
+                                          val_reg=1e-12,
+                                          flow_reg=1e-10)
     print 'Kojima ran for:', time.time() - start, 's'
-    return (p,d)
+    return (p,d,lcp_builder)
 
 def build_projective_lcp(mdp,disc,basis):
     n = mdp.num_states
@@ -61,7 +65,7 @@ def build_projective_lcp(mdp,disc,basis):
     unreach = find_isolated(mdp,disc)
     index_mask = np.ones(n)
     index_mask[unreach] = 0
-    indices = np.where(index_mask == 1.0)[0]
+    indices = np.argwhere(index_mask == 1.0).squeeze()
     I = indices.size
     
     start = time.time()
@@ -116,21 +120,61 @@ if __name__ == '__main__':
     ####################################################
     # Solve, initially, using Kojima
         # Build / load
-    if False:
-        (p,d) = solve_mdp_with_kojima(mdp)
+    if True:
+        (p,d,lcp_builder) = kojima_solve(mdp,disc)
         np.save('p.npy',p)
         np.save('d.npy',d)
     else:
         p = np.load('p.npy')
         d = np.load('d.npy')         
     sol = block_solution(mdp,p)
+    dsol = block_solution(mdp,d)
+
+    (x,F) = cdf_points(p * d)
+    (y,G) = cdf_points(p + d)
+    plt.figure()
+    plt.suptitle('CDFs')
+    plt.subplot(1,2,1);
+    plt.plot(x,F)
+    plt.title('P*D')
+    plt.subplot(1,2,2)
+    plt.semilogx(y,G)
+    plt.title('P+D')
+
+    A = mdp.num_actions+1
+
+    plt.figure()
+    plt.suptitle('Primal')
+    for i in xrange(A):
+        plt.subplot(2,2,i+1)
+        img = reshape_full(np.log(sol[:,i]),disc)
+        plt.imshow(img,interpolation='none')
+        plt.colorbar()
+        
+    plt.figure()
+    plt.suptitle('Dual')
+    for i in xrange(A):
+        plt.subplot(2,2,i+1)
+        img = reshape_full(np.log(dsol[:,i]),disc)
+        plt.imshow(img,interpolation='none')
+        plt.colorbar()
+        
+    plt.figure()
+    plt.suptitle('Primal + Dual')
+    for i in xrange(A):
+        plt.subplot(2,2,i+1)
+        img = reshape_full(np.log(sol[:,i] + dsol[:,i]),disc)
+        plt.imshow(img,interpolation='none')
+        plt.colorbar()
+    plt.show()
+    quit()
 
     ####################################################
     # Only use nodes that are reachable
     unreach = find_isolated(mdp,disc)
     index_mask = np.ones(mdp.num_states)
     index_mask[unreach] = 0
-    indices = np.where(index_mask == 1.0)[0]
+    indices = np.argwhere(index_mask == 1.0).squeeze()
     # These are the indicies of active nodes
 
     ####################################################

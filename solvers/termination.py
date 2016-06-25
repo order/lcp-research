@@ -100,3 +100,26 @@ class PotentialTerminationCondition(TerminationCondition):
     def __str__(self):
         return 'PotentialTerminationCondition {0}'.format(self.thresh)
         
+class PotentialDiffTerminationCondition(TerminationCondition):
+    """
+    Broadcast potential every iteration
+    """
+    def __init__(self,thresh):
+        self.thresh = thresh
+        self.old_P = np.nan
+        
+    def isdone(self,iterator):
+        p = iterator.get_primal_vector()
+        d = iterator.get_dual_vector()
+        
+        N = p.size
+        P = (N + np.sqrt(N)) * np.log(p.dot(d)) \
+            - np.sum(np.log(p)) - np.sum(np.log(d))
+
+        diff = np.abs(P - self.old_P)
+        self.old_P = P
+
+        return diff <= self.thresh
+
+    def __str__(self):
+        return 'PotentialTerminationCondition {0}'.format(self.thresh)

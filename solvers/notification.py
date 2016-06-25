@@ -171,3 +171,33 @@ class PotentialAnnounce(Notification):
                     ip_term,
                     x_term,
                     y_term)
+
+
+class PotentialDiffAnnounce(Notification):
+    """
+    Broadcast potential every iteration
+    """
+    def __init__(self,k=None):
+        self.k = k
+        self.old_P = np.nan
+        
+    def announce(self,iterator):
+        x = iterator.get_primal_vector()
+        y = iterator.get_dual_vector()
+        
+        N = x.size
+        if self.k:
+            k = self.k
+        else:
+            k = np.sqrt(N)
+
+        ip_term = (N + k) * np.log(x.dot(y))
+        x_term = np.sum(np.log(x))
+        y_term = np.sum(np.log(y))
+        
+        P = ip_term - x_term - y_term
+        diff = np.abs(self.old_P - P)
+        self.old_P = P
+        
+        print 'Potential change {0:.3g} at iteration {1}'\
+            .format(diff,iterator.get_iteration())

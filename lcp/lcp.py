@@ -1,10 +1,6 @@
 import util
 import numpy as np
 
-class LCPBuilder(object):
-    def build_lcp(self,**kwargs):
-        pass
-
 class LCPObj(object):
     """An object that wraps around the matrix M and vector q
     for an LCP

@@ -9,9 +9,11 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         self.lcp = lcp_obj
         self.M = lcp_obj.M
         self.q = lcp_obj.q
-        
-        self.centering_coeff = kwargs.get('centering_coeff',0.1)
-        self.linesearch_backoff = kwargs.get('linesearch_backoff',0.8)  
+         
+        self.centering_coeff = kwargs.get('centering_coeff',0.99)
+        self.linesearch_backoff = kwargs.get('linesearch_backoff',
+                                             0.99)
+        self.central_path_backoff = kwargs.get('central_path_backoff',0.9995)
         
         self.iteration = 0
         
@@ -20,8 +22,8 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         self.x = kwargs.get('x0',np.ones(n))
         self.y = kwargs.get('y0',np.ones(n))
         self.step = np.nan
-        self.dir_x = np.full(n,np.nan)
-        self.dir_y = np.full(n,np.nan)
+        self.del_x = np.full(n,np.nan)
+        self.del_y = np.full(n,np.nan)
 
         self.newton_system = sps.eye(1)
         
@@ -34,6 +36,7 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         Uses a log-barrier w/centering parameter
         (How is this different than the basic scheme a la Nocedal and Wright?)
         """
+        
         M = self.lcp.M
         q = self.lcp.q
         n = self.lcp.dim
@@ -41,8 +44,16 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         x = self.x
         y = self.y
 
+        S = x+y
+        print 'min(S):',np.min(S)
+        print 'max(S):',np.max(S)
+        print 'log ratio:', np.log10(np.max(S) / np.min(S))
+        print 'argmin(S)',np.argmin(S)
+        print 'argmax(S)',np.argmax(S)
+
         sigma = self.centering_coeff
         beta = self.linesearch_backoff
+        backoff = self.central_path_backoff
         
         r = (M.dot(x) + q) - y 
         dot = x.dot(y)
@@ -54,28 +65,42 @@ class KojimaIPIterator(IPIterator,LCPIterator):
 
         self.newton_system = A
         
-        dir = sps.linalg.spsolve(A,b)
-        dir_x = dir[:n]
-        dir_y = dir[n:]
+        Del = sps.linalg.spsolve(A,b)
+        del_x = Del[:n]
+        del_y = Del[n:]
+
+        print '||dx||:',np.linalg.norm(del_x)
+        print '||dy||:',np.linalg.norm(del_y)
             
         # Get step length so that x,y are strictly feasible after move
-        step = 1
-        x_cand = x + step*dir_x
-        y_cand = y + step*dir_y    
-        while np.any(x_cand < 0) or np.any(y_cand < 0):
-            step *= beta
-            x_cand = x + step*dir_x
-            y_cand = y + step*dir_y
+        steplen = max(np.max(-del_x/x),
+                      np.max(-del_y/y))
+        if steplen <= 0:
+            steplen = float('inf')
+        else:
+            steplen = 1.0 / steplen
+        steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
+        print 'Steplen', steplen
 
-        x = x_cand
-        y = y_cand
-        
-        self.x = x
-        self.y = y
+        # Sigma is beta in Geoff's code
+        if(1.0 >= steplen > 0.95):
+            sigma *= 0.9 # Long step
+        elif(0.1 >= steplen > 1e-3):
+            sigma *= 1.2
+            sigma = min(sigma,0.99)
+        elif (steplen <= 1e-3):
+            sigma = 0.99 # Short step
+        print 'sigma:',sigma
+
+            # Update point and fields
+        self.steplen = steplen
+        self.centering_coeff = sigma
+              
+        self.x = x + steplen * del_x
+        self.y = y + steplen * del_y
+        self.dir_x = del_x
+        self.dir_y = del_y
         self.iteration += 1
-        self.step = step
-        self.dir_x = dir_x
-        self.dir_y = dir_y
         
     def get_primal_vector(self):
         return self.x
@@ -86,8 +111,8 @@ class KojimaIPIterator(IPIterator,LCPIterator):
     def get_step_len(self):
         return self.step
     def get_primal_dir(self):
-        return self.dir_x
+        return self.del_x
     def get_dual_dir(self):
-        return self.dir_y
+        return self.del_y
     def get_newton_system(self):
         return self.newton_system
