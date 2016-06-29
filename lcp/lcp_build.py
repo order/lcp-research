@@ -114,20 +114,81 @@ class LCPBuilder(object):
         for idx in unreach:
             self.remove_node(idx,terminal_cost)
 
-    def convert_index(self,i):
-        I = i % len(self.included_nodes) 
-        return self.included_nodes[I]
+    def convert_variable(self,i):
+        # Figure out what block and node variable corresponds to
+        block_id = int(i / len(self.included_nodes))
+        idx = i % len(self.included_nodes) # Mod out block
+        node_id = self.included_nodes[idx]
+        return (block_id, node_id)
 
-    def expand(self, f, pad_elem=np.nan):
+    def contract_vector(self,f):
+        n = self.num_states
+        assert((n,) == f.shape)
+
+        idx = np.array(self.included_nodes)
+        return f[idx]
+    
+    def contract_block_vector(self,f):
+        n = self.num_states
+        A = self.num_actions
+        N = n*(A+1)
+        assert((N,) == f.shape)
+        reshaped_f = np.reshape(f,(n,(A+1)),order='F')
+
+        m = len(self.included_nodes)
+        M = m * (A+1)
+        idx = np.array(self.included_nodes)
+        F = reshaped_f[idx,:]
+        F = np.reshape(F,M,order='F')
+        assert((M,) == F.shape)
+        return F
+
+    def contract_block_matrix(self,B):
+        (l,K) = B.shape
+        
+        n = self.num_states
+        A = self.num_actions
+        N = n*(A+1)
+        assert(N == l)
+        
+        reshaped_B = np.reshape(B,(n,(A+1),K),order='F')
+
+        m = len(self.included_nodes)
+        M = m * (A+1)
+        idx = np.array(self.included_nodes)
+        
+        B = reshaped_B[idx,...]
+        B = np.reshape(B,(M,K),order='F')
+        assert((M,K) == B.shape)
+        return B
+    
+    def expand_vector(self,f,pad_elem=np.nan):
+        # Expand a vector corresponding to a single block
+        (M,) = f.shape
+        m = len(self.included_nodes)
+        assert(M == m)
+
+        N = self.num_states
+        F = np.empty(N)
+
+        idx = np.array(self.omitted_nodes.keys())
+        F[idx] = pad_elem
+        idx = np.array(self.included_nodes)
+        F[idx] = f
+
+        return F
+        
+    def expand_block_vector(self, f, pad_elem=np.nan):
         # For padding out solutions from the LCP
         # so that it's the full size
         # I.e. map omitted nodes to to nan
+
+        # Size checking
         assert(1 == len(f.shape))
 
         (M,) = f.shape
         m = len(self.included_nodes)
         A = self.mdp.num_actions
-        print 'expand sizes', M,m,A,(A+1)*m
         assert(M == (A+1)*m)
         
         n = self.mdp.num_states
@@ -135,18 +196,22 @@ class LCPBuilder(object):
         O = len(self.omitted_nodes)
         assert(M + (A+1)*O == N)
 
+        # Convert block vector to matrix
         reshaped_f = np.reshape(f,(m,(A+1)),order='F')
 
+        # Write information to blocks
         F = np.empty((n,A+1))
         idx = np.array(self.omitted_nodes.keys())
         F[idx,:] = pad_elem
         idx = np.array(self.included_nodes)
         F[idx,:] = reshaped_f
 
+        # Convert back to matrix
         F = np.reshape(F,(N,),order='F')
         return F      
 
 def find_sinks(transition_matrix):
+    # Find nodes that have no flow out
     T = transition_matrix
     (N,n) = T.shape
     assert(N == n)
@@ -160,6 +225,7 @@ def find_sinks(transition_matrix):
     return idx
 
 def find_unreachable(transition_matrix):
+    # Find nodes that have no flow in
     T = transition_matrix
     (N,n) = T.shape
     assert(N == n)

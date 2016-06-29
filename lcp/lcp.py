@@ -19,29 +19,6 @@ class LCPObj(object):
 
     def __str__(self):
         return '<{0} in R^{1}>'.format(self.name, self.dim)                
-
-# Ever used?
-class MDPLCPObj(LCPObj):
-    """LCP generated from an MDP
-    """
-    def __init__(self,MDP):
-        self.MDP = MDP
-        (M,q) = MDP.build_lcp()
-        super(MDPLCPObj,self).__init__(M,q)
-        
-    def split_vector(self,x):        
-        N = self.dim # M is N-by-N
-        n = self.MDP.num_states
-        A = self.MDP.num_actions
-        assert(N == n*(A+1)) # Basic sanity
-        
-        assert((N,) == x.shape) # x is N-by-1
-        
-        blocks = [x[(i*n):((i+1)*n)] for i in xrange(A+1)]
-        # break in chucks
-
-        # first block is value, rest is flow
-        return [blocks[0],blocks[1:]]
            
 class ProjectiveLCPObj(LCPObj):
     """An object for a projective LCP where M = Phi U + Pi_bot
@@ -50,8 +27,9 @@ class ProjectiveLCPObj(LCPObj):
     monotone linear complementarity problems" 
     (http://arxiv.org/pdf/1212.6958v1.pdf)  
     """
-    def __init__(self,Phi,PtPU,q,**kwargs):
+    def __init__(self,Phi,U,PtPU,q,**kwargs):
         self.Phi = Phi
+        self.U = U
         self.PtPU = PtPU # <P,PU>
         self.q = q
 

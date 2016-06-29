@@ -50,4 +50,3 @@ class NewtonCondNumRecorder(Recorder):
             pass
         assert(2 == len(A.shape))
         self.data.append(np.linalg.cond(A))
-

@@ -1,6 +1,8 @@
-from solvers import IPIterator,LCPIterator
+from solvers import IPIterator,LCPIterator,potential
 import numpy as np
 import scipy.sparse as sps
+
+from collections import defaultdict
 
 ##############################
 # Kojima lcp_obj
@@ -29,6 +31,8 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         
         assert(not np.any(self.x < 0))
         assert(not np.any(self.y < 0))
+
+        self.data = defaultdict(list)
         
     def next_iteration(self):
         """Interior point solver based on Kojima et al's
@@ -44,6 +48,8 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         x = self.x
         y = self.y
 
+        (N,) = x.shape
+
         S = x+y
         print 'min(S):',np.min(S)
         print 'max(S):',np.max(S)
@@ -51,12 +57,25 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         print 'argmin(S)',np.argmin(S)
         print 'argmax(S)',np.argmax(S)
 
+        (P,ip_term,x_term,y_term) = potential(x,y,0.25*N)
+        self.data['P'].append(P)
+        #self.data['ip term'].append(ip_term)
+        #self.data['x term'].append(x_term)
+        #self.data['y term'].append(y_term)
+
+        #self.data['min(S)'].append(np.min(S))
+        #self.data['max(S)'].append(np.max(S))
+        #self.data['ratio(S)'].append(np.log10(np.max(S) / np.min(S)))
+
         sigma = self.centering_coeff
         beta = self.linesearch_backoff
         backoff = self.central_path_backoff
         
         r = (M.dot(x) + q) - y 
         dot = x.dot(y)
+
+        self.data['res_norm'].append(np.linalg.norm(r))
+        self.data['ip'].append(dot)
             
             # Set up Newton direction equations
         A = sps.bmat([[sps.spdiags(y,0,n,n),sps.spdiags(x,0,n,n)],\
@@ -82,6 +101,8 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
         print 'Steplen', steplen
 
+        #self.data['steplen'].append(steplen)
+
         # Sigma is beta in Geoff's code
         if(1.0 >= steplen > 0.95):
             sigma *= 0.9 # Long step
@@ -91,6 +112,9 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         elif (steplen <= 1e-3):
             sigma = 0.99 # Short step
         print 'sigma:',sigma
+
+        #self.data['sigma'].append(sigma)
+
 
             # Update point and fields
         self.steplen = steplen

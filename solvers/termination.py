@@ -70,8 +70,16 @@ class ResidualTerminationCondition(TerminationCondition):
         return self.residual < self.thresh
         
     def __str__(self):
-        return 'ResidualTerminationCondition {0} ({1})'.format(self.thresh,self.residual)   
+        return 'ResidualTerminationCondition {0} ({1})'.format(self.thresh,self.residual)
 
+class SteplenTerminationCondition(TerminationCondition):
+    def __init__(self,thresh):
+        self.thresh = thresh
+    def isdone(self,iterator):
+        return self.thresh > iterator.steplen
+    def __str__(self):
+        return 'SteplenTerminationConditions'.format(self.thresh)
+    
 class MaxIterTerminationCondition(TerminationCondition):
     def __init__(self,max_iter):
         self.max_iter = max_iter

@@ -7,6 +7,8 @@ import scipy.sparse as sps
 import utils
 import matplotlib.pyplot as plt
 
+from collections import defaultdict
+
 import time
 
 def form_Gh_dense(x,y,w,g,p,q,Phi,PtPUP,PtPU_P):
@@ -70,14 +72,12 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         self.proj_lcp_obj = proj_lcp_obj
         self.q = proj_lcp_obj.q
         Phi = proj_lcp_obj.Phi
+        U = proj_lcp_obj.U
         PtPU = proj_lcp_obj.PtPU
         (N,K) = Phi.shape
         assert((K,N) == PtPU.shape)
         
-        self.nonneg_mask = kwargs.get('nonneg_mask',
-                                      np.arange(N))
-
-        self.update_P_PtPU(Phi,PtPU)
+        self.update_P_PtPU(Phi,U,PtPU)
 
         self.x = kwargs.get('x0',np.ones(N))
         self.y = kwargs.get('y0',np.ones(N))
@@ -90,6 +90,8 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         assert((N,) == self.x.shape)
         assert((N,) == self.y.shape)
         assert((K,) == self.w.shape)
+
+        self.data = defaultdict(list)
 
         self.iteration = 0
         
@@ -107,7 +109,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         backoff = self.central_path_backoff
      
         Phi = self.Phi
-        #U = self.U
+        U = self.U
         q = self.q
         
         assert(len(Phi.shape) == 2)
@@ -125,6 +127,23 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         assert((N,) == x.shape)
         assert((N,) == y.shape)
         assert((k,) == w.shape)
+        self.data['x'].append(x)
+        self.data['y'].append(y)
+        #self.data['w'].append(w)
+        
+
+        (P,ip_term,x_term,y_term) = potential(x,y,np.sqrt(N))
+        self.data['P'].append(P)
+
+        # Use M = PU + (I - PP^T)
+        recovered_y = Phi.dot(U.dot(x))\
+                      + x - Phi.dot(Phi.T.dot(x)) + q
+        
+        r = recovered_y - y 
+        dot = x.dot(y)
+
+        self.data['res_norm'].append(np.linalg.norm(r))
+        self.data['ip'].append(dot)
 
         # Step 3: form right-hand sides
         g = sigma * x.dot(y) / float(N) * np.ones(N) - x * y
@@ -167,6 +186,11 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         print 'max(S):',np.max(S)
         print 'argmin(S)',np.argmin(S)
         print 'argmax(S)',np.argmax(S)
+        self.data['sum'].append(S)
+
+        self.data['product'].append(x*y)
+
+        
        
         inv_XY = sps.diags(1.0/S,0)
         del_y = inv_XY.dot(g + y*p - y*Phidw)
@@ -178,26 +202,37 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
 
         print '||dx||:',np.linalg.norm(del_x)
         print '||dy||:',np.linalg.norm(del_y)
+        print '||dw||:',np.linalg.norm(del_w)
+        #self.data['dx'].append(del_x)
+        #self.data['dy'].append(del_y)
+        #self.data['dw'].append(del_w)
+        
            
         # Step 8 Step length
-        nnm = self.nonneg_mask
-        steplen = max(np.max(-del_x[nnm]/x[nnm]),
-                      np.max(-del_y[nnm]/y[nnm]))
+        steplen = max(np.max(-del_x/x),
+                      np.max(-del_y/y))
+        #self.data['dx/x'].append(del_x/x)
+        #self.data['dy/x'].append(del_y/x)
         
         if steplen <= 0:
             steplen = float('inf')
         else:
             steplen = 1.0 / steplen
         steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
-
         print 'Steplen', steplen
-        # Sigma is beta in Geoff's code
-        if(steplen > 0.95):
-            sigma *= 0.9 # Long step
-        elif (steplen < 0.05):
-            sigma = 0.99 # Short step
+        #self.data['steplen'].append(steplen)       
+        
 
-        print 'sigma:',sigma
+        # Sigma is beta in Geoff's code
+        if(1.0 >= steplen > 0.95):
+            sigma *= 0.9 # Long step
+        elif(0.1 >= steplen > 1e-3):
+            sigma *= 1.2
+            sigma = min(sigma,0.99)
+        elif (steplen <= 1e-3):
+            sigma = 0.99 # Short step
+        print 'Sigma',sigma
+        #self.data['sigma'].append(sigma)
 
         # Update point and fields
         self.steplen = steplen
@@ -245,8 +280,9 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         self.update_P_PtPU(Phi,PtPU)
         
 
-    def update_P_PtPU(self,Phi,PtPU):        
+    def update_P_PtPU(self,Phi,U,PtPU):        
         self.Phi = Phi
+        self.U = U
         self.PtPU = PtPU
         (N,K) = Phi.shape            
          

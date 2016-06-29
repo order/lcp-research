@@ -1,9 +1,12 @@
 import numpy as np
 import scipy as sp
 import scipy.sparse as sps
+import scipy.linalg as spl
 import multiprocessing
 
 import matplotlib.pyplot as plt
+
+from collections import defaultdict
 
 from mdp import *
 from config.mdp import *
@@ -16,7 +19,12 @@ from utils import *
 
 from experiment import *
 
-DIM = 32
+DIM = 16
+
+REBUILD = True
+
+#########################################################
+# Build objects
 
 def build_problem(disc_n):
     # disc_n = number of cells per dimension
@@ -47,150 +55,221 @@ def build_problem(disc_n):
     #add_drain(mdp,disc,np.zeros(2),0)
     return (mdp,disc,problem)
 
-def kojima_solve(mdp,disc):
-    # Solve
-    start = time.time()
-    (p,d,lcp_builder) = solve_with_kojima(mdp,disc,
-                                          thresh=1e-8,
-                                          max_iter=100,
-                                          val_reg=1e-12,
-                                          flow_reg=1e-10)
-    print 'Kojima ran for:', time.time() - start, 's'
-    return (p,d,lcp_builder)
+def build_lcp(mdp,disc,reg):
+    val_reg = reg
+    flow_reg = reg
+    lcp_builder = LCPBuilder(mdp,
+                             disc,
+                             val_reg=val_reg,
+                             flow_reg=flow_reg)
 
-def build_projective_lcp(mdp,disc,basis):
-    n = mdp.num_states
-    A = mdp.num_actions
+    lcp_builder.remove_oobs(0.0)
+    lcp_builder.add_drain(np.zeros(2),0.0)
+    
+    lcp_builder.build_uniform_state_weights()
+    
+    lcp = lcp_builder.build()
+    return(lcp,lcp_builder)
 
-    unreach = find_isolated(mdp,disc)
-    index_mask = np.ones(n)
-    index_mask[unreach] = 0
-    indices = np.argwhere(index_mask == 1.0).squeeze()
-    I = indices.size
+def build_projective_lcp(lcp,lcp_builder,basis,extra_reg,scale):
+    (N,n) = lcp.M.shape
+    assert(N == n)
     
     start = time.time()
-    # Build the LCP
-    lcp = mdp.build_lcp(indices=indices,
-                        val_reg = 1e-6,
-                        flow_reg = 1e-6)
-
-    print 'LCP shape:',lcp.M.shape
-    print 'Anticipated:',(n-unreach.size)*(A+1)
-
-    # TODO: indices need to be repeated "per block"
-    B = linalg.orthonorm(basis.toarray()[indices,:])
-    assert(I*(A+1) == B.shape[0])
+    # Remove omitted nodes
+    B = np.random.randn(*basis.shape)
+    B = lcp_builder.contract_block_matrix(basis.toarray()) 
+    B = linalg.orthonorm(B)
     
-    # Convert matrices to sparse and elim zeros
+    #B = sps.eye(N)
+    
+    # Convert to sparse and elim zeros
     B = sps.csr_matrix(B)
     B.eliminate_zeros()
-    M = linalg.spsubmat(lcp.M,indices,indices)
-    M.eliminate_zeros()
+    reg_M = (lcp.M + extra_reg*sps.eye(N)).tocsr()
+    reg_M.eliminate_zeros()
 
+    assert(N == B.shape[0])    
     # Project MDP onto basis
-    PtPU = B.T.dot(M)
-    plcp = ProjectiveLCPObj(B, PtPU, lcp.q[indices])    
+    U = B.T.dot(reg_M) # Assumes that B is orthonormal
+    
+    PtPU = U # Also assumes B is orthonormal
+    plcp = ProjectiveLCPObj(B,scale*U,scale*PtPU, scale*lcp.q)
     print 'Building projective LCP: {0}s'.format(time.time() - start)
-    return (plcp,indices)
+    return (plcp,B)
 
-def solve_mdp_with_projective(mdp,disc,basis,p,d):
-    (plcp,included_states) = build_projective_lcp(mdp,disc,basis)
+###############################################
+# Solvers
+
+def kojima_solve(lcp,lcp_builder):
+    # Solve
+    start = time.time()
+    (p,d,data) = solve_with_kojima(lcp,
+                                   thresh=1e-8,
+                                   max_iter=100)
+    print 'Kojima ran for:', time.time() - start, 's'
+    P = lcp_builder.expand_block_vector(p,1e-22)
+    D = lcp_builder.expand_block_vector(d,1e-22)
+    return (P,D,data)
+
+def projective_solve(plcp,p,d):
     start = time.time()
     (N,k) = plcp.Phi.shape
 
     print 'q', plcp.q.shape
     print 'PtPU', plcp.PtPU.shape
     print 'Phi', plcp.Phi.shape
-    x0 = (1e-6)*np.ones(N)    
-    y0 = np.maximum(plcp.q,1e-6)
-    w0 = np.zeros(k)
+    x0 = p
+    y0 = d
+
+    w0 = plcp.Phi.T.dot(x0 - y0 + plcp.q)
+    assert((k,) == w0.shape)
 
         
-    (p,d) = solve_with_projective(plcp,1e-12,100,x0,y0,w0)
+    (p,d,data) = solve_with_projective(plcp,
+                                       thresh=1e-12,
+                                       max_iter=150,
+                                       x0=x0,
+                                       y0=y0,
+                                       w0=w0)
     print 'Projective ran for:', time.time() - start, 's'
-    (p,d) = expand_states(mdp,p,d,included_states)
-    return block_solution(mdp,p)
+    return (p,d,data)
+
+def projective_regularization_homotopy(mdp,disc,basis):
+    
+    (lcp,lcp_builder) = build_lcp(mdp,disc,0)
+    (N,) = lcp.q.shape
+    p = np.abs(np.random.randn(N))
+    d = np.abs(np.random.randn(N))
+
+    #G = 25
+    #reg_grid = np.power(10.0, - np.linspace(4,6,25))
+    G = 1
+    reg_grid = [1e-6]
+    for i in xrange(G):
+        reg = reg_grid[i]
+        (plcp,_) = build_projective_lcp(lcp,lcp_builder,basis,reg,20.0)
+        (p,d,data) = projective_solve(plcp,
+                                      p + reg*reg,
+                                      d + reg*reg)
+        if True:
+            for (key,value) in data.items():
+                plt.figure()
+                plt.semilogy(np.abs(value),alpha=0.5)
+                plt.title(key)
+            plt.show()
+
+            
+    return (lcp_builder.expand_block_vector(p),
+            lcp_builder.expand_block_vector(d))
+            
 
 if __name__ == '__main__':
 
     ####################################################
     # Build the MDP and discretizer
     (mdp,disc,_) = build_problem(DIM)
+
+    ####################################################
+    # Build LCP and builder
+    (lcp,lcp_builder) = build_lcp(mdp,disc,1e-15)
     
     ####################################################
     # Solve, initially, using Kojima
         # Build / load
-    if True:
-        (p,d,lcp_builder) = kojima_solve(mdp,disc)
+    if REBUILD:
+        (p,d,data) = kojima_solve(lcp,lcp_builder)
         np.save('p.npy',p)
         np.save('d.npy',d)
+        
     else:
         p = np.load('p.npy')
-        d = np.load('d.npy')         
+        d = np.load('d.npy')
+        data = {}
     sol = block_solution(mdp,p)
     dsol = block_solution(mdp,d)
 
-    (x,F) = cdf_points(p * d)
-    (y,G) = cdf_points(p + d)
-    plt.figure()
-    plt.suptitle('CDFs')
-    plt.subplot(1,2,1);
-    plt.plot(x,F)
-    plt.title('P*D')
-    plt.subplot(1,2,2)
-    plt.semilogx(y,G)
-    plt.title('P+D')
-
+    if False:
+        plt.figure()
+        for value in data.values():
+            plt.semilogy(value)
+        plt.legend(data.keys(),loc='best')
+        plt.title('Kojima internal state')
+    
     A = mdp.num_actions+1
 
-    plt.figure()
-    plt.suptitle('Primal')
-    for i in xrange(A):
-        plt.subplot(2,2,i+1)
-        img = reshape_full(np.log(sol[:,i]),disc)
-        plt.imshow(img,interpolation='none')
-        plt.colorbar()
-        
-    plt.figure()
-    plt.suptitle('Dual')
-    for i in xrange(A):
-        plt.subplot(2,2,i+1)
-        img = reshape_full(np.log(dsol[:,i]),disc)
-        plt.imshow(img,interpolation='none')
-        plt.colorbar()
-        
-    plt.figure()
-    plt.suptitle('Primal + Dual')
-    for i in xrange(A):
-        plt.subplot(2,2,i+1)
-        img = reshape_full(np.log(sol[:,i] + dsol[:,i]),disc)
-        plt.imshow(img,interpolation='none')
-        plt.colorbar()
-    plt.show()
-    quit()
+    if False:
+        # CDF plots for final primal / dual
+        (x,F) = cdf_points(p * d)
+        (y,G) = cdf_points(p + d)
+        plt.figure()
+        plt.suptitle('CDFs')
+        plt.subplot(1,2,1);
+        plt.plot(x,F)
+        plt.title('P*D')
+        plt.subplot(1,2,2)
+        plt.semilogx(y,G)
+        plt.title('P+D')
 
-    ####################################################
-    # Only use nodes that are reachable
-    unreach = find_isolated(mdp,disc)
-    index_mask = np.ones(mdp.num_states)
-    index_mask[unreach] = 0
-    indices = np.argwhere(index_mask == 1.0).squeeze()
-    # These are the indicies of active nodes
+    if False:
+        # Image plots for final primal / dual
+        plt.figure()
+        plt.suptitle('Primal')
+        for i in xrange(A):
+            plt.subplot(2,2,i+1)
+            img = reshape_full(np.log(sol[:,i]),disc)
+            plt.imshow(img,interpolation='none')
+            plt.colorbar()
+        
+        plt.figure()
+        plt.suptitle('Dual')
+        for i in xrange(A):
+            plt.subplot(2,2,i+1)
+            img = reshape_full(np.log(dsol[:,i]),disc)
+            plt.imshow(img,interpolation='none')
+            plt.colorbar()
+        
+        plt.figure()
+        plt.suptitle('Primal + Dual')
+        for i in xrange(A):
+            plt.subplot(2,2,i+1)
+            img = reshape_full(np.log(sol[:,i] + dsol[:,i]),disc)
+            plt.imshow(img,interpolation='none')
+            plt.colorbar()
+
+        plt.figure()
+        plt.suptitle('Primal * Dual')
+        for i in xrange(A):
+            plt.subplot(2,2,i+1)
+            img = reshape_full(np.log(sol[:,i] * dsol[:,i]),disc)
+            plt.imshow(img,interpolation='none')
+            plt.colorbar()
+        plt.show()
 
     ####################################################
     # Form the Fourier projection (both value and flow)
-    basis = get_basis_from_solution(mdp,disc,indices,sol,100)
-    
-    #B = np.eye(p.size)
-    print 'Basis shape:',basis.shape
-    # Solve with projective method
-    start = time.time()
-    p_sol = solve_mdp_with_projective(mdp,disc,basis,p,d)
-    ptime = time.time() - start
-    for i in xrange(4):
-        plt.subplot(2,2,i+1)
-        img = reshape_full(p_sol[:,i],disc)
-        imshow(img)
+    basis = get_basis_from_solution(mdp,disc,sol,17*17)
+    proj_p,proj_d = projective_regularization_homotopy(mdp,disc,basis)
+
+    proj_sol = block_solution(mdp,proj_p)
+    proj_dsol = block_solution(mdp,proj_d)
+
+
+    if True:
+        plt.figure()
+        plt.suptitle('Projected primal')
+        for i in xrange(A):
+            plt.subplot(2,2,i+1)
+            img = reshape_full(np.log(proj_sol[:,i]),disc)
+            plt.imshow(img,interpolation='none')
+            plt.colorbar()
+
+        plt.figure()
+        plt.suptitle('Projected Dual')
+        for i in xrange(A):
+            plt.subplot(2,2,i+1)
+            img = reshape_full(np.log(proj_dsol[:,i]),disc)
+            plt.imshow(img,interpolation='none')
+            plt.colorbar()
     plt.show()
-    
-    
+        

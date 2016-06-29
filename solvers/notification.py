@@ -1,5 +1,7 @@
 import numpy as np
 import math
+
+from solvers import potential
    
 #############################
 # Notifications
@@ -153,19 +155,14 @@ class PotentialAnnounce(Notification):
     def announce(self,iterator):
         x = iterator.get_primal_vector()
         y = iterator.get_dual_vector()
-        
-        N = x.size
-        if self.k:
-            k = self.k
-        else:
-            k = np.sqrt(N)
 
-        ip_term = (N + k) * np.log(x.dot(y))
-        x_term = np.sum(np.log(x))
-        y_term = np.sum(np.log(y))
-        
-        P = ip_term - x_term - y_term
-        
+        (N,) = x.shape
+        if self.k:
+            K = self.k
+        else:
+            K = np.sqrt(N)
+
+        (P,ip_term,y_term,x_term) = potential(x,y,K)
         print 'Potential {0:.3g} at iteration {1} ({2:.3g} {3:.3g} {4:.3g})'\
             .format(P,iterator.get_iteration(),
                     ip_term,
@@ -184,18 +181,16 @@ class PotentialDiffAnnounce(Notification):
     def announce(self,iterator):
         x = iterator.get_primal_vector()
         y = iterator.get_dual_vector()
-        
-        N = x.size
-        if self.k:
-            k = self.k
-        else:
-            k = np.sqrt(N)
 
-        ip_term = (N + k) * np.log(x.dot(y))
-        x_term = np.sum(np.log(x))
-        y_term = np.sum(np.log(y))
+        (N,) = x.shape
+        if self.k:
+            K = self.k
+        else:
+            K = np.sqrt(N)
         
-        P = ip_term - x_term - y_term
+        (P,ip_term,y_term,x_term) = potential(x,y,K)
+
+
         diff = np.abs(self.old_P - P)
         self.old_P = P
         

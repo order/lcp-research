@@ -19,6 +19,18 @@ Most are phrased as iteration generators. These plug in to the iter_solver class
 the generators and provides a standardized framework for recording per-iteration information (like residuals and state) and termination checking (like maximum iteration count or residual threshold checking.
 """
 
+def potential(x,y,K):
+    (N,) = x.shape
+    assert((N,) == y.shape)
+    
+    ip_term = (N + K) * np.log(x.dot(y))
+    x_term = np.sum(np.log(x))
+    y_term = np.sum(np.log(y))
+
+    P = ip_term - x_term - y_term
+
+    return (P,ip_term,y_term,x_term)
+
 class IterativeSolver(object):
 
     """

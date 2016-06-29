@@ -144,7 +144,7 @@ def get_basis_from_array(mdp_obj,disc,f,num_bases):
 
 ###############################################################
 # Use the above routine to build a basis for the entire problem
-def get_basis_from_solution(mdp_obj,disc,indices,sol,num_bases):
+def get_basis_from_solution(mdp_obj,disc,sol,num_bases):
     (N,Ap) = sol.shape
     assert(N == mdp_obj.num_states)
     assert(Ap == mdp_obj.num_actions+1)
@@ -162,7 +162,7 @@ def get_basis_from_solution(mdp_obj,disc,indices,sol,num_bases):
         assert(n == N)
         #assert(k <= num_bases + disc.num_oob())
         total_bases += k
-        Bases.append(B[indices,:])
+        Bases.append(B)
 
     # Stitch together
     BigB = sps.block_diag(Bases)
