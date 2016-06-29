@@ -62,110 +62,23 @@ def animate_cdf(X,**kwargs):
         im_ani.save(args['save_file'])
     plt.show()
 
-def animate_frames(Frames,**kwargs):
-    """
-    Turn frames into a movie
-    """
-    # Parse input
-    parser = KwargParser()
-    parser.add_optional('save_file',str)
-    parser.add('title','No title',str)
-    parser.add('xlabel','x',str)
-    parser.add('ylabel','y',str)
-    parser.add('cmap','jet',str)
-    args = parser.parse(kwargs)
-    
-    assert(3 == len(Frames.shape)) # Frame index, x, y
-    (I,X,Y) = Frames.shape
-    
+def animate_frames(frames):
+    (T,X,Y) = frames.shape
+    lo = np.min(frames)-1e-3
+    hi = np.max(frames)+1e-3
+
     fig = plt.figure()
-    low = np.min(Frames)
-    hi = np.max(Frames)
-
-    print 'Starting animation...'        
     Plotters = []
-    cmap = plt.get_cmap(args['cmap'])
-    for i in xrange(I):
-        img = plt.pcolormesh(Frames[i,:,:],
-                             vmin = low,
-                             vmax = hi,
-                             cmap=cmap)
-        Plotters.append([img])
-    im_ani = animation.ArtistAnimation(fig,Plotters,\
-                                       interval=50,\
-                                       repeat_delay=3000,\
-                                       blit=True)
-    plt.xlabel(args['xlabel'])
-    plt.ylabel(args['ylabel'])
-    plt.title(args['title'])
-
-    if 'save_file' in args:
-        im_ani.save(args['save_file'])
-    plt.show()
-
-def plot(data,**kwargs):
-    parser = KwargParser()
-    parser.add_optional('save_file',str)
-    parser.add('title','No title',str)
-    parser.add('xlabel','x',str)
-    parser.add('ylabel','y',str)
-    args = parser.parse(kwargs)
-    
-    plt.plot(data)
-    plt.xlabel(args['xlabel'])
-    plt.ylabel(args['ylabel'])
-    plt.title(args['title'])
-
-    if 'save_file' in args:
-        plt.savefig(args['save_file'], bbox_inches='tight')
-    plt.show()
-
-def pcolor(data,**kwargs):
-    parser = KwargParser()
-    parser.add_optional('save_file',str)
-    parser.add('title','No title',str)
-    parser.add('xlabel','x',str)
-    parser.add('ylabel','y',str)
-    parser.add('cmap','jet',str)
-
-    args = parser.parse(kwargs)
-
-    cmap = plt.get_cmap(args['cmap'])
-    plt.pcolormesh(data,cmap=cmap)
-    plt.xlabel(args['xlabel'])
-    plt.ylabel(args['ylabel'])
-    plt.title(args['title'])
-    plt.colorbar()
-
-
-    if 'save_file' in args:
-        plt.savefig(args['save_file'], bbox_inches='tight')
-    plt.show()
-
-def cdf(data,**kwargs):
-    parser = KwargParser()
-    parser.add_optional('save_file',str)
-    parser.add('title','No title',str)
-    parser.add('xlabel','x',str)
-    parser.add('ylabel','y',str)
-    args = parser.parse(kwargs)
-
-    data = data.flatten()
-    n = data.size
-    
-    sorted_data = np.sort(data)
-    low = sorted_data[0]
-    hi = sorted_data[-1]
-    cdf = plt.plot(sorted_data,np.linspace(0,1,n),'-b',lw=2.0)
-    
-    plt.ylim([0,1])
-    plt.xlim([low,hi])
-    plt.xlabel(args['xlabel'])
-    plt.ylabel(args['ylabel'])
-    plt.title(args['title'])
-
-    if 'save_file' in args:
-        plt.savefig(args['save_file'], bbox_inches='tight')
+    for t in xrange(T):
+        p = plt.pcolormesh(frames[t,...],
+                           vmin=lo,vmax=hi,
+                           cmap='viridis')
+        Plotters.append([p])
+        
+        im_ani = animation.ArtistAnimation(fig,Plotters,\
+                                           interval=50,\
+                                           repeat_delay=3000,\
+                                           blit=True)
     plt.show()
 
 def scatter_knn(y,X,K,G):

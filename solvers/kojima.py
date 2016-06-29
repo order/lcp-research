@@ -47,6 +47,7 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         
         x = self.x
         y = self.y
+        self.data['x'].append(x)
 
         (N,) = x.shape
 

@@ -38,6 +38,24 @@ class MCTSParams(object):
         self.update_return_mode = UPDATE_RET_Q
         self.action_select_mode = ACTION_Q
 
+##########################################
+# Plot the data dictionary
+def plot_data_dict(data):
+    single_keys=[]
+    for (key,value) in data.items():
+        D = np.array(value)
+        if (2 == len(D.shape)):
+            plt.figure()
+            plt.semilogy(D,alpha=0.5)
+            plt.title(key)
+        else:
+            single_keys.append(key)
+    plt.figure()
+    for key in single_keys:
+        plt.semilogy(np.array(data[key]))
+    plt.legend(single_keys,loc='best')
+    plt.show()
+        
 ######################################################
 # Use n-dim RFFT to extract good features
 def top_k_value(q,k,thresh):
@@ -50,6 +68,20 @@ def top_k_value(q,k,thresh):
         if sq[i] >= thresh:
             return sq[i]
     return sq[-1]
+
+def contour_features(f,k):
+    (N,) = f.shape
+
+    # Form percentiles, discard 0 and 100
+    P = np.percentile(f,np.linspace(0,100,k+1))
+    assert((k+1,) == P.shape)
+
+    B = np.empty((N,k))
+    for i in xrange(k-1):
+        B[:,i] = (P[i] <= f) * (f < P[i+1])
+    B[:,k-1] = (P[k-1] <= f) * (f <= P[k])
+
+    return B
 
 def top_trig_features(f,k,thresh):
     Ns = np.array(f.shape) # Get dimensions
@@ -117,9 +149,14 @@ def add_oob_nodes(B,k):
     return ExpandedB
 ##################################################
 # Build a trig basis that explains f well
-def get_basis_from_array(mdp_obj,disc,f,num_bases):
+def get_trig_basis_from_block(mdp_obj,disc,f,num_bases):
+    (n,) = f.shape
+    assert(n == disc.num_nodes())
+    
+    F = reshape_full(f,disc)
+
     # Use the real FFT to find some reasonable bases
-    (freq,shift,_) = top_trig_features(f,num_bases,1e-8)
+    (freq,shift,_) = top_trig_features(F,num_bases,1e-8)
     fn = TrigBasis(freq,shift)
     
     # Rescale so the functions are over the boundary,
@@ -142,9 +179,61 @@ def get_basis_from_array(mdp_obj,disc,f,num_bases):
   
     return B
 
+def get_contour_basis_from_block(disc,f,num_bases):
+    (n,) = f.shape
+    K = num_bases
+    assert(n == disc.num_nodes())
+
+    P = np.percentile(f,np.linspace(0,100,K+1))
+    assert(P[0] == np.min(f))
+    assert(P[-1] == np.max(f))
+
+    B = np.zeros((n,K),dtype=np.double)
+
+    # Add ones
+    for i in xrange(K):
+        idx = (P[i] <= f)
+        B[idx,i] = 1
+
+    assert(np.all(np.all(B >= 0)))
+    
+    return B
+
+def get_jigsaw_basis_from_block(disc,f,num_bases):
+    (n,) = f.shape
+    K = num_bases
+    assert(n == disc.num_nodes())
+
+    P = np.percentile(f,np.linspace(0,100,K+1))
+
+    B = np.zeros((n,K+1),dtype=np.double)
+
+    # Add ones
+    for i in xrange(K):
+        idx = np.logical_and(P[i] <= f, f < P[i+1])
+        B[idx,i] = f[idx] + 1e-3
+    idx = (f == P[K])
+    B[idx,K] = f[idx]
+
+    assert(np.all(np.all(B >= 0)))
+    
+    return B
+
 ###############################################################
 # Use the above routine to build a basis for the entire problem
-def get_basis_from_solution(mdp_obj,disc,sol,num_bases):
+def get_basis_from_solution(mdp_obj,
+                            disc,
+                            sol,
+                            mode,
+                            num_bases):
+
+    # Check mode
+    mode = mode.lower()
+    assert(mode in ['identity',
+                    'trig',
+                    'contour',
+                    'jigsaw'])
+        
     (N,Ap) = sol.shape
     assert(N == mdp_obj.num_states)
     assert(Ap == mdp_obj.num_actions+1)
@@ -153,20 +242,26 @@ def get_basis_from_solution(mdp_obj,disc,sol,num_bases):
     Bases = []
     total_bases = 0
     for i in xrange(Ap):
-        A = reshape_full(sol[:,i],disc)
-        if True or i != 0:
-            B = get_basis_from_array(mdp_obj,disc,A,num_bases)
+        if 'trig' == mode:
+            B = get_trig_basis_from_block(mdp_obj,disc,sol[:,i],num_bases)
+        elif 'contour' == mode:
+            B = get_contour_basis_from_block(disc,sol[:,i],num_bases)
+        elif 'jigsaw' == mode:
+            B = get_jigsaw_basis_from_block(disc,sol[:,i],num_bases)
         else:
             B = sps.eye(N)
         (n,k) = B.shape
         assert(n == N)
         #assert(k <= num_bases + disc.num_oob())
+        
         total_bases += k
         Bases.append(B)
 
     # Stitch together
     BigB = sps.block_diag(Bases)
+    
     return BigB
+
 
 # Build a list of start state blocks; for use in multi-threaded solving
 def create_start_states(N,problem,Batches):

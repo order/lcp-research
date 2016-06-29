@@ -186,9 +186,9 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         print 'max(S):',np.max(S)
         print 'argmin(S)',np.argmin(S)
         print 'argmax(S)',np.argmax(S)
-        self.data['sum'].append(S)
-
-        self.data['product'].append(x*y)
+        
+        #self.data['sum'].append(S)
+        #self.data['product'].append(x*y)
 
         
        

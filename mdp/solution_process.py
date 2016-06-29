@@ -1,5 +1,23 @@
 import numpy as np
 
+def lcp_internal_to_frames(mdp_obj,disc,lcp_builder,data,block_id,pad=0):
+
+    # Pad out omitted nodes
+    X = lcp_builder.expand_block_matrix(data,pad)
+    (_,T) = X.shape
+
+    frames = []
+    for t in xrange(T):
+        blocks = block_solution(mdp_obj,X[:,t]) # Block solution
+        frame = reshape_full(blocks[:,block_id],disc)
+        (U,V) = frame.shape
+        frames.append(frame)
+    frames = np.array(frames)
+    
+    assert((T,U,V) == frames.shape)
+    return frames
+    
+
 def block_solution(mdp_obj,sol):
     """
     Reshape solution into matrix
@@ -7,6 +25,7 @@ def block_solution(mdp_obj,sol):
     A = mdp_obj.num_actions
     n = mdp_obj.num_states
     return sol.reshape(n,A+1,order='F')
+
 
 def split_solution(mdp_obj,sol):
     """

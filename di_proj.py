@@ -19,7 +19,7 @@ from utils import *
 
 from experiment import *
 
-DIM = 16
+DIM = 32
 
 REBUILD = True
 
@@ -55,9 +55,7 @@ def build_problem(disc_n):
     #add_drain(mdp,disc,np.zeros(2),0)
     return (mdp,disc,problem)
 
-def build_lcp(mdp,disc,reg):
-    val_reg = reg
-    flow_reg = reg
+def build_lcp(mdp,disc,val_reg,flow_reg):
     lcp_builder = LCPBuilder(mdp,
                              disc,
                              val_reg=val_reg,
@@ -71,27 +69,31 @@ def build_lcp(mdp,disc,reg):
     lcp = lcp_builder.build()
     return(lcp,lcp_builder)
 
-def build_projective_lcp(lcp,lcp_builder,basis,extra_reg,scale):
+def build_projective_lcp(lcp_builder,basis,val_reg,flow_reg,scale):
+    lcp_builder.val_reg = val_reg
+    lcp_builder.flow_reg = flow_reg
+
+    lcp = lcp_builder.build()
+  
     (N,n) = lcp.M.shape
     assert(N == n)
     
     start = time.time()
     # Remove omitted nodes
-    B = np.random.randn(*basis.shape)
-    B = lcp_builder.contract_block_matrix(basis.toarray()) 
+    
+    B = lcp_builder.contract_block_matrix(basis.toarray())
+
     B = linalg.orthonorm(B)
-    
-    #B = sps.eye(N)
-    
     # Convert to sparse and elim zeros
     B = sps.csr_matrix(B)
     B.eliminate_zeros()
-    reg_M = (lcp.M + extra_reg*sps.eye(N)).tocsr()
-    reg_M.eliminate_zeros()
+    M = lcp.M.tocsr()
+    M.eliminate_zeros()
+
 
     assert(N == B.shape[0])    
     # Project MDP onto basis
-    U = B.T.dot(reg_M) # Assumes that B is orthonormal
+    U = B.T.dot(M) # Assumes that B is orthonormal
     
     PtPU = U # Also assumes B is orthonormal
     plcp = ProjectiveLCPObj(B,scale*U,scale*PtPU, scale*lcp.q)
@@ -105,8 +107,8 @@ def kojima_solve(lcp,lcp_builder):
     # Solve
     start = time.time()
     (p,d,data) = solve_with_kojima(lcp,
-                                   thresh=1e-8,
-                                   max_iter=100)
+                                   thresh=1e-12,
+                                   max_iter=150)
     print 'Kojima ran for:', time.time() - start, 's'
     P = lcp_builder.expand_block_vector(p,1e-22)
     D = lcp_builder.expand_block_vector(d,1e-22)
@@ -128,7 +130,7 @@ def projective_solve(plcp,p,d):
         
     (p,d,data) = solve_with_projective(plcp,
                                        thresh=1e-12,
-                                       max_iter=150,
+                                       max_iter=5000,
                                        x0=x0,
                                        y0=y0,
                                        w0=w0)
@@ -137,28 +139,31 @@ def projective_solve(plcp,p,d):
 
 def projective_regularization_homotopy(mdp,disc,basis):
     
-    (lcp,lcp_builder) = build_lcp(mdp,disc,0)
+    (lcp,lcp_builder) = build_lcp(mdp,disc,0,0)
     (N,) = lcp.q.shape
-    p = np.abs(np.random.randn(N))
-    d = np.abs(np.random.randn(N))
+    p = np.ones(N)
+    d = np.ones(N)
 
-    #G = 25
-    #reg_grid = np.power(10.0, - np.linspace(4,6,25))
-    G = 1
-    reg_grid = [1e-6]
-    for i in xrange(G):
-        reg = reg_grid[i]
-        (plcp,_) = build_projective_lcp(lcp,lcp_builder,basis,reg,20.0)
-        (p,d,data) = projective_solve(plcp,
-                                      p + reg*reg,
-                                      d + reg*reg)
-        if True:
-            for (key,value) in data.items():
-                plt.figure()
-                plt.semilogy(np.abs(value),alpha=0.5)
-                plt.title(key)
-            plt.show()
+    val_reg = 1e-6
+    flow_reg = 1e-6
+    
+    (plcp,_) = build_projective_lcp(lcp_builder,
+                                    basis,
+                                    val_reg,
+                                    flow_reg,
+                                    1) # Scale term
+    (p,d,data) = projective_solve(plcp,p,d)
 
+    if False:
+        # Movie
+        X = np.array(data['x']).T
+        frames = lcp_internal_to_frames(mdp,disc,lcp_builder,X,0)
+        animate_frames(frames)
+        quit()
+    
+    if False:
+        # Trajectory plots
+        plot_data_dict(data)
             
     return (lcp_builder.expand_block_vector(p),
             lcp_builder.expand_block_vector(d))
@@ -172,7 +177,9 @@ if __name__ == '__main__':
 
     ####################################################
     # Build LCP and builder
-    (lcp,lcp_builder) = build_lcp(mdp,disc,1e-15)
+    val_reg = 1e-15
+    flow_reg = 1e-12
+    (lcp,lcp_builder) = build_lcp(mdp,disc,val_reg,flow_reg)
     
     ####################################################
     # Solve, initially, using Kojima
@@ -189,7 +196,8 @@ if __name__ == '__main__':
     sol = block_solution(mdp,p)
     dsol = block_solution(mdp,d)
 
-    if False:
+    if REBUILD and False:
+        # Show internal information from Kojima solve
         plt.figure()
         for value in data.values():
             plt.semilogy(value)
@@ -248,7 +256,11 @@ if __name__ == '__main__':
 
     ####################################################
     # Form the Fourier projection (both value and flow)
-    basis = get_basis_from_solution(mdp,disc,sol,17*17)
+    basis = get_basis_from_solution(mdp,
+                                    disc,
+                                    sol,
+                                    'jigsaw',
+                                    128)
     proj_p,proj_d = projective_regularization_homotopy(mdp,disc,basis)
 
     proj_sol = block_solution(mdp,proj_p)
@@ -256,11 +268,12 @@ if __name__ == '__main__':
 
 
     if True:
+        # Show images of the projected solution
         plt.figure()
         plt.suptitle('Projected primal')
         for i in xrange(A):
             plt.subplot(2,2,i+1)
-            img = reshape_full(np.log(proj_sol[:,i]),disc)
+            img = reshape_full(proj_sol[:,i],disc)
             plt.imshow(img,interpolation='none')
             plt.colorbar()
 
@@ -268,7 +281,7 @@ if __name__ == '__main__':
         plt.suptitle('Projected Dual')
         for i in xrange(A):
             plt.subplot(2,2,i+1)
-            img = reshape_full(np.log(proj_dsol[:,i]),disc)
+            img = reshape_full(proj_dsol[:,i],disc)
             plt.imshow(img,interpolation='none')
             plt.colorbar()
     plt.show()

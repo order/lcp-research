@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 
 from lcp import *
 from linalg import *
-from utils import *
+from utils import issorted
+
 from sortedcontainers import SortedSet as sortedset
 
 class LCPBuilder(object):
@@ -208,7 +209,32 @@ class LCPBuilder(object):
 
         # Convert back to matrix
         F = np.reshape(F,(N,),order='F')
-        return F      
+        return F
+
+    def expand_block_matrix(self,F,pad_elem=np.nan):
+        assert(2 == len(F.shape))
+
+        (M,T) = F.shape
+        m = len(self.included_nodes)
+        A = self.mdp.num_actions
+        assert(M == (A+1)*m)
+
+        n = self.mdp.num_states
+        N = (A+1)*n
+        O = len(self.omitted_nodes)
+        assert(M + (A+1)*O == N)
+
+        # Convert block matrix to cube
+        reshaped_F = np.reshape(F,(m,(A+1),T),order='F')
+
+        F = np.empty((n,(A+1),T))
+        idx = np.array(self.omitted_nodes.keys())
+        F[idx,...] = pad_elem
+        idx = np.array(self.included_nodes)
+        F[idx,...] = reshaped_F
+
+        return np.reshape(F,(N,T),order='F')
+        
 
 def find_sinks(transition_matrix):
     # Find nodes that have no flow out
