@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
 
 from utils import cdf_points
 
@@ -23,6 +24,7 @@ def component_cdf_plot():
     ax.set_title('Components of MCTS')
     ax.legend(['rollout','16x16','64x64'],loc='best')
     fig.savefig(IMAGES + 'mcts_components.png')
+    plt.show()
     plt.close()
     
 def mcts32_cdf_plot():
@@ -95,6 +97,8 @@ def mcts_neither_cdf_plot():
     plt.close()
 
 component_cdf_plot()
+
+quit()
 mcts32_cdf_plot()  
 mcts_cdf_plot()
 mcts_noq_cdf_plot()
