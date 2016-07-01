@@ -58,7 +58,7 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         print 'argmin(S)',np.argmin(S)
         print 'argmax(S)',np.argmax(S)
 
-        (P,ip_term,x_term,y_term) = potential(x,y,0.25*N)
+        (P,ip_term,x_term,y_term) = potential(x,y,np.sqrt(N))
         self.data['P'].append(P)
         #self.data['ip term'].append(ip_term)
         #self.data['x term'].append(x_term)

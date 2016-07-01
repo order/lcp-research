@@ -31,7 +31,7 @@ def build_problem(disc_n):
     step_len = 0.01           # Step length
     n_steps = 1               # Steps per iteration
     damp = 0.01               # Dampening
-    jitter = 0.1              # Control jitter 
+    jitter = 5.0               # Control jitter 
     discount = 0.995          # Discount (\gamma)
     B = 5
     bounds = [[-B,B],[-B,B]]  # Square bounds, 
@@ -90,7 +90,6 @@ def build_projective_lcp(lcp_builder,basis,val_reg,flow_reg,scale):
     M = lcp.M.tocsr()
     M.eliminate_zeros()
 
-
     assert(N == B.shape[0])    
     # Project MDP onto basis
     U = B.T.dot(M) # Assumes that B is orthonormal
@@ -130,7 +129,7 @@ def projective_solve(plcp,p,d):
         
     (p,d,data) = solve_with_projective(plcp,
                                        thresh=1e-12,
-                                       max_iter=5000,
+                                       max_iter=250,
                                        x0=x0,
                                        y0=y0,
                                        w0=w0)
@@ -161,7 +160,7 @@ def projective_regularization_homotopy(mdp,disc,basis):
         animate_frames(frames)
         quit()
     
-    if False:
+    if True:
         # Trajectory plots
         plot_data_dict(data)
             
@@ -197,12 +196,7 @@ if __name__ == '__main__':
     dsol = block_solution(mdp,d)
 
     if REBUILD and False:
-        # Show internal information from Kojima solve
-        plt.figure()
-        for value in data.values():
-            plt.semilogy(value)
-        plt.legend(data.keys(),loc='best')
-        plt.title('Kojima internal state')
+        plot_data_dict(data)
     
     A = mdp.num_actions+1
 
@@ -219,13 +213,13 @@ if __name__ == '__main__':
         plt.semilogx(y,G)
         plt.title('P+D')
 
-    if False:
+    if True:
         # Image plots for final primal / dual
         plt.figure()
         plt.suptitle('Primal')
         for i in xrange(A):
             plt.subplot(2,2,i+1)
-            img = reshape_full(np.log(sol[:,i]),disc)
+            img = reshape_full(sol[:,i],disc)
             plt.imshow(img,interpolation='none')
             plt.colorbar()
         
@@ -233,7 +227,7 @@ if __name__ == '__main__':
         plt.suptitle('Dual')
         for i in xrange(A):
             plt.subplot(2,2,i+1)
-            img = reshape_full(np.log(dsol[:,i]),disc)
+            img = reshape_full(dsol[:,i],disc)
             plt.imshow(img,interpolation='none')
             plt.colorbar()
         
@@ -241,7 +235,7 @@ if __name__ == '__main__':
         plt.suptitle('Primal + Dual')
         for i in xrange(A):
             plt.subplot(2,2,i+1)
-            img = reshape_full(np.log(sol[:,i] + dsol[:,i]),disc)
+            img = reshape_full(sol[:,i] + dsol[:,i],disc)
             plt.imshow(img,interpolation='none')
             plt.colorbar()
 
@@ -249,7 +243,7 @@ if __name__ == '__main__':
         plt.suptitle('Primal * Dual')
         for i in xrange(A):
             plt.subplot(2,2,i+1)
-            img = reshape_full(np.log(sol[:,i] * dsol[:,i]),disc)
+            img = reshape_full(sol[:,i] * dsol[:,i],disc)
             plt.imshow(img,interpolation='none')
             plt.colorbar()
         plt.show()
@@ -259,8 +253,8 @@ if __name__ == '__main__':
     basis = get_basis_from_solution(mdp,
                                     disc,
                                     sol,
-                                    'jigsaw',
-                                    128)
+                                    'trig',
+                                    150)
     proj_p,proj_d = projective_regularization_homotopy(mdp,disc,basis)
 
     proj_sol = block_solution(mdp,proj_p)

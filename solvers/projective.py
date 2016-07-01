@@ -127,8 +127,8 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         assert((N,) == x.shape)
         assert((N,) == y.shape)
         assert((k,) == w.shape)
-        self.data['x'].append(x)
-        self.data['y'].append(y)
+        #self.data['x'].append(x)
+        #self.data['y'].append(y)
         #self.data['w'].append(w)
         
 
@@ -203,9 +203,9 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         print '||dx||:',np.linalg.norm(del_x)
         print '||dy||:',np.linalg.norm(del_y)
         print '||dw||:',np.linalg.norm(del_w)
-        #self.data['dx'].append(del_x)
-        #self.data['dy'].append(del_y)
-        #self.data['dw'].append(del_w)
+        self.data['dx'].append(np.linalg.norm(del_x))
+        self.data['dy'].append(np.linalg.norm(del_y))
+        self.data['dw'].append(np.linalg.norm(del_w))
         
            
         # Step 8 Step length
