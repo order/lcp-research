@@ -241,11 +241,11 @@ def get_basis_from_solution(mdp_obj,
     Bases = []
     total_bases = 0
     for i in xrange(Ap):
-        if i==0 and 'trig' == mode:
+        if 'trig' == mode:
             B = get_trig_basis_from_block(mdp_obj,disc,sol[:,i],num_bases)
-        elif i==0 and 'contour' == mode:
+        elif 'contour' == mode:
             B = get_contour_basis_from_block(disc,sol[:,i],num_bases)
-        elif i==0 and 'jigsaw' == mode:
+        elif 'jigsaw' == mode:
             B = get_jigsaw_basis_from_block(disc,sol[:,i],num_bases)
         else:
             B = sps.eye(N)

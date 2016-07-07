@@ -143,7 +143,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         dot = x.dot(y)
 
         self.data['res_norm'].append(np.linalg.norm(r))
-        self.data['ip'].append(dot)
+        self.data['ip'].append(dot / float(N))
 
         # Step 3: form right-hand sides
         g = sigma * x.dot(y) / float(N) * np.ones(N) - x * y
@@ -208,39 +208,42 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         self.data['dw'].append(np.linalg.norm(del_w))
         
            
-        # Step 8 Step length
-        steplen = max(np.max(-del_x/x),
-                      np.max(-del_y/y))
-        #self.data['dx/x'].append(del_x/x)
-        #self.data['dy/x'].append(del_y/x)
-        
-        if steplen <= 0:
-            steplen = float('inf')
+        # Step 8 Step length for x and y separately
+        x_mask = (del_x < 0) # Decreasing direction
+        if np.any(x_mask):
+            # Stop just short of  max step
+            x_steplen = min(1.0, 0.1*np.min(x[x_mask] / -del_x[x_mask]))
+            print 'Argmin steplen', np.argmin(x[x_mask] / -del_x[x_mask])
         else:
-            steplen = 1.0 / steplen
-        steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
-        print 'Steplen', steplen
-        #self.data['steplen'].append(steplen)       
-        
+            x_steplen = 1.0
+          
+        y_mask = (del_y < 0) # Decreasing direction
+        if np.any(y_mask):
+            # Stop just short of  max step
+            y_steplen = min(1.0, 0.25*np.min(y[y_mask] / -del_y[y_mask])) 
+        else:
+            y_steplen = 1.0
+
+        least_steplen = min(x_steplen,y_steplen)
+        print 'Steplen',least_steplen
 
         # Sigma is beta in Geoff's code
-        if(1.0 >= steplen > 0.95):
-            sigma *= 0.9 # Long step
-        elif(0.1 >= steplen > 1e-3):
-            sigma *= 1.2
+        if(1.0 >= least_steplen > 0.95):
+            sigma *= 0.99 # Long step
+        elif(0.05 >= least_steplen > 1e-3):
+            sigma *= 1.05
             sigma = min(sigma,0.99)
-        elif (steplen <= 1e-3):
+        elif (least_steplen <= 1e-3):
             sigma = 0.99 # Short step
         print 'Sigma',sigma
         #self.data['sigma'].append(sigma)
 
         # Update point and fields
-        self.steplen = steplen
         self.centering_coeff = sigma
               
-        self.x = x + steplen * del_x
-        self.y = y + steplen * del_y
-        self.w = w + steplen * del_w
+        self.x = x + least_steplen * del_x
+        self.y = y + least_steplen * del_y
+        self.w = w + least_steplen * del_w
         self.dir_x = del_x
         self.dir_y = del_y
         self.dir_w = del_w

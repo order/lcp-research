@@ -19,9 +19,9 @@ from utils import *
 
 from experiment import *
 
-DIM = 32
+DIM = 20
 
-REBUILD = True
+REBUILD = False
 
 #########################################################
 # Build objects
@@ -31,7 +31,7 @@ def build_problem(disc_n):
     step_len = 0.01           # Step length
     n_steps = 1               # Steps per iteration
     damp = 0.01               # Dampening
-    jitter = 5.0               # Control jitter 
+    jitter = 0.1               # Control jitter 
     discount = 0.995          # Discount (\gamma)
     B = 5
     bounds = [[-B,B],[-B,B]]  # Square bounds, 
@@ -129,7 +129,7 @@ def projective_solve(plcp,p,d):
         
     (p,d,data) = solve_with_projective(plcp,
                                        thresh=1e-12,
-                                       max_iter=250,
+                                       max_iter=500,
                                        x0=x0,
                                        y0=y0,
                                        w0=w0)
@@ -143,14 +143,14 @@ def projective_regularization_homotopy(mdp,disc,basis):
     p = np.ones(N)
     d = np.ones(N)
 
-    val_reg = 1e-6
-    flow_reg = 1e-6
+    val_reg = 1e-12
+    flow_reg = 1e-12
     
     (plcp,_) = build_projective_lcp(lcp_builder,
                                     basis,
                                     val_reg,
                                     flow_reg,
-                                    1) # Scale term
+                                    1e-2) # Scale term
     (p,d,data) = projective_solve(plcp,p,d)
 
     if False:
@@ -213,7 +213,7 @@ if __name__ == '__main__':
         plt.semilogx(y,G)
         plt.title('P+D')
 
-    if True:
+    if False:
         # Image plots for final primal / dual
         plt.figure()
         plt.suptitle('Primal')
@@ -253,8 +253,8 @@ if __name__ == '__main__':
     basis = get_basis_from_solution(mdp,
                                     disc,
                                     sol,
-                                    'trig',
-                                    150)
+                                    'contour',
+                                    120)
     proj_p,proj_d = projective_regularization_homotopy(mdp,disc,basis)
 
     proj_sol = block_solution(mdp,proj_p)
