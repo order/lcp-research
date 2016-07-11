@@ -1,4 +1,4 @@
-from solvers import IPIterator,LCPIterator,potential
+from solvers import IPIterator,LCPIterator,potential,steplen_heuristic
 import numpy as np
 import scipy.sparse as sps
 
@@ -11,23 +11,19 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         self.lcp = lcp_obj
         self.M = lcp_obj.M
         self.q = lcp_obj.q
-         
-        self.centering_coeff = kwargs.get('centering_coeff',0.99)
-        self.linesearch_backoff = kwargs.get('linesearch_backoff',
-                                             0.99)
-        self.central_path_backoff = kwargs.get('central_path_backoff',0.9995)
-        
+                 
         self.iteration = 0
         
         n = lcp_obj.dim
         
         self.x = kwargs.get('x0',np.ones(n))
         self.y = kwargs.get('y0',np.ones(n))
-        self.step = np.nan
-        self.del_x = np.full(n,np.nan)
-        self.del_y = np.full(n,np.nan)
 
-        self.newton_system = sps.eye(1)
+        self.sigma = 0.95
+        self.steplen = np.nan
+
+        self.dir_x = np.full(n,np.nan)
+        self.dir_y = np.full(n,np.nan)
         
         assert(not np.any(self.x < 0))
         assert(not np.any(self.y < 0))
@@ -60,17 +56,8 @@ class KojimaIPIterator(IPIterator,LCPIterator):
 
         (P,ip_term,x_term,y_term) = potential(x,y,np.sqrt(N))
         self.data['P'].append(P)
-        #self.data['ip term'].append(ip_term)
-        #self.data['x term'].append(x_term)
-        #self.data['y term'].append(y_term)
 
-        #self.data['min(S)'].append(np.min(S))
-        #self.data['max(S)'].append(np.max(S))
-        #self.data['ratio(S)'].append(np.log10(np.max(S) / np.min(S)))
-
-        sigma = self.centering_coeff
-        beta = self.linesearch_backoff
-        backoff = self.central_path_backoff
+        sigma = self.sigma
         
         r = (M.dot(x) + q) - y 
         dot = x.dot(y)
@@ -78,28 +65,20 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         self.data['res_norm'].append(np.linalg.norm(r))
         self.data['ip'].append(dot)
             
-            # Set up Newton direction equations
+        # Set up Newton direction equations
         A = sps.bmat([[sps.spdiags(y,0,n,n),sps.spdiags(x,0,n,n)],\
             [-M,sps.eye(n)]],format='csc')          
         b = np.concatenate([sigma * dot / float(n) * np.ones(n) - x*y, r])
-
-        self.newton_system = A
         
         Del = sps.linalg.spsolve(A,b)
-        del_x = Del[:n]
-        del_y = Del[n:]
+        dir_x = Del[:n]
+        dir_y = Del[n:]
 
-        print '||dx||:',np.linalg.norm(del_x)
-        print '||dy||:',np.linalg.norm(del_y)
+        print '||dx||:',np.linalg.norm(dir_x)
+        print '||dy||:',np.linalg.norm(dir_y)
             
-        # Get step length so that x,y are strictly feasible after move
-        steplen = max(np.max(-del_x/x),
-                      np.max(-del_y/y))
-        if steplen <= 0:
-            steplen = float('inf')
-        else:
-            steplen = 1.0 / steplen
-        steplen = min(1.0, 0.666*steplen + (backoff - 0.666) * steplen**2)
+
+        steplen = steplen_heuristic(x,dir_x,y,dir_y,0.6)
         print 'Steplen', steplen
 
         #self.data['steplen'].append(steplen)
@@ -119,12 +98,12 @@ class KojimaIPIterator(IPIterator,LCPIterator):
 
             # Update point and fields
         self.steplen = steplen
-        self.centering_coeff = sigma
+        self.sigma = sigma
               
-        self.x = x + steplen * del_x
-        self.y = y + steplen * del_y
-        self.dir_x = del_x
-        self.dir_y = del_y
+        self.x = x + steplen * dir_x
+        self.y = y + steplen * dir_y
+        self.dir_x = dir_x
+        self.dir_y = dir_y
         self.iteration += 1
         
     def get_primal_vector(self):
@@ -136,8 +115,8 @@ class KojimaIPIterator(IPIterator,LCPIterator):
     def get_step_len(self):
         return self.step
     def get_primal_dir(self):
-        return self.del_x
+        return self.dir_x
     def get_dual_dir(self):
-        return self.del_y
+        return self.dir_y
     def get_newton_system(self):
         return self.newton_system

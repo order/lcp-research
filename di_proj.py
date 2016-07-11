@@ -21,7 +21,15 @@ from experiment import *
 
 DIM = 20
 
-REBUILD = False
+BASIS_TYPE = 'contour'
+BASIS_NUM = 75
+
+PROJ_VAL_REG = 1e-10
+PROJ_FLOW_REG = 1e-8
+PROJ_ALPHA = 1e-2 # Primal/dual scale term
+
+THRESH = 1e-10
+ITER = 2500
 
 #########################################################
 # Build objects
@@ -106,177 +114,101 @@ def kojima_solve(lcp,lcp_builder):
     # Solve
     start = time.time()
     (p,d,data) = solve_with_kojima(lcp,
-                                   thresh=1e-12,
+                                   thresh=1e-10,
                                    max_iter=150)
     print 'Kojima ran for:', time.time() - start, 's'
     P = lcp_builder.expand_block_vector(p,1e-22)
     D = lcp_builder.expand_block_vector(d,1e-22)
     return (P,D,data)
 
-def projective_solve(plcp,p,d):
-    start = time.time()
-    (N,k) = plcp.Phi.shape
-
-    print 'q', plcp.q.shape
-    print 'PtPU', plcp.PtPU.shape
-    print 'Phi', plcp.Phi.shape
-    x0 = p
-    y0 = d
-
-    w0 = plcp.Phi.T.dot(x0 - y0 + plcp.q)
-    assert((k,) == w0.shape)
-
-        
+def projective_solve(plcp,lcp_builder):
+    q = plcp.q
+    Phi = plcp.Phi
+    
+    (N,k) = Phi.shape
+    x0 = np.ones(N)
+    y0 = np.ones(N) + q
+    w0 = np.zeros(k)
+    
+    start = time.time()    
     (p,d,data) = solve_with_projective(plcp,
-                                       thresh=1e-12,
-                                       max_iter=500,
+                                       thresh=THRESH,
+                                       max_iter=ITER,
                                        x0=x0,
                                        y0=y0,
                                        w0=w0)
     print 'Projective ran for:', time.time() - start, 's'
-    return (p,d,data)
-
-def projective_regularization_homotopy(mdp,disc,basis):
     
-    (lcp,lcp_builder) = build_lcp(mdp,disc,0,0)
-    (N,) = lcp.q.shape
-    p = np.ones(N)
-    d = np.ones(N)
+    return (lcp_builder.expand_block_vector(p,1e-22),
+            lcp_builder.expand_block_vector(d,1e-22),
+            data)
 
-    val_reg = 1e-12
-    flow_reg = 1e-12
+def dumb_projective_solve(plcp,lcp_builder):
+    U = plcp.U
+    P = plcp.Phi
+    Pi = P.dot(P.T)
+    q = plcp.q
     
-    (plcp,_) = build_projective_lcp(lcp_builder,
-                                    basis,
-                                    val_reg,
-                                    flow_reg,
-                                    1e-2) # Scale term
-    (p,d,data) = projective_solve(plcp,p,d)
+    (N,) = q.shape
+    x0 = np.ones(N)
+    y0 = np.ones(N)
+    w0 = plcp.Phi.T.dot(plcp.q)
 
-    if False:
-        # Movie
-        X = np.array(data['x']).T
-        frames = lcp_internal_to_frames(mdp,disc,lcp_builder,X,0)
-        animate_frames(frames)
-        quit()
+    # Explicitly build the projective LCP
+    pM = P.dot(U) + (sps.eye(N) - Pi)
+    pq = Pi.dot(q)
+
+    dumb_plcp = LCPObj(pM,pq)
     
-    if True:
-        # Trajectory plots
-        plot_data_dict(data)
-            
-    return (lcp_builder.expand_block_vector(p),
-            lcp_builder.expand_block_vector(d))
-            
+    start = time.time()    
+    (p,d,data) = solve_with_kojima(dumb_plcp,
+                                   thresh=THRESH,
+                                   max_iter=ITER)
+    print 'Dumb way of solving projective ran for:', time.time() - start, 's'
+    
+    return (lcp_builder.expand_block_vector(p,0),
+            lcp_builder.expand_block_vector(d,0),
+            data)  
 
 if __name__ == '__main__':
 
-    ####################################################
     # Build the MDP and discretizer
     (mdp,disc,_) = build_problem(DIM)
 
-    ####################################################
     # Build LCP and builder
     val_reg = 1e-15
     flow_reg = 1e-12
     (lcp,lcp_builder) = build_lcp(mdp,disc,val_reg,flow_reg)
     
-    ####################################################
     # Solve, initially, using Kojima
-        # Build / load
-    if REBUILD:
-        (p,d,data) = kojima_solve(lcp,lcp_builder)
-        np.save('p.npy',p)
-        np.save('d.npy',d)
-        
-    else:
+    try:
         p = np.load('p.npy')
         d = np.load('d.npy')
         data = {}
-    sol = block_solution(mdp,p)
-    dsol = block_solution(mdp,d)
-
-    if REBUILD and False:
-        plot_data_dict(data)
+        sol = block_solution(mdp,p)
+    except Exception:
+        (p,d,data) = kojima_solve(lcp,lcp_builder)
+        np.save('p.npy',p)
+        np.save('d.npy',d)
+        sol = block_solution(mdp,p)
     
-    A = mdp.num_actions+1
-
-    if False:
-        # CDF plots for final primal / dual
-        (x,F) = cdf_points(p * d)
-        (y,G) = cdf_points(p + d)
-        plt.figure()
-        plt.suptitle('CDFs')
-        plt.subplot(1,2,1);
-        plt.plot(x,F)
-        plt.title('P*D')
-        plt.subplot(1,2,2)
-        plt.semilogx(y,G)
-        plt.title('P+D')
-
-    if False:
-        # Image plots for final primal / dual
-        plt.figure()
-        plt.suptitle('Primal')
-        for i in xrange(A):
-            plt.subplot(2,2,i+1)
-            img = reshape_full(sol[:,i],disc)
-            plt.imshow(img,interpolation='none')
-            plt.colorbar()
-        
-        plt.figure()
-        plt.suptitle('Dual')
-        for i in xrange(A):
-            plt.subplot(2,2,i+1)
-            img = reshape_full(dsol[:,i],disc)
-            plt.imshow(img,interpolation='none')
-            plt.colorbar()
-        
-        plt.figure()
-        plt.suptitle('Primal + Dual')
-        for i in xrange(A):
-            plt.subplot(2,2,i+1)
-            img = reshape_full(sol[:,i] + dsol[:,i],disc)
-            plt.imshow(img,interpolation='none')
-            plt.colorbar()
-
-        plt.figure()
-        plt.suptitle('Primal * Dual')
-        for i in xrange(A):
-            plt.subplot(2,2,i+1)
-            img = reshape_full(sol[:,i] * dsol[:,i],disc)
-            plt.imshow(img,interpolation='none')
-            plt.colorbar()
-        plt.show()
-
-    ####################################################
     # Form the Fourier projection (both value and flow)
-    basis = get_basis_from_solution(mdp,
-                                    disc,
-                                    sol,
-                                    'contour',
-                                    120)
-    proj_p,proj_d = projective_regularization_homotopy(mdp,disc,basis)
+    basis = get_basis_from_solution(mdp,disc,sol,BASIS_TYPE,BASIS_NUM)
 
-    proj_sol = block_solution(mdp,proj_p)
-    proj_dsol = block_solution(mdp,proj_d)
+    (plcp,_) = build_projective_lcp(lcp_builder,
+                                    basis,
+                                    PROJ_VAL_REG,
+                                    PROJ_FLOW_REG,
+                                    PROJ_ALPHA)
 
+    (proj_p,proj_d,proj_data) = projective_solve(plcp,lcp_builder)
+    #(dumb_p,dumb_d,dumb_data) = dumb_projective_solve(plcp,lcp_builder)
+    #print 'Primal error norm', np.linalg.norm(proj_p - dumb_p)
+    #print 'Dual error norm', np.linalg.norm(proj_d - dumb_d)
+    
+    plot_sol_images(mdp,disc,proj_p)
+    plt.suptitle('Projected primal')
 
-    if True:
-        # Show images of the projected solution
-        plt.figure()
-        plt.suptitle('Projected primal')
-        for i in xrange(A):
-            plt.subplot(2,2,i+1)
-            img = reshape_full(proj_sol[:,i],disc)
-            plt.imshow(img,interpolation='none')
-            plt.colorbar()
-
-        plt.figure()
-        plt.suptitle('Projected Dual')
-        for i in xrange(A):
-            plt.subplot(2,2,i+1)
-            img = reshape_full(proj_dsol[:,i],disc)
-            plt.imshow(img,interpolation='none')
-            plt.colorbar()
-    plt.show()
-        
+    plot_sol_images(mdp,disc,proj_d)
+    plt.suptitle('Projected dual')
+    plt.show()     

@@ -31,6 +31,21 @@ def potential(x,y,K):
 
     return (P,ip_term,y_term,x_term)
 
+def max_steplen(x,dir_x):
+    neg = dir_x < 0
+    if not np.any(neg):
+        return 1.0
+    step = np.min(-x[neg] / dir_x[neg])
+    assert(step > 0)
+    return step
+
+def steplen_heuristic(x,dir_x,y,dir_y,scale):
+    x_step = max_steplen(x,dir_x)
+    y_step = max_steplen(y,dir_y)
+
+    return min([1.0,scale*x_step, scale*y_step])
+
+
 class IterativeSolver(object):
 
     """

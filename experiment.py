@@ -55,6 +55,33 @@ def plot_data_dict(data):
         plt.semilogy(np.array(data[key]))
     plt.legend(single_keys,loc='best')
     plt.show
+
+############################################
+# Plot the solution in (A+1) plots
+def plot_sol_images(mdp,disc,x):
+    A = mdp.num_actions
+    blocks = block_solution(mdp,x)
+
+    R = int(np.ceil(np.sqrt(A+1)))
+    C = int(np.ceil(float(A+1) / float(R)))
+    
+    plt.figure()
+    # Value block
+    
+    plt.subplot(R,C,1)
+    img = reshape_full(blocks[:,0],disc)
+    plt.pcolormesh(img,cmap = 'jet')
+    plt.title('Value')
+    plt.colorbar()
+
+    for i in xrange(1,A+1):
+        plt.subplot(R,C,i+1)
+        img = reshape_full(blocks[:,i],disc)
+        plt.pcolormesh(img,cmap = 'plasma')
+        plt.title('Action ' + str(i-1))
+        plt.colorbar()
+        
+    
 ######################################################
 # Use n-dim RFFT to extract good features
 def top_k_value(q,k,thresh):
