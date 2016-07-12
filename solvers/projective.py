@@ -38,7 +38,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         self.w = kwargs.get('w0',Phi.T.dot(q))
         w_res = self.x - self.y + q - Phi.dot(self.w)
         print 'W residual', np.linalg.norm(w_res)
-        assert(np.linalg.norm(w_res) < 1e-15)
+        assert(np.linalg.norm(w_res) < 1e-12)
 
         self.sigma = 0.95
         self.steplen = np.nan
@@ -63,7 +63,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
 
         This is a straight-forward implementation of Figure 2
         """
-     
+        iter_start = time.time()
         Phi = self.Phi
         U = self.U
         q = self.q
@@ -98,22 +98,32 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         sigma = self.sigma
                 
         # Step 4: Form the reduced system G dw = h
-        (G,g,h) =  self.form_Gh(x,y)     
-
+        newton_start = time.time()
+        print 'Forming Netwon system...'
+        (G,g,h) =  self.form_Gh(x,y,True)     
+        print 'Elapsed time', time.time() - newton_start
+        
         if isinstance(G,sps.spmatrix):
+            G.eliminate_zeros()
             fillin = float(G.nnz) / float(G.size)
         else:
             fillin = 1.0
 
+        print 'Fill in',fillin
+
         # Step 5: Solve for dir_w
+        solver_start = time.time()
         if fillin > 0.1:
+            print '->Solving dense Newton system...'
             if isinstance(G,sps.spmatrix):
                 G = G.toarray()
-            dir_w = np.linalg.solve(G + 1e-12*np.eye(k),h)
+            dir_w = np.linalg.solve(G,h)
         else:
-            dir_w = sps.linalg.spsolve(G + 1e-12*sps.eye(k),h)
+            print '->Solving sparse Newton system...'
+            dir_w = sps.linalg.spsolve(G,h)
+        print 'Solve residual', np.linalg.norm(G.dot(dir_w) - h)
         assert((k,) == dir_w.shape)
-            
+        print 'Elapsed time', time.time() - solver_start
             # Step 6
         Phidw= Phi.dot(dir_w)
         assert((N,) == Phidw.shape)
@@ -142,12 +152,12 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
 
         # Sigma is beta in Geoff's code
         if(1.0 >= steplen > 0.95):
-            sigma *= 0.9 # Long step
+            sigma *= 0.95  # Long step
         elif(0.1 >= steplen > 1e-3):
-            sigma *= 1.2
-            sigma = min(sigma,0.99)
+            sigma = 0.5 + 0.5*sigma
         elif (steplen <= 1e-3):
-            sigma = 0.99 # Short step
+            sigma = 0.9 + 0.1*sigma
+
         print 'sigma:',sigma
 
         #self.data['sigma'].append(sigma)
@@ -169,6 +179,8 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         
         self.iteration += 1
 
+        print 'Total iteration time', time.time() - iter_start
+        
     def get_primal_vector(self):
         return self.x
     def get_dual_vector(self):

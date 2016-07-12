@@ -19,16 +19,16 @@ from utils import *
 
 from experiment import *
 
-DIM = 20
+DIM = 40
 
-BASIS_TYPE = 'contour'
-BASIS_NUM = 75
+BASIS_TYPE = 'trig'
+BASIS_NUM = 2*DIM
 
 PROJ_VAL_REG = 1e-10
-PROJ_FLOW_REG = 1e-8
-PROJ_ALPHA = 1e-2 # Primal/dual scale term
+PROJ_FLOW_REG = 1e-10
+PROJ_ALPHA = 1e-8 # Primal/dual scale term
 
-THRESH = 1e-10
+THRESH = 1e-12
 ITER = 2500
 
 #########################################################
@@ -37,10 +37,10 @@ ITER = 2500
 def build_problem(disc_n):
     # disc_n = number of cells per dimension
     step_len = 0.01           # Step length
-    n_steps = 1               # Steps per iteration
+    n_steps = 10              # Steps per iteration
     damp = 0.01               # Dampening
-    jitter = 0.1               # Control jitter 
-    discount = 0.995          # Discount (\gamma)
+    jitter = 0.1              # Control jitter 
+    discount = 0.99           # Discount (\gamma)
     B = 5
     bounds = [[-B,B],[-B,B]]  # Square bounds, 
     cost_radius = 0.25        # Goal region radius
@@ -191,7 +191,12 @@ if __name__ == '__main__':
         np.save('p.npy',p)
         np.save('d.npy',d)
         sol = block_solution(mdp,p)
-    
+
+        plot_sol_images(mdp,disc,p)
+        plt.suptitle('Reference primal')
+        plot_sol_images(mdp,disc,d)
+        plt.suptitle('Reference dual')
+        plt.show()
     # Form the Fourier projection (both value and flow)
     basis = get_basis_from_solution(mdp,disc,sol,BASIS_TYPE,BASIS_NUM)
 

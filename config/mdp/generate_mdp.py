@@ -17,7 +17,7 @@ def make_uniform_mdp(problem,N,A):
     action_cuts = [np.linspace(l,u,A) for (l,u) in action_limits]
     actions = discrete.make_points(action_cuts)
 
-    num_samples = 10
+    num_samples = 150
     
     builder = MDPBuilder(problem,
                          discretizer,
