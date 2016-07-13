@@ -8,12 +8,17 @@ def solve_with_kojima(lcp,**kwargs):
     max_iter = kwargs.get('max_iter',1000)
     val_reg  = kwargs.get('val_reg',1e-15)
     flow_reg = kwargs.get('flow_reg',1e-12)
+    
+    (N,) = lcp.q.shape
+    x0 = kwargs.get('x0',np.ones(N))
+    y0 = kwargs.get('y0',np.ones(N))
 
-    iterator = KojimaIPIterator(lcp)
+    iterator = KojimaIPIterator(lcp,x0=x0,y0=y0)
     solver = IterativeSolver(iterator)
 
     term_conds = [PotentialDiffTerminationCondition(thresh),
-                  MaxIterTerminationCondition(max_iter)]
+                  MaxIterTerminationCondition(max_iter),
+                  SteplenTerminationCondition(1e-20)]
     announce = [IterAnnounce(),
                 PotentialAnnounce(),
                 PotentialDiffAnnounce()]

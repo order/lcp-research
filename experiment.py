@@ -46,13 +46,40 @@ def plot_data_dict(data):
         D = np.array(value)
         if (2 == len(D.shape)):
             plt.figure()
-            plt.semilogy(D,alpha=0.5)
+            plt.semilogy(D,'-b',alpha=0.5)
             plt.title(key)
         else:
             single_keys.append(key)
     plt.figure()
     for key in single_keys:
         plt.semilogy(np.array(data[key]))
+    plt.legend(single_keys,loc='best')
+    plt.show
+
+##########################################
+# Plot the data dictionary
+def plot_data_dict_abs_diff(A,B):
+    A_keys = set(A.keys())
+    B_keys = set(B.keys())
+
+    ignoring = list(A_keys ^ B_keys)
+    if len(ignoring) > 0:
+        print 'Ignoring',ignoring
+
+    overlap = A_keys & B_keys
+    single_keys=[]
+    for key in overlap:
+        D = np.abs(np.array(A[key]) - np.array(B[key])) + 1e-35
+        if (2 == len(D.shape)):
+            plt.figure()
+            plt.semilogy(D,'-b',alpha=0.5)
+            plt.title(key)
+        else:
+            single_keys.append(key)
+    plt.figure()
+    for key in single_keys:
+        D = np.abs(np.array(A[key]) - np.array(B[key])) + 1e-35
+        plt.semilogy(D)
     plt.legend(single_keys,loc='best')
     plt.show
 

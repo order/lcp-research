@@ -18,7 +18,8 @@ def solve_with_projective(plcp,**kwargs):
     # No threshold condition yet
     term_conds = [MaxIterTerminationCondition(max_iter),
                   SteplenTerminationCondition(thresh),
-                  PrimalChangeTerminationCondition(thresh)]
+                  PrimalChangeTerminationCondition(thresh),
+                  SteplenTerminationCondition(1e-20)]
     announce = [IterAnnounce(),PotentialAnnounce(),PrimalDiffAnnounce()]
     solver.termination_conditions.extend(term_conds)
     solver.notifications.extend(announce)

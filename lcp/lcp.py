@@ -1,5 +1,6 @@
 import util
 import numpy as np
+import scipy.sparse as sps
 
 class LCPObj(object):
     """An object that wraps around the matrix M and vector q
@@ -43,6 +44,29 @@ class ProjectiveLCPObj(LCPObj):
 
     def update_q(self,new_q):
         self.q = new_q
+
+    def form_M(self):
+        if hasattr(self,'M'):
+            return self.M
+                
+        P = self.Phi
+        U = self.U
+        (N,_) = P.shape
+
+        # ASSUMES THAT P IS ORTHONORMAL
+        Pi = self.form_Pi()
+        M = P.dot(U) + (sps.eye(N) - Pi)
+        self.Pi = Pi
+        self.M = M
+        return M
+
+    def form_Pi(self):
+        if hasattr(self,'Pi'):
+            return self.Pi
+        P = self.Phi
+        Pi = P.dot(P.T)
+        self.Pi = Pi
+        return Pi
         
     def __str__(self):
         return '<{0} in R^{1}'.\

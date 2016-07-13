@@ -10,6 +10,22 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 
 import time
+
+def solve_system(A,b):
+    # Try to smartly use the right solver for A
+    if isinstance(A,sps.spmatrix):
+        A.eliminate_zeros()
+        fillin = float(A.nnz) / float(A.size)
+    else:
+        fillin = 1.0
+    
+    if fillin > 0.1:
+        if isinstance(A,sps.spmatrix):
+            A = A.toarray()
+        x = np.linalg.solve(A,b)
+    else:
+        x = sps.linalg.spsolve(A,b)
+    return x
     
 ###################################################################
 # Start of the iterator
@@ -38,7 +54,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         self.w = kwargs.get('w0',Phi.T.dot(q))
         w_res = self.x - self.y + q - Phi.dot(self.w)
         print 'W residual', np.linalg.norm(w_res)
-        assert(np.linalg.norm(w_res) < 1e-12)
+        #assert(np.linalg.norm(w_res) < 1e-12)
 
         self.sigma = 0.95
         self.steplen = np.nan
@@ -82,16 +98,15 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         assert((N,) == x.shape)
         assert((N,) == y.shape)
         assert((k,) == w.shape)
-        #self.data['x'].append(x)
-        #self.data['y'].append(y)
-        #self.data['w'].append(w)
+        self.data['x'].append(x)
+        self.data['y'].append(y)
+        self.data['w'].append(w)
         
 
         (P,ip_term,x_term,y_term) = potential(x,y,np.sqrt(N))
-        self.data['P'].append(P)
+        #self.data['P'].append(P)
 
         dot = x.dot(y)
-
         self.data['ip'].append(dot / float(N))
 
         # Step 3: form right-hand sides
@@ -100,31 +115,17 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         # Step 4: Form the reduced system G dw = h
         newton_start = time.time()
         print 'Forming Netwon system...'
-        (G,g,h) =  self.form_Gh(x,y,True)     
+        (G,g,h) =  self.form_Gh(x,y,sparse=True)     
         print 'Elapsed time', time.time() - newton_start
-        
-        if isinstance(G,sps.spmatrix):
-            G.eliminate_zeros()
-            fillin = float(G.nnz) / float(G.size)
-        else:
-            fillin = 1.0
-
-        print 'Fill in',fillin
 
         # Step 5: Solve for dir_w
         solver_start = time.time()
-        if fillin > 0.1:
-            print '->Solving dense Newton system...'
-            if isinstance(G,sps.spmatrix):
-                G = G.toarray()
-            dir_w = np.linalg.solve(G,h)
-        else:
-            print '->Solving sparse Newton system...'
-            dir_w = sps.linalg.spsolve(G,h)
-        print 'Solve residual', np.linalg.norm(G.dot(dir_w) - h)
+        dir_w = solve_system(G,h)
+        print 'Solver dw residual', np.linalg.norm(G.dot(dir_w) - h)
         assert((k,) == dir_w.shape)
         print 'Elapsed time', time.time() - solver_start
-            # Step 6
+        
+        # Step 6: recover dir_y
         Phidw= Phi.dot(dir_w)
         assert((N,) == Phidw.shape)
         S = x+y
@@ -133,22 +134,36 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         dir_y = inv_XY.dot(g - y*Phidw)
         assert((N,) == dir_y.shape)
         
-        # Step 7
+        # Step 7: recover dir_x
         dir_x = dir_y + Phidw
         assert((N,) == dir_x.shape)
+
+        if False:
+            print '!!! Checking against full Newton system'
+            (A,b) = self.form_full_newton(x,y)
+            dir = solve_system(A,b)
+            dir_x_alt = dir[:N]
+            dir_y_alt = dir[N:(2*N)]
+            dir_w_alt = dir[(2*N):]
+
+            print '||dx res||:',np.linalg.norm(dir_x - dir_x_alt)
+            print '||dy res||:',np.linalg.norm(dir_y - dir_y_alt)
+            print '||dw res||:',np.linalg.norm(dir_w - dir_w_alt)            
+            
 
         print '||dx||:',np.linalg.norm(dir_x)
         print '||dy||:',np.linalg.norm(dir_y)
         print '||dw||:',np.linalg.norm(dir_w)
-        self.data['dx'].append(np.linalg.norm(dir_x))
-        self.data['dy'].append(np.linalg.norm(dir_y))
-        self.data['dw'].append(np.linalg.norm(dir_w))
+        self.data['dx'].append(dir_x)
+        self.data['dy'].append(dir_y)
+        self.data['dw'].append(dir_w)
         
         # Get step length so that x,y are strictly feasible after move
         steplen = steplen_heuristic(x,dir_x,y,dir_y,0.6)
+        #steplen = min(0.1,steplen)
         print 'Steplen', steplen
 
-        #self.data['steplen'].append(steplen)
+        self.data['steplen'].append(steplen)
 
         # Sigma is beta in Geoff's code
         if(1.0 >= steplen > 0.95):
@@ -157,10 +172,10 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
             sigma = 0.5 + 0.5*sigma
         elif (steplen <= 1e-3):
             sigma = 0.9 + 0.1*sigma
-
+        #sigma = 0.9
+        sigma = min(0.999,max(0.1,sigma))
         print 'sigma:',sigma
-
-        #self.data['sigma'].append(sigma)
+        self.data['sigma'].append(sigma)
 
 
         # Update point and fields
@@ -216,11 +231,12 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         self.PtPUP_dense = self.PtPUP.toarray()
         self.PtPU_P_dense =self.PtPU_P.toarray()
 
-    def form_Gh(self,x,y,sparse=False):
+    def form_Gh(self,x,y,**kwargs):
         """
         Form the G matrix and h vector from DENSE 
         matices.
         """
+        sparse = kwargs.get('sparse',False)
         
         Ptq = self.Ptq
         if sparse:
@@ -259,3 +275,40 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         assert((k,) == h.shape)
         
         return (G,g,h)
+
+    def form_M(self):
+        # Form M; expensive
+        if hasattr(self,'M'):
+            return self.M
+        P = self.Phi
+        U = self.U
+        (N,K) = P.shape
+
+        I = sps.eye(N)
+        M = P.dot(U) + (I - P.dot(P.T)) # assumes P orthogonal
+        self.M = M
+        return M
+        
+    def form_full_newton(self,x,y):
+        Phi = self.Phi
+        (N,K) = Phi.shape
+        
+        X = sps.diags(x,0)
+        Y = sps.diags(y,0)
+        I = sps.eye(N)
+
+        M = self.form_M()
+        A = sps.bmat([[Y , X, None],
+                      [-M, I, None],
+                      [-I, I, Phi]],format='csr')
+        assert((3*N,2*N+K) == A.shape)
+        
+        g = self.sigma * x.dot(y) / float(N) * np.ones(N) - x * y
+        r = M.dot(x) + self.q - y
+        z = np.zeros(N)
+        b = np.concatenate([g,r,z])
+        assert((3*N,) == b.shape)
+
+        return (A,b)
+        
+        

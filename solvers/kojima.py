@@ -44,6 +44,7 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         x = self.x
         y = self.y
         self.data['x'].append(x)
+        self.data['y'].append(y)
 
         (N,) = x.shape
 
@@ -55,19 +56,22 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         print 'argmax(S)',np.argmax(S)
 
         (P,ip_term,x_term,y_term) = potential(x,y,np.sqrt(N))
-        self.data['P'].append(P)
+        #self.data['P'].append(P)
 
         sigma = self.sigma
         
         r = (M.dot(x) + q) - y 
         dot = x.dot(y)
 
-        self.data['res_norm'].append(np.linalg.norm(r))
-        self.data['ip'].append(dot)
+        #self.data['res_norm'].append(np.linalg.norm(r))
+        self.data['ip'].append(dot / float(N))
             
         # Set up Newton direction equations
-        A = sps.bmat([[sps.spdiags(y,0,n,n),sps.spdiags(x,0,n,n)],\
-            [-M,sps.eye(n)]],format='csc')          
+        X = sps.diags(x,0)
+        Y = sps.diags(y,0)
+        I = sps.eye(n)
+        A = sps.bmat([[Y,X],
+                      [-M,I]],format='csc')          
         b = np.concatenate([sigma * dot / float(n) * np.ones(n) - x*y, r])
         
         Del = sps.linalg.spsolve(A,b)
@@ -76,27 +80,27 @@ class KojimaIPIterator(IPIterator,LCPIterator):
 
         print '||dx||:',np.linalg.norm(dir_x)
         print '||dy||:',np.linalg.norm(dir_y)
-            
+        self.data['dx'].append(dir_x)
+        self.data['dy'].append(dir_y)
 
         steplen = steplen_heuristic(x,dir_x,y,dir_y,0.6)
+        #steplen = min(0.1,steplen)
         print 'Steplen', steplen
 
-        #self.data['steplen'].append(steplen)
+        self.data['steplen'].append(steplen)
 
-        # Sigma is beta in Geoff's code
         if(1.0 >= steplen > 0.95):
-            sigma *= 0.9 # Long step
+            sigma *= 0.95  # Long step
         elif(0.1 >= steplen > 1e-3):
-            sigma *= 1.2
-            sigma = min(sigma,0.99)
+            sigma = 0.5 + 0.5*sigma
         elif (steplen <= 1e-3):
-            sigma = 0.99 # Short step
+            sigma = 0.9 + 0.1*sigma
+        #sigma = 0.9
+        sigma = min(0.999,max(0.1,sigma))
         print 'sigma:',sigma
+        self.data['sigma'].append(sigma)
 
-        #self.data['sigma'].append(sigma)
-
-
-            # Update point and fields
+        # Update point and fields
         self.steplen = steplen
         self.sigma = sigma
               
