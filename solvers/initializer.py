@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.sparse as sps
+import cvxopt
 from cvxopt import solvers,matrix,spmatrix
 
 def generate_initial_feasible_points(M,q):
@@ -41,7 +42,11 @@ def generate_initial_feasible_points(M,q):
     beq = q
     assert((N,2*N+1) == Aeq.shape)
 
-    solvers.options['feastol']=1e-12
+    solvers.options['max_iters'] = 100
+    #solvers.options['kktsolver'] = 'robust'
+    #solvers.options['abstol']=1e-9
+    solvers.options['reltol']=1e-9
+    solvers.options['feastol']=1e-9
     res = solvers.lp(matrix(c),
                      spmatrix(Aineq.data,
                               Aineq.row.tolist(),
@@ -52,7 +57,8 @@ def generate_initial_feasible_points(M,q):
                               Aeq.row.tolist(),
                               Aeq.col.tolist(),
                               size=Aeq.shape),
-                     matrix(beq))
+                     matrix(beq),
+                     solver='cvxopt')
 
     sol = np.array(res['x']).flatten()
     x = sol[:N]
@@ -68,6 +74,5 @@ def generate_initial_feasible_points(M,q):
     assert(np.all(x > 0))
     assert(np.all(y > 0))
     #assert(np.linalg.norm(M.dot(x) + q -y) < 1e-6)
-
 
     return (x,y,z)

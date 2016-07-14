@@ -19,17 +19,17 @@ from utils import *
 
 from experiment import *
 
-DIM = 16
+DIM = 32
 
-BASIS_TYPE = 'trig'
-BASIS_NUM = 4*DIM
+BASIS_TYPE = 'contour'
+BASIS_NUM = 3*DIM
 
 
-VAL_REG = 0
-FLOW_REG = 0
-PROJ_VAL_REG = 0
-PROJ_FLOW_REG = 0
-PROJ_ALPHA = 1 # Primal/dual scale term
+VAL_REG = 1e-6
+FLOW_REG = 1e-6
+PROJ_VAL_REG = 1e-6
+PROJ_FLOW_REG = 1e-6
+PROJ_ALPHA = 1
 
 THRESH = 1e-12
 ITER = 1500
@@ -78,7 +78,9 @@ def build_lcp(mdp,disc,val_reg,flow_reg):
     lcp_builder.build_uniform_state_weights()
     
     lcp = lcp_builder.build()
-    return(lcp,lcp_builder)
+
+    M = lcp.M
+    return (lcp,lcp_builder)
 
 def build_projective_lcp(lcp_builder,basis,val_reg,flow_reg,scale):
     lcp_builder.val_reg = val_reg
@@ -108,10 +110,9 @@ def build_projective_lcp(lcp_builder,basis,val_reg,flow_reg,scale):
 
     q = scale * P.dot(P.T.dot(lcp.q))
     
-    plcp = ProjectiveLCPObj(P,
-                            U,
-                            PtPU,
-                            q)
+    plcp = ProjectiveLCPObj(P,U,PtPU,q)
+
+    M = plcp.form_M()
     print 'Building projective LCP: {0}s'.format(time.time() - start)
     return (plcp,P)
 
@@ -213,14 +214,14 @@ if __name__ == '__main__':
     (N,) = q.shape
     M = plcp.form_M()
     (x0,y0,z) = generate_initial_feasible_points(M,q)
-    x0 += 1e-6
-    y0 += 1e-6
     print 'Elapsed time',time.time() - initial_start
+    #x0 = np.ones(N)
+    #y0 = q+1
     w0 = plcp.Phi.T.dot(x0 - y0 + plcp.q)
-
+   
     (proj_p,proj_d,proj_data) = projective_solve(plcp,lcp_builder,
                                                  x0,y0,w0)
-    plot_data_dict(proj_data)
+    #plot_data_dict(proj_data)
     
     plot_sol_images(mdp,disc,proj_p)
     plt.suptitle('Projected primal')
