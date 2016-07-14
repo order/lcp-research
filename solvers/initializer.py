@@ -2,6 +2,93 @@ import numpy as np
 import scipy.sparse as sps
 import cvxopt
 from cvxopt import solvers,matrix,spmatrix
+from lcp import LCPObj,ProjectiveLCPObj
+
+def augment_lcp(lcp,scale,**kwargs):
+    """
+    Augment the LCP with an extra variable so that it is easier to initialize.
+
+    Noting that Mx + (u - Mv - q) + q = y, we augment the LCP:
+
+    0 <= [x]   |  [M (u - Mv - q)][x]  + [q] >= 0
+    0 <= [x0] --- [0            s][x0] + [0] >= 0
+    Then x = [v,1]' and y = [u,scale]'  are feasible initial
+    points.
+
+    So initializing with all variables at unity is a feasible
+    start; and x0,y0 must go to zero.
+
+    The scale term controls how imporant reducing x0y0 is, since
+    x0y0 = scale * x0^2, which should be roughly equal to the central
+    path term. It seems that setting scale >> 1 is advisable. 
+    """
+    
+    M = lcp.M
+    q = lcp.q
+    (N,) = q.shape
+    
+    x = kwargs.get('x',np.ones(N))
+    y = kwargs.get('y',np.ones(N))
+    assert(np.all(x > 0))
+    assert(np.all(y > 0))
+    
+    x0 = 1
+    y0 = scale
+    
+    b = y - M.dot(x) - q
+    assert((N,) == b.shape)
+    assert((N,N) == M.shape)
+    
+    new_M = sps.bmat([[M,b[:,np.newaxis]],
+                      [None,scale*np.ones((1,1))]])
+    new_q = np.hstack([q,0])
+    
+    x = np.hstack([x,x0])
+    y = np.hstack([y,y0])
+    
+    return LCPObj(new_M,new_q),x,y
+
+def augment_plcp(plcp,scale,**kwargs):
+    P = plcp.Phi
+    U = plcp.U
+    q = plcp.q
+    (N,k) = P.shape
+    assert((k,N) == U.shape)
+
+    u = kwargs.get('u',np.ones(N))
+    u = u # Must be equal
+    assert(np.all(u > 0))
+
+    x0 = 1
+    y0 = scale
+
+    # b = u - Mu - q
+    #   = u - (PUu + u - PPtu) - q
+    #   = u -  PUu - u + PPtu - PPtq
+    #   = P(-Uu + Pt(u-q))
+    # Assuming q in the span of P
+    b = -U.dot(u) + P.T.dot(u - q)
+    assert((k,) == b.shape)
+    
+    # [P 0]
+    # [0 1]
+    new_P = sps.bmat([[P,None],
+                      [None,np.ones((1,1))]])
+    # [U b]
+    # [0 s]
+    new_U = sps.bmat([[U,b[:,np.newaxis]],
+                      [None,scale*np.ones((1,1))]])
+    new_PtPU = new_P.T.dot(new_P.dot(new_U))
+    new_q = np.hstack([q,0])
+
+    # Pw = u - u + q = q; w = Ptq
+    # Pw0 = x0 - y0 = 1 - scale
+    w = np.hstack([P.T.dot(q), 1.0 - scale])
+    x = np.hstack([u,x0])
+    y = np.hstack([u,y0])
+    # w doesn't have to be +ve
+
+    return ProjectiveLCPObj(new_P,new_U,new_PtPU,new_q),x,y,w
 
 def generate_initial_feasible_points(M,q):
     """

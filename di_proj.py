@@ -19,10 +19,10 @@ from utils import *
 
 from experiment import *
 
-DIM = 32
+DIM = 16
 
-BASIS_TYPE = 'contour'
-BASIS_NUM = 3*DIM
+BASIS_TYPE = 'jigsaw'
+BASIS_NUM = 4*DIM
 
 
 VAL_REG = 1e-6
@@ -32,7 +32,10 @@ PROJ_FLOW_REG = 1e-6
 PROJ_ALPHA = 1
 
 THRESH = 1e-12
-ITER = 1500
+ITER = 500
+
+PROJ_THRESH = 1e-12
+PROJ_ITER = 2500
 
 #########################################################
 # Build objects
@@ -119,35 +122,31 @@ def build_projective_lcp(lcp_builder,basis,val_reg,flow_reg,scale):
 ###############################################
 # Solvers
 
-def kojima_solve(lcp,lcp_builder,**kwargs):
+def kojima_solve(lcp,**kwargs):
     # Solve
     (N,) = lcp.q.shape
     x0 = kwargs.get('x0',np.ones(N))
     y0 = kwargs.get('y0',np.ones(N))
     start = time.time()
     (p,d,data) = solve_with_kojima(lcp,
-                                   thresh=1e-10,
-                                   max_iter=1500,
+                                   thresh=THRESH,
+                                   max_iter=ITER,
                                    x0=x0,
                                    y0=y0)
     print 'Kojima ran for:', time.time() - start, 's'
-    P = lcp_builder.expand_block_vector(p,1e-22)
-    D = lcp_builder.expand_block_vector(d,1e-22)
-    return (P,D,data)
+    return (p,d,data)
 
-def projective_solve(plcp,lcp_builder,x0,y0,w0):        
+def projective_solve(plcp,x0,y0,w0):        
     start = time.time()    
     (p,d,data) = solve_with_projective(plcp,
-                                       thresh=THRESH,
-                                       max_iter=ITER,
+                                       thresh=PROJ_THRESH,
+                                       max_iter=PROJ_ITER,
                                        x0=x0,
                                        y0=y0,
                                        w0=w0)
     print 'Projective ran for:', time.time() - start, 's'
     
-    return (lcp_builder.expand_block_vector(p,1e-22),
-            lcp_builder.expand_block_vector(d,1e-22),
-            data)
+    return (p,d,data)
 
 def dumb_projective_solve(plcp,lcp_builder,x0,y0,w0):
     # Explicitly build the projective LCP
@@ -159,8 +158,8 @@ def dumb_projective_solve(plcp,lcp_builder,x0,y0,w0):
     
     start = time.time()    
     (p,d,data) = solve_with_kojima(dumb_plcp,
-                                   thresh=THRESH,
-                                   max_iter=ITER,
+                                   thresh=PROJ_THRESH,
+                                   max_iter=PROJ_ITER,
                                    x0=x0,
                                    y0=y0)
     print 'Dumb way of solving projective ran for:', time.time() - start, 's'
@@ -179,24 +178,41 @@ if __name__ == '__main__':
     
     # Solve, initially, using Kojima
     try:
+        #assert(False) # Uncomment to regenerate
         p = np.load('p.npy')
         d = np.load('d.npy')
         data = {}
         sol = block_solution(mdp,p)
     except Exception:
-        (x0,y0,z) = generate_initial_feasible_points(lcp.M,
-                                                     lcp.q)
-        (p,d,data) = kojima_solve(lcp,lcp_builder,x0=x0+1e-8,
-                                  y0=y0+1e-8)
+        #(x0,y0,z) = generate_initial_feasible_points(lcp.M,
+        #                                             lcp.q)
+
+        # Create an augmented LCP system with known
+        # Feasible start
+        alcp,x0,y0 = augment_lcp(lcp,1e3)
+        (N,) = alcp.q.shape
+        assert(N == lcp.q.shape[0] + 1) # Augmented
+        
+        (p,d,data) = kojima_solve(alcp,
+                                  x0=np.ones(N),
+                                  y0=np.ones(N))
+        print 'Slack variables', p[-1],d[-1]
+
+        # Strip augmented variable and expand omitted nodes
+        p = p[:-1]
+        d = d[:-1]
+        p = lcp_builder.expand_block_vector(p,1e-35)
+        d = lcp_builder.expand_block_vector(d,1e-35)
+        
         np.save('p.npy',p)
         np.save('d.npy',d)
         sol = block_solution(mdp,p)
 
-        plot_sol_images(mdp,disc,p)
-        plt.suptitle('Reference primal')
-        plot_sol_images(mdp,disc,d)
-        plt.suptitle('Reference dual')
-        plt.show()
+        #plot_sol_images(mdp,disc,p)
+        #plt.suptitle('Reference primal')
+        #plot_sol_images(mdp,disc,d)
+        #plt.suptitle('Reference dual')
+        #plt.show()
         
     # Form the Fourier projection (both value and flow)
     basis = get_basis_from_solution(mdp,disc,sol,BASIS_TYPE,BASIS_NUM)
@@ -208,19 +224,26 @@ if __name__ == '__main__':
                                     PROJ_ALPHA)
 
     # Generate feasible initial points
-    print 'Generating feasible initial points for projective solve...'
-    initial_start = time.time()
-    q = plcp.q
-    (N,) = q.shape
-    M = plcp.form_M()
-    (x0,y0,z) = generate_initial_feasible_points(M,q)
-    print 'Elapsed time',time.time() - initial_start
+    #print 'Generating feasible initial points for projective solve...'
+    #initial_start = time.time()
+    #q = plcp.q
+    #(N,) = q.shape
+    #M = plcp.form_M()
+    #(x0,y0,z) = generate_initial_feasible_points(M,q)
+    #print 'Elapsed time',time.time() - initial_start
     #x0 = np.ones(N)
     #y0 = q+1
-    w0 = plcp.Phi.T.dot(x0 - y0 + plcp.q)
-   
-    (proj_p,proj_d,proj_data) = projective_solve(plcp,lcp_builder,
+    #w0 = plcp.Phi.T.dot(x0 - y0 + plcp.q)
+    x = lcp_builder.contract_block_vector(p)
+    y = lcp_builder.contract_block_vector(d)
+    aplcp,x0,y0,w0 = augment_plcp(plcp,1e2,x=x,y=y)
+    (proj_p,proj_d,proj_data) = projective_solve(aplcp,
                                                  x0,y0,w0)
+    # Strip augmented variable and expand omitted nodes
+    proj_p = proj_p[:-1]
+    proj_d = proj_d[:-1]
+    proj_p = lcp_builder.expand_block_vector(proj_p,1e-35)
+    proj_d = lcp_builder.expand_block_vector(proj_d,1e-35)
     #plot_data_dict(proj_data)
     
     plot_sol_images(mdp,disc,proj_p)

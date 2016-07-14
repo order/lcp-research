@@ -131,3 +131,14 @@ class PotentialDiffTerminationCondition(TerminationCondition):
 
     def __str__(self):
         return 'PotentialTerminationCondition {0}'.format(self.thresh)
+
+class InnerProductTerminationCondition(TerminationCondition):
+    def __init__(self,thresh):
+        self.thresh = thresh
+    def isdone(self,iterator):
+        p = iterator.get_primal_vector()
+        d = iterator.get_dual_vector()
+        ip = p.dot(d) / float(p.shape[0])
+        return ip <= self.thresh
+    def __str__(self):
+        return 'InnerProductTerminationCondition {0}'.format(self.thresh)

@@ -1,6 +1,8 @@
-from solvers import IPIterator,LCPIterator,potential,steplen_heuristic
 import numpy as np
 import scipy.sparse as sps
+
+from solvers import IPIterator,LCPIterator,potential
+from steplen import *
 
 from collections import defaultdict
 
@@ -64,6 +66,7 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         dot = x.dot(y)
 
         #self.data['res_norm'].append(np.linalg.norm(r))
+        print 'IP/N', dot / float(N)
         self.data['ip'].append(dot / float(N))
             
         # Set up Newton direction equations
@@ -77,31 +80,19 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         Del = sps.linalg.spsolve(A,b)
         dir_x = Del[:n]
         dir_y = Del[n:]
-
         print '||dx||:',np.linalg.norm(dir_x)
         print '||dy||:',np.linalg.norm(dir_y)
         self.data['dx'].append(dir_x)
         self.data['dy'].append(dir_y)
 
         steplen = steplen_heuristic(x,dir_x,y,dir_y,0.6)
-        #steplen = min(0.1,steplen)
         print 'Steplen', steplen
-
         self.data['steplen'].append(steplen)
+        self.steplen = steplen
 
-        if(1.0 >= steplen > 0.95):
-            sigma *= 0.95  # Long step
-        elif(0.1 >= steplen > 1e-3):
-            sigma = 0.5 + 0.5*sigma
-        elif (steplen <= 1e-3):
-            sigma = 0.9 + 0.1*sigma
-        #sigma = 0.9
-        sigma = min(0.999,max(0.1,sigma))
+        sigma = sigma_heuristic(sigma,steplen)
         print 'sigma:',sigma
         self.data['sigma'].append(sigma)
-
-        # Update point and fields
-        self.steplen = steplen
         self.sigma = sigma
               
         self.x = x + steplen * dir_x

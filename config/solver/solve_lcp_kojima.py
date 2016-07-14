@@ -16,9 +16,9 @@ def solve_with_kojima(lcp,**kwargs):
     iterator = KojimaIPIterator(lcp,x0=x0,y0=y0)
     solver = IterativeSolver(iterator)
 
-    term_conds = [PotentialDiffTerminationCondition(thresh),
-                  MaxIterTerminationCondition(max_iter),
-                  SteplenTerminationCondition(1e-20)]
+    term_conds = [InnerProductTerminationCondition(thresh),
+                  MaxIterTerminationCondition(max_iter),                  
+                  SteplenTerminationCondition(1e-15)]
     announce = [IterAnnounce(),
                 PotentialAnnounce(),
                 PotentialDiffAnnounce()]

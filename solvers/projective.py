@@ -1,8 +1,9 @@
-from solvers import *
-
 import numpy as np
 import scipy as sp
 import scipy.sparse as sps
+
+from solvers import *
+from steplen import *
 
 import utils
 import matplotlib.pyplot as plt
@@ -73,11 +74,14 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         
     def next_iteration(self):
         """
-        A projective interior point algorithm based on "Fast solutions to projective monotone LCPs" by Geoff Gordon. 
-        If M = \Phi U + \Pi_\bot where Phi is low rank (k << n) and \Pi_\bot is projection onto the nullspace of \Phi^\top, 
-        then each iteration only costs O(nk^2), rather than O(n^{2 + \eps}) for a full system solve.
+        A projective interior point algorithm based on 
+        "Fast solutions to projective monotone LCPs" by Geoff Gordon. 
+        If M = \Phi U + \Pi_\bot where Phi is low rank (k << n) and 
+        \Pi_\bot is projection onto the nullspace of \Phi^\top, 
+        then each iteration only costs O(nk^2), rather than O(n^{2 + \eps}) 
+        for a full system solve.
 
-        This is a straight-forward implementation of Figure 2
+        This is an implementation of Figure 2
         """
         iter_start = time.time()
         Phi = self.Phi
@@ -107,6 +111,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         #self.data['P'].append(P)
 
         dot = x.dot(y)
+        print 'IP/N', dot / float(N)
         self.data['ip'].append(dot / float(N))
 
         # Step 3: form right-hand sides
@@ -158,29 +163,15 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         self.data['dy'].append(dir_y)
         self.data['dw'].append(dir_w)
         
-        # Get step length so that x,y are strictly feasible after move
         steplen = steplen_heuristic(x,dir_x,y,dir_y,0.6)
-        #steplen = min(0.1,steplen)
         print 'Steplen', steplen
-
         self.data['steplen'].append(steplen)
+        self.steplen = steplen
 
-        # Sigma is beta in Geoff's code
-        if(1.0 >= steplen > 0.95):
-            sigma *= 0.95  # Long step
-        elif(0.1 >= steplen > 1e-3):
-            sigma = 0.5 + 0.5*sigma
-        elif (steplen <= 1e-3):
-            sigma = 0.9 + 0.1*sigma
-        #sigma = 0.9
-        sigma = min(0.999,max(0.1,sigma))
+        sigma = sigma_heuristic(sigma,steplen)
         print 'sigma:',sigma
         self.data['sigma'].append(sigma)
-
-
-        # Update point and fields
-        self.steplen = steplen
-        self.sigma = sigma          
+        self.sigma = sigma      
               
         self.x = x + steplen * dir_x
         self.y = y + steplen * dir_y
@@ -189,8 +180,8 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         self.dir_y = dir_y
         self.dir_w = dir_w
 
-        w_res = dir_x - dir_y - Phidw
-        print 'W residual:', np.linalg.norm(w_res)
+        #w_res = dir_x - dir_y - Phidw
+        #print 'W residual:', np.linalg.norm(w_res)
         
         self.iteration += 1
 

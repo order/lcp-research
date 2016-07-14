@@ -107,6 +107,24 @@ def plot_sol_images(mdp,disc,x):
         plt.pcolormesh(img,cmap = 'plasma')
         plt.title('Action ' + str(i-1))
         plt.colorbar()
+
+
+def report_spectral_info(M):
+    if isinstance(M,sps.spmatrix):
+        M = M.toarray()
+        
+    [U,S,Vt] = np.linalg.svd(M)
+    print "\tSV(M):", (S[-1],S[0])
+    
+    [U,S,Vt] = np.linalg.svd((M+M.T))
+    print "\tSV(M + Mt):", (S[-1],S[0])
+    
+    [L,X] = np.linalg.eigh(M.T.dot(M))
+    print "\tEV(MtM):", (L[0],L[-1])
+    
+    print '\tMonotone:', S[-1]/2.0
+    print '\tLipschitz:', np.sqrt(L[-1])
+    print '\tAlpha:', S[-1]/(2.0 * L[-1])
         
     
 ######################################################
