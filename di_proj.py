@@ -19,10 +19,10 @@ from utils import *
 
 from experiment import *
 
-DIM = 16
+DIM = 128
 
 BASIS_TYPE = 'jigsaw'
-BASIS_NUM = 4*DIM
+BASIS_NUM = 2*DIM
 
 
 VAL_REG = 1e-6
@@ -35,7 +35,7 @@ THRESH = 1e-12
 ITER = 500
 
 PROJ_THRESH = 1e-12
-PROJ_ITER = 2500
+PROJ_ITER = 500
 
 #########################################################
 # Build objects
@@ -208,11 +208,11 @@ if __name__ == '__main__':
         np.save('d.npy',d)
         sol = block_solution(mdp,p)
 
-        #plot_sol_images(mdp,disc,p)
-        #plt.suptitle('Reference primal')
-        #plot_sol_images(mdp,disc,d)
-        #plt.suptitle('Reference dual')
-        #plt.show()
+    plot_sol_images_interp(mdp,disc,p)
+    plt.suptitle('Reference primal')
+    plot_sol_images_interp(mdp,disc,d)
+    plt.suptitle('Reference dual')
+    plt.show()
         
     # Form the Fourier projection (both value and flow)
     basis = get_basis_from_solution(mdp,disc,sol,BASIS_TYPE,BASIS_NUM)
@@ -246,9 +246,9 @@ if __name__ == '__main__':
     proj_d = lcp_builder.expand_block_vector(proj_d,1e-35)
     #plot_data_dict(proj_data)
     
-    plot_sol_images(mdp,disc,proj_p)
+    plot_sol_images_interp(mdp,disc,proj_p)
     plt.suptitle('Projected primal')
 
-    plot_sol_images(mdp,disc,proj_d)
+    plot_sol_images_interp(mdp,disc,proj_d)
     plt.suptitle('Projected dual')
     plt.show()     

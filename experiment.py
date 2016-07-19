@@ -10,6 +10,8 @@ from mdp.policies import *
 from mdp.transitions import *
 from utils import Marshaller
 
+from discrete import make_points
+
 import os
 
 #########################################
@@ -85,6 +87,37 @@ def plot_data_dict_abs_diff(A,B):
 
 ############################################
 # Plot the solution in (A+1) plots
+def plot_sol_images_interp(mdp,disc,x,G=512):
+    A = mdp.num_actions
+    blocks = block_solution(mdp,x)
+
+    R = int(np.ceil(np.sqrt(A+1)))
+    C = int(np.ceil(float(A+1) / float(R)))
+
+    low = disc.get_lower_boundary()
+    hi = disc.get_upper_boundary()
+    assert(2 == len(low))
+
+    [P,[X,Y]] = make_points([np.linspace(low[0],hi[0],G),
+                             np.linspace(low[1],hi[1],G)],True)
+    plt.figure()
+    # Value block    
+    plt.subplot(R,C,1)
+    v_fn = InterpolatedFunction(disc,blocks[:,0])
+    Z = np.reshape(v_fn.evaluate(P),X.shape)
+    plt.pcolormesh(X,Y,Z,cmap = 'jet')
+    plt.title('Value')
+    plt.colorbar()
+
+    for i in xrange(1,A+1):
+        plt.subplot(R,C,i+1)
+        f_fn = InterpolatedFunction(disc,blocks[:,i])
+        Z = np.reshape(f_fn.evaluate(P),X.shape)
+        Z = np.log(Z + 1e-20)
+        plt.pcolormesh(X,Y,Z,cmap = 'plasma')
+        plt.title('log Action ' + str(i-1))
+        plt.colorbar()
+
 def plot_sol_images(mdp,disc,x):
     A = mdp.num_actions
     blocks = block_solution(mdp,x)
@@ -107,7 +140,6 @@ def plot_sol_images(mdp,disc,x):
         plt.pcolormesh(img,cmap = 'plasma')
         plt.title('Action ' + str(i-1))
         plt.colorbar()
-
 
 def report_spectral_info(M):
     if isinstance(M,sps.spmatrix):
