@@ -322,11 +322,21 @@ def get_jigsaw_basis_from_block(disc,f,num_bases):
     
     return B
 
+def get_solution_and_noise_basis(mdp,p,d,num_basis):
+    (n,k) = p.shape
+    columns = [np.ones((n,1)),p,d]
+    columns.extend([x[:,np.newaxis] for x in mdp.costs])
+    columns = np.hstack(columns)
+    assert(num_basis >= columns.shape[1])
+    return np.hstack([columns,
+                      np.random.rand(n,num_basis-columns.shape[1])])   
+
 ###############################################################
 # Use the above routine to build a basis for the entire problem
 def get_basis_from_solution(mdp_obj,
                             disc,
-                            sol,
+                            primal_sol,
+                            dual_sol,
                             mode,
                             num_bases):
 
@@ -335,9 +345,10 @@ def get_basis_from_solution(mdp_obj,
     assert(mode in ['identity',
                     'trig',
                     'contour',
-                    'jigsaw'])
+                    'jigsaw',
+                    'solution'])
         
-    (N,Ap) = sol.shape
+    (N,Ap) = primal_sol.shape
     assert(N == mdp_obj.num_states)
     assert(Ap == mdp_obj.num_actions+1)
 
@@ -346,16 +357,24 @@ def get_basis_from_solution(mdp_obj,
     total_bases = 0
     for i in xrange(Ap):
         if 'trig' == mode:
-            B = get_trig_basis_from_block(mdp_obj,disc,sol[:,i],num_bases)
+            B = get_trig_basis_from_block(mdp_obj,
+                                          disc,
+                                          primal_sol[:,i],
+                                          num_bases)
         elif 'contour' == mode:
-            B = get_contour_basis_from_block(disc,sol[:,i],num_bases)
+            B = get_contour_basis_from_block(disc,
+                                             primal_sol[:,i],
+                                             num_bases)
         elif 'jigsaw' == mode:
-            B = get_jigsaw_basis_from_block(disc,sol[:,i],num_bases)
+            B = get_jigsaw_basis_from_block(disc,
+                                            primal_sol[:,i],
+                                            num_bases)
         else:
             B = sps.eye(N)
         (n,k) = B.shape
         assert(n == N)
         #assert(k <= num_bases + disc.num_oob())
+
         
         total_bases += k
         Bases.append(B)

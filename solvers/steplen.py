@@ -27,4 +27,4 @@ def sigma_heuristic(sigma,steplen):
     elif (steplen <= 1e-3):
         sigma = 0.9 + 0.1*sigma
         #sigma = 0.9
-    return min(0.999,max(0.1,sigma))
+    return min(0.95,max(0.1,sigma))

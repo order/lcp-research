@@ -19,19 +19,19 @@ from utils import *
 
 from experiment import *
 
-DIM = 128
+DIM = 32
 
 BASIS_TYPE = 'jigsaw'
-BASIS_NUM = 2*DIM
+BASIS_NUM = 10
 
 
 VAL_REG = 1e-6
 FLOW_REG = 1e-6
 PROJ_VAL_REG = 1e-6
 PROJ_FLOW_REG = 1e-6
-PROJ_ALPHA = 1
+PROJ_ALPHA = 1e-3
 
-THRESH = 1e-12
+THRESH = 1e-15
 ITER = 500
 
 PROJ_THRESH = 1e-12
@@ -182,7 +182,9 @@ if __name__ == '__main__':
         p = np.load('p.npy')
         d = np.load('d.npy')
         data = {}
-        sol = block_solution(mdp,p)
+        p_sol = block_solution(mdp,p)
+        d_sol = block_solution(mdp,d)
+        
     except Exception:
         #(x0,y0,z) = generate_initial_feasible_points(lcp.M,
         #                                             lcp.q)
@@ -206,19 +208,47 @@ if __name__ == '__main__':
         
         np.save('p.npy',p)
         np.save('d.npy',d)
-        sol = block_solution(mdp,p)
 
-    plot_sol_images_interp(mdp,disc,p)
-    plt.suptitle('Reference primal')
-    plot_sol_images_interp(mdp,disc,d)
-    plt.suptitle('Reference dual')
-    plt.show()
+        plot_sol_images_interp(mdp,disc,p)
+        plt.suptitle('Reference primal')
+        plot_sol_images_interp(mdp,disc,d)
+        plt.suptitle('Reference dual')
+        plt.show()
+        
+        p_sol = block_solution(mdp,p)
+        d_sol = block_solution(mdp,d)
         
     # Form the Fourier projection (both value and flow)
-    basis = get_basis_from_solution(mdp,disc,sol,BASIS_TYPE,BASIS_NUM)
+    """
+    basis = get_basis_from_solution(mdp,
+                                    disc,
+                                    p_sol,
+                                    d_sol,
+                                    BASIS_TYPE,
+                                    BASIS_NUM)
+    """
+    # Value basis; approximate v, E_1f_1, E_2F_2,p
+    E1 = mdp.get_E_matrix(0)
+    E2 = mdp.get_E_matrix(1)
+    c = mdp.costs[0]
+    weights = np.ones(c.size)
+    [v,f1,f2] = [p_sol[:,i] for i in range(3)]
+    [u,g1,g2] = [d_sol[:,i] for i in range(3)]
 
+    Bv = np.array([v,
+                   E1.dot(f1),
+                   E2.dot(f2),
+                   weights]).T
+    Bf1 = np.array([f1,E1.T.dot(v),c]).T
+    Bf2 = np.array([f2,E2.T.dot(v),c]).T
+    
+    Bv = orthonorm(Bv)
+    Bf1 = orthonorm(Bf1)
+    Bf2 = orthonorm(Bf2)    
+    B = -sps.block_diag([Bv,Bf1,Bf2])
+    print 'Solution residual', np.linalg.norm(p - B.dot(B.T.dot(p))) 
     (plcp,_) = build_projective_lcp(lcp_builder,
-                                    basis,
+                                    B,
                                     PROJ_VAL_REG,
                                     PROJ_FLOW_REG,
                                     PROJ_ALPHA)
