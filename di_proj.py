@@ -20,24 +20,24 @@ from utils import *
 
 from experiment import *
 
-DIM = 32
+DIM = 64
 
 BASIS_TYPE = 'jigsaw'
 BASIS_NUM = 10
 
 REGEN = True
 
-REG = 1e-6
+REG = 1e-7
 VAL_REG = REG
 FLOW_REG = REG
 PROJ_VAL_REG = REG
 PROJ_FLOW_REG = REG
-PROJ_ALPHA = 1e-6
+PROJ_ALPHA = 1
 
-THRESH = 1e-20
+THRESH = 1e-16
 ITER = 500
 
-PROJ_THRESH = 1e-20
+PROJ_THRESH = 1e-16
 PROJ_ITER = 2500
 
 #########################################################
@@ -265,30 +265,35 @@ if __name__ == '__main__':
     [u,g1,g2] = [contract_d_sol[:,i] for i in range(3)]
 
     ##
-    s = 1
-    v = v*np.abs(0.01*np.random.randn(v.size)+1)
+    #s = 1
+    v = np.abs(v + 0.5*np.random.randn(v.size))
     #f1 *= (1 + s*(2*np.random.rand(v.size)-1))
     #f2 *= (1 + s*(2*np.random.rand(v.size)-1))
-    Bv = hstack([v,
-                 #E1.dot(f1),
-                 #E2.dot(f2),
-                 np.random.rand(v.size,10),
+    c1_ish = sps.linalg.lsqr(E1.T,c)[0]
+    c2_ish = sps.linalg.lsqr(E2.T,c)[0]
+    Bv = hstack([np.random.rand(v.size,15),
+                 v,
+                 c1_ish,
+                 c2_ish,
                  weights])
-    Bf1 = hstack([f1,
-                  E1.T.dot(v),
-                  c,
-                  np.random.rand(v.size,27)])
-    Bf1 = np.eye(v.size)
-    Bf2 = hstack([f2,
-                  E2.T.dot(v),
-                  c,
-                  np.random.rand(v.size,27)])
-    Bf2 = np.eye(v.size)
+    #Bf1 = hstack([f1,
+    #              c,
+    #              E1.T.dot(v),
+    #              np.random.rand(v.size,17)])
+    Bf1 = hstack([E1.T.dot(Bv)])
+    #Bf1 = np.eye(v.size)
+    #Bf2 = hstack([f2,
+    #              c,
+    #              E2.T.dot(v),
+    #              np.random.rand(v.size,17)])    
+    #Bf2 = np.eye(v.size)
+    Bf2 = hstack([E2.T.dot(Bv)])
     
     Bv = orthonorm(Bv)
     Bf1 = orthonorm(Bf1)
-    Bf2 = orthonorm(Bf2)    
-    B = sps.block_diag([Bv,Bf1,Bf2])
+    Bf2 = orthonorm(Bf2)
+    B = sps.block_diag([Bv,Bf1,Bf2]).tocsr()
+    B.eliminate_zeros()
 
     proj_p = B.dot(B.T.dot(contract_p))
     proj_d = B.dot(B.T.dot(contract_d))
@@ -305,10 +310,10 @@ if __name__ == '__main__':
                                     PROJ_ALPHA)
 
     # Generate feasible initial points
-    x = lcp_builder.contract_block_vector(p)
-    y = lcp_builder.contract_block_vector(d)
-    x = np.ones(x.size)
-    y = np.ones(y.size)
+    #x = lcp_builder.contract_block_vector(p)
+    #y = lcp_builder.contract_block_vector(d)
+    x = np.ones(contract_p.size)
+    y = np.ones(contract_d.size)
     aplcp,x0,y0,w0 = augment_plcp(plcp,1e2,x0=x,y0=y)
     (proj_p,proj_d,proj_data) = projective_solve(aplcp,
                                                  x0,y0,w0)

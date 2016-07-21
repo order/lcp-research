@@ -20,7 +20,7 @@ def steplen_heuristic(x,dir_x,y,dir_y,scale):
     return min([1.0,scale*x_step, scale*y_step])
 
 def sigma_heuristic(sigma,steplen):
-    max_sigma = 0.99
+    max_sigma = 0.995
     min_sigma = 0.1
     
     if(1.0 >= steplen > 0.95):
