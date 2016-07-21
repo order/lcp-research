@@ -55,19 +55,27 @@ def augment_plcp(plcp,scale,**kwargs):
     (N,k) = P.shape
     assert((k,N) == U.shape)
 
-    u = kwargs.get('u',np.ones(N))
-    u = u # Must be equal
-    assert(np.all(u > 0))
+    x = kwargs.get('x0',np.ones(N))
+    y = kwargs.get('y0',np.ones(N))
+
+    d = x - y
+    proj_d = P.dot(P.T.dot(d))
+    err = np.linalg.norm(d - proj_d)
+    print 'Projection residual in x-y',err
+    #assert(err < 1e-12)
+    assert(np.all(x > 0))
+    assert(np.all(y > 0))
 
     x0 = 1
     y0 = scale
 
-    # b = u - Mu - q
-    #   = u - (PUu + u - PPtu) - q
-    #   = u -  PUu - u + PPtu - PPtq
-    #   = P(-Uu + Pt(u-q))
-    # Assuming q in the span of P
-    b = -U.dot(u) + P.T.dot(u - q)
+    # b = y - Mx - q
+    #   = y - (PUx + x - PPtx) - q
+    #   = y -  PUx - x + PPtx - PPtq
+    #   = PPt(y-x) + P(-Ux + Pt(x-q))
+    # Assuming q and y-u in the span of P
+    d = P.T.dot(y - x)
+    b = d + -U.dot(x) + P.T.dot(x - q)
     assert((k,) == b.shape)
     
     # [P 0]
@@ -84,8 +92,8 @@ def augment_plcp(plcp,scale,**kwargs):
     # Pw = u - u + q = q; w = Ptq
     # Pw0 = x0 - y0 = 1 - scale
     w = np.hstack([P.T.dot(q), 1.0 - scale])
-    x = np.hstack([u,x0])
-    y = np.hstack([u,y0])
+    x = np.hstack([x,x0])
+    y = np.hstack([y,y0])
     # w doesn't have to be +ve
 
     return ProjectiveLCPObj(new_P,new_U,new_PtPU,new_q),x,y,w

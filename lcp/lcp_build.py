@@ -29,7 +29,7 @@ class LCPBuilder(object):
         
     def build(self):
         print 'Omitting', self.omitted_nodes.keys()
-        idx = np.array(self.included_nodes)
+        idx = np.array(self.included_nodes,dtype=np.int)
         assert(issorted(idx))
 
         # Define matrix and block sizes
@@ -50,8 +50,8 @@ class LCPBuilder(object):
             action = block - 1
             # Get the E block (I - g P)
             # Immediately slice off omitted nodes
-            E = spsubmat(self.mdp.get_E_matrix(action),
-                         idx,idx).tocoo()
+            E = self.mdp.get_E_matrix(action)
+            E = self.contract_sparse_square_matrix(E)
 
             # Add both E and -E.T to the growing COO structures
             row.extend([E.row,E.col + shift])
@@ -123,13 +123,19 @@ class LCPBuilder(object):
         return (block_id, node_id)
 
     def contract_vector(self,f):
-        n = self.num_states
-        assert((n,) == f.shape)
+        """
+        Remove nodes from single vector (e.g. value vector)
+        """
+        (n,) = f.shape
+        assert(n == self.num_states)
 
-        idx = np.array(self.included_nodes)
+        idx = np.array(self.included_nodes,dtype=np.int)
         return f[idx]
     
     def contract_block_vector(self,f):
+        """
+        Remove nodes from blocked vector (e.g. primal vector)
+        """
         n = self.num_states
         A = self.num_actions
         N = n*(A+1)
@@ -138,13 +144,30 @@ class LCPBuilder(object):
 
         m = len(self.included_nodes)
         M = m * (A+1)
-        idx = np.array(self.included_nodes)
+        idx = np.array(self.included_nodes,dtype=np.int)
         F = reshaped_f[idx,:]
         F = np.reshape(F,M,order='F')
         assert((M,) == F.shape)
         return F
 
+    def contract_solution_block(self,sol):
+        """
+        Contract a n x (A+1) solution block
+        """
+        (n,a) = sol.shape
+        
+        assert(n == self.num_states)
+        assert(a == self.num_actions + 1)
+        
+        idx = np.array(self.included_nodes,dtype=np.int)
+        return sol[idx,:]
+      
+    
     def contract_block_matrix(self,B):
+        """
+        Use this for contracting solution N blocks
+        (e.g. basis matrices)
+        """
         (l,K) = B.shape
         
         n = self.num_states
@@ -156,12 +179,21 @@ class LCPBuilder(object):
 
         m = len(self.included_nodes)
         M = m * (A+1)
-        idx = np.array(self.included_nodes)
+        idx = np.array(self.included_nodes,dtype=np.int)
         
         B = reshaped_B[idx,...]
         B = np.reshape(B,(M,K),order='F')
         assert((M,K) == B.shape)
         return B
+
+    def contract_sparse_square_matrix(self,M):
+        (n,m) = M.shape
+        assert(n == m)
+        assert(n == self.num_states)
+
+        idx = np.array(self.included_nodes,dtype=np.int)
+
+        return spsubmat(M,idx,idx).tocoo()
     
     def expand_vector(self,f,pad_elem=np.nan):
         # Expand a vector corresponding to a single block
@@ -172,7 +204,7 @@ class LCPBuilder(object):
         N = self.num_states
         F = np.empty(N)
 
-        idx = np.array(self.omitted_nodes.keys())
+        idx = np.array(self.omitted_nodes.keys(),dtype=np.int)
         F[idx] = pad_elem
         idx = np.array(self.included_nodes)
         F[idx] = f
@@ -202,9 +234,9 @@ class LCPBuilder(object):
 
         # Write information to blocks
         F = np.empty((n,A+1))
-        idx = np.array(self.omitted_nodes.keys())
+        idx = np.array(self.omitted_nodes.keys(),dtype=np.int)
         F[idx,:] = pad_elem
-        idx = np.array(self.included_nodes)
+        idx = np.array(self.included_nodes,dtype=np.int)
         F[idx,:] = reshaped_f
 
         # Convert back to matrix
@@ -228,13 +260,13 @@ class LCPBuilder(object):
         reshaped_F = np.reshape(F,(m,(A+1),T),order='F')
 
         F = np.empty((n,(A+1),T))
-        idx = np.array(self.omitted_nodes.keys())
+        idx = np.array(self.omitted_nodes.keys(),dtype=np.int)
         F[idx,...] = pad_elem
-        idx = np.array(self.included_nodes)
+        idx = np.array(self.included_nodes,dtype=np.int)
         F[idx,...] = reshaped_F
 
         return np.reshape(F,(N,T),order='F')
-        
+         
 
 def find_sinks(transition_matrix):
     # Find nodes that have no flow out

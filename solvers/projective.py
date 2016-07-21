@@ -57,7 +57,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         print 'W residual', np.linalg.norm(w_res)
         #assert(np.linalg.norm(w_res) < 1e-12)
 
-        self.sigma = 0.95
+        self.sigma = 0.5
         self.steplen = np.nan
         
         self.dir_x = np.full(N,np.nan)
@@ -159,9 +159,9 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         print '||dx||:',np.linalg.norm(dir_x)
         print '||dy||:',np.linalg.norm(dir_y)
         print '||dw||:',np.linalg.norm(dir_w)
-        self.data['dx'].append(dir_x)
-        self.data['dy'].append(dir_y)
-        self.data['dw'].append(dir_w)
+        #self.data['dx'].append(dir_x)
+        #self.data['dy'].append(dir_y)
+        #self.data['dw'].append(dir_w)
         
         steplen = steplen_heuristic(x,dir_x,y,dir_y,0.6)
         print 'Steplen', steplen
