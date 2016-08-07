@@ -71,6 +71,8 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         self.data = defaultdict(list)
 
         self.iteration = 0
+
+        self.verbose = False
         
     def next_iteration(self):
         """
@@ -111,7 +113,8 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         #self.data['P'].append(P)
 
         dot = x.dot(y)
-        print 'IP/N', dot / float(N)
+        if self.verbose:
+            print 'IP/N', dot / float(N)
         self.data['ip'].append(dot / float(N))
 
         # Step 3: form right-hand sides
@@ -119,16 +122,20 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
                 
         # Step 4: Form the reduced system G dw = h
         newton_start = time.time()
-        print 'Forming Netwon system...'
-        (G,g,h) =  self.form_Gh(x,y,sparse=True)     
-        print 'Elapsed time', time.time() - newton_start
+        if self.verbose:
+            print 'Forming Netwon system...'
+        (G,g,h) =  self.form_Gh(x,y,sparse=True)
+        if self.verbose:
+            print 'Elapsed time', time.time() - newton_start
 
         # Step 5: Solve for dir_w
         solver_start = time.time()
         dir_w = solve_system(G,h)
-        print 'Solver dw residual', np.linalg.norm(G.dot(dir_w) - h)
+        if self.verbose:
+            print 'Solver dw residual', np.linalg.norm(G.dot(dir_w) - h)
         assert((k,) == dir_w.shape)
-        print 'Elapsed time', time.time() - solver_start
+        if self.verbose:
+            print 'Elapsed time', time.time() - solver_start
         
         # Step 6: recover dir_y
         Phidw= Phi.dot(dir_w)
@@ -155,21 +162,23 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
             print '||dy res||:',np.linalg.norm(dir_y - dir_y_alt)
             print '||dw res||:',np.linalg.norm(dir_w - dir_w_alt)            
             
-
-        print '||dx||:',np.linalg.norm(dir_x)
-        print '||dy||:',np.linalg.norm(dir_y)
-        print '||dw||:',np.linalg.norm(dir_w)
+        if self.verbose:
+            print '||dx||:',np.linalg.norm(dir_x)
+            print '||dy||:',np.linalg.norm(dir_y)
+            print '||dw||:',np.linalg.norm(dir_w)
         #self.data['dx'].append(dir_x)
         #self.data['dy'].append(dir_y)
         #self.data['dw'].append(dir_w)
         
         steplen = steplen_heuristic(x,dir_x,y,dir_y,0.6)
-        print 'Steplen', steplen
+        if self.verbose:
+            print 'Steplen', steplen
         self.data['steplen'].append(steplen)
         self.steplen = steplen
 
         sigma = sigma_heuristic(sigma,steplen)
-        print 'sigma:',sigma
+        if self.verbose:
+            print 'sigma:',sigma
         self.data['sigma'].append(sigma)
         self.sigma = sigma      
               
@@ -184,8 +193,8 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         #print 'W residual:', np.linalg.norm(w_res)
         
         self.iteration += 1
-
-        print 'Total iteration time', time.time() - iter_start
+        if self.verbose:
+            print 'Total iteration time', time.time() - iter_start
         
     def get_primal_vector(self):
         return self.x

@@ -13,7 +13,6 @@ def steplen_heuristic(x,dir_x,y,dir_y,scale):
     y_step = max_steplen(y,dir_y)
 
     alpha = -(x.dot(dir_y) + y.dot(dir_x)) / dir_x.dot(dir_y)
-    print 'alpha:',alpha
     if alpha > 0:
         return min([1.0,alpha,scale*x_step, scale*y_step])
     
