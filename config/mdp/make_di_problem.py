@@ -41,7 +41,8 @@ def make_di_problem(step_len,
         **trans_params)
     
     #boundary = DoubleIntBoundary(bounds)
-    boundary = SaturationBoundary(bounds)
+    #boundary = SaturationBoundary(bounds)
+    boundary = TorusBoundary(bounds)
     
     cost_state_fn = BallSetFn(np.zeros(2), cost_radius)
     #cost_state_fn = TargetZoneFn(np.array([[-0.5,0.5],[-0.5,0.5]]))

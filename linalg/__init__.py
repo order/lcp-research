@@ -5,4 +5,4 @@ from rand import *
 from split import *
 from orthonormalize import *
 from spsubmat import *
-from stack import *
+from hstack import *

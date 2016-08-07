@@ -16,7 +16,10 @@ class LCPObj(object):
         assert(M.shape[0] == self.dim)
         assert(M.shape[1] == self.dim)
         
-        self.name = kwargs.get('name','Unnamed')        
+        self.name = kwargs.get('name','Unnamed')
+
+    def F(self,x):
+        return self.M.dot(x) + self.q
 
     def __str__(self):
         return '<{0} in R^{1}>'.format(self.name, self.dim)                
@@ -44,6 +47,12 @@ class ProjectiveLCPObj(LCPObj):
 
     def update_q(self,new_q):
         self.q = new_q
+
+    def F(self,x):
+        P = self.Phi
+        U = self.U
+        q = self.q
+        return P.dot(U.dot(x)) + (x - P.dot(P.T.dot(x))) + q        
 
     def form_M(self):
         if hasattr(self,'M'):

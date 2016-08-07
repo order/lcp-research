@@ -122,6 +122,19 @@ class LCPBuilder(object):
         node_id = self.included_nodes[idx]
         return (block_id, node_id)
 
+    #######################################################
+    # CONTRACT AND EXPAND
+    """
+    Contract methods strip particular indices out of the solution vector
+    This is if we want to remove some nodes from the solution and solve
+    without these nodes in the system.
+    Examples include OOB nodes, disconnected nodes, and sinks (like 0 in some
+    problems).
+
+    Expand methods add these indices back, filling their value in with some 
+    default.
+    """
+
     def contract_vector(self,f):
         """
         Remove nodes from single vector (e.g. value vector)

@@ -87,6 +87,20 @@ def plot_data_dict_abs_diff(A,B):
 
 ############################################
 # Plot the solution in (A+1) plots
+
+def plot_state_image_interp(mdp,disc,x,G=512):
+    low = disc.get_lower_boundary()
+    hi = disc.get_upper_boundary()
+    assert(2 == len(low))
+
+    [P,[X,Y]] = make_points([np.linspace(low[0],hi[0],G),
+                             np.linspace(low[1],hi[1],G)],True)
+    
+    interp_fn = InterpolatedFunction(disc,x)
+    Z = np.reshape(interp_fn.evaluate(P),X.shape)
+    plt.pcolormesh(X,Y,Z,cmap = 'jet')
+    plt.colorbar()   
+
 def plot_sol_images_interp(mdp,disc,x,G=512):
     A = mdp.num_actions
     blocks = block_solution(mdp,x)

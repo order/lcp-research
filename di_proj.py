@@ -14,18 +14,19 @@ from config.solver import *
 from utils import *
 from discrete import *
 from lcp import *
+
 from linalg import hstack
 
 from utils import *
 
 from experiment import *
 
-DIM = 64
+DIM = 16
 
 BASIS_TYPE = 'jigsaw'
 BASIS_NUM = 10
 
-REGEN = True
+REGEN = False
 
 REG = 1e-7
 VAL_REG = REG
@@ -49,7 +50,7 @@ def build_problem(disc_n):
     n_steps = 10              # Steps per iteration
     damp = 0.01               # Dampening
     jitter = 0.1              # Control jitter 
-    discount = 0.95            # Discount (\gamma)
+    discount = 0.9            # Discount (\gamma)
     B = 5
     bounds = [[-B,B],[-B,B]]  # Square bounds, 
     cost_radius = 0.25        # Goal region radius
@@ -95,7 +96,7 @@ def build_projective_lcp(lcp_builder,basis,val_reg,flow_reg,scale):
     lcp = lcp_builder.build()
   
     (N,n) = lcp.M.shape
-    assert(N == n)
+    assert(N == n) # Square
     
     start = time.time()
     # Remove omitted nodes
@@ -118,7 +119,11 @@ def build_projective_lcp(lcp_builder,basis,val_reg,flow_reg,scale):
 
     assert(N == P.shape[0])    
     # Project MDP onto basis
-    U = scale * P.T.dot(M) # Assumes that B is orthonormal
+    SmallM = P.T.dot(M.dot(P))
+    SmallM = 0.5 * (SmallM-SmallM.T) 
+    print SmallM.shape
+    print P.shape
+    U = scale * SmallM.dot(P.T) # Assumes that B is orthonormal
     PtPU = U # Also assumes B is orthonormal
 
     q = scale * P.dot(P.T.dot(lcp.q))
@@ -225,38 +230,28 @@ if __name__ == '__main__':
         
         p_sol = block_solution(mdp,p)
         d_sol = block_solution(mdp,d)
-    
-    # Form the Fourier projection (both value and flow)
+
+    ####################################################
+    # Form the projected LCP
     M = lcp.M
     q = lcp.q
+
+    # Strip out omitted states
     contract_p = lcp_builder.contract_block_vector(p)
     contract_d = lcp_builder.contract_block_vector(d)
     assert(q.shape == contract_p.shape)
     assert(q.shape == contract_d.shape)
 
+    # Check if the dual vector from IP is the same as Mx+q
     recon_d = M.dot(contract_p) + q
     print 'Inner product:', contract_p.dot(contract_d)
     print 'Dual reconstruction error', np.linalg.norm(contract_d - recon_d)
-    
-    """
-    basis = get_basis_from_solution(mdp,
-                                    disc,
-                                    p_sol,
-                                    d_sol,
-                                    BASIS_TYPE,
-                                    BASIS_NUM)
-    """
-    # Value basis; approximate v, E_1f_1, E_2F_2,p
-    E1 = mdp.get_E_matrix(0)
-    E1 = lcp_builder.contract_sparse_square_matrix(E1)
-    E2 = mdp.get_E_matrix(1)
-    E2 = lcp_builder.contract_sparse_square_matrix(E2)
 
-    #print np.linalg.cond(E1.toarray())
-    #print np.linalg.cond(E2.toarray())
-
+        
+    # Cost (uniform)
     c = lcp_builder.contract_vector(mdp.costs[0])
-    
+
+    # Uniform weights
     weights = np.ones(c.size) / float(c.size)
     contract_p_sol = lcp_builder.contract_solution_block(p_sol)
     contract_d_sol = lcp_builder.contract_solution_block(d_sol)
@@ -264,30 +259,16 @@ if __name__ == '__main__':
     [v,f1,f2] = [contract_p_sol[:,i] for i in range(3)]
     [u,g1,g2] = [contract_d_sol[:,i] for i in range(3)]
 
-    ##
-    #s = 1
-    v = np.abs(v + 0.5*np.random.randn(v.size))
-    #f1 *= (1 + s*(2*np.random.rand(v.size)-1))
-    #f2 *= (1 + s*(2*np.random.rand(v.size)-1))
-    c1_ish = sps.linalg.lsqr(E1.T,c)[0]
-    c2_ish = sps.linalg.lsqr(E2.T,c)[0]
-    Bv = hstack([np.random.rand(v.size,15),
-                 v,
-                 c1_ish,
-                 c2_ish,
-                 weights])
-    #Bf1 = hstack([f1,
-    #              c,
-    #              E1.T.dot(v),
-    #              np.random.rand(v.size,17)])
-    Bf1 = hstack([E1.T.dot(Bv)])
-    #Bf1 = np.eye(v.size)
-    #Bf2 = hstack([f2,
-    #              c,
-    #              E2.T.dot(v),
-    #              np.random.rand(v.size,17)])    
-    #Bf2 = np.eye(v.size)
-    Bf2 = hstack([E2.T.dot(Bv)])
+    n = v.size
+    vp = v + 0.01*np.random.randn(v.size)
+    f1p = f1 + 0.01*np.random.randn(v.size)
+    f2p = f2 + 0.01*np.random.randn(v.size)
+
+    Bv = hstack([c,weights,vp[:,np.newaxis]])
+    #Bf1 = hstack([c,weights,f1p[:,np.newaxis]])
+    #Bf2 = hstack([c,weights,f2p[:,np.newaxis]])
+    Bf1 = np.eye(n)
+    Bf2 = np.eye(n)
     
     Bv = orthonorm(Bv)
     Bf1 = orthonorm(Bf1)
@@ -302,6 +283,9 @@ if __name__ == '__main__':
     d_res = contract_d - proj_d
     print 'Primal projection residual', np.linalg.norm(p_res)
     print 'Dual projection residual', np.linalg.norm(d_res)
+    
+    #plot_sol_images_interp(mdp,disc,
+    #                       np.abs(lcp_builder.expand_block_vector(p_res,1e-35)))
 
     (plcp,_) = build_projective_lcp(lcp_builder,
                                     B,
@@ -323,6 +307,14 @@ if __name__ == '__main__':
     # Strip augmented variable and expand omitted nodes
     proj_p = proj_p[:-1]
     proj_d = proj_d[:-1]
+    #proj_p = np.abs(proj_p - B.dot(B.T.dot(proj_p)))
+    print 'IP', proj_p.dot(plcp.F(proj_p))
+    PU = plcp.Phi.dot(plcp.U)
+    print '', sps.linalg.norm(PU + PU.T)
+
+
+    #proj_d = np.abs(proj_p - B.dot(B.T.dot(proj_d)))
+   
     proj_p = lcp_builder.expand_block_vector(proj_p,1e-35)
     proj_d = lcp_builder.expand_block_vector(proj_d,1e-35)
     #plot_data_dict(proj_data)

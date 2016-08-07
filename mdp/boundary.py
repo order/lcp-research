@@ -10,6 +10,34 @@ class Boundary(object):
     def enforce(self,states):
         raise NotImplmentedError()
 
+class TorusBoundary(Boundary):
+    def __init__(self,boundary):
+        self.boundary = boundary
+        self.D = len(boundary)
+        for (l,u) in boundary:
+            assert(l < u)
+        self.lower_bound = [l for (l,u) in boundary]
+        self.upper_bound = [u for (l,u) in boundary]
+
+    def enforce(self,states):
+        # Enforce the boundary by saturation
+        assert(2 <= len(states.shape) <= 3)
+        # 2 -> number of points x dimension
+        # 3 -> samples x number of points x dimension
+        
+        D = states.shape[-1]
+        assert(D == self.D)
+
+        S = np.empty(states.shape)
+        for d in xrange(D):
+            L = self.lower_bound[d]
+            U = self.upper_bound[d]
+            S[...,d] = ((states[...,d] - L) % (U - L)) + L
+        return S
+
+    def random_points(self,N):
+        return linalg.random_points(self.boundary,N)   
+
 class SaturationBoundary(Boundary):
     def __init__(self,boundary):
         self.boundary = boundary
