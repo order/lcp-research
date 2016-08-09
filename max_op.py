@@ -10,15 +10,15 @@ import matplotlib.pyplot as plt
 def rect(x):
     return np.maximum(0,x)
 
-def r_res(x,M,q):
-    return np.linalg.norm(np.minimum(x,M.dot(x)+q))
+def r_res(x,M,q,ord=2):
+    return np.linalg.norm(np.minimum(x,M.dot(x)+q),ord)
 
-def s_res(x,M,q):
+def s_res(x,M,q,ord=2):
     w = M.dot(x) + q
     res = np.hstack([rect(-x),
                      rect(-w),
                      x.dot(w)])
-    return np.linalg.norm(res)
+    return np.linalg.norm(res,ord)
 
 def get_smoothed_random(N,w=25):
     assert(w > 2)
@@ -41,19 +41,25 @@ def build_lcp(a,b):
 
     return LCPObj(M,q)
 
-def build_chebyshev_basis(N,k):
+def build_chebyshev_basis(a,b,N,k):
     x = np.linspace(-1,1,N)
 
-    B = np.polynomial.chebyshev.chebvander(x,k)
+    B = np.polynomial.chebyshev.chebvander(x,k-3)
+    B = np.hstack([a[:,np.newaxis],
+                   b[:,np.newaxis],
+                   B])
     B = orthonorm(B)
     P = sps.block_diag([B]*3)
+    assert (3*N,3*k) == P.shape
     return P
 
-def build_plcp(P,lcp):
+def build_aug_plcp(P,lcp):
     U = P.T.dot(lcp.M)
     q = P.dot(P.T.dot(lcp.q))
     
-    return ProjectiveLCPObj(P,U,U,q)
+    plcp = ProjectiveLCPObj(P,U,U,q)
+    (aplcp,x0,y0,w0) = augment_plcp(plcp,10)
+    return (plcp,aplcp,x0,y0,w0)
 
 def kojima_solve(lcp,**kwargs):
     # Solve
@@ -69,14 +75,11 @@ def kojima_solve(lcp,**kwargs):
     print 'Kojima ran for:', time.time() - start, 's'
     return (p,d,data)
 
-def projective_solve(plcp):
+def projective_solve(plcp,x0,y0,w0):
     (N,K) = plcp.Phi.shape
-    x0 = np.ones(N)
-    y0 = np.ones(N)
-    w0 = np.zeros(K) 
     start = time.time()
     (p,d,data) = solve_with_projective(plcp,
-                                       thresh=1e-12,
+                                       thresh=1e-22,
                                        max_iter=250,
                                        x0=x0,
                                        y0=y0,
@@ -87,15 +90,21 @@ def projective_solve(plcp):
 if __name__ == "__main__":
 
     N = 256 # Vector length
-    w = 16 # Window size (smoothing)
+    window_size = 16 # Window size (smoothing)
     T = 1 # Trials
 
-    num_basis = range(16,128,2) # Basis size to try
+    num_basis = range(16,64,4) # Basis size to try
     K = len(num_basis)
     
     if True:
         LCPError = np.empty((T,K))
         LCPSol = np.empty((T,K,N))
+        ExactDualRes = np.empty((T,K)) # d - (Mx+q)
+        ApproxDualRes = np.empty((T,K)) # d - (PMP + (I-P))x - q
+        
+        IP = np.empty((T,K)) # <x,Mx+q>
+        DualInfeas = np.empty((T,K)) # (-Mx-q)_+
+        
         ProjError = np.empty((T,K))
         ProjSol = np.empty((T,K,N))
         R = np.empty((T,K))
@@ -103,30 +112,51 @@ if __name__ == "__main__":
         BasisRes = np.empty((T,K))
                         
         for t in xrange(T):
-            a = get_smoothed_random(N,w)
-            b = get_smoothed_random(N,w)
+            a = get_smoothed_random(N,window_size)
+            b = get_smoothed_random(N,window_size)
             ab = np.minimum(a,b)            
             lcp = build_lcp(a,b)
             M = lcp.M
             q = lcp.q
             for (i,k) in enumerate(num_basis):
-                P = build_chebyshev_basis(N,k)
+                # Build basis; make sure orthogonal
+                P = build_chebyshev_basis(a,b,N,k)
+                PtP = P.T.dot(P)
+                Pi = P.dot(P.T)
+                PiNull = (np.eye(3*N) - Pi)
+                I = np.eye(3*k)
+                assert np.linalg.norm(PtP - I) < 1e-12
 
-                plcp = build_plcp(P,lcp)
-                (p,d,data) = projective_solve(plcp)
-                lcp_error = np.linalg.norm(ab - p[:N])
+                # Solve LCP
+                (plcp,aplcp,x0,y0,w0) = build_aug_plcp(P,lcp)
+                (aug_x,aug_y,data) = projective_solve(aplcp,x0,y0,w0)
+                print 'Augmented pair:',(aug_x[-1],aug_y[-1])
+                x = aug_x[:-1]
+                y = aug_y[:-1]
+                lcp_error = np.linalg.norm(ab - x[:N])
 
+                # Project exact solution
                 B = (P.tolil())[:N,:N]
-                proj_p = B.dot(B.T.dot(ab))
-                proj_err = np.linalg.norm(ab - proj_p)
+                proj_ab = B.dot(B.T.dot(ab))
+                proj_err = np.linalg.norm(ab - proj_ab)
 
+                # Store data
                 LCPError[t,i] = lcp_error
-                LCPSol[t,i,:] = p[:N]
+                LCPSol[t,i,:] = x[:N]
+
+                w = lcp.F(x) # Exact dual from x
+                u = plcp.F(x) # Projective dual from x
+                
+                ExactDualRes[t,i] = np.linalg.norm(y - w)
+                ApproxDualRes[t,i] = np.linalg.norm(y - u)
+                IP[t,i] = x.dot(w)
+                DualInfeas[t,i] = np.linalg.norm(rect(-w))
+                
                 ProjError[t,i] = proj_err
-                ProjSol[t,i,:] = proj_p[:N]
-                R[t,i] = r_res(p,M,q)
-                S[t,i] = s_res(p,M,q)
-                BasisRes[t,i] = np.linalg.norm(p - P.dot(P.T.dot(p)))
+                ProjSol[t,i,:] = proj_ab[:N]
+                R[t,i] = r_res(x,M,q,np.inf)
+                S[t,i] = s_res(x,M,q,np.inf)
+                BasisRes[t,i] = np.linalg.norm(PiNull.dot(x))
 
     t = 0
     plt.figure()
@@ -134,21 +164,20 @@ if __name__ == "__main__":
     plt.semilogy(num_basis,ProjError[t,:])
     plt.semilogy(num_basis,R[t,:])
     plt.semilogy(num_basis,S[t,:])
-    plt.semilogy(num_basis,BasisRes[t,:])
+    plt.semilogy(num_basis,S[t,:] + np.sqrt(S[t,:]))
+    
     plt.legend(['LCP error',
                 'Projection error',
                 'R residual',
                 'S residual',
-                'Basis residual'])
-
+                'S + S**0.5'])
 
     plt.figure()
-    plt.subplot(1,2,1)
-    plt.plot(LCPSol[t,...] - ab[np.newaxis,:],'-b',alpha=0.2)
-    plt.title('LCP residual')
-    plt.subplot(1,2,2)
-    plt.plot(ProjSol[t,...] - ab[np.newaxis,:],'-r',alpha=0.2)
-    plt.title('Projection residual')
+    plt.semilogy(num_basis,ExactDualRes[t,:])
+    plt.semilogy(num_basis,ApproxDualRes[t,:])
+    plt.semilogy(num_basis,BasisRes[t,:],'.-')
+    plt.semilogy(num_basis,np.abs(IP[t,:]),'-x')
+    plt.legend(['|y - (Mx+q)|','|y - (Ax+q)|', '|(I-Pi)x|^2','<x,w>'])
     
     plt.show()
     

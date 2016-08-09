@@ -52,8 +52,8 @@ def augment_plcp(plcp,scale,**kwargs):
     P = plcp.Phi
     U = plcp.U
     q = plcp.q
-    (N,k) = P.shape
-    assert((k,N) == U.shape)
+    (N,K) = P.shape
+    assert((K,N) == U.shape)
 
     x = kwargs.get('x0',np.ones(N))
     y = kwargs.get('y0',np.ones(N))
@@ -76,7 +76,7 @@ def augment_plcp(plcp,scale,**kwargs):
     # Assuming q and y-u in the span of P
     d = P.T.dot(y - x)
     b = d + -U.dot(x) + P.T.dot(x - q)
-    assert((k,) == b.shape)
+    assert((K,) == b.shape)
     
     # [P 0]
     # [0 1]
@@ -96,6 +96,15 @@ def augment_plcp(plcp,scale,**kwargs):
     y = np.hstack([y,y0])
     # w doesn't have to be +ve
 
+
+    assert (N+1,K+1) == new_P.shape
+    assert (K+1,N+1) == new_U.shape
+    assert (N+1,) == new_q.shape
+    assert (N+1,) == x.shape
+    assert (N+1,) == y.shape
+    assert (K+1,) == w.shape
+    
+    
     return ProjectiveLCPObj(new_P,new_U,new_PtPU,new_q),x,y,w
 
 def generate_initial_feasible_points(M,q):

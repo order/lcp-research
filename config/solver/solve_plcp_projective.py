@@ -8,6 +8,12 @@ def solve_with_projective(plcp,**kwargs):
     w0 = kwargs['w0']
     max_iter = kwargs.get('max_iter',1000)
     thresh = kwargs.get('thresh',1e-12)
+
+    Phi = plcp.Phi
+    (N,K) = Phi.shape
+    assert (N,) == x0.shape
+    assert (N,) == y0.shape
+    assert (K,) == w0.shape
     
     iterator = ProjectiveIPIterator(plcp,
                                     x0=x0,

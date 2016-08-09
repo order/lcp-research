@@ -41,20 +41,28 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         U = plcp.U
         PtPU = plcp.PtPU
         q = plcp.q
+        
         (N,K) = Phi.shape
-        assert((K,N) == PtPU.shape)
+        assert (K,N) == U.shape
+        assert (K,N) == PtPU.shape
+        assert (N,) == q.shape
 
         self.q = plcp.q
         self.Ptq = Phi.T.dot(self.q)
-        assert((K,) == self.Ptq.shape)
+        assert (K,) == self.Ptq.shape
         
         self.update_P_PtPU(Phi,U,PtPU)
 
         self.x = kwargs.get('x0',np.ones(N))
         self.y = kwargs.get('y0',np.ones(N))
         self.w = kwargs.get('w0',Phi.T.dot(q))
+
+        assert (N,) == self.x.shape
+        assert (N,) == self.y.shape
+        assert (K,) == self.w.shape
+        
         w_res = self.x - self.y + q - Phi.dot(self.w)
-        print 'W residual', np.linalg.norm(w_res)
+        #print 'W residual', np.linalg.norm(w_res)
         #assert(np.linalg.norm(w_res) < 1e-12)
 
         self.sigma = 0.5
