@@ -197,6 +197,8 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         self.dir_y = dir_y
         self.dir_w = dir_w
 
+        print 
+
         #w_res = dir_x - dir_y - Phidw
         #print 'W residual:', np.linalg.norm(w_res)
         
