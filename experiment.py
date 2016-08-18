@@ -8,6 +8,7 @@ import subprocess
 from mdp import *
 from mdp.policies import *
 from mdp.transitions import *
+from lcp import *
 from utils import Marshaller
 
 from discrete import make_points
@@ -681,3 +682,40 @@ def get_mcts_returns(driver,
     pool.join()
     returns = np.array([map(float,x.split()) for x in ret]).flatten()
     return returns
+
+def rect(x):
+    return np.maximum(0,x)
+
+def r_res(x,M,q,ord=2):
+    return np.linalg.norm(np.minimum(x,M.dot(x)+q),ord)
+
+def s_res(x,M,q,ord=2):
+    w = M.dot(x) + q
+    res = np.hstack([rect(-x),
+                     rect(-w),
+                     x.dot(w)])
+    return np.linalg.norm(res,ord)
+
+def get_smoothed_random(N,w=25):
+    assert(w > 2)
+    x = np.random.rand(N+w-1)
+    x *= float(N) / np.sum(x)
+    win = signal.hann(w)
+    smooth = signal.convolve(x,win,mode='valid')/np.sum(win)
+    assert((N,) == smooth.shape)
+    return smooth
+
+def build_max_lcp(a,b,c):
+    assert np.all(a >= 0)
+    assert np.all(b >= 0)
+    assert np.all(c > 0)
+    
+    N = a.size
+    q = np.hstack([-c,a,b])
+    assert((3*N,) == q.shape)
+    
+    I = sps.eye(N)
+    M = sps.bmat([[None,I,I],[-I,None,None],[-I,None,None]])
+    assert((3*N,3*N) == M.shape)
+
+    return LCPObj(M,q)
