@@ -7,6 +7,10 @@ import indexer
 import discretize
 
 class RegularGridInterpolator(object):
+    """
+    Class for doing multilinear interpolation on a rectalinear grid with 
+    regular spacing within each dimension.
+    """
     def __init__(self,grid_desc):
         self.D = len(grid_desc)
         self.grid_desc = grid_desc # List of (low,high,num) triples
@@ -33,13 +37,12 @@ class RegularGridInterpolator(object):
     def get_lower_boundary(self):
         return [l for (l,h,n) in self.grid_desc]
     def get_upper_boundary(self):
-        return [h for (l,h,n) in self.grid_desc]
-    def get_num_cells(self):
-        return [n for (l,h,n) in self.grid_desc]    
+        return [h for (l,h,n) in self.grid_desc]   
     
     def num_nodes(self):
         # Include oob
         return self.indexer.max_index+1
+    
     def num_real_nodes(self):
         # Exclude oob
         return self.indexer.physical_max_index+1
@@ -114,6 +117,7 @@ class RegularGridInterpolator(object):
         num_oob = np.sum(oob_mask)
         num_norm = N - num_oob
 
+        # Basically done, just need to package up into sparse array
         B = num_norm*(2**D) # Space for normal points
         L = B + num_oob # Add on space for oob nodes
         cols = np.empty(L)

@@ -1,56 +1,77 @@
 import numpy as np
-import scipy as sp
-import scipy.sparse as sps
-
-from discretize import make_points
-
-from mdp import InterpolatedFunction
+from rectilinear_grid import Grid,RegularGrid,IrregularGrid
+from discretize import make_points, TabularDiscretizer
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import time
 
+def plot_pairwise(A,B):
+    assert 2 == A.ndim
+    assert np.all(A.shape == B.shape)
 
-from regular_interpolate import RegularGridInterpolator
-Grid = [(0,1,1),(0,1,1)]
-interp = RegularGridInterpolator(Grid)
-cpts = interp.get_cutpoints()
-
-point = np.array([[2, -1]])
-
-dist = interp.points_to_index_distributions(point)
-
-#assert((dist.sum() - M) / float(M) < 1e-15)
-
-if False:
-    plt.subplot(1,2,1)
-    plt.spy(dist)
-
-    plt.subplot(1,2,2)
-    plt.plot(point[:,0],point[:,1],'go')
-    N = dist.nnz
+    (N,D) = A.shape
     for i in xrange(N):
-        c = dist.col[i]
-        r = dist.row[i]
-        if interp.is_oob(r):
-            continue
-        plt.plot([point[c,0],cpts[r,0]],
-                 [point[c,1],cpts[r,1]],'-b')
+        plt.plot([A[i,0],B[i,0]],[A[i,1],B[i,1]],'.-b',alpha=0.2)
+    plt.show()
+    
+def regular_grid_test_0():
+    """
+    Map random points to cell index point
+    Cell index point is always the least vertex in the cell,
+    So 'error' should always be negative
+    """
+    
+    grid_desc = [(-1,1,15),(-1,1,15)]
+    RG = RegularGrid(grid_desc)
 
+    points = 2 * np.random.rand(1500,2) - 1
+    indices = RG.points_to_indices(points)    
+    recon_points = RG.indices_to_lowest_points(indices)
+    
+    plot_pairwise(points,recon_points)
+
+    diff = points - recon_points
+    assert np.all(diff >= 0)
+
+def regular_grid_test_1():
+    """
+    Map cell index points. Should be identity
+    """
+    grid_desc = [(-1,1,15),(-1,1,25)]
+    RG = RegularGrid(grid_desc)
+
+    points = make_points([np.linspace(l,u,n+1)[:-1] for (l,u,n) in grid_desc])
+    indices = RG.points_to_indices(points)    
+    recon_points = RG.indices_to_lowest_points(indices)
+    
+    diff = points - recon_points
+    assert np.linalg.norm(diff) < 1e-9    
+
+def regular_grid_test_2():
+    grid_desc = [(-1,1,5),(-1,1,5)]
+    RG = RegularGrid(grid_desc)
+
+    points = 2 * np.random.rand(2500,2) - 1
+    indices = RG.points_to_indices(points)    
+
+    plt.scatter(points[:,0],points[:,1],
+                s=25,c=indices,alpha=0.5,lw=0,cmap='plasma')
     plt.show()
 
+def tabular_discretizer_test_0():
+    grid_desc = [(-1,1,5),(-1,1,5)]
+    RG = RegularGrid(grid_desc)
 
-G = 25
-(P,(X,Y)) = make_points([np.linspace(-0.2,1.2,G)]*2,True)
-print P
-print interp.to_cell_coord(P)
-print interp.to_indices(P)
-print interp.points_to_index_distributions(P)
-v = np.arange(interp.num_nodes())
-fn = InterpolatedFunction(interp,v)
-Z = fn.evaluate(P)
-Img = np.reshape(Z,(G,G))
+    points = 2 * np.random.rand(500,2) - 1
+    disc = TabularDiscretizer(RG)
+    dist = disc.locate(points)
 
-if True:
-    plt.pcolor(X,Y,Img)
-    plt.show()
+    (N,D) = points.shape
+    assert N == dist.shape[1]
+    assert np.linalg.norm(dist.sum(axis=0) - np.ones(N)) < 1e-12
+    
+if __name__ == "__main__":
+    #regular_grid_test_0()
+    #regular_grid_test_1()
+    #regular_grid_test_2()
+
+    tabular_discretizer_test_0()

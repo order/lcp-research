@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import h5py
 import importlib
 
-def issorted(x):
+def is_sorted(x):
     if isinstance(x,np.ndarray):
         (N,) = x.shape
     else:

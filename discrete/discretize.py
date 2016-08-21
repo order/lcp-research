@@ -2,62 +2,108 @@ import numpy as np
 import scipy.sparse as sps
 
 class Discretizer(object):
-    def points_to_index_distributions(self,points):
+    
+    def locate(self,points):
         """
         Takes in (n,d) points,
-        Returns (n,N) sparse row-stochastic matrix indicating index
-        distribution
-        """
-        raise NotImplementedError()
-    def indices_to_points(self,indices):
-        """
-        Takes in (n,) indices,
-        Returns (n,d) matrix indicating canonical points associated
-        with each
+        LOCATES the cells that they are in,
+        Returns the appropriated distribution
+        node indices
         """
         raise NotImplementedError()
 
-    def get_cutpoints(self):
-        raise NotImplementedError()
+#######################
+# TABULAR DISCRETIZER #
+#######################
 
-    def has_point(self,target):
-        (N,) = target.shape
-        for (i,(l,h,n)) in enumerate(self.grid_desc):
-            skip = (target[i] - l) / n
-            if (skip % 1) > 1e-15:
-                return False
-        return True
-        
+class TabularDiscretizer(Discretizer):
+    def __init__(self,grid):
+        self.grid = grid
 
-class TrivialDiscretizer(object):
-    def __init__(self,num_nodes):
-        self.num_nodes = num_nodes
-    def points_to_index_distributions(self,points):
+    def locate(self,points):
         (N,D) = points.shape
-        assert(D == 1)
-        assert(not np.any(points < 0))
-        assert(not np.any(points >= self.num_nodes))
-        data = np.ones(N)
-        row = points.flatten().astype('i')
-        col = np.arange(N)
-        return sps.coo_matrix((data,(row,col)),
-                              shape=(self.num_nodes,N))
-    def indicies_to_points(self,indices):
-        (N,) = indicies.shape
-        return np.array(indices).reshape((N,1))
-    def get_cutpoints(self):
-        N = self.num_nodes
-        return np.arange(N)[:,np.newaxis]
-    def has_point(self,target):
-        assert((1,) == target)
-        return 0 <= target[0] < self.num_nodes\
-           and (target[0] % 1) < 1e-15    
+        assert (D == self.grid.get_dim())
+        
+        indices = self.grid.points_to_indices(points)
+        assert(not np.any(np.isnan(indices)))
+        
+        cols = np.arange(N)
+        rows = indices
+        data = np.ones(N,dtype=np.double)
+
+        M = self.grid.get_num_nodes()
+        return sps.coo_matrix((data,(rows,cols)),shape=(M,N))
+
+#############################
+# MULTILINEAR INTERPOLATION #
+#############################
+
+def MultilinearInterpolation(object):
+        def __init__(self,grid):
+            self.grid = grid
+
+        def convert_to_sparse_matrix(self,indices,vertices,weights):
+            (N,) = indices.shape
+            D = self.grid.get_dim()
+            
+            oob_mask = self.grid.indexer.is_oob(indices)
+            num_oob = np.sum(oob_mask)
+            num_normal = N = num_oob
+            normal_idx = np.arange(N)[~oob_mask]
+            oob_idx = np.arange(N)[oob_mask]
+
+            m = num_norm*(2**D) # Space for normal points
+            M = m + num_oob # Add on space for oob nodes
+            cols = np.empty(M)
+            rows = np.empty(M)
+            data = np.empty(M)
+
+            # Add normal weights
+            cols[:m] = (np.tile(normal_idx,(2**D,1)).T).flatten()
+            rows[:m] = (vertices[~oob_mask,:]).flatten()
+            data[:m] = (weights[~oob_mask,:]).flatten()
+
+            # Route all oob points to oob node
+            cols[B:] = oob_idx
+            rows[B:] = indices[oob_idx]
+            data[B:] = np.ones(num_oob)
+
+            NN = self.grid.get_num_nodes()
+            return sps.coo_matrix((data,(rows,cols)),shape=(NN,N))           
+            
+        def locate(self,points):
+        (N,D) = points.shape
+        assert D == self.grid.get_dim()
+
+        # Get indices
+        indices = points_to_indices(points) # Compute once
+        
+        dist = self.grid.get_rel_distance_to_low(points,indices)
+        assert (N,D) == dist
+
+        vertices = self.grid.get_neighbors(indices)
+        assert (N,2**D) == vertices.shape
+        
+        # Calculate multilinear interp weights from distances
+        weights = np.empty((N,2**D))
+        for (i,diff) in enumerate(itertools.product([0,1],
+                                                    repeat=D)):
+            mask = np.array(diff,dtype=bool)
+            weights[:,i] = np.product(dist[:,mask],axis=1)\
+                           * np.product(1 - dist[:,~mask],axis=1)
+
+        return convert_to_sparse_matrix(self,indices,vertices,weights)
+        
 
 #######################################
 # AUX functions    
 
 def is_int(x):
-    return x.dtype.kind in 'ui'
+    f = np.mod(x,1.0)
+    mask = ~np.isnan(x)
+
+    return np.all(f[mask]<1e-9)
+
 
 def make_points(gens,ret_mesh=False,order='C'):
     """

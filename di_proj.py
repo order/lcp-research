@@ -26,7 +26,7 @@ DIM = 16
 BASIS_TYPE = 'jigsaw'
 BASIS_NUM = 10
 
-REGEN = False
+REGEN = True
 
 REG = 1e-7
 VAL_REG = REG
