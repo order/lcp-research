@@ -10,7 +10,7 @@ from utils import is_sorted
 ##############################
 class Grid(object):
     # Main function: convert points to cell coordinates
-    def points_to_cell_coord(self,points):
+    def points_to_cell_coords(self,points):
         raise NotImplementedError()
     def points_to_indices(self,points):
         raise NotImplementedError()       
@@ -24,6 +24,9 @@ class Grid(object):
         return self.upper_bound
     def get_dim(self):
         return self.dim
+
+    def get_indexer(self):
+        return indexer
 
     def get_num_nodes(self):
         # Total number (scalar), include oob
@@ -76,6 +79,7 @@ class RegularGrid(Grid):
         Coords = np.empty((N,D))
         for d in xrange(D):
             (low,high,n) = self.grid_desc[d]
+            hi_cell = n-1
             # Transform: [low,high) |-> [0,n)
             transform = n * (points[:,d] - low) / (high - low) + self.fuzz
             Coords[:,d] = np.floor(transform)
@@ -83,7 +87,7 @@ class RegularGrid(Grid):
             # Fuzz top boundary to get [low,high]
             fuzz_mask = np.logical_and(high <= points[:,d],
                                      points[:,d] < high + 2*self.fuzz)
-            Coords[fuzz_mask,d] = n-1
+            Coords[fuzz_mask,d] = hi_cell
         return Coords
     
     def points_to_indices(self,points):
@@ -115,7 +119,8 @@ class IrregularGrid(Grid):
     """
     def __init__(self,node_lists):
         self.dim = len(node_lists)
-        self.node_lists # List of np.ndarray cutpoint locations
+        self.node_lists = np.array(node_lists)
+        # List of np.ndarray cutpoint locations
 
         for nl in node_lists:
             assert nl.ndim == 1 # 1D array
@@ -135,9 +140,9 @@ class IrregularGrid(Grid):
         self.indexer = Indexer(self.num_nodes)
 
         # Fuzz to convert [low,high) to [low,high]
-        self.upper_fuzz = 1e-15
-
-    def to_cell_coord(self,points):
+        self.fuzz = 1e-12
+    
+    def points_to_cell_coords(self,points):
         (N,D) = points.shape
         assert D == self.dim
 
@@ -155,29 +160,34 @@ class IrregularGrid(Grid):
             ub = self.upper_bound[d]
             hi_cell = self.num_cells[d] - 1
             fuzz_mask = np.logical_and(points[:,d] >= ub,
-                                       points[:,d] < ub+self.fuzz)
+                                       points[:,d] < ub + self.fuzz)
             Coords[fuzz_mask,d] = hi_cell
 
-            lb = self.lower_bound[d]
-            oob_mask = np.logical_or(points[:,d] < lb,
-                                     points[:,d] >= ub+self.fuzz)
-            Coords[oob_mask,d] = np.nan
+            # Indexer will take care of mapping to correct OOB node
+            #lb = self.lower_bound[d]
+            #oob_mask = np.logical_or(points[:,d] < lb,
+            #                         points[:,d] >= ub+self.fuzz)
+            #Coords[oob_mask,d] = np.nan
         return Coords
 
-    def canonical_point_from_indices(self,indices):
-        assert 1 == x.ndim
+    def points_to_indices(self,points):
+        coords = self.points_to_cell_coords(points)
+        return self.indexer.coords_to_indices(coords)
+
+    def indices_to_lowest_points(self,indices):
+        assert 1 == indices.ndim
         
         coords = self.indexer.indices_to_coords(indices)
-        return canonical_point_from_coords(self,coords)
+        return self.coords_to_lowest_points(coords)
         
-    def canonical_point_from_coords(self,coords):
+    def coords_to_lowest_points(self,coords):
         assert 2 == coords.ndim
         (N,D) = coords.shape
         assert self.dim == D
 
         points = np.empty((N,D))
         for d in xrange(D):
-            points[:,d] = self.node_lists[coords[:,d]]
+            points[:,d] = self.node_lists[d,coords[:,d]]
 
         return points
 

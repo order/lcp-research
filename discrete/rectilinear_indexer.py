@@ -2,6 +2,33 @@ import numpy as np
 import discretize
 import itertools
 
+# Coord to index testing function (slow)
+def slow_coord_to_index(target,lens):
+    """
+    Slow way of converting coords to indices
+    C-style indexing
+    """
+    assert 1 == target.ndim
+    assert 1 == lens.ndim
+    D = lens.size
+    assert D == target.size
+    
+    coord = np.zeros(D)
+    I = 0
+    while np.any(target > coord):
+        coord[-1] += 1
+        I += 1
+        for d in xrange(D-1,-1,-1):
+            if lens[d] == coord[d]:
+                coord[d] = 0
+                if d > 0:
+                    coord[d-1] += 1
+                else:
+                    return -1
+            else:
+                break        
+    return I
+
 def c_stride_coef(lens):
     """
     The coefficients for converting ND-array coords
@@ -29,7 +56,7 @@ class Indexer(object):
 
     """
     def __init__(self,lens):
-        lens = np.array(lens)
+        lens = np.array(lens) 
         (D,) = lens.shape
         self.dim = D
 
@@ -38,6 +65,7 @@ class Indexer(object):
         If a point is oob in several dimensions, it's assigned to the oob 
         node in the first dimension that it violates
         """
+        
         self.physical_max_index = np.product(lens) - 1
         self.max_index = self.physical_max_index + 2*D
         self.lens = np.array(lens)
@@ -71,6 +99,7 @@ class Indexer(object):
         assert not np.any(np.isnan(coords))
 
         # Does most of the work
+        
         indices = coords.dot(self.coef)
 
         # OOB handling
@@ -83,7 +112,7 @@ class Indexer(object):
 
             # Too large
             oob_idx = self.get_oob_index(d,1)
-            mask = (coords[:,d] >= self.lens[d]-1)
+            mask = (coords[:,d] >= self.lens[d])
             indices[mask] = oob_idx
             
         return indices
@@ -128,6 +157,6 @@ class Indexer(object):
         assert((N,2**D) == neighbors.shape)
         return neighbors
 
-
     def is_oob(self,indices):
         return indices > self.physical_max_index
+

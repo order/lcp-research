@@ -19,11 +19,71 @@ class Discretizer(object):
 class TabularDiscretizer(Discretizer):
     def __init__(self,grid):
         self.grid = grid
+        self.dim = grid.dim
+        
+        self.node_indexer = grid.get_indexer()
+        lens = self.node_indexer.lens
+        assert np.all(lens >= 2) # 2 nodes, one cell
+        self.num_nodes = lens
+        self.num_cells = lens - 1
+        self.cell_indexer = Indexer(self.num_cells)
 
+        self.oob_offset = self.node_indexer.physical_max_index \
+                          - self.cell_indexer.physical_max_index
+        
+
+    def remap_node_indices_to_cell_indices(self,node_indices):
+        """
+        Map least indexed vertex to cell index
+        
+        6 - 7 - 8
+        | 3 | 4 |
+        3 - 4 - 5
+        | 0 | 1 |
+        0 - 1 - 2
+
+            |
+            v
+
+        6 - 7 - 8
+        | 2 | 3 |
+        3 - 4 - 5
+        | 0 | 1 |
+        0 - 1 - 2
+        """
+        node_oob_mask = self.node_indexer.is_oob(node_indices)
+        node_coords = self.node_indexer.indices_to_coords(node_indices)
+
+        node_coords[node_oob_mask,:] = -1
+        # Nothing has final coord
+        for d in xrange(self.dim):
+            assert(node_coords[node_oob_mask,d] < self.num_nodes-1)
+
+        cell_indices = self.cell_indexer.coords_to_indices(node_coords)
+        cell_oob_mask = self.cell_indexer.is_oob(cell_indices)
+        assert(np.all(cell_oob_mask == node_oob_mask))
+
+        cell_indices[node_oob_mask] = node_indices - self.oob_offset
+        
+        return cell_indices      
+    
+        
     def locate(self,points):
+        """
+        The location distribution for a point is the 
+        index of the cell that it falls in.
+
+        6 - 7 - 8
+        | 2 | 3 |
+        3 - 4 - 5
+        | 0 | 1 |
+        0 - 1 - 2
+        
+        """
         (N,D) = points.shape
         assert (D == self.grid.get_dim())
-        
+
+ 
         indices = self.grid.points_to_indices(points)
         assert(not np.any(np.isnan(indices)))
         
@@ -39,39 +99,40 @@ class TabularDiscretizer(Discretizer):
 #############################
 
 def MultilinearInterpolation(object):
-        def __init__(self,grid):
-            self.grid = grid
+    def __init__(self,grid):
+        self.grid = grid
 
-        def convert_to_sparse_matrix(self,indices,vertices,weights):
-            (N,) = indices.shape
-            D = self.grid.get_dim()
+    def convert_to_sparse_matrix(self,indices,vertices,weights):
+        (N,) = indices.shape
+        D = self.grid.get_dim()
+
+        indexer = self.grid.get_indexer()
+        oob_mask = indexer.is_oob(indices)
+        num_oob = np.sum(oob_mask)
+        num_normal = N = num_oob
+        normal_idx = np.arange(N)[~oob_mask]
+        oob_idx = np.arange(N)[oob_mask]
+        
+        m = num_norm*(2**D) # Space for normal points
+        M = m + num_oob # Add on space for oob nodes
+        cols = np.empty(M)
+        rows = np.empty(M)
+        data = np.empty(M)
+
+        # Add normal weights
+        cols[:m] = (np.tile(normal_idx,(2**D,1)).T).flatten()
+        rows[:m] = (vertices[~oob_mask,:]).flatten()
+        data[:m] = (weights[~oob_mask,:]).flatten()
+
+        # Route all oob points to oob node
+        cols[B:] = oob_idx
+        rows[B:] = indices[oob_idx]
+        data[B:] = np.ones(num_oob)
+
+        NN = self.grid.get_num_nodes()
+        return sps.coo_matrix((data,(rows,cols)),shape=(NN,N))           
             
-            oob_mask = self.grid.indexer.is_oob(indices)
-            num_oob = np.sum(oob_mask)
-            num_normal = N = num_oob
-            normal_idx = np.arange(N)[~oob_mask]
-            oob_idx = np.arange(N)[oob_mask]
-
-            m = num_norm*(2**D) # Space for normal points
-            M = m + num_oob # Add on space for oob nodes
-            cols = np.empty(M)
-            rows = np.empty(M)
-            data = np.empty(M)
-
-            # Add normal weights
-            cols[:m] = (np.tile(normal_idx,(2**D,1)).T).flatten()
-            rows[:m] = (vertices[~oob_mask,:]).flatten()
-            data[:m] = (weights[~oob_mask,:]).flatten()
-
-            # Route all oob points to oob node
-            cols[B:] = oob_idx
-            rows[B:] = indices[oob_idx]
-            data[B:] = np.ones(num_oob)
-
-            NN = self.grid.get_num_nodes()
-            return sps.coo_matrix((data,(rows,cols)),shape=(NN,N))           
-            
-        def locate(self,points):
+    def locate(self,points):
         (N,D) = points.shape
         assert D == self.grid.get_dim()
 

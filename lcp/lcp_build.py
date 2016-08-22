@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from lcp import *
 from linalg import *
-from utils import issorted
+from utils import is_sorted
 
 from sortedcontainers import SortedSet as sortedset
 
@@ -28,9 +28,8 @@ class LCPBuilder(object):
         self.state_weights = scale * np.ones(self.num_states)
         
     def build(self):
-        print 'Omitting', self.omitted_nodes.keys()
         idx = np.array(self.included_nodes,dtype=np.int)
-        assert(issorted(idx))
+        assert is_sorted(idx)
 
         # Define matrix and block sizes
         block_size = idx.size # Use the included number 
