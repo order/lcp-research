@@ -180,12 +180,12 @@ if __name__ == "__main__":
 
     indexer_test_0()
     
-    #regular_grid_test_0()
-    #regular_grid_test_1()
-    #regular_grid_test_2()
+    regular_grid_test_0()
+    regular_grid_test_1()
+    regular_grid_test_2()
 
-    #irregular_grid_test_0()
-    #irregular_grid_test_1()
-    #irregular_grid_test_2()
+    irregular_grid_test_0()
+    irregular_grid_test_1()
+    irregular_grid_test_2()
 
-    #tabular_discretizer_test_0()
+    tabular_discretizer_test_0()
