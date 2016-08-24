@@ -2,6 +2,8 @@ import numpy as np
 import discretize
 import itertools
 
+from coord import OutOfBounds, Coordinates
+
 from utils import row_vect,col_vect,is_int,is_vect
 
 class Indexer(object):
@@ -72,9 +74,9 @@ class Indexer(object):
 
         if oob.has_oob():
             indices = np.empty(N)
-            indices[~oob.mask] = (raw_coords[~oob_mask,:]).dot(self.coef)
+            indices[~oob.mask] = (raw_coords[~oob.mask,:]).dot(self.coef)
             oob_offset = self.get_num_spatial_nodes() 
-            indices[oob.mask] = oob.indices + oob_offset
+            indices[oob.mask] = oob.indices[oob.mask] + oob_offset
         else:
             indices = raw_coords.dot(self.coef)
         
@@ -97,14 +99,14 @@ class Indexer(object):
 
         # OOB indices mapped to NAN
         oob_mask = self.are_indices_oob(indices)
-        raw_coord[oob_mask,:] = np.nan
+        raw_coords[oob_mask,:] = np.nan
 
         oob_indices = self.indices_to_oob_indices(indices,oob_mask)
 
         oob = OutOfBounds()
         oob.build_from_oob_indices(oob_indices,D)
 
-        Coordinates(raw_coords,oob)
+        coords = Coordinates(raw_coords,oob)
         
         return coords
 
@@ -181,7 +183,9 @@ def slow_coord_to_index(target,lens):
     p q r -> r + R*q + (R*Q)*p
     """
     assert is_vect(target)
+    assert is_int(target)
     assert is_vect(lens)
+    assert is_int(target)
     assert target.shape == lens.shape
     (D,) = lens.shape
 
@@ -194,12 +198,15 @@ def slow_coord_to_index(target,lens):
 
 def even_slower_coord_to_index(target,lens):
     assert is_vect(target)
+    assert is_int(target)
     assert is_vect(lens)
+    assert is_int(target)
     assert target.shape == lens.shape
 
     N = np.prod(lens)
     C = np.reshape(np.arange(N),lens) # Should be row-major ordering
-    return C[tuple(target)]
+    idx = tuple(target.astype(np.integer))
+    return C[idx]
 
 def c_stride_coef(lens):
     """

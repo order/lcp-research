@@ -1,6 +1,6 @@
 import numpy as np
-from rectilinear_grid import *
-from rectilinear_indexer import *
+from grid import *
+from indexer import *
 from discretize import *
 from coord import *
 from utils import *
@@ -66,12 +66,9 @@ def indexer_test_0():
     for i in xrange(10):
         # Convert
         points = np.random.uniform(-1.0,1.0,(1,2))
-        print 'Points', points
         idx1 = RG.points_to_cell_indices(points)[0]
-        print 'Fast index',idx1
         # Double check
         coords = RG.points_to_cell_coords(points)
-        print 'Coords',coords.coords
         raw_coords = coords.coords[0,:]
         idx2 = slow_coord_to_index(raw_coords,num_cells)
         idx3 = even_slower_coord_to_index(raw_coords,num_cells)
@@ -94,8 +91,10 @@ def indexer_test_1():
     indices = RG.points_to_cell_indices(points)
 
     recon_coords = RG.cell_indices_to_cell_coords(indices)
-
-    assert np.all(coords.coords == recon_coords.coords)
+    
+    assert np.all(coords.oob.mask == recon_coords.oob.mask)
+    mask = coords.oob.mask
+    assert np.all(coords.coords[~mask,:] == recon_coords.coords[~mask,:])
 
 ######################
 # REGULAR GRID TESTS #
@@ -108,7 +107,7 @@ def regular_grid_test_0():
     So 'error' should always be negative
     """
     print "regular_grid_test_0"
-    grid_desc = [(-1,1,5),(-1,1,5)]
+    grid_desc = [(-1,1,7),(-1,1,4)]
     RG = RegularGrid(grid_desc)
 
     points = np.random.uniform(-1,1,(1000,2))
@@ -143,7 +142,7 @@ def regular_grid_test_2():
     """
     print "regular_grid_test_2"
     
-    grid_desc = [(-1,1,5),(-1,1,5)]
+    grid_desc = [(-1,1,4),(-1,1,9)]
     RG = RegularGrid(grid_desc)
 
     # Make a little larger for NaN behavior
@@ -159,15 +158,15 @@ def regular_grid_test_3():
     """
     print "regular_grid_test_3"
 
-    grid_desc = [(-1,1,5),(-1,1,5)]
+    grid_desc = [(-1,1,3),(-1,1,16)]
     RG = RegularGrid(grid_desc)
     
-    points = np.random.uniform(-1.1,1.1,(5000,2))
+    points = 1.25*np.random.uniform(-1,1,(5000,2))
     cell_coords = RG.points_to_cell_coords(points)
 
-    oob = RG.is_oob(points)
-    assert np.all(cell_coords[~oob,:] < RG.num_cells[np.newaxis,:])
-    assert np.all(cell_coords[~oob,:] >= 0)
+    oob = RG.are_points_oob(points)
+    assert np.all(cell_coords.coords[~oob,:] < RG.num_cells[np.newaxis,:])
+    assert np.all(cell_coords.coords[~oob,:] >= 0)
 
 def regular_grid_test_4():
     """
@@ -186,7 +185,7 @@ def regular_grid_test_4():
     cell_coords = RG.points_to_cell_coords(points)
     vertices = RG.cell_coords_to_vertex_indices(cell_coords)
     expected = np.arange(4) + (N+1)**2
-    assert np.all(vertices == col_vect(expected))
+    assert np.all(vertices[:,0] == expected)
     
 def regular_grid_test_5():
     """
@@ -194,11 +193,11 @@ def regular_grid_test_5():
     """
     print "regular_grid_test_5"
 
-    grid_desc = [(-1,1,3),(-1,1,3)]
+    grid_desc = [(-1,1,4),(-1,1,5)]
     RG = RegularGrid(grid_desc)
 
-    N = 100
-    points = np.random.uniform(-1.1,1.1,(N,2))
+    N = 125
+    points = 1.25*np.random.uniform(-1,1,(N,2))
     cell_coords = RG.points_to_cell_coords(points)
     vertices = RG.cell_coords_to_vertex_indices(cell_coords)
 

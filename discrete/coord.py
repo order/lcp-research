@@ -1,9 +1,7 @@
 import numpy as np
 import scipy.sparse as sps
 
-from rectilinear_indexer import Indexer
-
-from utils import is_vect,is_mat,row_vect,col_vect   
+from utils import is_int,is_vect,is_mat,row_vect,col_vect   
 
 ############
 # OOB DATA #
@@ -11,10 +9,9 @@ from utils import is_vect,is_mat,row_vect,col_vect
 
 class OutOfBounds(object):
     def __init__(self):
-        self.data = None
-        self.rows = None
-        self.mask = None
-        self.indices = None
+        self.data = None    # sps.spmatrix
+        self.mask = None    # np.array, dtype=bool
+        self.indices = None # np.array
 
         self.dim = None
         self.num = None
@@ -41,22 +38,20 @@ class OutOfBounds(object):
         self.shape = (N,D)
 
         self.mask = oob_mask # Binary mask
-        self.rows = np.where(oob_mask) # Components that aren't nan
-        self.indices = indices[oob_mask] # Cache of the indices
-
+        self.indices = np.empty(N)
+        self.indices[~oob_mask].fill(np.nan)
+        self.indices[oob_mask] = indices[oob_mask] # Cache of the indices
+        
         # Go through the non nan indices, unpack into data
         data = sps.lil_matrix((N,D),dtype=np.integer)
         for d in xrange(D):
             # Even indices
             mask = (self.indices == 2*d)
-            rows = self.row[mask]
-            self.data[mask,d] = -1
+            data[mask,d] = -1
 
             # Odd indices
             mask = (self.indices == 2*d+1)
-            rows = self.row[mask]
-            self.data[mask,d] = 1
-
+            data[mask,d] = 1
         self.data = data.tocsc()
             
     def build_from_points(self,grid,points):
@@ -77,35 +72,34 @@ class OutOfBounds(object):
         L = sps.csc_matrix(points < row_vect(low),dtype=np.integer)
         self.data = U - L
         
-        # Points that violate some boundary
-        self.rows = (self.data.tocoo()).row
-
         # Mask of same
         self.mask = np.zeros(N,dtype=bool)
-        self.mask[self.rows] = True
+        self.mask[self.data.nonzero()[0]] = True
+        assert isinstance(self.mask,np.ndarray)
+        assert (N,) == self.mask.shape
 
         # Sanity check
         assert np.all(self.mask == grid.are_points_oob(points))
 
         # Pre-offset oob node or cell indices
         self.indices = self.find_oob_index()
+        assert is_vect(self.indices)
+        assert np.all(np.isnan(self.indices) == ~self.mask)
         
     def has_oob(self):
-        if self.data is None:
-            # Dummy object
-            return False
+        assert self.data is not None
         
         # Are there any oob points?
-        ret = self.rows.size > 0
-        assert ret == (self.data.sum() > 0)
+        ret = (self.data.nnz > 0)
+        assert ret == (np.sum(self.mask) > 0)
         return ret
         
     def find_oob_index(self):
         """
         Linearizes the oob information
         """
-        (N,) = self.rows.shape
-        indices = np.empty(N)
+        indices = np.empty(self.num)
+        indices.fill(np.nan)
         # Reverse order, larger overwrites smaller
         for d in xrange(self.dim-1,-1,-1):
             # All points that are too small in this dimension

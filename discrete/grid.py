@@ -1,10 +1,10 @@
 import numpy as np
 import scipy.sparse as sps
 
-from rectilinear_indexer import Indexer
+from indexer import Indexer
 from coord import OutOfBounds, Coordinates
 
-from utils import is_sorted,is_vect,is_mat,row_vect,col_vect        
+from utils import is_sorted,is_int,is_vect,is_mat,row_vect,col_vect        
 
 ##############################
 # ABSTRACT RECTILINEAR GRID #
@@ -156,7 +156,7 @@ class RegularGrid(Grid):
             (low,high,num_cells) = self.grid_desc[d]
             # Transform: [low,high) |-> [0,n)
             transform = num_cells * (points[:,d] - low) / (high - low)
-            coords[:,d] = np.floor(transform + self.fuzz)
+            coords[:,d] = np.floor(transform + self.fuzz).astype(np.integer)
             # Add a little fuzz to make sure stuff on the boundary is
             # mapped correctly
 
@@ -165,9 +165,10 @@ class RegularGrid(Grid):
                                      points[:,d] < high + 2*self.fuzz)
             coords[fuzz_mask,d] = num_cells - 1
             # Counts things just a littttle bit greater than last cell
-            # boundary as part of the last cell            
-        coords[~oob.mask,:] = np.nan
+            # boundary as part of the last cell
         
+        coords[oob.mask,:] = np.nan
+        assert is_int(coords)
         return Coordinates(coords,oob)
     
     def points_to_cell_indices(self,points):
@@ -231,12 +232,14 @@ class RegularGrid(Grid):
         node_coords = self.node_indexer.indices_to_coords(node_indices)
         assert isinstance(node_coords,Coordinates)
         
-        C = node_coords.coords
         oob = node_coords.oob
+        C = node_coords.coords
+        assert np.all(np.isnan(C[oob.mask,:]))
+
         node_points = row_vect(self.lower_bound) + C * row_vect(self.delta)
         assert is_mat(node_points)
-        assert np.all(node_points[oob.mask,:] == np.nan)
-        assert cell_coords.shape == node_points.shape
+        assert np.all(np.isnan(node_points[oob.mask,:]))
+        assert node_coords.shape == node_points.shape
         
         return node_points
 
@@ -248,7 +251,7 @@ class RegularGrid(Grid):
         
         vertex_indices = self.cell_coords_to_vertex_indices(cell_coords)
         assert is_mat(vertex_indices) # (N x 2**D) matrix
-        
+
         return vertex_indices
         
     def cell_coords_to_vertex_indices(self,cell_coords):
@@ -283,11 +286,11 @@ class RegularGrid(Grid):
         oob = cell_coords.oob
         if oob.has_oob():
             # Figure out the right oob node
-            oob_indices = low_vertex[oob.mask]
-            offset = self.node_indexer.get_num_spatial_nodes() \
-                     - self.cell_indexer.get_num_spatial_nodes()
-            vertices[oob.mask,0] = col_vect(oob_indices) + offset
+            oob_indices = cell_coords.oob.indices[oob.mask]
+            offset = self.node_indexer.get_num_spatial_nodes()
+            vertices[oob.mask,0] = oob_indices + offset
             vertices[oob.mask,1:] = np.nan
+
         return vertices
 
     def point_to_low_vertex_rel_distance(self,points,cell_indices):

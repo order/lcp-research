@@ -1,8 +1,6 @@
 import numpy as np
 import scipy.sparse as sps
 
-import rectilinear_indexer as rect_indexer
-
 class Discretizer(object):
     
     def points_to_basis_dists(self,points):
