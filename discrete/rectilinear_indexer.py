@@ -2,7 +2,7 @@ import numpy as np
 import discretize
 import itertools
 
-from utils import row_vect,col_vect,is_int
+from utils import row_vect,col_vect,is_int,is_vect
 
 class Indexer(object):
     """
@@ -28,8 +28,8 @@ class Indexer(object):
         node in the first dimension that it violates
         """
         
-        self.physical_max_index = np.product(lens) - 1
-        self.max_index = self.physical_max_index + 2*D
+        self.spatial_max_index = np.product(lens) - 1
+        self.max_index = self.spatial_max_index + 2*D
         self.lens = np.array(lens)
           
         self.coef = c_stride_coef(lens)
@@ -37,14 +37,14 @@ class Indexer(object):
     def get_num_nodes(self):
         return self.max_index + 1
 
-    def get_num_physical_nodes(self):
-        return self.physical_max_index + 1
+    def get_num_spatial_nodes(self):
+        return self.spatial_max_index + 1
 
     def get_oob_indices(self):
         """
         Get all the indices for OOB nodes
         """
-        ret =  range(self.physical_max_index+1,self.max_index+1)
+        ret =  range(self.spatial_max_index+1,self.max_index+1)
         assert 2*self.dim == len(ret)
         return ret
 
@@ -56,7 +56,7 @@ class Indexer(object):
         """
         assert sign in [-1,1]
         assert 0 <= d < self.dim
-        return int(self.physical_max_index + 2*(d+1) + (sign - 1)/2)
+        return int(self.spatial_max_index + 2*(d+1) + (sign - 1)/2)
     
     def coords_to_indices(self,coords):
         """
@@ -64,44 +64,49 @@ class Indexer(object):
         """
         (N,D) = coords.shape
         assert D == self.dim # Dimension right
-        assert not np.any(np.isnan(coords))
 
         # Does most of the work
+
+        raw_coords = coords.coords
+        oob = coords.oob
+
+        if oob.has_oob():
+            indices = np.empty(N)
+            indices[~oob.mask] = (raw_coords[~oob_mask,:]).dot(self.coef)
+            oob_offset = self.get_num_spatial_nodes() 
+            indices[oob.mask] = oob.indices + oob_offset
+        else:
+            indices = raw_coords.dot(self.coef)
         
-        indices = coords.dot(self.coef)
-
-        # OOB handling
-        for d in xrange(D-1,-1,-1):
-            # Reverse order so higher violations are masked by lower ones.
-            # Too small
-            oob_idx = self.get_oob_index(d,-1)
-            mask = coords[:,d] < 0
-            indices[mask] = oob_idx
-
-            # Too large
-            oob_idx = self.get_oob_index(d,1)
-            mask = (coords[:,d] >= self.lens[d])
-            indices[mask] = oob_idx
-            
         return indices
 
     def indices_to_coords(self,indices):
         # Converts indices to coordinates
+        assert is_vect(indices)
         assert is_int(indices)
+        
         (N,) = indices.shape
         D = len(self.coef)
 
         # Does the hard work
-        coords = np.empty((N,D))
+        raw_coords = np.empty((N,D))
         res = indices
         for d in xrange(D):
             (coord,res) = divmod(res,self.coef[d])
-            coords[:,d] = coord
+            raw_coords[:,d] = coord
 
         # OOB indices mapped to NAN
-        oob_mask = np.logical_or(indices < 0,
-                                 indices > self.physical_max_index)
-        coords[oob_mask] = np.nan        
+        oob_mask = self.are_indices_oob(indices)
+        raw_coords[oob_mask,:] = np.nan
+
+        oob_indices = indices - self.get_num_spatial_nodes()
+        oob_indices[~oob_mask] = np.nan
+
+        oob = OutOfBounds()
+        oob.build_from_oob_indices(oob_indices,D)
+
+        Coordinates(raw_coords,oob)
+        
         return coords
 
     def cell_shift(self):
@@ -137,7 +142,8 @@ class Indexer(object):
     def are_indices_oob(self,indices):
         assert 1 == indices.ndim
         assert not np.any(indices > self.max_index)
-        return indices > self.physical_max_index
+        assert not np.any(indices < 0)
+        return indices > self.spatial_max_index
 
 ##################
 # MISC FUNCTIONS #
@@ -147,28 +153,36 @@ class Indexer(object):
 def slow_coord_to_index(target,lens):
     """
     Slow but simple way of converting coords to indices
-    C-style indexing
+    Uses C-style indexing; this means the last coordinate
+    changes most freqently.
+
+    For an (P,Q,R) matrix: 
+    0 0 0 -> 0
+    0 0 1 -> 1
+    0 0 2 -> 2
+       ...
+    p q r -> r + R*q + (R*Q)*p
     """
-    assert 1 == target.ndim
-    assert 1 == lens.ndim
-    D = lens.size
-    assert D == target.size
-    
-    coord = np.zeros(D)
-    I = 0
-    while np.any(target > coord):
-        coord[-1] += 1
-        I += 1
-        for d in xrange(D-1,-1,-1):
-            if lens[d] == coord[d]:
-                coord[d] = 0
-                if d > 0:
-                    coord[d-1] += 1
-                else:
-                    return -1
-            else:
-                break        
-    return I
+    assert is_vect(target)
+    assert is_vect(lens)
+    assert target.shape == lens.shape
+    (D,) = lens.shape
+
+    idx = 0
+    mult = 1
+    for d in xrange(D-1,-1,-1):
+        idx += mult * target[d]
+        mult *= lens[d]
+    return idx
+
+def even_slower_coord_to_index(target,lens):
+    assert is_vect(target)
+    assert is_vect(lens)
+    assert target.shape == lens.shape
+
+    N = np.prod(lens)
+    C = np.reshape(np.arange(N),lens) # Should be row-major ordering
+    return C[tuple(target)]
 
 def c_stride_coef(lens):
     """

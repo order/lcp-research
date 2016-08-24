@@ -2,7 +2,7 @@ import numpy as np
 from rectilinear_grid import *
 from rectilinear_indexer import *
 from discretize import *
-
+from coord import *
 from utils import *
 
 import matplotlib.pyplot as plt
@@ -45,8 +45,9 @@ def oob_test_0():
                        [1.01,0.9],
                        [0.9,-1.01],
                        [0.9,1.01]])
-    oob = OutOfBoundsData(RG,points)
+    oob = OutOfBounds(RG,points)
     print oob.indices
+
 
 #################
 # INDEXER TESTS #
@@ -56,13 +57,37 @@ def indexer_test_0():
     # Make sure that the fast indexer matches the slow indexer
     lens = np.array([5,6])
     indexer = Indexer(lens)
-
+    
     for i in xrange(lens[0]):
-        for j in xrange(lens[1]):
-            coords = np.array([i,j])
-            idx1 = indexer.coords_to_indices(coords[np.newaxis,:])[0]
-            idx2 = slow_coord_to_index(coords,lens)
-            assert(idx1 == idx2)    
+        for j in xrange(lens[1]):            
+            raw_coords = np.array([i,j])[np.newaxis,:]
+            oob = OutOfBounds(raw_coords) # Dummy oob; right dim
+            coords = Coordinates(raw_coords,oob)
+            idx1 = indexer.coords_to_indices(coords)[0]
+            idx2 = slow_coord_to_index(raw_coords[0,:],lens)
+            idx3 = even_slower_coord_to_index(raw_coords[0,:],lens)
+            assert idx1 == idx2
+            assert idx1 == idx3
+
+def indexer_test_1():
+    """
+    Reconstructing coord from indices the same as original convertion
+    of points
+    """
+    print "indexer_test_1"
+    
+    grid_desc = [(-1,1,2),(-1,1,2)]
+    RG = RegularGrid(grid_desc)
+
+    # Make a little larger for NaN behavior
+    points = np.random.uniform(-1.1,1.1,(5000,2))
+    coords = RG.points_to_cell_coords(points)
+    indices = RG.points_to_cell_indices(points)
+
+    recon_coords = 
+
+    node_list = [np.linspace(l,u,n+1) for (l,u,n) in grid_desc]
+    plot_index_scatter(points,indices,node_list)
 
 ######################
 # REGULAR GRID TESTS #
@@ -274,14 +299,14 @@ def tabular_discretizer_test_0():
 if __name__ == "__main__":
 
     oob_test_0()
-    #indexer_test_0()
+    indexer_test_0()
     
-    #regular_grid_test_0()
-    #regular_grid_test_1()
-    #regular_grid_test_2() # Visually inspect plots
-    #regular_grid_test_3()
-    #regular_grid_test_4()
-    #regular_grid_test_5() # Visually inspect plots
+    regular_grid_test_0()
+    regular_grid_test_1()
+    regular_grid_test_2() # Visually inspect plots
+    regular_grid_test_3()
+    regular_grid_test_4()
+    regular_grid_test_5() # Visually inspect plots
 
     #irregular_grid_test_0()
     #irregular_grid_test_1()

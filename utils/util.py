@@ -21,6 +21,16 @@ def is_sorted(x):
         N = len(x)
     return all([x[i] <= x[i+1] for i in xrange(N-1)])
 
+def is_vect(x):
+    if not isinstance(x,np.ndarray):
+        return False
+    return 1 == x.ndim
+
+def is_mat(x):
+    if not isinstance(x,np.ndarray):
+        return False
+    return 2 == x.ndim
+
 def is_int(x):
     """
     Checks if a ndarray is filled with integers

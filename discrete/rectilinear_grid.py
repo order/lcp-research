@@ -2,95 +2,70 @@ import numpy as np
 import scipy.sparse as sps
 
 from rectilinear_indexer import Indexer
+from coord import OutOfBounds, Coordinates
 
-from utils import is_sorted,row_vect,col_vect
-
-############
-# OOB DATA #
-############
-
-class OutOfBoundsData(object):
-    def __init__(self,grid,points):
-        (N,D) = points.shape
-        self.dim = D
-        self.num = N
-        
-        low = grid.get_lower_boundary()
-        high = grid.get_upper_boundary()
-
-
-        # What boundary is violated;
-        # -1 lower boundary,
-        # +1 upper boundary
-        self.data = 1.0*sps.csc_matrix(points > high) \
-               - 1.0*sps.csc_matrix(points < row_vect(low))
-        
-        # Points that violate some boundary
-        self.rows = (self.data.tocoo()).row
-
-        # Mask of same
-        self.mask = np.zeros(N,dtype=bool)
-        self.mask[self.rows] = True
-
-        # Pre-offset oob node or cell indices
-        self.indices = self.find_oob_index()
-        
-    def find_oob_index(self):
-        """
-        Linearizes the oob information
-        """
-        (N,) = self.rows.shape
-        indices = np.empty(N)
-        # Reverse order, larger overwrites smaller
-        for d in xrange(self.dim-1,-1,-1):
-            # All points that are too small in this dimension
-            small = (self.data.getcol(d) == -1).nonzero()[0]
-            indices[small] = 2*d
-
-            # ALl points that are too large in this dimension
-            large = (self.data.getcol(d) == 1).nonzero()[0]
-            indices[large] = 2*d + 1
-        return indices
-            
-                
+from utils import is_sorted,is_vect,is_mat,row_vect,col_vect        
 
 ##############################
 # ABSTRACT RECTILINEAR GRID #
 ##############################
 class Grid(object):
-    # Main functions: convert points to cell coords and indices
-    def points_to_cell_coords(self,points,oob):
+    def points_to_cell_indices(self,points):
+        """
+        Main function: convert points to cell indices.
+        The cells mapped to are the cells that contain them.
+        Points are (N,D) arrays.
+        """
         raise NotImplementedError()
-    def points_to_cell_indices(self,points,oob):
+    def points_to_cell_coords(self,points):
+        """
+        Convert points to cell coords
+        Points are (N,D) arrays.
+        Coords are internal data structures containing the grid
+        coordinates for the cell, and out of bounds information
+        """
         raise NotImplementedError()
 
-    # Map indices to cell midpoint
-    # o - o
-    # | x |
-    # o - o
     def cell_indices_to_mid_points(self,cell_indices):
-        raise NotImplementedError()
-    # Map indices to cell lowpoint
-    # o - o
-    # |   |
-    # x - o   
+        """
+        Map indices to cell midpoint
+        o - o
+        | x |
+        o - o
+        """
+        raise NotImplementedError()  
     def cell_indices_to_low_points(self,cell_indices):
+        """
+        Map indices to cell lowpoint
+        o - o
+        |   |
+        x - o 
+        """
         raise NotImplementedError()
 
     def node_indices_to_node_points(self,node_indices):
         raise NotImplementedError()
 
-    # Map cell indices to the vertex indices of the cell surrounding them
     def cell_indices_to_vertex_indices(self,cell_indices):
+        """
+        Map cell indices to the vertex indices of the cell surrounding them.
+        Vertex indices are node indices.
+        """
         raise NotImplementedError()
-    def cell_coords_to_vertex_indices(self,cell_coords):
-        raise NotImplementedError()
-    # Map points to the relative distance (i.e. scale so the cell is a
-    # unit hypercube) from them to the low point in the cell.
-    def point_to_low_vertex_rel_distance(self,points):
+    def cell_coords_to_vertex_indices(self,cell_coords):        
         raise NotImplementedError()
     
-    # Overall space is an axis-aligned rectangle
+
+    def point_to_low_vertex_rel_distance(self,points):
+        """
+        Map points to the relative distance (i.e. scale so the cell is a
+        unit hypercube) from them to the low point in the cell.
+        """
+        raise NotImplementedError()
+
+    """
+    Gridded space is an axis-aligned rectangle
+    """
     def get_lower_boundary(self):
         return self.lower_bound    
     def get_upper_boundary(self):
@@ -107,27 +82,27 @@ class Grid(object):
     def get_node_indexer(self):
         return self.node_indexer
 
-    def get_num_cells(self):
+    def get_num_total_cells(self):
         # Total number (scalar), include oob
         return self.cell_indexer.max_index+1
     
-    def get_num_real_cells(self):
+    def get_num_spatial_cells(self):
         # Exclude oob
-        return self.cell_indexer.physical_max_index+1
+        return self.cell_indexer.spatial_max_index+1
 
-    def get_num_nodes(self):
+    def get_num_total_nodes(self):
         # Total number (scalar), include oob
         return self.nodes_indexer.max_index+1
     
-    def get_num_real_nodes(self):
+    def get_num_spatial_nodes(self):
         # Exclude oob
-        return self.nodes_indexer.physical_max_index+1
+        return self.nodes_indexer.spatial_max_index+1
     
     def get_num_oob(self):
-        return self.num_nodes() - self.num_real_nodes()
+        return self.num_nodes() - self.num_spatial_nodes()
     
     def get_oob_range(self):
-        return xrange(self.num_real_nodes(),self.num_nodes())
+        return xrange(self.num_spatial_nodes(),self.num_nodes())
 
 
 ##############################
@@ -135,15 +110,18 @@ class Grid(object):
 ##############################
 class RegularGrid(Grid):
     def __init__(self,grid_desc):
+        assert isinstance(grid_desc,(list,tuple))
+        for gd in grid_desc:
+            assert isinstance(gd,(list,tuple))
+            assert 3 == len(gd)        
         self.dim = len(grid_desc)
         self.grid_desc = grid_desc # List of (low,high,num) triples
 
-        # Number of cutpoints along each dimension
         (low,hi,num_cells) = zip(*self.grid_desc)
         self.lower_bound = np.array(low,dtype=np.double)
         self.upper_bound = np.array(hi,dtype=np.double)
-        self.num_cells = np.array(num_cells)
-        assert not np.any(self.num_cells == 0)
+        self.num_cells = np.array(num_cells,dtype=np.integer)
+        assert not np.any(self.num_cells <= 0)
         self.num_nodes = self.num_cells + 1
 
         # Cell dimensions
@@ -157,91 +135,151 @@ class RegularGrid(Grid):
         # Fuzz to convert [low,high) to [low,high]
         self.fuzz = 1e-15
 
-    def points_to_cell_coords(self,points,oob=None):
+    def points_to_cell_coords(self,points):
         """
         Figure out where points are. Returns the cell coordinate.
         """
-
-        if oob is None:
-            oob = OutOfBoundsData(self,points)
-        
+        assert is_mat(points) 
         (N,D) = points.shape
         assert D == self.dim
         
-        Coords = np.empty((N,D))
+        # Get the OOB info
+        oob = OutOfBounds(self,points)
+        
+        coords = np.empty((N,D))
         for d in xrange(D):
             (low,high,num_cells) = self.grid_desc[d]
             # Transform: [low,high) |-> [0,n)
             transform = num_cells * (points[:,d] - low) / (high - low)
-            Coords[:,d] = np.floor(transform + self.fuzz)
+            coords[:,d] = np.floor(transform + self.fuzz)
             # Add a little fuzz to make sure stuff on the boundary is
             # mapped correctly
 
             # Fuzz top boundary to get [low,high]
             fuzz_mask = np.logical_and(high <= points[:,d],
                                      points[:,d] < high + 2*self.fuzz)
-            Coords[fuzz_mask,d] = num_cells - 1
+            coords[fuzz_mask,d] = num_cells - 1
             # Counts things just a littttle bit greater than last cell
-            # boundary as part of the last cell
-            
-        Coords[~oob.mask,:] = np.nan
-        return Coords
+            # boundary as part of the last cell            
+        coords[~oob.mask,:] = np.nan
+        
+        return Coordinates(coords,oob)
     
-    def points_to_cell_indices(self,points,oob=None):
-        if oob is None:
-            oob = OutOfBoundsData(self,points)
-        cell_coords = self.points_to_cell_coords(points,oob)
-        cell_indices = self.cell_indexer.coords_to_indices(cell_coords,oob)
+    def points_to_cell_indices(self,points):
+        assert is_mat(points)
+        (N,D) = points.shape
+        
+        cell_coords = self.points_to_cell_coords(points)
+        assert isinstance(cell_coords,Coordinates)
+        assert (N,D) == cell_coords.shape
+        
+        cell_indices = self.cell_indexer.coords_to_indices(cell_coords)
+        assert is_vect(cell_indices)
+        assert (N,) == cell_indices.shape
+        
         return cell_indices
 
     def cell_indices_to_mid_points(self,cell_indices):
+        assert is_vect(cell_indices)
+
         low_points = cell_indices_to_low_points(self,cell_indices)
-        return low_points + row_vect(0.5 * self.delta)
+        mid_points = low_points + row_vect(0.5 * self.delta)
+        assert is_mat(mid_points)
+        assert mid_points.shape[0] == cell_indices.shape[0]
+        
+        return mid_points
 
     def cell_indices_to_low_points(self,cell_indices):
-        assert 1 == cell_indices.ndim        
+        assert is_vect(cell_indices)
+        
         cell_coords = self.cell_indexer.indices_to_coords(cell_indices)
-        return self.cell_coords_to_low_points(cell_coords)
+        assert isinstance(cell_coords,Coordinates)
+        
+        low_points = self.cell_coords_to_low_points(cell_coords)
+        assert is_mat(low_points)
+        assert cell_coords.shape == low_points.shape
+
+        return low_points
+        
         
     def cell_coords_to_low_points(self,cell_coords):
-        assert 2 == cell_coords.ndim
-        (N,D) = cell_coords.shape
-        assert self.dim == D
-        points = self.lower_bound + cell_coords * row_vect(self.delta)
-        assert (N,D) == points.shape
-        return points
+        assert isinstance(cell_coords,Coordinates)
+        assert self.dim == cell_coords.dim
+        
+        C = cell_coords.coords
+        oob = cell_coords.oob
+        low_points = row_vect(self.lower_bound) + C * row_vect(self.delta)
 
+        assert is_mat(low_points)
+        assert np.all(low_points[oob.mask,:] == np.nan)
+        assert cell_coords.shape == low_points.shape
+        return low_points
+    
     def node_indices_to_node_points(self,node_indices):
+        assert is_vect(node_indices)
+        (N,) = node_indices.shape
+        
         node_coords = self.node_indexer.indices_to_coords(node_indices)
-        return row_vect(self.lower_bound) + node_coords * row_vect(self.delta)
+        assert isinstance(node_coords,Coordinates)
+        
+        C = node_coords.coords
+        oob = node_coords.oob
+        node_points = row_vect(self.lower_bound) + C * row_vect(self.delta)
+        assert is_mat(node_points)
+        assert np.all(node_points[oob.mask,:] == np.nan)
+        assert cell_coords.shape == node_points.shape
+        
+        return node_points
 
     def cell_indices_to_vertex_indices(self,cell_indices):
+        assert is_vect(cell_indices)
+        
         cell_coords = self.cell_indexer.indices_to_coords(cell_indices)
-        return self.cell_coords_to_vertex_indices(cell_coords)
+        assert isinstance(cell_coords,Coordinates)
+        
+        vertex_indices = self.cell_coords_to_vertex_indices(cell_coords)
+        assert is_mat(vertex_indices) # (N x 2**D) matrix
+        
+        return vertex_indices
         
     def cell_coords_to_vertex_indices(self,cell_coords):
+        assert isinstance(cell_coords,Coordinates)
         (N,D) = cell_coords.shape
         assert self.dim == D
 
-        oob_mask = self.cell_indexer.are_coords_oob(cell_coords)
-        
-        # The low node index in the cell has the same coords in node-land
-        # as the cell in cell-land
+
+        """
+        The low node index in the cell has the same coords in node-land
+        as the cell in cell-land:
+         |   |
+        -o - o-
+         | x |
+        -x - o-
+         |   |
+        """        
         low_vertex = self.node_indexer.coords_to_indices(cell_coords)
 
+        # Array of index offsets to reach every vertex in cell
         shift = self.node_indexer.cell_shift()
         assert (2**D,) == shift.shape
         
-        vertices = col_vect(low_vertex) + row_vect(shift)        
-        
-        if oob_mask.sum() > 0:
+        vertices = col_vect(low_vertex) + row_vect(shift)
+        assert (N,2**D) == vertices.shape
+
+        """
+        Handle out of bound nodes. There is a constant offset for 
+        converting cell oob indices to node oob indices.
+        Also the difference between max spatial indices.
+        """
+        oob = cell_coords.oob
+        if oob.has_oob():
             # Figure out the right oob node
-            oob_coords = cell_coords[oob_mask,:]
-            cell_oob = self.cell_indexer.coords_to_indices(oob_coords)
-            node_offset = self.node_indexer.get_num_nodes() \
-                          - self.cell_indexer.get_num_nodes()
-            vertices[oob_mask,:] = col_vect(cell_oob) + node_offset
-        return vertices        
+            oob_indices = low_vertex[oob.mask]
+            offset = self.node_indexer.get_num_spatial_nodes() \
+                     - self.cell_indexer.get_num_spatial_nodes()
+            vertices[oob.mask,0] = col_vect(oob_indices) + offset
+            vertices[oob.mask,1:] = np.nan
+        return vertices
 
     def point_to_low_vertex_rel_distance(self,points,cell_indices):
         raise NotImplementedError()
