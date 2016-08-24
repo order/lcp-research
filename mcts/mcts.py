@@ -1,7 +1,6 @@
 import numpy as np
 from mdp.policies import UniformDiscretePolicy
 import discrete       
-from utils import hash_ndarray
 
 from collections import defaultdict
 from graphviz import Digraph

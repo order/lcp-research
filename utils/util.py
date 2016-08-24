@@ -12,20 +12,48 @@ import matplotlib.pyplot as plt
 import importlib
 
 def is_sorted(x):
+    """
+    Check if an array is sorted
+    """
     if isinstance(x,np.ndarray):
         (N,) = x.shape
     else:
         N = len(x)
     return all([x[i] <= x[i+1] for i in xrange(N-1)])
 
+def is_int(x):
+    """
+    Checks if a ndarray is filled with integers
+    """
+    assert isinstance(x,np.ndarray)
+    if issubclass(x.dtype.type,np.integer):
+        return True
+    f = np.mod(x,1.0)
+    mask = ~np.isnan(x) # ignore NaN
+    return np.all(f[mask] < 1e-15)
 
-def tail_max(discount,T):
-    return np.power(discount,T) / (1.0 - discount)
+def make_points(gens,ret_mesh=False,order='C'):
+    """
+    Makes the mesh in the order you would expect for
+    np.reshape after.
 
-def bounded_tail(discount,bound):
-    T = np.ceil(np.log((1.0 - discount)*bound) / np.log(discount))
-    assert(bound > tail_max(discount,T))
-    return int(T)
+    E.g. if handed [np.linspace(0,1,5),np.linspace(0,1,7)]
+    then this would make the points P such that if mapped
+    the 2D plot makes spacial sense. So np.reshape(np.sum(P),(5,7))
+    would look pretty and not jumpy
+    """
+    if 'F' == order:
+        gens = list(reversed(gens))
+    if 1 == len(gens):
+        return gens[0][:,np.newaxis] # meshgrid needs 2 args
+    
+    meshes = np.meshgrid(*gens,indexing='ij')
+    points = np.column_stack([M.flatten() for M in meshes])
+    if 'F' == order:
+        return np.fliplr(points)
+    if ret_mesh:
+        return points,meshes
+    return points
 
 def banner(msg):
     """
@@ -55,156 +83,16 @@ def banner(msg):
     print '# ' + loc_msg + ' #'
     print '#'*(N+4)      
 
-def sparsity_ratio(A):
-    return float(A.nnz) / float(np.prod(A.shape))
-
-def shift_array(x,pos,pad=np.nan):        
-    (N,) = x.shape # Just for array atm
-    
-    shift = np.empty(N)
-    if pos >= 0:
-        # Right shift:
-        # [0 0 0 x x ... x]
-        shift[:pos] = pad
-        shift[pos:] = x[:-pos]
-    else:
-        # Left shift:
-        #[x ... x x 0 0 0]
-        shift[:pos] = x[-pos:]
-        shift[pos:] = pad
-    
-    return shift
-
-def hash_ndarray(A):
-    return hash(A.tostring())
-    
-def split_extension(filename,ext=None):
-    if ext:
-        assert(not ext.startswith('.'))
-        assert(filename.endswith('.' + ext))
-
-    comps = filename.split('.')
-    return ('.'.join(comps[:-1]),comps[-1])
-    
-
-def kwargify(**kwargs):
-    # I like this dict format
-    return kwargs
-
-def get_instance_from_file(conf_file):
-    """
-    Loads a class from file string
-    So if the string is 'foo/bar/baz.py' then it loads the UNIQUE
-    class in that file.
-    """
-    module = load_module_from_filename(conf_file)
-    classlist = list_module_classes(module)
-
-    assert(1 == len(classlist)) # Class is UNIQUE.
-    return classlist[0][1]() # Instantiate too
-
-def load_module_from_filename(filename):
-    """
-    Loads a module from a relative filename
-    e.g. config/solvers/foo.py will load
-    config.solvers.foo
-    
-    """
-    assert(filename.endswith('.py'))
-    module_str = filename[:-3].replace(os.sep,'.')
-    module = importlib.import_module(module_str)
-    return module
-
-def list_module_classes(mod):
-    classes = inspect.getmembers(mod, inspect.isclass)
-    return classes
-
-# Some debugging routines
-def debug_mapprint(level,**kwargs):
-    if level:
-        for (k,v) in kwargs.items():
-            print k,'=',v
-
-def debug_print(level,str):
-    if level:
-        print str
-
-def shape_str(M):
-    return 'x'.join(map(str,M.shape))
-
 def col_vect(v):
     """
     Convert a n-vector into a nx1 np array.
-    This is an annoying distinct in numpy.
     """
     assert(len(v.shape) == 1)
-    return v[:,np.newaxis]    
+    return v[:,np.newaxis]
 
-def max_eigen(M):
+def row_vect(v):
     """
-    Find the max eigenvalue; wraps around a simple scipy call
+    Convert a n-vector into a 1xn np array.
     """
-    return scipy.sparse.linalg.eigs(M,k=1,return_eigenvectors=False)
-
-def quad(a,b,c):
-    """
-    Solve a simple 1d quadratic formula
-    """
-    d = b**2 - 4*a*c
-    if d < 0:
-        # Only report real solutions
-        return None
-    return ((-b + math.sqrt(d))/2,(-b - math.sqrt(d))/2)
-
-def has_pos_diag(M):
-    """
-    Check if diagonal is positive
-    """
-    [n,m] = M.shape
-    assert(n==m)
-    for i in xrange(n):
-        if M[i,i] <= 0:
-            return False
-    return True
-
-def isvector(x):
-    S = x.shape
-    return len(S) == 1
-    
-def issquare(x):
-    S = x.shape
-    
-    return len(S) == 2 and (S[0] == S[1])
-    
-def nonneg_proj(x):
-    """
-    Projections onto non-negative orthant; the []_+ operator
-    """
-    assert(isvector(x))
-    return np.maximum(np.zeros(x.size),x)
-    
-
-def proj_forward_prop(x,M,q,w):
-    """
-    Does the projected version of Gauss-Siedel-ish forward solving
-    """
-    N = len(x)
-    y = np.zeros(N)
-    for i in xrange(N):
-        curr_round_terms = M[i,0:i].dot(y[0:i])
-        past_round_terms = M[i,i:].dot(x[i:])
-        y[i] = max(0,x[i] - w * (1/M[i][i]) * (q[i] + curr_round_terms  + past_round_terms))
-    return y
-    
-def basic_residual(x,w):
-    """
-    A basic residual for LCPs; will be zero if 
-    """
-    res = np.minimum(x,w)
-    return np.linalg.norm(res)
-    
-# Fisher-Burmeister residual
-def fb_residual(x,w):
-    fb = np.sqrt(x**2 + w**2) - x - w
-    return np.linalg.norm(fb)
-
+    assert(len(v.shape) == 1)
+    return v[np.newaxis,:]    

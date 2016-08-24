@@ -2,45 +2,7 @@ import numpy as np
 import discretize
 import itertools
 
-# Coord to index testing function (slow)
-def slow_coord_to_index(target,lens):
-    """
-    Slow way of converting coords to indices
-    C-style indexing
-    """
-    assert 1 == target.ndim
-    assert 1 == lens.ndim
-    D = lens.size
-    assert D == target.size
-    
-    coord = np.zeros(D)
-    I = 0
-    while np.any(target > coord):
-        coord[-1] += 1
-        I += 1
-        for d in xrange(D-1,-1,-1):
-            if lens[d] == coord[d]:
-                coord[d] = 0
-                if d > 0:
-                    coord[d-1] += 1
-                else:
-                    return -1
-            else:
-                break        
-    return I
-
-def c_stride_coef(lens):
-    """
-    The coefficients for converting ND-array coords
-    to 1D array coords
-
-    NB: in row-major (C) order; requires some flipping.
-    """
-    coef = np.cumprod(np.flipud(lens))
-    coef = np.roll(coef,1)
-    coef[0] = 1.0
-    coef = np.flipud(coef)
-    return coef
+from utils import row_vect,col_vect,is_int
 
 class Indexer(object):
     """
@@ -71,6 +33,12 @@ class Indexer(object):
         self.lens = np.array(lens)
           
         self.coef = c_stride_coef(lens)
+
+    def get_num_nodes(self):
+        return self.max_index + 1
+
+    def get_num_physical_nodes(self):
+        return self.physical_max_index + 1
 
     def get_oob_indices(self):
         """
@@ -119,7 +87,7 @@ class Indexer(object):
 
     def indices_to_coords(self,indices):
         # Converts indices to coordinates
-        assert discretize.is_int(indices)
+        assert is_int(indices)
         (N,) = indices.shape
         D = len(self.coef)
 
@@ -132,13 +100,15 @@ class Indexer(object):
 
         # OOB indices mapped to NAN
         oob_mask = np.logical_or(indices < 0,
-                                 indices >= self.physical_max_index)
-        coords[oob_mask] = np.nan
-        
-        return coords.astype(np.int64)
+                                 indices > self.physical_max_index)
+        coords[oob_mask] = np.nan        
+        return coords
 
     def cell_shift(self):
-        # Returns the index offsets requiresd to visit all nodes in a cell
+        # Returns the index offsets required to visit all nodes in a cell
+        # o - o
+        # |   |
+        # x - o
         D = self.dim
         shift = np.empty(2**D)
 
@@ -153,10 +123,62 @@ class Indexer(object):
         D = self.dim
         shift = self.cell_shift()
         
-        neighbors = indices[:,np.newaxis] + shift[np.newaxis,:]
+        neighbors = col_vect(indices) + row_vect(shift)
         assert((N,2**D) == neighbors.shape)
         return neighbors
-
-    def is_oob(self,indices):
+    
+    def are_coords_oob(self,coords):
+        (N,D) = coords.shape
+        assert D == self.dim
+        L = np.any(coords < 0,axis=1)
+        U = np.any(coords >= row_vect(self.lens),axis=1)
+        return np.logical_or(L,U)
+            
+    def are_indices_oob(self,indices):
+        assert 1 == indices.ndim
+        assert not np.any(indices > self.max_index)
         return indices > self.physical_max_index
 
+##################
+# MISC FUNCTIONS #
+##################
+
+# Coord to index testing function (slow)
+def slow_coord_to_index(target,lens):
+    """
+    Slow but simple way of converting coords to indices
+    C-style indexing
+    """
+    assert 1 == target.ndim
+    assert 1 == lens.ndim
+    D = lens.size
+    assert D == target.size
+    
+    coord = np.zeros(D)
+    I = 0
+    while np.any(target > coord):
+        coord[-1] += 1
+        I += 1
+        for d in xrange(D-1,-1,-1):
+            if lens[d] == coord[d]:
+                coord[d] = 0
+                if d > 0:
+                    coord[d-1] += 1
+                else:
+                    return -1
+            else:
+                break        
+    return I
+
+def c_stride_coef(lens):
+    """
+    The coefficients for converting ND-array coords
+    to 1D array coords
+
+    NB: in row-major (C) order; requires some flipping.
+    """
+    coef = np.cumprod(np.flipud(lens))
+    coef = np.roll(coef,1)
+    coef[0] = 1.0
+    coef = np.flipud(coef)
+    return coef

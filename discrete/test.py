@@ -3,6 +3,8 @@ from rectilinear_grid import *
 from rectilinear_indexer import *
 from discretize import *
 
+from utils import *
+
 import matplotlib.pyplot as plt
 
 def plot_pairwise(A,B):
@@ -31,6 +33,21 @@ def sorted_random(N):
     points = np.concatenate([np.array([-1,1]), np.random.uniform(-1,1,N-2)])
     return np.sort(points)
 
+#############
+# OOB TESTS #
+#############
+def oob_test_0():
+
+    print "oob_test_0"
+    grid_desc = [(-1,1,5),(-1,1,5)]
+    RG = RegularGrid(grid_desc)
+    points = np.array([[-1.01,0.9],
+                       [1.01,0.9],
+                       [0.9,-1.01],
+                       [0.9,1.01]])
+    oob = OutOfBoundsData(RG,points)
+    print oob.indices
+
 #################
 # INDEXER TESTS #
 #################
@@ -57,14 +74,15 @@ def regular_grid_test_0():
     Cell index point is always the least vertex in the cell,
     So 'error' should always be negative
     """
-    
-    grid_desc = [(-1,1,15),(-1,1,15)]
+    print "regular_grid_test_0"
+    grid_desc = [(-1,1,5),(-1,1,5)]
     RG = RegularGrid(grid_desc)
 
-    points = np.random.uniform(-1,1,1500,2)
-    indices = RG.points_to_indices(points)    
-    recon_points = RG.indices_to_lowest_points(indices)
-    
+    points = np.random.uniform(-1,1,(1000,2))
+    indices = RG.points_to_cell_indices(points)
+    recon_points = RG.cell_indices_to_low_points(indices)
+
+    # Visually look at the mapping to the low points
     #plot_pairwise(points,recon_points)
 
     diff = points - recon_points
@@ -74,12 +92,14 @@ def regular_grid_test_1():
     """
     Map cell index points. Should be identity
     """
+    print "regular_grid_test_1"
+
     grid_desc = [(-1,1,15),(-1,1,25)]
     RG = RegularGrid(grid_desc)
 
     points = make_points([np.linspace(l,u,n+1)[:-1] for (l,u,n) in grid_desc])
-    indices = RG.points_to_indices(points)    
-    recon_points = RG.indices_to_lowest_points(indices)
+    indices = RG.points_to_cell_indices(points)    
+    recon_points = RG.cell_indices_to_low_points(indices)
     
     diff = points - recon_points
     assert np.linalg.norm(diff) < 1e-9    
@@ -88,15 +108,77 @@ def regular_grid_test_2():
     """
     Plot mappings, visually scan for issues
     """
+    print "regular_grid_test_2"
+    
     grid_desc = [(-1,1,5),(-1,1,5)]
     RG = RegularGrid(grid_desc)
 
     # Make a little larger for NaN behavior
     points = np.random.uniform(-1.1,1.1,(5000,2))
-    indices = RG.points_to_indices(points)
+    indices = RG.points_to_cell_indices(points)
 
     node_list = [np.linspace(l,u,n+1) for (l,u,n) in grid_desc]
     plot_index_scatter(points,indices,node_list)
+
+def regular_grid_test_3():
+    """
+    Some santity conditions on the cell coordinates
+    """
+    print "regular_grid_test_3"
+
+    grid_desc = [(-1,1,5),(-1,1,5)]
+    RG = RegularGrid(grid_desc)
+    
+    points = np.random.uniform(-1.1,1.1,(5000,2))
+    cell_coords = RG.points_to_cell_coords(points)
+
+    oob = RG.is_oob(points)
+    assert np.all(cell_coords[~oob,:] < RG.num_cells[np.newaxis,:])
+    assert np.all(cell_coords[~oob,:] >= 0)
+
+def regular_grid_test_4():
+    """
+    Checking oob behavior for regular grids
+    """
+    print "regular_grid_test_4"
+
+    N = 3
+    grid_desc = [(-1,1,N),(-1,1,N)]
+    RG = RegularGrid(grid_desc)
+
+    points = np.array([[-1.01,0.9],
+                       [1.01,0.9],
+                       [0.9,-1.01],
+                       [0.9,1.01]])
+    cell_coords = RG.points_to_cell_coords(points)
+    vertices = RG.cell_coords_to_vertex_indices(cell_coords)
+    expected = np.arange(4) + (N+1)**2
+    assert np.all(vertices == col_vect(expected))
+    
+def regular_grid_test_5():
+    """
+    Map points to cell vertices
+    """
+    print "regular_grid_test_5"
+
+    grid_desc = [(-1,1,3),(-1,1,3)]
+    RG = RegularGrid(grid_desc)
+
+    N = 100
+    points = np.random.uniform(-1.1,1.1,(N,2))
+    cell_coords = RG.points_to_cell_coords(points)
+    vertices = RG.cell_coords_to_vertex_indices(cell_coords)
+
+    plt.plot(points[:,0],points[:,1],'.b')
+    for v in xrange(4):
+        V = RG.node_indices_to_node_points(vertices[:,v])
+        for i in xrange(N):
+            plt.plot([points[i,0],V[i,0]],
+                     [points[i,1],V[i,1]],
+                     '-b',alpha=0.25)
+        plt.plot(V[:,0],V[:,1],'or')
+    plt.title('Mapping random points to containing node')
+    plt.show()
 
 ########################
 # IRREGULAR GRID TESTS #
@@ -160,16 +242,29 @@ def irregular_grid_test_2():
 ################################
 
 def tabular_discretizer_test_0():
-    grid_desc = [(-1,1,2),(-1,1,2)]
+    """
+    Some basic sanity tests for tabular discretization
+    """
+    print "tabular_discretizer_test_0"
+
+    N = 5
+    grid_desc = [(-1,1,N),(-1,1,N)]
     RG = RegularGrid(grid_desc)
 
-    points = 2 * np.random.rand(500,2) - 1
     disc = TabularDiscretizer(RG)
-    dist = disc.locate(points)
+    assert (N*N + 4) == disc.get_num_basis()
 
-    print dist.sum(axis=0)
-    print dist.sum(axis=1)
-    
+    points = np.random.uniform(-1.1,1.1,(1500,2))
+    dist = disc.points_to_basis_dists(points)
+
+    num_phys = disc.num_physical_basis-1
+    assert num_phys == N*N-1
+
+    # Covers physical spaces
+    assert np.all((dist.sum(axis=1))[:num_phys] > 0)
+
+    # Is stochastic
+    assert np.max(np.abs(dist.sum(axis=0) - 1)) < 1e-8
     
 
 #################
@@ -178,14 +273,18 @@ def tabular_discretizer_test_0():
     
 if __name__ == "__main__":
 
-    indexer_test_0()
+    oob_test_0()
+    #indexer_test_0()
     
-    regular_grid_test_0()
-    regular_grid_test_1()
-    regular_grid_test_2()
+    #regular_grid_test_0()
+    #regular_grid_test_1()
+    #regular_grid_test_2() # Visually inspect plots
+    #regular_grid_test_3()
+    #regular_grid_test_4()
+    #regular_grid_test_5() # Visually inspect plots
 
-    irregular_grid_test_0()
-    irregular_grid_test_1()
-    irregular_grid_test_2()
+    #irregular_grid_test_0()
+    #irregular_grid_test_1()
+    #irregular_grid_test_2()
 
-    tabular_discretizer_test_0()
+    #tabular_discretizer_test_0()

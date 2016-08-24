@@ -3,18 +3,91 @@ import scipy.sparse as sps
 
 from rectilinear_indexer import Indexer
 
-from utils import is_sorted
+from utils import is_sorted,row_vect,col_vect
+
+############
+# OOB DATA #
+############
+
+class OutOfBoundsData(object):
+    def __init__(self,grid,points):
+        (N,D) = points.shape
+        self.dim = D
+        self.num = N
+        
+        low = grid.get_lower_boundary()
+        high = grid.get_upper_boundary()
+
+
+        # What boundary is violated;
+        # -1 lower boundary,
+        # +1 upper boundary
+        self.data = 1.0*sps.csc_matrix(points > high) \
+               - 1.0*sps.csc_matrix(points < row_vect(low))
+        
+        # Points that violate some boundary
+        self.rows = (self.data.tocoo()).row
+
+        # Mask of same
+        self.mask = np.zeros(N,dtype=bool)
+        self.mask[self.rows] = True
+
+        # Pre-offset oob node or cell indices
+        self.indices = self.find_oob_index()
+        
+    def find_oob_index(self):
+        """
+        Linearizes the oob information
+        """
+        (N,) = self.rows.shape
+        indices = np.empty(N)
+        # Reverse order, larger overwrites smaller
+        for d in xrange(self.dim-1,-1,-1):
+            # All points that are too small in this dimension
+            small = (self.data.getcol(d) == -1).nonzero()[0]
+            indices[small] = 2*d
+
+            # ALl points that are too large in this dimension
+            large = (self.data.getcol(d) == 1).nonzero()[0]
+            indices[large] = 2*d + 1
+        return indices
+            
+                
 
 ##############################
 # ABSTRACT RECTILINEAR GRID #
 ##############################
 class Grid(object):
-    # Main function: convert points to cell coordinates
-    def points_to_cell_coords(self,points):
+    # Main functions: convert points to cell coords and indices
+    def points_to_cell_coords(self,points,oob):
         raise NotImplementedError()
-    def points_to_indices(self,points):
-        raise NotImplementedError()       
-    def indices_to_lowest_points(self,coords):
+    def points_to_cell_indices(self,points,oob):
+        raise NotImplementedError()
+
+    # Map indices to cell midpoint
+    # o - o
+    # | x |
+    # o - o
+    def cell_indices_to_mid_points(self,cell_indices):
+        raise NotImplementedError()
+    # Map indices to cell lowpoint
+    # o - o
+    # |   |
+    # x - o   
+    def cell_indices_to_low_points(self,cell_indices):
+        raise NotImplementedError()
+
+    def node_indices_to_node_points(self,node_indices):
+        raise NotImplementedError()
+
+    # Map cell indices to the vertex indices of the cell surrounding them
+    def cell_indices_to_vertex_indices(self,cell_indices):
+        raise NotImplementedError()
+    def cell_coords_to_vertex_indices(self,cell_coords):
+        raise NotImplementedError()
+    # Map points to the relative distance (i.e. scale so the cell is a
+    # unit hypercube) from them to the low point in the cell.
+    def point_to_low_vertex_rel_distance(self,points):
         raise NotImplementedError()
     
     # Overall space is an axis-aligned rectangle
@@ -25,16 +98,30 @@ class Grid(object):
     def get_dim(self):
         return self.dim
 
-    def get_indexer(self):
-        return indexer
+    def are_points_oob(self,points):
+        raise NotImplementedError()
+
+    def get_cell_indexer(self):
+        return self.cell_indexer
+
+    def get_node_indexer(self):
+        return self.node_indexer
+
+    def get_num_cells(self):
+        # Total number (scalar), include oob
+        return self.cell_indexer.max_index+1
+    
+    def get_num_real_cells(self):
+        # Exclude oob
+        return self.cell_indexer.physical_max_index+1
 
     def get_num_nodes(self):
         # Total number (scalar), include oob
-        return self.indexer.max_index+1
+        return self.nodes_indexer.max_index+1
     
     def get_num_real_nodes(self):
         # Exclude oob
-        return self.indexer.physical_max_index+1
+        return self.nodes_indexer.physical_max_index+1
     
     def get_num_oob(self):
         return self.num_nodes() - self.num_real_nodes()
@@ -52,63 +139,126 @@ class RegularGrid(Grid):
         self.grid_desc = grid_desc # List of (low,high,num) triples
 
         # Number of cutpoints along each dimension
-        (low,hi,num) = zip(*self.grid_desc)
+        (low,hi,num_cells) = zip(*self.grid_desc)
         self.lower_bound = np.array(low,dtype=np.double)
         self.upper_bound = np.array(hi,dtype=np.double)
-        self.num_cells = np.array(num)
-        
+        self.num_cells = np.array(num_cells)
         assert not np.any(self.num_cells == 0)
         self.num_nodes = self.num_cells + 1
 
+        # Cell dimensions
         self.delta = (self.upper_bound - self.lower_bound)
         self.delta /= self.num_cells.astype(np.double)
 
         # Initialize the indexer
-        self.indexer = Indexer(self.num_nodes)
+        self.cell_indexer = Indexer(self.num_cells)
+        self.node_indexer = Indexer(self.num_nodes)
 
         # Fuzz to convert [low,high) to [low,high]
-        self.fuzz = 1e-12        
+        self.fuzz = 1e-15
 
-    def points_to_cell_coords(self,points):
+    def points_to_cell_coords(self,points,oob=None):
         """
-        Figure out which cell each point is in
+        Figure out where points are. Returns the cell coordinate.
         """
+
+        if oob is None:
+            oob = OutOfBoundsData(self,points)
+        
         (N,D) = points.shape
         assert D == self.dim
         
         Coords = np.empty((N,D))
         for d in xrange(D):
-            (low,high,n) = self.grid_desc[d]
-            hi_cell = n-1
+            (low,high,num_cells) = self.grid_desc[d]
             # Transform: [low,high) |-> [0,n)
-            transform = n * (points[:,d] - low) / (high - low) + self.fuzz
-            Coords[:,d] = np.floor(transform)
+            transform = num_cells * (points[:,d] - low) / (high - low)
+            Coords[:,d] = np.floor(transform + self.fuzz)
+            # Add a little fuzz to make sure stuff on the boundary is
+            # mapped correctly
 
             # Fuzz top boundary to get [low,high]
             fuzz_mask = np.logical_and(high <= points[:,d],
                                      points[:,d] < high + 2*self.fuzz)
-            Coords[fuzz_mask,d] = hi_cell
+            Coords[fuzz_mask,d] = num_cells - 1
+            # Counts things just a littttle bit greater than last cell
+            # boundary as part of the last cell
+            
+        Coords[~oob.mask,:] = np.nan
         return Coords
     
-    def points_to_indices(self,points):
-        coords = self.points_to_cell_coords(points)
-        return self.indexer.coords_to_indices(coords)
+    def points_to_cell_indices(self,points,oob=None):
+        if oob is None:
+            oob = OutOfBoundsData(self,points)
+        cell_coords = self.points_to_cell_coords(points,oob)
+        cell_indices = self.cell_indexer.coords_to_indices(cell_coords,oob)
+        return cell_indices
 
-    def indices_to_lowest_points(self,indices):
-        assert 1 == indices.ndim
+    def cell_indices_to_mid_points(self,cell_indices):
+        low_points = cell_indices_to_low_points(self,cell_indices)
+        return low_points + row_vect(0.5 * self.delta)
+
+    def cell_indices_to_low_points(self,cell_indices):
+        assert 1 == cell_indices.ndim        
+        cell_coords = self.cell_indexer.indices_to_coords(cell_indices)
+        return self.cell_coords_to_low_points(cell_coords)
         
-        coords = self.indexer.indices_to_coords(indices)
-        return self.coords_to_lowest_points(coords)
+    def cell_coords_to_low_points(self,cell_coords):
+        assert 2 == cell_coords.ndim
+        (N,D) = cell_coords.shape
+        assert self.dim == D
+        points = self.lower_bound + cell_coords * row_vect(self.delta)
+        assert (N,D) == points.shape
+        return points
+
+    def node_indices_to_node_points(self,node_indices):
+        node_coords = self.node_indexer.indices_to_coords(node_indices)
+        return row_vect(self.lower_bound) + node_coords * row_vect(self.delta)
+
+    def cell_indices_to_vertex_indices(self,cell_indices):
+        cell_coords = self.cell_indexer.indices_to_coords(cell_indices)
+        return self.cell_coords_to_vertex_indices(cell_coords)
         
-    def coords_to_lowest_points(self,coords):
-        assert 2 == coords.ndim
-        (N,D) = coords.shape
+    def cell_coords_to_vertex_indices(self,cell_coords):
+        (N,D) = cell_coords.shape
         assert self.dim == D
 
-        points = self.lower_bound + coords * self.delta
-        assert (N,D) == points.shape
+        oob_mask = self.cell_indexer.are_coords_oob(cell_coords)
+        
+        # The low node index in the cell has the same coords in node-land
+        # as the cell in cell-land
+        low_vertex = self.node_indexer.coords_to_indices(cell_coords)
 
-        return points
+        shift = self.node_indexer.cell_shift()
+        assert (2**D,) == shift.shape
+        
+        vertices = col_vect(low_vertex) + row_vect(shift)        
+        
+        if oob_mask.sum() > 0:
+            # Figure out the right oob node
+            oob_coords = cell_coords[oob_mask,:]
+            cell_oob = self.cell_indexer.coords_to_indices(oob_coords)
+            node_offset = self.node_indexer.get_num_nodes() \
+                          - self.cell_indexer.get_num_nodes()
+            vertices[oob_mask,:] = col_vect(cell_oob) + node_offset
+        return vertices        
+
+    def point_to_low_vertex_rel_distance(self,points,cell_indices):
+        raise NotImplementedError()
+
+    def are_points_oob(self,points):
+        """
+        Check if points are out-of-bounds
+        """
+        (N,D) = points.shape
+        assert D == self.dim
+
+        L = np.any(points < row_vect(self.lower_bound),axis=1)
+        U = np.any(points > row_vect(self.upper_bound) + self.fuzz,axis=1)
+        assert (N,) == L.shape
+        assert (N,) == U.shape
+
+        return np.logical_or(L,U)
 
 ##############################
 # IRREGULAR RECTILINEAR GRID #
