@@ -17,6 +17,7 @@ class Grid(object):
         Points are (N,D) arrays.
         """
         raise NotImplementedError()
+    
     def points_to_cell_coords(self,points):
         """
         Convert points to cell coords
@@ -25,6 +26,9 @@ class Grid(object):
         coordinates for the cell, and out of bounds information
         """
         raise NotImplementedError()
+
+    def cell_indices_to_cell_coords(self,cell_indices):
+        raise NotImplementedError()       
 
     def cell_indices_to_mid_points(self,cell_indices):
         """
@@ -144,7 +148,8 @@ class RegularGrid(Grid):
         assert D == self.dim
         
         # Get the OOB info
-        oob = OutOfBounds(self,points)
+        oob = OutOfBounds()
+        oob.build_from_points(self,points)
         
         coords = np.empty((N,D))
         for d in xrange(D):
@@ -178,6 +183,10 @@ class RegularGrid(Grid):
         assert (N,) == cell_indices.shape
         
         return cell_indices
+
+    def cell_indices_to_cell_coords(self,cell_indices):
+        cell_coords = self.cell_indexer.indices_to_coords(cell_indices)
+        return cell_coords
 
     def cell_indices_to_mid_points(self,cell_indices):
         assert is_vect(cell_indices)

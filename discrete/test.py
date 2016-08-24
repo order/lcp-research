@@ -45,8 +45,9 @@ def oob_test_0():
                        [1.01,0.9],
                        [0.9,-1.01],
                        [0.9,1.01]])
-    oob = OutOfBounds(RG,points)
-    print oob.indices
+    oob = OutOfBounds()
+    oob.build_from_points(RG,points)
+    assert np.all(oob.indices == np.arange(4))
 
 
 #################
@@ -54,20 +55,28 @@ def oob_test_0():
 #################
 
 def indexer_test_0():
-    # Make sure that the fast indexer matches the slow indexer
-    lens = np.array([5,6])
-    indexer = Indexer(lens)
+    print "indexer_test_0"
     
-    for i in xrange(lens[0]):
-        for j in xrange(lens[1]):            
-            raw_coords = np.array([i,j])[np.newaxis,:]
-            oob = OutOfBounds(raw_coords) # Dummy oob; right dim
-            coords = Coordinates(raw_coords,oob)
-            idx1 = indexer.coords_to_indices(coords)[0]
-            idx2 = slow_coord_to_index(raw_coords[0,:],lens)
-            idx3 = even_slower_coord_to_index(raw_coords[0,:],lens)
-            assert idx1 == idx2
-            assert idx1 == idx3
+    # Make sure that the fast indexer matches the slow indexer
+    grid_desc = [(-1,1,4),(-1,1,6)]
+    (low,hi,num_cells) = zip(*grid_desc)
+    num_cells = np.array(num_cells)
+    RG = RegularGrid(grid_desc)
+
+    for i in xrange(10):
+        # Convert
+        points = np.random.uniform(-1.0,1.0,(1,2))
+        print 'Points', points
+        idx1 = RG.points_to_cell_indices(points)[0]
+        print 'Fast index',idx1
+        # Double check
+        coords = RG.points_to_cell_coords(points)
+        print 'Coords',coords.coords
+        raw_coords = coords.coords[0,:]
+        idx2 = slow_coord_to_index(raw_coords,num_cells)
+        idx3 = even_slower_coord_to_index(raw_coords,num_cells)
+        assert idx1 == idx2
+        assert idx1 == idx3
 
 def indexer_test_1():
     """
@@ -80,14 +89,13 @@ def indexer_test_1():
     RG = RegularGrid(grid_desc)
 
     # Make a little larger for NaN behavior
-    points = np.random.uniform(-1.1,1.1,(5000,2))
+    points = np.random.uniform(-1.1,1.1,(10,2))
     coords = RG.points_to_cell_coords(points)
     indices = RG.points_to_cell_indices(points)
 
-    recon_coords = 
+    recon_coords = RG.cell_indices_to_cell_coords(indices)
 
-    node_list = [np.linspace(l,u,n+1) for (l,u,n) in grid_desc]
-    plot_index_scatter(points,indices,node_list)
+    assert np.all(coords.coords == recon_coords.coords)
 
 ######################
 # REGULAR GRID TESTS #
@@ -300,6 +308,7 @@ if __name__ == "__main__":
 
     oob_test_0()
     indexer_test_0()
+    indexer_test_1()
     
     regular_grid_test_0()
     regular_grid_test_1()

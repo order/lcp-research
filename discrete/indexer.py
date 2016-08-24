@@ -97,10 +97,9 @@ class Indexer(object):
 
         # OOB indices mapped to NAN
         oob_mask = self.are_indices_oob(indices)
-        raw_coords[oob_mask,:] = np.nan
+        raw_coord[oob_mask,:] = np.nan
 
-        oob_indices = indices - self.get_num_spatial_nodes()
-        oob_indices[~oob_mask] = np.nan
+        oob_indices = self.indices_to_oob_indices(indices,oob_mask)
 
         oob = OutOfBounds()
         oob.build_from_oob_indices(oob_indices,D)
@@ -108,6 +107,24 @@ class Indexer(object):
         Coordinates(raw_coords,oob)
         
         return coords
+
+    def indices_to_oob_indices(self,indices,oob_mask=None):
+        assert is_vect(indices)
+        assert is_int(indices)
+        # Identify oob indices
+        if oob_mask is None:
+            oob_mask = self.are_indices_oob(indices)
+        
+        assert is_vect(oob_mask)
+        assert oob_mask.shape == indices.shape
+
+        # Subtract offset, so least oob index is 0
+        oob_indices = indices - self.get_num_spatial_nodes()
+
+        # Nan-out any normal index location
+        oob_indices[~oob_mask] = np.nan
+
+        return oob_indices
 
     def cell_shift(self):
         # Returns the index offsets required to visit all nodes in a cell
