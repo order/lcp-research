@@ -107,6 +107,7 @@ class Indexer(object):
         oob.build_from_oob_indices(oob_indices,D)
 
         coords = Coordinates(raw_coords,oob)
+        assert coords.check()
         
         return coords
 

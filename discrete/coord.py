@@ -16,6 +16,32 @@ class OutOfBounds(object):
         self.dim = None
         self.num = None
         self.shape = None
+
+    def check(self):
+        assert isinstance(self.data,sps.spmatrix)
+        assert is_vect(self.mask)
+        assert is_vect(self.indices)
+
+        (N,D) = self.shape
+        assert N == self.num
+        assert D == self.dim
+
+        assert (N,D) == self.data.shape
+        assert (N,) == self.mask.shape
+        assert (N,) == self.indices.shape
+
+        nz_rows = self.data.nonzero()[0]
+        assert np.all(self.mask[nz_rows])
+
+        assert np.all(np.isnan(self.indices) == ~self.mask)
+        assert not np.any(np.isnan(self.indices[self.mask]))
+        assert np.all(np.isnan(self.indices[~self.mask]))
+
+        assert np.all(self.indices[self.mask] >= 0)
+        assert np.all(self.indices[self.mask] < 2*D)
+        
+        return True
+
     
     def build_from_oob_indices(self,indices,D):
         """
@@ -39,7 +65,7 @@ class OutOfBounds(object):
 
         self.mask = oob_mask # Binary mask
         self.indices = np.empty(N)
-        self.indices[~oob_mask].fill(np.nan)
+        self.indices.fill(np.nan)
         self.indices[oob_mask] = indices[oob_mask] # Cache of the indices
         
         # Go through the non nan indices, unpack into data
@@ -53,6 +79,8 @@ class OutOfBounds(object):
             mask = (self.indices == 2*d+1)
             data[mask,d] = 1
         self.data = data.tocsc()
+
+        assert self.check()
             
     def build_from_points(self,grid,points):
         assert is_mat(points)
@@ -74,7 +102,8 @@ class OutOfBounds(object):
         
         # Mask of same
         self.mask = np.zeros(N,dtype=bool)
-        self.mask[self.data.nonzero()[0]] = True
+        oob_rows = self.data.nonzero()[0]
+        self.mask[oob_rows] = True
         assert isinstance(self.mask,np.ndarray)
         assert (N,) == self.mask.shape
 
@@ -85,7 +114,9 @@ class OutOfBounds(object):
         self.indices = self.find_oob_index()
         assert is_vect(self.indices)
         assert np.all(np.isnan(self.indices) == ~self.mask)
-        
+
+        assert self.check()
+
     def has_oob(self):
         assert self.data is not None
         
@@ -113,6 +144,8 @@ class OutOfBounds(object):
 
         
 
+        
+
 ###################
 # COORDINATE DATA #
 ###################
@@ -131,4 +164,18 @@ class Coordinates(object):
         self.shape = (N,D)
         
         self.coords = coords
-        self.oob = oob   
+        self.oob = oob
+
+    def check(self):
+        assert (self.num,self.dim) == self.shape
+        (N,D) = self.shape
+
+        assert (N,D) == self.coords.shape
+        assert (N,D) == self.oob.shape
+        assert self.oob.check()
+
+        
+        assert np.all(np.isnan(self.coords[self.oob.mask,:]))
+        assert not np.any(np.isnan(self.coords[~self.oob.mask,:]))
+
+        return True

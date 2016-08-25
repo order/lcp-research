@@ -26,8 +26,9 @@ class TabularDiscretizer(Discretizer):
         self.grid = grid
         self.dim = grid.dim
 
+        # Each cell gets a basis function
         self.num_basis = grid.cell_indexer.get_num_nodes()
-        self.num_physical_basis = grid.cell_indexer.get_num_physical_nodes()
+        self.num_spatial_basis = grid.cell_indexer.get_num_spatial_nodes()
 
     def get_num_basis(self):
         return self.num_basis
@@ -62,15 +63,17 @@ class TabularDiscretizer(Discretizer):
 # MULTILINEAR INTERPOLATION #
 #############################
 
-def MultilinearInterpolation(object):
+class MultilinearInterpolation(Discretizer):
     def __init__(self,grid):
-        self.grid = grid       
+        self.grid = grid
+        self.dim = grid.dim
+
+        # Each node gets a basic function
+        self.num_basis = grid.node_indexer.get_num_nodes()
+        self.num_spatial_basis = grid.node_indexer.get_num_spatial_nodes()
 
     def get_num_basis(self):
-        """
-        Gets the number of basis functions / nodes
-        """
-        raise NotImplementedError()
+        return self.num_basis
 
     def convert_to_sparse_matrix(self,indices,vertices,weights):
         (N,) = indices.shape
@@ -102,16 +105,21 @@ def MultilinearInterpolation(object):
         NN = self.grid.get_num_nodes()
         return sps.coo_matrix((data,(rows,cols)),shape=(NN,N))           
             
-    def locate(self,points):
+    def points_to_basis_dists(self,points):
         (N,D) = points.shape
         assert D == self.grid.get_dim()
 
-        # Get indices
-        indices = points_to_indices(points) # Compute once
-        
-        dist = self.grid.get_rel_distance_to_low(points,indices)
-        assert (N,D) == dist
+        G = self.grid
 
+        # Get indices
+        cell_coords = G.points_to_cell_coords(points)
+
+        # Get rel distances
+        rel_dist = G.points_to_low_vertex_rel_distance(points,
+                                                       cell_coords)
+        assert (N,D) == rel_dist.shape
+
+        # Get the vertices
         vertices = self.grid.get_neighbors(indices)
         assert (N,2**D) == vertices.shape
         
@@ -122,5 +130,8 @@ def MultilinearInterpolation(object):
             mask = np.array(diff,dtype=bool)
             weights[:,i] = np.product(dist[:,mask],axis=1)\
                            * np.product(1 - dist[:,~mask],axis=1)
+
+        print weights
+        quit()
 
         return convert_to_sparse_matrix(self,indices,vertices,weights)

@@ -47,6 +47,9 @@ class Grid(object):
         """
         raise NotImplementedError()
 
+    def cell_coords_to_low_points(self,cell_coords):
+        raise NotImplementedError()
+
     def node_indices_to_node_points(self,node_indices):
         raise NotImplementedError()
 
@@ -60,7 +63,7 @@ class Grid(object):
         raise NotImplementedError()
     
 
-    def point_to_low_vertex_rel_distance(self,points):
+    def points_to_low_vertex_rel_distance(self,points,cell_coords):
         """
         Map points to the relative distance (i.e. scale so the cell is a
         unit hypercube) from them to the low point in the cell.
@@ -150,26 +153,31 @@ class RegularGrid(Grid):
         # Get the OOB info
         oob = OutOfBounds()
         oob.build_from_points(self,points)
+        assert oob.check()
         
-        coords = np.empty((N,D))
+        raw_coords = np.empty((N,D))
         for d in xrange(D):
             (low,high,num_cells) = self.grid_desc[d]
             # Transform: [low,high) |-> [0,n)
             transform = num_cells * (points[:,d] - low) / (high - low)
-            coords[:,d] = np.floor(transform + self.fuzz).astype(np.integer)
+            transform += self.fuzz
+            raw_coords[:,d] = np.floor(transform).astype(np.integer)
             # Add a little fuzz to make sure stuff on the boundary is
             # mapped correctly
 
             # Fuzz top boundary to get [low,high]
             fuzz_mask = np.logical_and(high <= points[:,d],
                                      points[:,d] < high + 2*self.fuzz)
-            coords[fuzz_mask,d] = num_cells - 1
+            raw_coords[fuzz_mask,d] = num_cells - 1
             # Counts things just a littttle bit greater than last cell
             # boundary as part of the last cell
         
-        coords[oob.mask,:] = np.nan
-        assert is_int(coords)
-        return Coordinates(coords,oob)
+        raw_coords[oob.mask,:] = np.nan
+        assert is_int(raw_coords)
+        coords = Coordinates(raw_coords,oob)
+        assert coords.check()
+
+        return coords
     
     def points_to_cell_indices(self,points):
         assert is_mat(points)
@@ -204,6 +212,7 @@ class RegularGrid(Grid):
         
         cell_coords = self.cell_indexer.indices_to_coords(cell_indices)
         assert isinstance(cell_coords,Coordinates)
+        assert cell_coords.check()
         
         low_points = self.cell_coords_to_low_points(cell_coords)
         assert is_mat(low_points)
@@ -215,13 +224,18 @@ class RegularGrid(Grid):
     def cell_coords_to_low_points(self,cell_coords):
         assert isinstance(cell_coords,Coordinates)
         assert self.dim == cell_coords.dim
+        assert cell_coords.check()
         
         C = cell_coords.coords
         oob = cell_coords.oob
+        assert np.all(np.isnan(C[oob.mask,:])) 
         low_points = row_vect(self.lower_bound) + C * row_vect(self.delta)
 
+        print low_points
+        
         assert is_mat(low_points)
-        assert np.all(low_points[oob.mask,:] == np.nan)
+        
+        assert np.all(np.isnan(low_points[oob.mask,:])) 
         assert cell_coords.shape == low_points.shape
         return low_points
     
@@ -293,8 +307,24 @@ class RegularGrid(Grid):
 
         return vertices
 
-    def point_to_low_vertex_rel_distance(self,points,cell_indices):
-        raise NotImplementedError()
+    def points_to_low_vertex_rel_distance(self,points,cell_coords):
+        assert is_mat(points)
+        assert isinstance(cell_coords,Coordinates)
+        (N,D) = points.shape
+        assert (N,D) == cell_coords.shape
+        
+        low_vertex = self.cell_coords_to_low_points(cell_coords)
+        
+        dist = np.empty((N,D))
+        for d in xrange(D):
+            dist[:,d] = (points[:,d] - low_vertex[:,d]) / self.delta[d]
+
+        dist[cell_coords.oob.mask,:] = 1.0
+        
+        assert np.all(dist >= 0.0)
+        assert np.all(dist <= 1.0)
+
+        return dist
 
     def are_points_oob(self,points):
         """
