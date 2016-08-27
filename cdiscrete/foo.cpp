@@ -17,5 +17,7 @@ int main(int argc, char** argv)
   uvec num = 10*ones<uvec>(D);
 
   UniformGrid grid = UniformGrid(low,high,num);
+
+  Points P = {{0,0},{1,1},{1.1,0},{0,1.1},{-0.1,0},{0,-0.1}};
  
 }

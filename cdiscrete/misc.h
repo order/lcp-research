@@ -36,9 +36,22 @@ void generate_mask(Mask & mask, bvec & source);
 // Element-wise modulus
 uvec vec_mod(const uvec & a, uint n);
 
+// Interval
+template<typename V> bvec in_interval(const V & x,
+				   double lb,
+				   double ub);
+template<typename M,typename V>
+  bvec in_intervals(const M & A,
+		    const V & lb,
+		    const V & ub);
+
 // Logical operations
-uvec land(const uvec & a, const uvec & b);
-uvec lor(const uvec & a, const uvec & b);
+template<typename V> bool is_logical(const V &);
+
+
+template<typename V> bvec land(const V &, const V &);
+template<typename V> bvec lor(const V &, const V &);
+template<typename V> bvec lnot(const V &);
 
 // Row-wise operation
 mat row_mult(const mat & A, const rowvec & b);

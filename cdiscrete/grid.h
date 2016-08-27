@@ -9,7 +9,7 @@
 using namespace std;
 using namespace arma;
 
-#define GRID_FUDGE 1e-15
+#define GRID_FUZZ 1e-15
 
 typedef mat Points;
 typedef uvec Indices;
@@ -19,9 +19,10 @@ typedef mat RelDist;
 
 struct OutOfBounds{
   // Contains out of bounds information
-  bvec oob_mask;
-  uvec oob_idx;
-  ivec oob_type; // +d / -d for violate in dth dim
+  bvec mask;
+  uvec indices;
+  ivec type; // +d / -d for violate in dth dim
+  uint num;
 };
 
 struct Coords{
@@ -39,6 +40,7 @@ class UniformGrid{
 	      uvec & num_cells);
 
   ElementDist points_to_element_dist(const Points &);
+  OutOfBounds points_to_out_of_bounds(const Points &);
   Coords points_to_cell_coords(const Points &);
   Indices cell_coords_to_cell_indicies(const Coords &);
   Indices cell_coords_to_low_node(const Coords &);
@@ -51,6 +53,8 @@ class UniformGrid{
   uvec m_num_cells;
   uvec m_num_nodes;
   vec m_width;
+
+  uint m_dim;
 };
 
 #endif

@@ -28,11 +28,60 @@ uvec vec_mod(const uvec & a, uint n){
   return a - (a / n) * n;
 }
 
-uvec land(const uvec & a, const uvec & b){
+template<typename V> bvec in_interval(const V & x,
+				      double lb,
+				      double ub){
+  uint N = x.n_elem;
+  bvec ret = zeros<bvec>(N);
+  ret(x >= lb).fill(1);
+  ret(x <= ub).fill(1);
+  return ret;
+}
+
+template<typename M,typename V>
+  bvec in_intervals(const M & A,
+		    const V & lb,
+		    const V & ub){
+  uint N = A.n_rows;
+  uint D = A.n_cols;
+  bvec ret = zeros<bvec>(N);
+  for(uint d = 0; d < D; d++){
+    ret(A.col(d) >= lb(d)).fill(1);
+    ret(A.col(d) <= ub(d)).fill(1);
+  }
+  return ret;
+}
+
+template<typename V> bool is_logical(const V & v){
+  vec u = unique(v);
+  if(u.n_elem > 2) return false;
+
+  if(u.n_elem == 2){
+    return (u(0)==0) and (u(1) == 1);
+  }
+
+  assert(u.n_elem == 1);
+  return (u(0) == 0) or (u(0) == 1);
+}
+
+template<typename V>
+bvec land(const V & a, const V & b){
+  assert(is_logical(a));
+  assert(is_logical(b));
   return min(a,b);
 }
-uvec lor(const uvec & a, const uvec & b){
+
+template<typename V>
+bvec lor(const V & a, const V & b){
+  assert(is_logical(a));
+  assert(is_logical(b));
   return max(a,b);
+}
+
+template<typename V>
+bvec lnot(const V & v){
+  assert(is_logical(v));
+  return 1 - v;
 }
 
 mat row_mult(const mat & A, const rowvec & b){
