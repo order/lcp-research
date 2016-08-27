@@ -42,6 +42,10 @@ def is_int(x):
     mask = ~np.isnan(x) # ignore NaN
     return np.all(f[mask] < 1e-15)
 
+def is_float(x):
+    assert isinstance(x,np.ndarray)
+    return issubclass(x.dtype.type,np.float)
+
 def make_points(gens,ret_mesh=False,order='C'):
     """
     Makes the mesh in the order you would expect for

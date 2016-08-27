@@ -333,18 +333,18 @@ def multilinear_discretizer_test_0():
     """
     print "multilinear_discretizer_test_0"
 
-    N = 5
-    grid_desc = [(-1,1,N),(-1,1,N)]
+    N = 3
+    grid_desc = [(0,1,N),(0,1,N)]
     RG = RegularGrid(grid_desc)
 
     disc = MultilinearInterpolation(RG)
     assert ((N+1)*(N+1) + 4) == disc.get_num_basis()
 
-    points = np.random.uniform(-1.1,1.1,(8,2))
+    points = np.random.uniform(0,1,(120,2))
     dist = disc.points_to_basis_dists(points)
 
     num_phys = disc.num_spatial_basis-1
-    assert num_phys == N*N-1
+    assert num_phys == (N+1)*(N+1)-1
 
     # Covers physical spaces
     assert np.all((dist.sum(axis=1))[:num_phys] > 0)
@@ -352,28 +352,54 @@ def multilinear_discretizer_test_0():
     # Is stochastic
     assert np.max(np.abs(dist.sum(axis=0) - 1)) < 1e-8
 
+def multilinear_discretizer_test_1():
+    """
+    Interpolate function
+    """
+    print "multilinear_discretizer_test_1"
+
+    grid_desc = [(-1,1,4),(-1,1,6)]
+    RG = RegularGrid(grid_desc)
+
+    disc = MultilinearInterpolation(RG)
+    N = disc.get_num_basis()
+    #f = np.arange(N)
+    f = np.random.rand(N)
+    
+    points = np.random.uniform(-1.1,1.1,(5000,2))
+    dist = disc.points_to_basis_dists(points)
+
+    g = dist.T.dot(f)
+
+    plt.scatter(points[:,0],
+                points[:,1],
+                c=g,s=50,alpha=0.5,lw=0,cmap='jet')
+    plt.title('Interpolation')
+    plt.show()
+
 #################
 # MAIN FUNCTION #
 #################
     
 if __name__ == "__main__":
 
-    oob_test_0()
-    indexer_test_0()
-    indexer_test_1()
+    #oob_test_0()
+    #indexer_test_0()
+    #indexer_test_1()
     
-    regular_grid_test_0()
-    regular_grid_test_1()
+    #regular_grid_test_0()
+    #regular_grid_test_1()
     #regular_grid_test_2() # Visually inspect plots
-    regular_grid_test_3()
-    regular_grid_test_4()
+    #regular_grid_test_3()
+    #regular_grid_test_4()
     #regular_grid_test_5() # Visually inspect plots
 
     #irregular_grid_test_0()
     #irregular_grid_test_1()
     #irregular_grid_test_2()
 
-    tabular_discretizer_test_0()
+    #tabular_discretizer_test_0()
     #tabular_discretizer_test_1() # Visually inspect plots
     
     multilinear_discretizer_test_0()
+    multilinear_discretizer_test_1()

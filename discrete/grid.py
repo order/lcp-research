@@ -99,17 +99,17 @@ class Grid(object):
 
     def get_num_total_nodes(self):
         # Total number (scalar), include oob
-        return self.nodes_indexer.max_index+1
+        return self.node_indexer.max_index+1
     
     def get_num_spatial_nodes(self):
         # Exclude oob
-        return self.nodes_indexer.spatial_max_index+1
+        return self.node_indexer.spatial_max_index+1
     
     def get_num_oob(self):
-        return self.num_nodes() - self.num_spatial_nodes()
+        return self.num_total_nodes() - self.num_spatial_nodes()
     
     def get_oob_range(self):
-        return xrange(self.num_spatial_nodes(),self.num_nodes())
+        return xrange(self.num_spatial_nodes(),self.num_total_nodes())
 
 
 ##############################
@@ -230,8 +230,6 @@ class RegularGrid(Grid):
         oob = cell_coords.oob
         assert np.all(np.isnan(C[oob.mask,:])) 
         low_points = row_vect(self.lower_bound) + C * row_vect(self.delta)
-
-        print low_points
         
         assert is_mat(low_points)
         
@@ -319,7 +317,8 @@ class RegularGrid(Grid):
         for d in xrange(D):
             dist[:,d] = (points[:,d] - low_vertex[:,d]) / self.delta[d]
 
-        dist[cell_coords.oob.mask,:] = 1.0
+        # OOB -> 0 distance from OOB node
+        dist[cell_coords.oob.mask,:] = 0.0
         
         assert np.all(dist >= 0.0)
         assert np.all(dist <= 1.0)

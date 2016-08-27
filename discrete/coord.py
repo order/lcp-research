@@ -30,7 +30,7 @@ class OutOfBounds(object):
         assert (N,) == self.mask.shape
         assert (N,) == self.indices.shape
 
-        nz_rows = self.data.nonzero()[0]
+        nz_rows = np.unique(self.data.nonzero()[0])
         assert np.all(self.mask[nz_rows])
 
         assert np.all(np.isnan(self.indices) == ~self.mask)
@@ -42,6 +42,11 @@ class OutOfBounds(object):
         
         return True
 
+    def num_oob(self):
+        nz_rows = np.unique(self.data.nonzero()[0])
+        num_oob = nz_rows.size
+        assert num_oob <= self.num
+        return num_oob
     
     def build_from_oob_indices(self,indices,D):
         """
