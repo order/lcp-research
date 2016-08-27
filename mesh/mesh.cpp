@@ -1,41 +1,48 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-#include <CGAL/Regular_triangulation_3.h>
-#include <CGAL/Regular_triangulation_euclidean_traits_3.h>
-#include <cassert>
-#include <vector>
+#include <CGAL/Constrained_Delaunay_triangulation_2.h>
+#include <CGAL/Delaunay_mesher_2.h>
+#include <CGAL/Delaunay_mesh_face_base_2.h>
+#include <CGAL/Delaunay_mesh_size_criteria_2.h>
+#include <CGAL/Random.h>
+
+#include <iostream>
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef CGAL::Regular_triangulation_euclidean_traits_3<K>  Traits;
-typedef Traits::RT                                          Weight;
-typedef Traits::Bare_point                                  Point;
-typedef Traits::Weighted_point                              Weighted_point;
-typedef CGAL::Regular_triangulation_3<Traits>               Rt;
-typedef Rt::Vertex_iterator                                 Vertex_iterator;
-typedef Rt::Vertex_handle                                   Vertex_handle;
+typedef CGAL::Triangulation_vertex_base_2<K> Vb;
+typedef CGAL::Delaunay_mesh_face_base_2<K> Fb;
+typedef CGAL::Triangulation_data_structure_2<Vb, Fb> Tds;
+typedef CGAL::Constrained_Delaunay_triangulation_2<K, Tds> CDT;
+typedef CGAL::Delaunay_mesh_size_criteria_2<CDT> Criteria;
+typedef CDT::Vertex_handle Vertex_handle;
+typedef CDT::Point Point;
+typedef CDT::Face_handle Face_handle;
 int main()
 {
-  // generate points on a 3D grid
-  std::vector<Weighted_point> P;
-  int number_of_points = 0;
-  for (int z=0 ; z<5 ; z++)
-    for (int y=0 ; y<5 ; y++)
-      for (int x=0 ; x<5 ; x++) {
-      Point p(x, y, z);
-          Weight w = (x+y-z*y*x)*2.0; // let's say this is the weight.
-      P.push_back(Weighted_point(p, w));
-          ++number_of_points;
-      }
-  Rt T;
-  // insert all points in a row (this is faster than one insert() at a time).
-  T.insert (P.begin(), P.end());
-  assert( T.is_valid() );
-  assert( T.dimension() == 3 );
-  std::cout << "Number of vertices : " << T.number_of_vertices() << std::endl;
-  // removal of all vertices
-  int count = 0;
-  while (T.number_of_vertices() > 0) {
-      T.remove (T.finite_vertices_begin());
-      ++count;
+  CDT cdt;
+  Vertex_handle va = cdt.insert(Point(-4,0));
+  Vertex_handle vb = cdt.insert(Point(0,-1));
+  Vertex_handle vc = cdt.insert(Point(4,0));
+  Vertex_handle vd = cdt.insert(Point(0,1));
+  cdt.insert(Point(2, 0.6));
+  cdt.insert_constraint(va, vb);
+  cdt.insert_constraint(vb, vc);
+  cdt.insert_constraint(vc, vd);
+  cdt.insert_constraint(vd, va);
+  std::cout << "Number of vertices: " << cdt.number_of_vertices() << std::endl;
+  std::cout << "Meshing the triangulation..." << std::endl;
+  CGAL::refine_Delaunay_mesh_2(cdt, Criteria(0.125, 0.5));
+  std::cout << "Number of vertices: " << cdt.number_of_vertices() << std::endl;
+
+  for(uint i = 0; i < 10;i++){
+    cdt.insert(Point(CGAL::default_random.get_double(-4,4),
+		     CGAL::default_random.get_double(-4,4)));
   }
-  assert( count == number_of_points );
-  return 0;
+  CGAL::refine_Delaunay_mesh_2(cdt, Criteria(0.125, 0.5));
+  std::cout << "Number of vertices: " << cdt.number_of_vertices() << std::endl;
+
+  Point query = Point(1,1);
+  Face_handle f = cdt.locate(query);
+  std::cout << "Face index: " << f->vertex(0)->point() << std::endl;
+  std::cout << "Face index: " << f->vertex(1)->point() << std::endl;
+  std::cout << "Face index: " << f->vertex(2)->point() << std::endl;
+
 }
