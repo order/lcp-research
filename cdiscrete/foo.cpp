@@ -4,19 +4,18 @@
 #include <assert.h>
 
 #include <armadillo>
-
-#include "marshaller.h"
-#include "transfer.h"
+#include "grid.h"
 
 using namespace std;
 using namespace arma;
 
 int main(int argc, char** argv)
 {
-  arma_rng::set_seed_random();
-  vec x = randn<vec>(5);
+  int D = 5;
+  vec low = zeros<vec>(D);
+  vec high = ones<vec>(D);
+  uvec num = 10*ones<uvec>(D);
 
-  cout << x.t();
-  cout << min(x.t() > 0, x.t() < 1);
+  UniformGrid grid = UniformGrid(low,high,num);
  
 }
