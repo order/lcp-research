@@ -44,10 +44,9 @@ template<typename V> bvec lor(const V &, const V &);
 template<typename V> bvec lnot(const V &);
 
 // Row-wise operation
-mat row_mult(const mat & A, const rowvec & b);
-mat row_diff(const mat & A, const rowvec & b);
-mat row_add(const mat & A, const rowvec & b);
-
+template <typename M, typename V> M row_mult(const M & A, const V & b);
+template <typename M, typename V> M row_diff(const M & A, const V & b);
+template <typename M, typename V> M row_add(const M & A, const V & b);
 template <typename M, typename V> M row_divide(const M & A, const V & b);
 
 vec row_2_norm(const mat & A);

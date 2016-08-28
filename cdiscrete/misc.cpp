@@ -88,15 +88,23 @@ bvec lnot(const V & v){
 }
 template bvec lnot(const bvec & v);
 
-mat row_mult(const mat & A, const rowvec & b){
+template <typename M, typename V> M row_mult(const M & A,
+					     const V & b){
   return A.each_row() % b;
 }
-mat row_diff(const mat & A, const rowvec & b){
+template mat row_mult(const mat & A, const rowvec & b);
+
+template <typename M, typename V> M row_diff(const M & A,
+					     const V & b){
   return A.each_row() - b;
 }
-mat row_add(const mat & A, const rowvec & b){
+template mat row_diff(const mat & A, const rowvec & b);
+
+template <typename M, typename V> M row_add(const M & A,
+					    const V & b){
   return A.each_row() + b;
 }
+template mat row_add(const mat & A, const rowvec & b);
 
 template <typename M, typename V> M row_divide(const M & A,
 					       const V & b){

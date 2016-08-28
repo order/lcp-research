@@ -21,7 +21,7 @@ struct OutOfBounds{
   // Contains out of bounds information
   bvec mask;
   uvec indices;
-  vec type; // +d / -d for violate in dth dim
+  uvec type; // +d / -d for violate in dth dim
   uint num;
 };
 ostream& operator<< (ostream& os, const OutOfBounds& oob);
@@ -33,10 +33,14 @@ struct Coords{
   OutOfBounds oob;  
   uvec indices;
   umat coords;
-  uint num;
+  
+  uint num_inbound;
+  uint num_total;
+  uint dim;
 };
 ostream& operator<< (ostream& os, const Coords& oob);
 
+uvec c_order_stride(const uvec & points_per_dim);
 
 class UniformGrid{
  public:
@@ -44,13 +48,14 @@ class UniformGrid{
 	      vec & high,
 	      uvec & num_cells);
 
-  ElementDist points_to_element_dist(const Points &);
   OutOfBounds points_to_out_of_bounds(const Points &);
   Coords points_to_cell_coords(const Points &);
-  Indices cell_coords_to_cell_indicies(const Coords &);
-  Indices cell_coords_to_low_node(const Coords &);
+  Indices cell_coords_to_cell_indices(const Coords &);  
+  Points cell_coords_to_low_node(const Coords &);
+  
   VertexIndicies cell_coords_to_vertices(const Coords &);
   RelDist cell_coords_to_low_node_rel_dist(const Coords &);  
+  ElementDist points_to_element_dist(const Points &);
 
   // private: 
   vec m_low;

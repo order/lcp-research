@@ -27,8 +27,11 @@ int main(int argc, char** argv)
   OutOfBounds oob = grid.points_to_out_of_bounds(P);
   cout << "OOB:\n" << oob;
   Coords coords = grid.points_to_cell_coords(P);
-  
   cout << "Coords:\n" << coords;
 
- 
+  Indices cell_idx = grid.cell_coords_to_cell_indices(coords);
+  cout << "Cell indices: " << cell_idx.t();
+
+  Points low_points = grid.cell_coords_to_low_node(coords);
+  cout << "Low node:\n" << low_points;
 }
