@@ -16,9 +16,9 @@ ostream& operator<< (ostream& os, const Coords& coords){
 }
 
 uvec c_order_stride(const uvec & points_per_dim){
-  /* Coeffs to converts from point grid coords to node indicies
+  /* Coeffs to converts from grid coords to indicies
    These are also called "strides"
-   E.g. if the mesh is 3x2, then the indices are:
+   E.g. if the mesh is 3x2 (nodes), then the (node) indices are:
 
    4 - 5
    |   |
@@ -43,7 +43,60 @@ uvec c_order_stride(const uvec & points_per_dim){
   return stride;
 }
 
+uvec c_order_cell_shift(const uvec & points_per_dim){
+  /* For D-dimensional cells, returns the constant index offsets
+     for the 2**D nodes in a cell.
+  */
+  
+  uint D = points_per_dim.n_elem;
+  uvec strides = c_order_stride(points_per_dim);
+  uint V = pow(2,D);
+  
+  uvec shifts = zeros<uvec>(V);
+  uvec idx;
+  for(uint d = 0; d < D; d++){
+    idx = find(binmask(d,D));
+    shifts(idx) += strides(d);
+  }
+  return shifts;
+}
 
+Indices coords_to_indices(const Coords & coords,
+			  const uvec & num_entity){
+  uint N = coords.num_total;
+  Indices idx = Indices(N);
+
+  // Out of bound indices
+  uint num_spatial_index = prod(num_entity);
+  idx(coords.oob.indices) = num_spatial_index + coords.oob.type;
+
+  // In bound indices
+  // Note that for 2-3 dim this functionality is provided by sub2ind
+  uvec stride = c_order_stride(num_entity);
+  Indices inbound_idx = coords.coords * stride;
+  idx(coords.indices) = inbound_idx;
+
+  // Check if indices are smaller than 3D
+  if(coords.dim == 1){
+    assert(all(inbound_idx == coords.coords.col(0)));
+  }
+  if(coords.dim == 2){
+    // Kludge. Not sure how to convert from uvec
+    // to return type of 'size' (SizeMat). conv_to doesn't work.
+    Indices check_idx = sub2ind(size(num_entity(0),
+				     num_entity(1)),
+				coords.coords.t());
+    assert(all(inbound_idx == check_idx));
+  }
+  if(coords.dim == 3){
+    Indices check_idx = sub2ind(size(num_entity(0),
+				     num_entity(1),
+				     num_entity(2)),
+				coords.coords.t());
+    assert(all(inbound_idx == check_idx));
+  }
+  return idx;
+}
 
 UniformGrid::UniformGrid(vec & low,
 			  vec & high,
@@ -116,40 +169,11 @@ Coords UniformGrid::points_to_cell_coords(const Points & points){
   }
   return coords;
 }
-
 Indices UniformGrid::cell_coords_to_cell_indices(const Coords & coords){
-  uint N = coords.num_total;
-  Indices idx = Indices(N);
-
-  // Out of bound indices
-  uint num_spatial_index = prod(m_num_cells);
-  idx(coords.oob.indices) = num_spatial_index + coords.oob.type;
-
-  // In bound indices
-  // Note that for 2-3 dim this functionality is provided by sub2ind
-  uvec stride = c_order_stride(m_num_cells);
-  Indices inbound_idx = coords.coords * stride;
-  idx(coords.indices) = inbound_idx;
-
-  // Check if indices are smaller than 3D
-  if(coords.dim == 1){
-    assert(all(inbound_idx == coords.coords.col(0)));
-  }
-  if(coords.dim == 2){
-    // Kludge. Not sure how to convert from uvec
-    // to return type of 'size' (SizeMat). conv_to doesn't work.
-    Indices check_idx = sub2ind(size(m_num_cells(0),m_num_cells(1)),
-				coords.coords.t());
-    assert(all(inbound_idx == check_idx));
-  }
-  if(coords.dim == 3){
-    Indices check_idx = sub2ind(size(m_num_cells(0),
-				     m_num_cells(1),
-				     m_num_cells(2)),
-				coords.coords.t());
-    assert(all(inbound_idx == check_idx));
-  }
-  return idx;
+  return coords_to_indices(coords,m_num_cells);
+}
+Indices UniformGrid::cell_coords_to_low_node_indices(const Coords & coords){
+  return coords_to_indices(coords,m_num_nodes);
 }
 
 Points UniformGrid::cell_coords_to_low_node(const Coords & coords){
@@ -160,4 +184,22 @@ Points UniformGrid::cell_coords_to_low_node(const Coords & coords){
   low_points.rows(coords.indices) = row_add(scaled,
 					    conv_to<rowvec>::from(m_low));
   return low_points;
+}
+
+
+VertexIndices UniformGrid::cell_coords_to_vertices(const Coords & coords){
+  uint N = coords.num_total;
+  uint D = coords.dim;
+  uint V = pow(2,D);
+  
+  uvec shift = c_order_cell_shift(m_num_nodes);
+  assert(shift.n_elem == V);
+  
+  Indices low_idx = cell_coords_to_low_node_indices(coords);
+  VertexIndices vertices = VertexIndices(N,V);
+  for(uint v = 0; v < V; v++){
+    vertices.col(v) = low_idx + shift(v);
+  }
+  return vertices;
+  // TODO: HANDLE OOB
 }

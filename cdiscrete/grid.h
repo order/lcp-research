@@ -13,7 +13,7 @@ using namespace arma;
 
 typedef mat Points;
 typedef uvec Indices;
-typedef mat VertexIndicies;
+typedef umat VertexIndices;
 typedef sp_mat ElementDist;
 typedef mat RelDist;
 
@@ -41,7 +41,9 @@ struct Coords{
 ostream& operator<< (ostream& os, const Coords& oob);
 
 uvec c_order_stride(const uvec & points_per_dim);
-
+uvec c_order_cell_shift(const uvec & points_per_dim);
+Indices coords_to_indices(const Coords & coords,
+			  const uvec & num_entity);
 class UniformGrid{
  public:
   UniformGrid(vec & low,
@@ -50,10 +52,11 @@ class UniformGrid{
 
   OutOfBounds points_to_out_of_bounds(const Points &);
   Coords points_to_cell_coords(const Points &);
-  Indices cell_coords_to_cell_indices(const Coords &);  
-  Points cell_coords_to_low_node(const Coords &);
+  Indices cell_coords_to_cell_indices(const Coords &);
+  Indices cell_coords_to_low_node_indices(const Coords & coords);
+  Points cell_coords_to_low_node(const Coords &);  
+  VertexIndices cell_coords_to_vertices(const Coords &);
   
-  VertexIndicies cell_coords_to_vertices(const Coords &);
   RelDist cell_coords_to_low_node_rel_dist(const Coords &);  
   ElementDist points_to_element_dist(const Points &);
 

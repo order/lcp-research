@@ -34,4 +34,8 @@ int main(int argc, char** argv)
 
   Points low_points = grid.cell_coords_to_low_node(coords);
   cout << "Low node:\n" << low_points;
+
+  VertexIndices vertex = grid.cell_coords_to_vertices(coords);
+  cout << "Vertices:\n" << vertex;
+  
 }
