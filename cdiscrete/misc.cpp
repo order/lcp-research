@@ -32,9 +32,9 @@ template<typename V> bvec in_interval(const V & x,
 				      double lb,
 				      double ub){
   uint N = x.n_elem;
-  bvec ret = zeros<bvec>(N);
-  ret(x >= lb).fill(1);
-  ret(x <= ub).fill(1);
+  bvec ret = ones<bvec>(N);
+  ret(find(x < lb)).fill(0);
+  ret(find(x > ub)).fill(0);
   return ret;
 }
 
@@ -44,16 +44,19 @@ template<typename M,typename V>
 		    const V & ub){
   uint N = A.n_rows;
   uint D = A.n_cols;
-  bvec ret = zeros<bvec>(N);
+  bvec ret = ones<bvec>(N);
   for(uint d = 0; d < D; d++){
-    ret(A.col(d) >= lb(d)).fill(1);
-    ret(A.col(d) <= ub(d)).fill(1);
+    ret(find(A.col(d) < lb(d))).fill(0);
+    ret(find(A.col(d) > ub(d))).fill(0);
   }
   return ret;
 }
+template bvec in_intervals<mat,vec>(const mat & A,
+				    const vec & lb,
+				    const vec & ub);
 
 template<typename V> bool is_logical(const V & v){
-  vec u = unique(v);
+  vec u = unique(conv_to<vec>::from(v));
   if(u.n_elem > 2) return false;
 
   if(u.n_elem == 2){
@@ -83,6 +86,7 @@ bvec lnot(const V & v){
   assert(is_logical(v));
   return 1 - v;
 }
+template bvec lnot(const bvec & v);
 
 mat row_mult(const mat & A, const rowvec & b){
   return A.each_row() % b;
@@ -93,6 +97,13 @@ mat row_diff(const mat & A, const rowvec & b){
 mat row_add(const mat & A, const rowvec & b){
   return A.each_row() + b;
 }
+
+template <typename M, typename V> M row_divide(const M & A,
+					       const V & b){
+  return A.each_row() / b;
+}
+template mat row_divide(const mat & A, const rowvec & b);
+
 
 vec row_2_norm(const mat & A){
   return sqrt(sum(square(A),1));

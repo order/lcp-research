@@ -21,17 +21,22 @@ struct OutOfBounds{
   // Contains out of bounds information
   bvec mask;
   uvec indices;
-  ivec type; // +d / -d for violate in dth dim
+  vec type; // +d / -d for violate in dth dim
   uint num;
 };
+ostream& operator<< (ostream& os, const OutOfBounds& oob);
+
 
 struct Coords{
   // Contains coordinate information.
   // This is the useful internal structure
   OutOfBounds oob;  
-  uvec inbound_idx;
+  uvec indices;
   umat coords;
+  uint num;
 };
+ostream& operator<< (ostream& os, const Coords& oob);
+
 
 class UniformGrid{
  public:
@@ -47,7 +52,7 @@ class UniformGrid{
   VertexIndicies cell_coords_to_vertices(const Coords &);
   RelDist cell_coords_to_low_node_rel_dist(const Coords &);  
 
- private: 
+  // private: 
   vec m_low;
   vec m_high;
   uvec m_num_cells;

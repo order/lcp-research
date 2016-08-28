@@ -19,16 +19,6 @@ void print_shape(const mat & A);
 //=====================================
 // BOOLEAN
 typedef Col<unsigned char> bvec; // boolean vector; bool doesn't work in arma
-// Mask structure
-struct Mask {
-  bvec mask;
-  uvec pos; // positive occurances
-  uvec neg; // negative occurances
-  uint n_pos;
-  uint n_neg;
-};
-void generate_mask(Mask & mask, uvec & source);
-void generate_mask(Mask & mask, bvec & source);
 
 //=====================================
 // SIMPLE EXTENSIONS TO ARMADILLO
@@ -57,6 +47,8 @@ template<typename V> bvec lnot(const V &);
 mat row_mult(const mat & A, const rowvec & b);
 mat row_diff(const mat & A, const rowvec & b);
 mat row_add(const mat & A, const rowvec & b);
+
+template <typename M, typename V> M row_divide(const M & A, const V & b);
 
 vec row_2_norm(const mat & A);
 vec dist(const mat & A, const mat & B);
