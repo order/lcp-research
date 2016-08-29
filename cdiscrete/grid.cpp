@@ -223,3 +223,26 @@ RelDist UniformGrid::points_to_low_node_rel_dist(const Points & points,
   dist.rows(oob_idx).fill(0);
   return dist;
 }
+
+ElementDist UniformGrid::points_to_element_dist(const Points & points){
+  Coords cell_coords = points_to_cell_coords(points);
+  VertexIndices vertex = cell_coords_to_vertices(coords);
+  RelDist rel_dist =  points_to_low_nod_rel_dist(points,coords);
+
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  uint NN = prod(m_num_nodes) + 2*D;
+  uint V = pow(2,D);
+
+  mat weights = ones<mat>(N,V);
+  bvec mask;
+  uvec inb_idx = cell_coords.indices;
+  uvec oob_idx = cell_coords.oob.indices;
+  uvec col_idx;
+  for(uint d = 0; d < D; d++){
+    mask = binmask(d,D);
+    col_idx = uvec({d});
+    weights(inb_idx,find(mask == 1)) %= rel_dist(inb_idx,col_vec);
+    // repmat?
+  }
+}
