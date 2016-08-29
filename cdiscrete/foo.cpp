@@ -21,12 +21,12 @@ int main(int argc, char** argv)
 
   UniformGrid grid = UniformGrid(low,high,num);
 
-  Points P = {{0,0},{1,1},{1.1,0},{0,1.1},{-0.1,0},{0,-0.1},{0.5,0.5}};
+  Points points = {{0,0},{1,1},{1.1,0},{0,1.1},{-0.1,0},{0,-0.1},{0.52,0.53}};
 
-  cout << "Points:\n" << P << endl;
-  OutOfBounds oob = grid.points_to_out_of_bounds(P);
+  cout << "Points:\n" << points << endl;
+  OutOfBounds oob = grid.points_to_out_of_bounds(points);
   cout << "OOB:\n" << oob;
-  Coords coords = grid.points_to_cell_coords(P);
+  Coords coords = grid.points_to_cell_coords(points);
   cout << "Coords:\n" << coords;
 
   Indices cell_idx = grid.cell_coords_to_cell_indices(coords);
@@ -37,5 +37,7 @@ int main(int argc, char** argv)
 
   VertexIndices vertex = grid.cell_coords_to_vertices(coords);
   cout << "Vertices:\n" << vertex;
-  
+
+  RelDist dist = grid.points_to_low_node_rel_dist(points,coords);
+  cout << "Rel Dist:\n" << dist; 
 }

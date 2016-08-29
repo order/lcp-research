@@ -56,8 +56,9 @@ class UniformGrid{
   Indices cell_coords_to_low_node_indices(const Coords & coords);
   Points cell_coords_to_low_node(const Coords &);  
   VertexIndices cell_coords_to_vertices(const Coords &);
+  RelDist points_to_low_node_rel_dist(const Points &,
+				      const Coords &);
   
-  RelDist cell_coords_to_low_node_rel_dist(const Coords &);  
   ElementDist points_to_element_dist(const Points &);
 
   // private: 

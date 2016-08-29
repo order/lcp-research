@@ -197,9 +197,29 @@ VertexIndices UniformGrid::cell_coords_to_vertices(const Coords & coords){
   
   Indices low_idx = cell_coords_to_low_node_indices(coords);
   VertexIndices vertices = VertexIndices(N,V);
+  uvec col_idx;
+  uvec inb_idx = coords.indices;
+  uvec oob_idx = coords.oob.indices;
   for(uint v = 0; v < V; v++){
-    vertices.col(v) = low_idx + shift(v);
+    col_idx = uvec({v});
+    vertices(inb_idx,col_idx) = low_idx(inb_idx) + shift(v);
+    vertices(oob_idx,col_idx) = low_idx(oob_idx);
   }
   return vertices;
-  // TODO: HANDLE OOB
+}
+
+RelDist UniformGrid::points_to_low_node_rel_dist(const Points & points,
+						 const Coords & coords){
+  uint N = coords.num_total;
+  uint D = coords.dim;
+
+  Points low_node = cell_coords_to_low_node(coords);
+  RelDist dist = RelDist(N,D);
+  uvec inb_idx = coords.indices;
+  uvec oob_idx = coords.oob.indices;
+  mat diff = points.rows(inb_idx) - low_node.rows(inb_idx);
+  rowvec div = conv_to<rowvec>::from(m_width);
+  dist.rows(inb_idx) = row_divide(diff,div);
+  dist.rows(oob_idx).fill(0);
+  return dist;
 }
