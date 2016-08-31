@@ -1,25 +1,44 @@
 #include "mesh.h"
 
-TriMesh::TriMesh():
-  m_mesh(),
-  m_refiner(m_mesh){}
+BaryCoord::BaryCoord(bool o,uvec i,vec w){
+  oob = o; indices = i; weights = w;
+}
+TriMesh::TriMesh() : m_mesh(),m_refiner(m_mesh){}
 
-vec TriMesh::barycentric_coord(const vec & p) const{
-  assert(2 == point.n_elem);
+ostream& operator<< (ostream& os, const BaryCoord& coord){
+  if(coord.oob){
+    os << "OOB" << endl;
+  }
+  else{
+    os << coord.indices.t() << coord.weights.t();
+  }
+  return os;
+}
 
-  double x = p(0);
-  double y = p(1);
-  
+BaryCoord TriMesh::barycentric_coord(const Point & point){  
+  regen_caches();
+
+  double x = point.x();
+  double y = point.y();
+
   // Locate face
-  Point cgal_point = Point(x,y);
-  FaceHandle face = m_mesh.locate(cgal_point);
-
+  int loc_int;
+  LocateType loc;
+  FaceHandle face = m_mesh.locate(point,
+				  loc,loc_int);
+  if(loc == CDT::OUTSIDE_CONVEX_HULL
+     or loc == CDT::OUTSIDE_AFFINE_HULL){
+    return BaryCoord(true,uvec(),vec()); // Out of bounds
+  }
+  
   // Extract vertices
   vec X = vec(3);
   vec Y = vec(3);
+  uvec idx = uvec(3);
   for(uint i = 0; i < 3; i++){
     X(i) = face->vertex(i)->point().x();
     Y(i) = face->vertex(i)->point().y();
+    idx(i) = m_vert_reg[face->vertex(i)];
   }
 
   // Barycentric voodoo (formula from wikipedia)
@@ -27,16 +46,24 @@ vec TriMesh::barycentric_coord(const vec & p) const{
   double Det = (Y(1) - Y(2))*(X(0) - X(2)) + (X(2) - X(1))*(Y(0) - Y(2));
   c(0) = ((Y(1) - Y(2))*(x - X(2)) + (X(2) - X(1))*(y - Y(2))) / Det;
   c(1) = ((Y(2) - Y(0))*(x - X(2)) + (X(0) - X(2))*(y - Y(2))) / Det;
+  assert(0 <= c(0) and c(0) <= 1);
+  assert(0 <= c(1) and c(1) <= 1);
+  assert(c(0) + c(1) <= 1);
   c(2) = 1.0 - c(0) - c(1);
 
-  // Check the reconstruction 
+  // Check the reconstruction
+  vec p = vec({x,y});
   vec recon = vec(2);
   recon(0) = dot(X,c);
   recon(1) = dot(Y,c);
   assert(approx_equal(recon,p,"reldiff",1e-12));
-
   // TODO: return vertex indices too (need vertex registry)
-  return c;
+  
+  return BaryCoord(false,idx,c);
+}
+
+FaceHandle TriMesh::locate(const Point & p) const{
+  return m_mesh.locate(p);
 }
 
 VertexHandle TriMesh::insert(vec & p){
@@ -200,6 +227,9 @@ int main()
   cout << "Number of vertices: " << mesh.number_of_vertices() << endl;
   cout << "Number of faces: " << mesh.number_of_faces() << endl;
 
-
+  cout << mesh.barycentric_coord(Point(-10,-10));
+  cout << mesh.barycentric_coord(Point(-1,-1));
+  cout << mesh.barycentric_coord(Point(-0.1,-0.5));
+ 
   mesh.write("test");
 }

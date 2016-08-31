@@ -29,10 +29,11 @@ typedef CGAL::Delaunay_mesh_size_criteria_2<CDT>                  MeshCriteria;
 typedef CGAL::Delaunay_mesher_2<CDT, MeshCriteria>                MeshRefiner;
 
 typedef CDT::Vertex_handle   VertexHandle;
-typedef CDT::Point          Point;
+typedef CDT::Point           Point;
 typedef CDT::Face_handle     FaceHandle;
 typedef CDT::Vertex_iterator VertexIterator;
 typedef CDT::Face_iterator   FaceIterator;
+typedef CDT::Locate_type     LocateType;
 
 typedef map<VertexHandle,uint> VertexRegistry;
 typedef map<FaceHandle,uint>   FaceRegistry;
@@ -46,6 +47,16 @@ typedef mat    RelDist;
 #define NUMDIM  2
 #define NUMVERT 3
 
+struct BaryCoord{
+  BaryCoord(bool,uvec,vec);
+  
+  bool oob;
+  uvec indices;
+  vec weights;
+};
+ostream& operator<< (ostream& os, const BaryCoord& coord);
+
+
 class TriMesh{
   /*
     Basically just a combination of CGAL's constrained Delaunay
@@ -55,7 +66,10 @@ class TriMesh{
   TriMesh();
   
   ElementDist points_to_element_dist(const Points &) const;
-  vec barycentric_coord(const vec &) const;
+  BaryCoord barycentric_coord(const vec &);
+  BaryCoord barycentric_coord(const Point &);
+
+  FaceHandle locate(const Point &) const;
   
   VertexHandle insert(vec &);
   VertexHandle insert(Point);
@@ -69,7 +83,7 @@ class TriMesh{
   
   void write(string base_filename); // To node and ele files
   
- protected:
+  //protected:
 
   bool m_dirty;
   

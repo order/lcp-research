@@ -5,6 +5,7 @@
 project( mesh_ )
 
 cmake_minimum_required(VERSION 2.8.10)
+set (CMAKE_CXX_STANDARD 11)
 
 find_package(CGAL QUIET COMPONENTS Core )
 
@@ -19,7 +20,6 @@ if ( CGAL_FOUND )
 
   create_single_source_cgal_program( "mesh.cpp" )
   target_link_libraries(mesh ${ARMADILLO_LIBRARIES})
-
 else()
   
     message(STATUS "This program requires the CGAL library, and will not be compiled.")
