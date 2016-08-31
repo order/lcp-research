@@ -253,7 +253,7 @@ ElementDist UniformGrid::points_to_element_dist(const Points & points){
     rep_dist = repmat(rel_dist(inb_idx,col_idx),
 		      1, halfV);
     
-    weights.cols(find(mask > 1e-12)) %= rep_dist;			       
+    weights.cols(find(mask > 1e-12)) %= rep_dist;		       
     weights.cols(find(mask <= 1e-12)) %= 1- rep_dist;
   }
 

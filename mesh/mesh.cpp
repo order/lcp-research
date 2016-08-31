@@ -28,9 +28,12 @@ int main()
   cdt.insert_constraint(vc, vd);
   cdt.insert_constraint(vd, va);
   std::cout << "Number of vertices: " << cdt.number_of_vertices() << std::endl;
-  std::cout << "Meshing the triangulation..." << std::endl;
-  CGAL::refine_Delaunay_mesh_2(cdt, Criteria(0.125, 0.5));
-  std::cout << "Number of vertices: " << cdt.number_of_vertices() << std::endl;
+  std::cout << "Refining triangulation..." << std::endl;
+  CGAL::refine_Delaunay_mesh_2(cdt, Criteria());
+  std::cout << "\tNumber of vertices: " << cdt.number_of_vertices() << std::endl;
+  std::cout << "Futher refining triangulation..." << std::endl;
+  CGAL::refine_Delaunay_mesh_2(cdt, Criteria(0.125, 0.25));
+  std::cout << "\tNumber of vertices: " << cdt.number_of_vertices() << std::endl; 
 
   for(uint i = 0; i < 10;i++){
     cdt.insert(Point(CGAL::default_random.get_double(-4,4),
