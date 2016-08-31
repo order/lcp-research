@@ -39,5 +39,8 @@ int main(int argc, char** argv)
   cout << "Vertices:\n" << vertex;
 
   RelDist dist = grid.points_to_low_node_rel_dist(points,coords);
-  cout << "Rel Dist:\n" << dist; 
+  cout << "Rel Dist:\n" << dist;
+
+  ElementDist distrib = grid.points_to_element_dist(points);
+  cout << "Distribution:\n" <<  distrib;
 }

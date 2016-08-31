@@ -225,24 +225,104 @@ RelDist UniformGrid::points_to_low_node_rel_dist(const Points & points,
 }
 
 ElementDist UniformGrid::points_to_element_dist(const Points & points){
-  Coords cell_coords = points_to_cell_coords(points);
-  VertexIndices vertex = cell_coords_to_vertices(coords);
-  RelDist rel_dist =  points_to_low_nod_rel_dist(points,coords);
+  
+  Coords coords = points_to_cell_coords(points);
+  VertexIndices vertices = cell_coords_to_vertices(coords);
+  RelDist rel_dist =  points_to_low_node_rel_dist(points,coords);
 
   uint N = points.n_rows;
   uint D = points.n_cols;
+  uint IN = coords.num_inbound;
   uint NN = prod(m_num_nodes) + 2*D;
   uint V = pow(2,D);
+  uint halfV = pow(2,D-1);
 
-  mat weights = ones<mat>(N,V);
+  // Calculate the interpolation weights for each point
+  mat weights = ones<mat>(IN,V);
   bvec mask;
-  uvec inb_idx = cell_coords.indices;
-  uvec oob_idx = cell_coords.oob.indices;
+  uvec inb_idx = coords.indices;
+  uvec oob_idx = coords.oob.indices;
   uvec col_idx;
+  mat rep_dist;
   for(uint d = 0; d < D; d++){
+    // Mask for whether the dth bit is on in the
+    // binary rep of the bth position
     mask = binmask(d,D);
     col_idx = uvec({d});
-    weights(inb_idx,find(mask == 1)) %= rel_dist(inb_idx,col_vec);
-    // repmat?
+
+    rep_dist = repmat(rel_dist(inb_idx,col_idx),
+		      1, halfV);
+    
+    weights.cols(find(mask > 1e-12)) %= rep_dist;			       
+    weights.cols(find(mask <= 1e-12)) %= 1- rep_dist;
   }
+
+  // Check the weights of the low and high nodes.
+  // position 0 -> 00...0 is the low node, so weight should be prod(rel_dist)
+  // position V-1 -> 11...1, so weight should be prod(1-rel_dist)
+  vec low_node_weights = prod(1 - rel_dist.rows(inb_idx),1);
+  vec hi_node_weights = prod(rel_dist.rows(inb_idx),1);
+  assert(approx_equal(weights.col(0),low_node_weights,"absdiff",1e-12));
+  assert(approx_equal(weights.col(V-1),hi_node_weights,"absdiff",1e-12));
+
+  for(uint d = 0; d < D; d++){
+    weights(find(weights.col(d) <= ALMOST_ZERO),
+	    uvec({d})).fill(0);
+  }
+
+  VertexIndices inbound_vertices = vertices.rows(coords.indices);
+  Indices oob_vertices = vertices(coords.oob.indices,uvec({0}));
+  ElementDist distrib = pack_vertices_and_weights(NN,
+						  coords.indices,
+						  inbound_vertices,
+						  weights,
+						  coords.oob.indices,
+						  oob_vertices);     
+
+  return distrib; 
 }
+
+ElementDist pack_vertices_and_weights(uint num_total_nodes,
+				      Indices inbound_indices,
+				      VertexIndices inbound_vertices,
+				      mat inbound_weights,
+				      Indices oob_indices,
+				      Indices oob_vertices){
+  assert(inbound_vertices.n_rows == inbound_indices.n_elem);
+  assert(oob_indices.n_elem == oob_vertices.n_elem);
+  assert(size(inbound_vertices) == size(inbound_weights));
+  
+  uint N = num_total_nodes;
+  uint M = inbound_vertices.n_rows + oob_vertices.n_elem;
+  uint INB_N = inbound_vertices.n_elem;
+  uint OOB_N = oob_vertices.n_elem;
+  uint NNZ = INB_N + OOB_N;
+ 
+
+  // Set the location
+  umat loc = umat(2,NNZ);
+  // Flatten vertices and indices into rows
+  uvec flat_inb_vertices = vectorise(inbound_vertices);
+  umat rep_inb_idx = repmat(inbound_indices,
+			    1, inbound_vertices.n_cols);
+  uvec flat_inb_idx = vectorise(rep_inb_idx);
+  // Check sizes
+  assert(flat_inb_vertices.n_elem == INB_N);
+  assert(flat_inb_idx.n_elem == INB_N);
+  loc(0,span(0,INB_N-1)) = flat_inb_vertices.t();
+  loc(1,span(0,INB_N-1)) = flat_inb_idx.t();
+
+  cout << "LOC:\n" << loc;
+
+  // Out of bound location
+  loc(0,span(INB_N,NNZ-1)) = oob_vertices.t();
+  loc(1,span(INB_N,NNZ-1)) = oob_indices.t();
+
+  // Set the data
+  vec data = vec(INB_N + OOB_N);
+  data(span(0,INB_N-1)) = vectorise(inbound_weights); // Inbound
+  data(span(INB_N,NNZ-1)).fill(1); // Out of bounds
+
+  return sp_mat(loc,data,N,M);  
+}
+				      

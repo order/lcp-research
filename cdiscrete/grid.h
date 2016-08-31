@@ -10,6 +10,7 @@ using namespace std;
 using namespace arma;
 
 #define GRID_FUZZ 1e-15
+#define ALMOST_ZERO 1e-15
 
 typedef mat Points;
 typedef uvec Indices;
@@ -69,5 +70,12 @@ class UniformGrid{
 
   uint m_dim;
 };
+
+ElementDist pack_vertices_and_weights(uint num_total_nodes,
+				      Indices inbound_indices,
+				      VertexIndices inbound_vertices,
+				      mat inbound_weights,
+				      Indices oob_indices,
+				      Indices oob_vertices);
 
 #endif
