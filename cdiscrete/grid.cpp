@@ -75,7 +75,7 @@ Indices coords_to_indices(const Coords & coords,
   uvec stride = c_order_stride(num_entity);
   Indices inbound_idx = coords.coords * stride;
   idx(coords.indices) = inbound_idx;
-
+  
   // Check if indices are smaller than 3D
   if(coords.dim == 1){
     assert(all(inbound_idx == coords.coords.col(0)));
