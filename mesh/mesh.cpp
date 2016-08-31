@@ -15,6 +15,9 @@ typedef CGAL::Delaunay_mesh_size_criteria_2<CDT> Criteria;
 typedef CDT::Vertex_handle Vertex_handle;
 typedef CDT::Point Point;
 typedef CDT::Face_handle Face_handle;
+
+using namespace std;
+
 int main()
 {
   CDT cdt;
@@ -27,25 +30,20 @@ int main()
   cdt.insert_constraint(vb, vc);
   cdt.insert_constraint(vc, vd);
   cdt.insert_constraint(vd, va);
-  std::cout << "Number of vertices: " << cdt.number_of_vertices() << std::endl;
-  std::cout << "Refining triangulation..." << std::endl;
+  cout << "Number of vertices: " << cdt.number_of_vertices() << endl;
+  cout << "Refining triangulation..." << endl;
   CGAL::refine_Delaunay_mesh_2(cdt, Criteria());
-  std::cout << "\tNumber of vertices: " << cdt.number_of_vertices() << std::endl;
-  std::cout << "Futher refining triangulation..." << std::endl;
-  CGAL::refine_Delaunay_mesh_2(cdt, Criteria(0.125, 0.25));
-  std::cout << "\tNumber of vertices: " << cdt.number_of_vertices() << std::endl; 
+  cout << "\tNumber of vertices: " << cdt.number_of_vertices() << endl;
+  cout << "\tNumber of faces: " << cdt.number_of_faces() << endl;
 
-  for(uint i = 0; i < 10;i++){
-    cdt.insert(Point(CGAL::default_random.get_double(-4,4),
-		     CGAL::default_random.get_double(-4,4)));
+  uint count = 0;
+  for(CDT::Face_iterator fit = cdt.faces_begin();
+      fit != cdt.faces_end(); ++fit){
+    cout << "Face " << count << endl;
+    for(uint i = 0; i < 3; i++){
+      cout << "\t" << fit->vertex(i)->info() << endl;
+    }
+    count++;
   }
-  CGAL::refine_Delaunay_mesh_2(cdt, Criteria(0.125, 0.5));
-  std::cout << "Number of vertices: " << cdt.number_of_vertices() << std::endl;
-
-  Point query = Point(1,1);
-  Face_handle f = cdt.locate(query);
-  std::cout << "Face index: " << f->vertex(0)->point() << std::endl;
-  std::cout << "Face index: " << f->vertex(1)->point() << std::endl;
-  std::cout << "Face index: " << f->vertex(2)->point() << std::endl;
-
+  cout <<"\tFound " << count << " face during iteration" << endl;
 }
