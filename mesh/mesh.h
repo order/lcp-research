@@ -47,6 +47,8 @@ typedef mat    RelDist;
 #define NUMDIM  2
 #define NUMVERT 3
 
+#define ALMOST_ZERO 1e-15
+
 struct BaryCoord{
   /*
     Holds the barycentric coordinates. These are the unique weights describing
@@ -70,8 +72,11 @@ class TriMesh{
   */
  public:
   TriMesh();
-  
-  ElementDist points_to_element_dist(const Points &);
+  ElementDist points_to_element_dist(const Points &);  
+  ElementDist points_to_element_dist(const Points &,
+				     uvec & row_idx_uvec,
+				     uvec & col_ptr_uvec,
+				     vec & data_vec);
   BaryCoord barycentric_coord(const Point &);
 
   FaceHandle locate(const Point &) const;
@@ -113,6 +118,14 @@ void add_di_bang_bang_curves(TriMesh & mesh,
 			     VertexHandle & v_lower_right,
 			     uint num_curve_points);
 
+// Subsume when merge with cdiscrete
+mat make_points(const vector<vec> & grids);
 
+void save_sp_mat(const uvec & row_idx,
+		 const uvec & col_ptr,
+		 const vec & data,
+		 uint R,
+		 uint C,
+		 string filename);
 
 #endif

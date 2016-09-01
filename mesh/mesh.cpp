@@ -18,8 +18,19 @@ ostream& operator<< (ostream& os, const BaryCoord& coord){
 }
 
 ElementDist TriMesh::points_to_element_dist(const Points & points){
+  // Ignore CSC returns
+  uvec row = uvec();
+  uvec col = uvec();
+  vec data = vec();
+  return points_to_element_dist(points,row,col,data);
+}
+
+ElementDist TriMesh::points_to_element_dist(const Points & points,
+					    uvec & row_idx_uvec,
+					    uvec & col_ptr_uvec,
+					    vec & data_vec){
   assert(2 == points.n_cols);
-  
+
   vector<uword> row_idx;
   vector<uword> col_ptr;
   vector<double> data;
@@ -35,11 +46,12 @@ ElementDist TriMesh::points_to_element_dist(const Points & points){
   // Assume elements are visited in col sorted order,
   // Column i is described by the row indices and data in the index range
   // col_ptr[i],...,col_ptr[i+1]-1 (empty if col_ptr[i] == col_ptr[i+1])
-  
+
+  uint oob_count;
   for(uint i = 0; i < N; i++){
     p = Point(points(i,0),points(i,1));
     coord = barycentric_coord(p);
-
+    
     // Start new column here
     col_ptr.push_back(row_idx.size());
     if(coord.oob){
@@ -48,12 +60,15 @@ ElementDist TriMesh::points_to_element_dist(const Points & points){
       assert(0 == coord.weights.n_elem);     
       row_idx.push_back(oob_idx);
       data.push_back(1.0);
+      oob_count++;
     }
     else{
       // In bounds; add barycentric coords.
       assert(NUMVERT == coord.indices.n_elem);
       assert(NUMVERT == coord.weights.n_elem);
       for(uint v = 0; v < NUMVERT; v++){
+	if(coord.weights(v) < ALMOST_ZERO) continue;
+	
 	row_idx.push_back(coord.indices(v));
 	data.push_back(coord.weights(v));
       }
@@ -63,7 +78,11 @@ ElementDist TriMesh::points_to_element_dist(const Points & points){
   assert(N == col_ptr.size());
   col_ptr.push_back(row_idx.size()); // Close off final column
 
-  return sp_mat(uvec(row_idx),uvec(col_ptr),vec(data),M,N);
+  row_idx_uvec = uvec(row_idx);
+  col_ptr_uvec = uvec(col_ptr);
+  data_vec     = vec(data);
+  
+  return sp_mat(row_idx_uvec,col_ptr_uvec,data_vec,M,N);
 }
 
 BaryCoord TriMesh::barycentric_coord(const Point & point){  
@@ -107,7 +126,7 @@ BaryCoord TriMesh::barycentric_coord(const Point & point){
   vec recon = vec(2);
   recon(0) = dot(X,c);
   recon(1) = dot(Y,c);
-  assert(approx_equal(recon,p,"reldiff",1e-12));
+  assert(approx_equal(recon,p,"absdiff",ALMOST_ZERO));
   // TODO: return vertex indices too (need vertex registry)
   
   return BaryCoord(false,idx,c);
@@ -272,7 +291,70 @@ void add_di_bang_bang_curves(TriMesh & mesh,
   mesh.insert_constraint(v_old,v_lower_right);
 }
 
+mat make_points(const vector<vec> & grids)
+{
+  // Makes a mesh out of the D vectors
+  // 'C' style ordering... last column changes most rapidly
+  
+  // Figure out the dimensions of things
+  uint D = grids.size();
+  uint N = 1;
+  for(vector<vec>::const_iterator it = grids.begin();
+      it != grids.end(); ++it){
+    N *= it->n_elem;
+  }
+  mat P = mat(N,D); // Create the matrix
+  
+  uint rep_elem = N; // Element repetition
+  uint rep_cycle = 1; // Pattern rep
+  for(uint d = 0; d < D; d++){
+    uint n = grids[d].n_elem;
+    rep_elem /= n;
+    assert(N == rep_cycle * rep_elem * n);
+    
+    uint I = 0;
+    for(uint c = 0; c < rep_cycle; c++){ // Cycle repeat
+      for(uint i = 0; i < n; i++){ // Element in pattern
+	for(uint e = 0; e < rep_elem; e++){ // Element repeat
+	  assert(I < N);
+	  P(I,d) = grids[d](i);
+	  I++;
+	}
+      }
+    }
+    rep_cycle *= n;
+  }
+  return P;
+}
 
+void save_sp_mat(const uvec & row_idx,
+		 const uvec & col_ptr,
+		 const vec & data,
+		 uint R,
+		 uint C,
+		 string filename){
+  
+  uint NNZ = row_idx.n_elem;
+  assert(col_ptr.n_elem == C+1);
+  assert(data.n_elem == NNZ);
+
+  uint header = 3;
+  vec combined = vec(2*NNZ + (C+1) + header);
+  assert(combined.n_elem == header
+	 + row_idx.n_elem
+	 + col_ptr.n_elem
+	 + data.n_elem);
+
+  // Assemble
+  combined(0) = R;
+  combined(1) = C;
+  combined(2) = NNZ;
+  combined(span(3,2+NNZ)) = conv_to<vec>::from(row_idx);
+  combined(span(3+NNZ, 3 + NNZ + C)) = conv_to<vec>::from(col_ptr);
+  combined.tail(NNZ) = data;
+  
+  combined.save(filename,raw_binary);
+}
 
 int main()
 {
@@ -290,19 +372,29 @@ int main()
   mesh.insert_constraint(v_up_right, v_low_right);
   mesh.insert_constraint(v_up_right, v_up_left);
 
-  uint num_curve_points = 10;
+  uint num_curve_points = 15;
   add_di_bang_bang_curves(mesh,v_zero,v_up_left,v_low_right,num_curve_points);
   
-  mesh.refine(0.125,0.5);
+  mesh.refine(0.125,0.1);
   mesh.lloyd(25);
 
   cout << "Number of vertices: " << mesh.number_of_vertices() << endl;
   cout << "Number of faces: " << mesh.number_of_faces() << endl;
 
-  Points points = randn<mat>(25,2);
+  cout << "Generating grid..." << endl;
+  vector<vec> grid;
+  uint G = 150;
+  grid.push_back(linspace<vec>(-1.1,1.1,G));
+  grid.push_back(linspace<vec>(-1.1,1.1,G));
+  Points points = make_points(grid);
 
-  ElementDist distrib = mesh.points_to_element_dist(points);
-  cout << "Distribution:" << distrib;
- 
+  cout << "Discretizing..." << endl;
+  uvec rows;
+  uvec cols;
+  vec data;
+  ElementDist distrib = mesh.points_to_element_dist(points,rows,cols,data);
+  //cout << distrib;
+
+  save_sp_mat(rows,cols,data,distrib.n_rows,distrib.n_cols,"test.dist");
   mesh.write("test");
 }
