@@ -48,6 +48,12 @@ typedef mat    RelDist;
 #define NUMVERT 3
 
 struct BaryCoord{
+  /*
+    Holds the barycentric coordinates. These are the unique weights describing
+    a point as a convex combination of vertices in the enclosed face.
+    Also indicates if the 
+   */
+  BaryCoord();
   BaryCoord(bool,uvec,vec);
   
   bool oob;
@@ -65,8 +71,7 @@ class TriMesh{
  public:
   TriMesh();
   
-  ElementDist points_to_element_dist(const Points &) const;
-  BaryCoord barycentric_coord(const vec &);
+  ElementDist points_to_element_dist(const Points &);
   BaryCoord barycentric_coord(const Point &);
 
   FaceHandle locate(const Point &) const;
@@ -80,12 +85,17 @@ class TriMesh{
 
   uint number_of_faces() const;
   uint number_of_vertices() const;
+  uint number_of_nodes() const;
+  uint oob_node_index() const;
+
+  void freeze();
   
   void write(string base_filename); // To node and ele files
   
   //protected:
 
   bool m_dirty;
+  bool m_frozen;
   
   CDT m_mesh;
   MeshRefiner m_refiner;

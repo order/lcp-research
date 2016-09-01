@@ -1,9 +1,11 @@
 #include "mesh.h"
+#include <vector>
 
-BaryCoord::BaryCoord(bool o,uvec i,vec w){
-  oob = o; indices = i; weights = w;
-}
-TriMesh::TriMesh() : m_mesh(),m_refiner(m_mesh){}
+BaryCoord::BaryCoord():oob(true){}
+BaryCoord::BaryCoord(bool o,uvec i,vec w) :
+  oob(o),indices(i),weights(w){}
+TriMesh::TriMesh() :
+  m_mesh(),m_refiner(m_mesh),m_dirty(true),m_frozen(false){}
 
 ostream& operator<< (ostream& os, const BaryCoord& coord){
   if(coord.oob){
@@ -13,6 +15,55 @@ ostream& operator<< (ostream& os, const BaryCoord& coord){
     os << coord.indices.t() << coord.weights.t();
   }
   return os;
+}
+
+ElementDist TriMesh::points_to_element_dist(const Points & points){
+  assert(2 == points.n_cols);
+  
+  vector<uword> row_idx;
+  vector<uword> col_ptr;
+  vector<double> data;
+
+  uint N = points.n_rows;
+  uint oob_idx = oob_node_index();
+  uint M = number_of_nodes();
+
+  Point p;
+  BaryCoord coord;
+
+  // Set up sparse matrix via row indices and col pointers.
+  // Assume elements are visited in col sorted order,
+  // Column i is described by the row indices and data in the index range
+  // col_ptr[i],...,col_ptr[i+1]-1 (empty if col_ptr[i] == col_ptr[i+1])
+  
+  for(uint i = 0; i < N; i++){
+    p = Point(points(i,0),points(i,1));
+    coord = barycentric_coord(p);
+
+    // Start new column here
+    col_ptr.push_back(row_idx.size());
+    if(coord.oob){
+      // Out of bounds; all weight on oob node
+      assert(0 == coord.indices.n_elem);
+      assert(0 == coord.weights.n_elem);     
+      row_idx.push_back(oob_idx);
+      data.push_back(1.0);
+    }
+    else{
+      // In bounds; add barycentric coords.
+      assert(NUMVERT == coord.indices.n_elem);
+      assert(NUMVERT == coord.weights.n_elem);
+      for(uint v = 0; v < NUMVERT; v++){
+	row_idx.push_back(coord.indices(v));
+	data.push_back(coord.weights(v));
+      }
+    }
+  }
+  assert(row_idx.size() == data.size());
+  assert(N == col_ptr.size());
+  col_ptr.push_back(row_idx.size()); // Close off final column
+
+  return sp_mat(uvec(row_idx),uvec(col_ptr),vec(data),M,N);
 }
 
 BaryCoord TriMesh::barycentric_coord(const Point & point){  
@@ -71,22 +122,26 @@ VertexHandle TriMesh::insert(vec & p){
 }
 
 VertexHandle TriMesh::insert(Point p){
+  assert(not m_frozen);
   m_dirty = true;
   return m_mesh.insert(p);
 }
 
 void TriMesh::insert_constraint(VertexHandle & a, VertexHandle & b){
+  assert(not m_frozen);
   m_dirty = true;
   m_mesh.insert_constraint(a,b);
 }
 
 void TriMesh::refine(double b, double s){
+  assert(not m_frozen);
   m_dirty = true;
   m_refiner.set_criteria(MeshCriteria(b,s));
   m_refiner.refine_mesh();
 }
 
 void TriMesh::lloyd(uint I){
+  assert(not m_frozen);
   m_dirty = true;
   CGAL::lloyd_optimize_mesh_2(m_mesh,
 			      CGAL::parameters::max_iteration_number = I);
@@ -139,8 +194,25 @@ uint TriMesh::number_of_vertices() const{
   return m_mesh.number_of_vertices();
 }
 
+uint TriMesh::number_of_nodes() const{
+  // Number of spatial vertices + 1 oob node
+  return number_of_vertices() + 1;
+} 
+
+uint TriMesh::oob_node_index() const{
+  /*
+    Only the one oob node so far
+   */
+  return m_mesh.number_of_vertices();
+}
+
+void TriMesh::freeze(){
+  m_frozen = true;
+}
+
 void TriMesh::regen_caches(){
   if(!m_dirty) return;
+  assert(not m_frozen);
   
   // Regenerate face and vertex caches
   m_nodes = mat(m_mesh.number_of_vertices(),2);
@@ -218,18 +290,19 @@ int main()
   mesh.insert_constraint(v_up_right, v_low_right);
   mesh.insert_constraint(v_up_right, v_up_left);
 
-  uint num_curve_points = 15;
+  uint num_curve_points = 10;
   add_di_bang_bang_curves(mesh,v_zero,v_up_left,v_low_right,num_curve_points);
   
-  mesh.refine(0.125,0.2);
+  mesh.refine(0.125,0.5);
   mesh.lloyd(25);
 
   cout << "Number of vertices: " << mesh.number_of_vertices() << endl;
   cout << "Number of faces: " << mesh.number_of_faces() << endl;
 
-  cout << mesh.barycentric_coord(Point(-10,-10));
-  cout << mesh.barycentric_coord(Point(-1,-1));
-  cout << mesh.barycentric_coord(Point(-0.1,-0.5));
+  Points points = randn<mat>(25,2);
+
+  ElementDist distrib = mesh.points_to_element_dist(points);
+  cout << "Distribution:" << distrib;
  
   mesh.write("test");
 }
