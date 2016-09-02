@@ -54,44 +54,47 @@ def read_sp_mat(sp_mat_file):
     R = int(data[0])
     C = int(data[1])
     NNZ = int(data[2])
-    row_idx = data[3:(3+NNZ)].astype(np.integer)
-    col_ptr = data[(3+NNZ):(4+NNZ+C)].astype(np.integer)
-    data = data[-NNZ:]
-    assert (NNZ,) == row_idx.shape
-    assert (NNZ,) == data.shape
-    assert (C+1,) == col_ptr.shape
+    assert (3 + 3*NNZ,) == data.shape
 
-    S = sps.csc_matrix((data,row_idx,col_ptr),shape=(R,C))
+    data = np.reshape(data[3:],(NNZ,3))
+    
+    S = sps.coo_matrix((data[:,2],(data[:,0], data[:,1])),shape=(R,C))
     return S
 
 if __name__ == "__main__":
     (_,base_file) = sys.argv
     nodes = read_node(base_file + ".node")
     faces = read_ele(base_file + ".ele")
-    dist = read_sp_mat(base_file + ".dist")
+    dist = read_sp_mat(base_file + ".grid")
 
     (R,C) = dist.shape
+    print dist.shape
+    print nodes.shape
     
     G = 150
-    (P,(X,Y)) = make_points([np.linspace(-1.1,1.1,G)]*2,True)
+    (P,(X,Y)) = make_points([np.linspace(-1,1,G)]*2,True)
 
     (N,D) = P.shape
     assert C == N
-    assert R == (nodes.shape[0] + 1)
+    assert R == (nodes.shape[0])
+
+    nodes = nodes[:-1,:] # Strip OOB node
 
     # Random values
-    v = np.random.rand(R)
+    #v = np.random.rand(R)
+    v = np.hstack([np.sum(np.abs(nodes),1),2])
     Z = dist.T.dot(v);
 
     #plt.scatter(P[:,0],P[:,1],c=Z,s=15,lw=0,alpha=0.25);
-    plt.pcolormesh(X,Y,np.reshape(Z,(G,G)))
+    plt.pcolormesh(X,Y,np.reshape(Z,(G,G)),lw=0)
     
     plt.triplot(nodes[:,0],
                 nodes[:,1],
+                '-k',
                 faces,alpha=0.25)
     plt.plot(nodes[:,0],
              nodes[:,1],
-             '.r')
+             '.k')
     
     plt.show()
     

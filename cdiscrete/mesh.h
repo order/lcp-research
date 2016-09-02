@@ -88,6 +88,9 @@ class TriMesh{
   void refine(double b,double S);
   void lloyd(uint I);
 
+  Points get_spatial_nodes();
+  Points get_all_nodes();
+
   uint number_of_faces() const;
   uint number_of_vertices() const;
   uint number_of_nodes() const;
@@ -112,20 +115,23 @@ class TriMesh{
   void regen_caches(); // Derive from m_mesh
 };
 
+
+void saturate(Points & points,
+	      const vec &lb,
+	      const vec &ub);
+// Subsume when merge with cdiscrete
+mat make_points(const vector<vec> & grids);
+
+// DI stuff
 void add_di_bang_bang_curves(TriMesh & mesh,
 			     VertexHandle & v_zero,
 			     VertexHandle & v_upper_left,
 			     VertexHandle & v_lower_right,
 			     uint num_curve_points);
 
-// Subsume when merge with cdiscrete
-mat make_points(const vector<vec> & grids);
+Points double_integrator(const Points & points,
+			 double a,double t);
 
-void save_sp_mat(const uvec & row_idx,
-		 const uvec & col_ptr,
-		 const vec & data,
-		 uint R,
-		 uint C,
-		 string filename);
-
+mat build_di_costs(const Points & points);
+vec build_di_state_weights(const Points & points);
 #endif

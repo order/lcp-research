@@ -30,6 +30,7 @@ ElementDist TriMesh::points_to_element_dist(const Points & points,
 					    uvec & col_ptr_uvec,
 					    vec & data_vec){
   assert(2 == points.n_cols);
+  assert(m_frozen);
 
   vector<uword> row_idx;
   vector<uword> col_ptr;
@@ -51,6 +52,8 @@ ElementDist TriMesh::points_to_element_dist(const Points & points,
   for(uint i = 0; i < N; i++){
     p = Point(points(i,0),points(i,1));
     coord = barycentric_coord(p);
+
+    //cout << p << endl;
     
     // Start new column here
     col_ptr.push_back(row_idx.size());
@@ -118,8 +121,9 @@ BaryCoord TriMesh::barycentric_coord(const Point & point){
   c(1) = ((Y(2) - Y(0))*(x - X(2)) + (X(0) - X(2))*(y - Y(2))) / Det;
   assert(0 <= c(0) and c(0) <= 1);
   assert(0 <= c(1) and c(1) <= 1);
-  assert(c(0) + c(1) <= 1);
-  c(2) = 1.0 - c(0) - c(1);
+  //cout << "\t" << (c(0) + c(1)) << endl;
+  assert(c(0) + c(1) <= 1 + ALMOST_ZERO);
+  c(2) = std::max(1.0 - c(0) - c(1),0.0);
 
   // Check the reconstruction
   vec p = vec({x,y});
@@ -164,6 +168,16 @@ void TriMesh::lloyd(uint I){
   m_dirty = true;
   CGAL::lloyd_optimize_mesh_2(m_mesh,
 			      CGAL::parameters::max_iteration_number = I);
+}
+
+Points TriMesh::get_spatial_nodes(){
+  assert(m_frozen);
+  return m_nodes.head_rows(number_of_vertices());
+}
+
+Points TriMesh::get_all_nodes(){
+  assert(m_frozen);
+  return m_nodes;
 }
 
 void TriMesh::write(string base_filename){
@@ -226,7 +240,9 @@ uint TriMesh::oob_node_index() const{
 }
 
 void TriMesh::freeze(){
+  regen_caches();
   m_frozen = true;
+
 }
 
 void TriMesh::regen_caches(){
@@ -234,7 +250,7 @@ void TriMesh::regen_caches(){
   assert(not m_frozen);
   
   // Regenerate face and vertex caches
-  m_nodes = mat(m_mesh.number_of_vertices(),2);
+  m_nodes = mat(m_mesh.number_of_vertices()+1,2);
   m_faces = umat(m_mesh.number_of_faces(),3);
   m_vert_reg.clear();
   m_face_reg.clear();
@@ -248,6 +264,8 @@ void TriMesh::regen_caches(){
     // Register
     m_vert_reg[vit] = v_id++;
   }
+  m_nodes(v_id,0) = HUGE_VAL;
+  m_nodes(v_id,1) = HUGE_VAL;
 
   uint f_id = 0;
   for(FaceIterator fit = m_mesh.faces_begin();
@@ -261,34 +279,45 @@ void TriMesh::regen_caches(){
   m_dirty = false;
 }
 
-void add_di_bang_bang_curves(TriMesh & mesh,
-			     VertexHandle & v_zero,
-			     VertexHandle & v_upper_left,
-			     VertexHandle & v_lower_right,
-			     uint num_curve_points){
-  VertexHandle v_old = v_zero;
-  VertexHandle v_new;
-  double x,y;
-  double N = num_curve_points;
-  // -ve x, +ve y
-  for(double i = 1; i < N; i++){
-    y = i / N; // Uniform over y
-    x = - y * y;
-    v_new = mesh.insert(Point(x,y));
-    mesh.insert_constraint(v_old,v_new);
-    v_old = v_new;
-  }
-  mesh.insert_constraint(v_old,v_upper_left);
+void save_mat(const mat & A,
+	      string filename){
+  uint N = A.n_rows;
+  uint D = A.n_cols;
+  uint header = 2;
+  vec data = vec(header + N*D);
+  data(0) = N;
+  data(1) = D;
+  data.tail(N*D) = vectorise(A);
+  data.save(filename,raw_binary);  
+}
 
-  v_old = v_zero;
-  for(double i = 1; i < N; i++){
-    y = -i / N;
-    x = y * y;
-    v_new = mesh.insert(Point(x,y));
-    mesh.insert_constraint(v_old,v_new);
-    v_old = v_new;
+void save_vec(const vec & v,
+	      string filename){
+  v.save(filename,raw_binary);  
+}
+
+void save_sp_mat(const sp_mat & A,
+		 string filename){
+
+  uint nnz = A.n_nonzero;
+  uint N = A.n_rows;
+  uint D = A.n_cols;
+
+  uint header = 3;
+  vec data = vec(header + 3*nnz);
+  data(0) = N;
+  data(1) = D;
+  data(2) = nnz;
+
+  typedef sp_mat::const_iterator SpIter;
+  uint idx = 3;
+  for(SpIter it = A.begin(); it != A.end(); ++it){
+    data[idx++] = it.row();
+    data[idx++] = it.col();
+    data[idx++] = (*it);
   }
-  mesh.insert_constraint(v_old,v_lower_right);
+  assert(idx == data.n_elem);
+  data.save(filename,raw_binary);
 }
 
 mat make_points(const vector<vec> & grids)
@@ -325,76 +354,4 @@ mat make_points(const vector<vec> & grids)
     rep_cycle *= n;
   }
   return P;
-}
-
-void save_sp_mat(const uvec & row_idx,
-		 const uvec & col_ptr,
-		 const vec & data,
-		 uint R,
-		 uint C,
-		 string filename){
-  
-  uint NNZ = row_idx.n_elem;
-  assert(col_ptr.n_elem == C+1);
-  assert(data.n_elem == NNZ);
-
-  uint header = 3;
-  vec combined = vec(2*NNZ + (C+1) + header);
-  assert(combined.n_elem == header
-	 + row_idx.n_elem
-	 + col_ptr.n_elem
-	 + data.n_elem);
-
-  // Assemble
-  combined(0) = R;
-  combined(1) = C;
-  combined(2) = NNZ;
-  combined(span(3,2+NNZ)) = conv_to<vec>::from(row_idx);
-  combined(span(3+NNZ, 3 + NNZ + C)) = conv_to<vec>::from(col_ptr);
-  combined.tail(NNZ) = data;
-  
-  combined.save(filename,raw_binary);
-}
-
-int main()
-{
-  TriMesh mesh;
-  
-  VertexHandle v_low_left = mesh.insert(Point(-1,-1));
-  VertexHandle v_low_right = mesh.insert(Point(1,-1));
-  VertexHandle v_up_left = mesh.insert(Point(-1,1));
-  VertexHandle v_up_right = mesh.insert(Point(1,1));
-  VertexHandle v_zero = mesh.insert(Point(0,0));
-
-  //Box boundary
-  mesh.insert_constraint(v_low_left, v_low_right);
-  mesh.insert_constraint(v_low_left, v_up_left);
-  mesh.insert_constraint(v_up_right, v_low_right);
-  mesh.insert_constraint(v_up_right, v_up_left);
-
-  uint num_curve_points = 15;
-  add_di_bang_bang_curves(mesh,v_zero,v_up_left,v_low_right,num_curve_points);
-  
-  mesh.refine(0.125,0.1);
-  mesh.lloyd(25);
-
-  cout << "Number of vertices: " << mesh.number_of_vertices() << endl;
-  cout << "Number of faces: " << mesh.number_of_faces() << endl;
-
-  cout << "Generating grid..." << endl;
-  vector<vec> grid;
-  uint G = 150;
-  grid.push_back(linspace<vec>(-1.1,1.1,G));
-  grid.push_back(linspace<vec>(-1.1,1.1,G));
-  Points points = make_points(grid);
-
-  cout << "Discretizing..." << endl;
-  uvec rows;
-  uvec cols;
-  vec data;
-  ElementDist distrib = mesh.points_to_element_dist(points,rows,cols,data);
-  //cout << distrib;
-
-  save_sp_mat(rows,cols,data,distrib.n_rows,distrib.n_cols,"test.dist");
-  mesh.write("test");
 }
