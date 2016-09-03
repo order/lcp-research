@@ -32,11 +32,13 @@ if ( NOT Boost_FOUND )
 
 endif()
 
+find_package(LibArchive REQUIRED)
 find_package(Armadillo REQUIRED)
 include_directories(${ARMADILLO_INCLUDE_DIRS})
+include_directories(${LibArchive_INCLUDE_DIRS})
 
 
-# include for local directory
+# Include for local directory
 
 # include for local package
 
@@ -45,5 +47,5 @@ include_directories(${ARMADILLO_INCLUDE_DIRS})
 # ##########################################################
 
 include( CGAL_CreateSingleSourceCGALProgram )
-create_single_source_cgal_program( "di.cpp" "mesh.cpp" )
-target_link_libraries(di ${ARMADILLO_LIBRARIES})
+create_single_source_cgal_program( "foo.cpp" "io.cpp" )
+target_link_libraries(foo ${ARMADILLO_LIBRARIES} ${LibArchive_LIBRARIES})
