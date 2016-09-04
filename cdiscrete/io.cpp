@@ -7,14 +7,27 @@
 #include <boost/filesystem/convenience.hpp>
 
 bool Archiver::add_mat(const string & field_name,
-	 const mat & A){
-  string filename = field_name + ".mat";
-  m_names.push_back(filename);
-
-  stringstream ss;
+		       const mat & A){
+  string name = field_name + ".mat";
   vec packed = pack_mat(A);
-  packed.save(ss,raw_binary);
-  m_data.push_back(ss.str());
+  generic_add(name,packed);
+}
+
+bool Archiver::add_vec(const string & field_name,
+		       const vec & v){
+  string name = field_name + ".vec";
+  vec packed = pack_vec(v);
+  generic_add(name,packed);
+}
+
+template <typename D>
+bool Archiver::generic_add(const string & name,
+			   const Col<D> & data){
+    m_names.push_back(name);
+    
+    stringstream ss;
+    data.save(ss,raw_binary);
+    m_data.push_back(ss.str());
 }
 
 void Archiver::write(const string & archive_name) {
@@ -65,31 +78,46 @@ Unarchiver::Unarchiver(const string & archive_name){
 }
 
 
-// Split out mat specific and generic stuff.
 mat Unarchiver::load_mat(const string & field_name){
-  string file_name = field_name + ".mat";
+  string filename = field_name + ".mat";
+  vec raw_vec;
+  bool rc = generic_load<double>(filename,raw_vec);
+  assert(rc);
+  return unpack_mat(raw_vec);
+}
+vec Unarchiver::load_vec(const string & field_name){
+  string filename = field_name + ".vec";
+  vec raw_vec;
+  bool rc = generic_load<double>(filename,raw_vec);
+  assert(rc);
+  return unpack_vec(raw_vec);
+}
 
+// Split out mat specific and generic stuff.
+template <typename D>
+bool Unarchiver::generic_load(const string & filename,
+				Col<D> & ret){
   archive_entry *entry;
   uint rc;
   char data[65536];
   size_t len;
   stringstream ss;
   
-  for (;;) {
+  while(true) {
     // Read entry
     rc = archive_read_next_header(m_archive_ptr, &entry);
     if(rc == ARCHIVE_EOF){
-      break;
+      return false;
     }
     if (rc != ARCHIVE_OK){
-      fprintf(stderr, "%s\n", archive_error_string(m_archive_ptr));
-      exit(1);
+      cerr << "[ACHIVE ERROR]" << archive_error_string(m_archive_ptr) << endl;
+      return false;
     }
 
     // Check header for a match
-    if(strcmp(file_name.c_str(),
+    if(strcmp(filename.c_str(),
 	      archive_entry_pathname(entry))){
-      continue; // No match
+      continue; // No match, continue
     }
 
     // Buffered read to stringstream
@@ -98,17 +126,16 @@ mat Unarchiver::load_mat(const string & field_name){
       ss.write(data,len);
       len = archive_read_data(m_archive_ptr,data,sizeof(data));
     }
-    
-    vec tmp;
-    tmp.load(ss,raw_binary);
-    return unpack_mat(tmp);
+
+    // Success! Load the stringstream into the return vector
+    ret.load(ss,raw_binary);
+    return true;
   }
-  cout << "Field " << field_name << " not found." << endl;
-  exit(1);
+  // Should never hit here.
+  assert(false);
 }
 
 // Packing and unpacking to vectors
-
 template<typename D> Col<D> pack_vec(const Col<D> & A){
   Col<D> ret = Col<D>(1 + A.n_elem);
   ret(0) = A.n_elem;

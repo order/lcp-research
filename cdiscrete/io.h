@@ -15,6 +15,11 @@ using namespace arma;
 struct Archiver{
   bool add_mat(const string & field_name,
 	   const mat & A);
+  bool add_vec(const string & field_name,
+	   const vec & v);
+  template <typename D>
+  bool generic_add(const string & name,
+		   const Col<D> & data);
   void write(const string & archive_name);
   vector<string> m_names;
   vector<string> m_data;
@@ -24,7 +29,11 @@ struct Archiver{
 struct Unarchiver{
   Unarchiver(const string & archive_name);
   mat load_mat(const string & field_name);
-
+  vec load_vec(const string & field_name);
+  
+  template <typename D>
+  bool generic_load(const string & filename,
+		    Col<D> & ret);
   archive * m_archive_ptr;
 };
 

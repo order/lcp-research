@@ -47,5 +47,5 @@ include_directories(${LibArchive_INCLUDE_DIRS})
 # ##########################################################
 
 include( CGAL_CreateSingleSourceCGALProgram )
-create_single_source_cgal_program( "foo.cpp" "io.cpp" )
+create_single_source_cgal_program( "foo.cpp" )
 target_link_libraries(foo ${ARMADILLO_LIBRARIES} ${LibArchive_LIBRARIES})
