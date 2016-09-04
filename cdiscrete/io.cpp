@@ -6,31 +6,106 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/convenience.hpp>
 
-/*
-bool mkdir(const string & dir_path) {
-  boost::filesystem::path dir(dir_path);
-  return boost::filesystem::create_directories(dir);
+bool Archiver::add_mat(const string & field_name,
+	 const mat & A){
+  string filename = field_name + ".mat";
+  m_names.push_back(filename);
+
+  stringstream ss;
+  vec packed = pack_mat(A);
+  packed.save(ss,raw_binary);
+  m_data.push_back(ss.str());
 }
 
-int rmdir(const string &dir_path){
-  boost::filesystem::path dir(dir_path);
-  return boost::filesystem::remove_all(dir);
+void Archiver::write(const string & archive_name) {
+  assert(m_names.size() == m_data.size());
+
+  struct archive *a;
+  struct archive_entry *entry;
+
+  a = archive_write_new();
+  archive_write_add_filter_gzip(a);
+  archive_write_set_format_pax_restricted(a); // Note 1
+  archive_write_open_filename(a, archive_name.c_str());
+
+  typedef vector<string>::const_iterator iter;
+  iter name_it = m_names.begin();
+  iter buff_it = m_data.begin();
+  uint sz;
+  for(;name_it != m_names.end();){
+    sz = buff_it->size();
+    entry = archive_entry_new();
+    archive_entry_set_pathname(entry, name_it->c_str());
+    archive_entry_set_size(entry, sz);
+    archive_entry_set_filetype(entry, AE_IFREG);
+    archive_entry_set_perm(entry, 0644);
+    archive_write_header(a, entry);
+    archive_write_data(a,buff_it->c_str(),sz);
+    archive_entry_free(entry);
+    ++name_it;
+    ++buff_it;
+  }
+  archive_write_close(a);
+  archive_write_free(a);
 }
 
-string strip_ext(const string & filname){
-  return boost::filesystem::change_extension(filename, "").string();
+Unarchiver::Unarchiver(const string & archive_name){
+  m_archive_ptr = archive_read_new();
+  archive_read_support_format_all(m_archive_ptr);
+  archive_read_support_filter_all(m_archive_ptr);
+
+  int rc;
+  if(rc = archive_read_open_filename(m_archive_ptr,
+				     archive_name.c_str(),
+				     16384)){
+    cout << "Cannot open " << archive_name
+	 << " (code " << rc << ")" << endl;
+    exit(1);
+  }  
 }
 
 
-Archiver::Archiver(const string & archive_name) : m_archive_name(archive_name){
-  m_tmp_dir = "tmp_" + strip_ext(archive_name) + "_dir";
-  rmdir(m_tmp_dir);
-  mkdir(m_tmp_dir);
-}
+// Split out mat specific and generic stuff.
+mat Unarchiver::load_mat(const string & field_name){
+  string file_name = field_name + ".mat";
 
-Archiver::~Archiver(){
+  archive_entry *entry;
+  uint rc;
+  char data[65536];
+  size_t len;
+  stringstream ss;
+  
+  for (;;) {
+    // Read entry
+    rc = archive_read_next_header(m_archive_ptr, &entry);
+    if(rc == ARCHIVE_EOF){
+      break;
+    }
+    if (rc != ARCHIVE_OK){
+      fprintf(stderr, "%s\n", archive_error_string(m_archive_ptr));
+      exit(1);
+    }
+
+    // Check header for a match
+    if(strcmp(file_name.c_str(),
+	      archive_entry_pathname(entry))){
+      continue; // No match
+    }
+
+    // Buffered read to stringstream
+    len = archive_read_data(m_archive_ptr,data,sizeof(data));
+    while(len > 0){
+      ss.write(data,len);
+      len = archive_read_data(m_archive_ptr,data,sizeof(data));
+    }
+    
+    vec tmp;
+    tmp.load(ss,raw_binary);
+    return unpack_mat(tmp);
+  }
+  cout << "Field " << field_name << " not found." << endl;
+  exit(1);
 }
-*/
 
 // Packing and unpacking to vectors
 

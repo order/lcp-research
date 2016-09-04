@@ -4,29 +4,29 @@
 #include <string>
 #include <armadillo>
 
+#include <archive.h>
+#include <archive_entry.h>
+
 #include "discrete.h"
 
 using namespace arma;
 
-/*
-struct Archiver{
-  Archiver(const string & archive_name);
-  ~Archiver();
-  
-  template <typename D> bool add(const Mat<D> &);
-  void write();
 
-  string m_archive_name;
-  string m_tmp_dir;
-  vector<string> m_content_name;
-  archive * m_archive_ptr;
+struct Archiver{
+  bool add_mat(const string & field_name,
+	   const mat & A);
+  void write(const string & archive_name);
+  vector<string> m_names;
+  vector<string> m_data;
+  
 };
 
-bool mkdir(const string &);
-string strip_ext(const string &);
-*/
+struct Unarchiver{
+  Unarchiver(const string & archive_name);
+  mat load_mat(const string & field_name);
 
-
+  archive * m_archive_ptr;
+};
 
 
 // Marshalling and unmarshalling matrices into vectors w/ headers
