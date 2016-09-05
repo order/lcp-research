@@ -4,6 +4,7 @@
 #include <armadillo>
 #include <random>
 #include <chrono>
+#include <vector>
 
 //=====================================
 // RANDOM GENERATOR
@@ -81,5 +82,16 @@ void replace_col(umat & M, uint col, double val,const uvec & cnd);
 // Binary ops
 bvec num2binvec(uint n,uint D);
 bvec binmask(uint d, uint D);
+
+// Some shifting stuff
+template <typename D> D last(const Col<D> & v);
+template <typename D> Col<D> rshift(const Col<D> & v);
+// Non-circular shift
+
+
+//Sparse stuff
+typedef std::vector<std::vector<sp_mat>> block_sp_mat;
+typedef std::vector<sp_mat> block_sp_row;
+sp_mat bmat(const block_sp_mat & B);
 
 #endif

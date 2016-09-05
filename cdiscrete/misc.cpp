@@ -257,3 +257,73 @@ bvec binmask(uint d, uint D){
   }
   return mask;
 }
+
+template <typename D> D last(const Col<D> & v){
+  return (v.tail(1))(0);
+}
+
+template <typename D>
+Col<D> rshift(const Col<D> & v){
+  Col<D> u = shift(v,1);
+  assert(u(1) == v(0));
+  u(0) = 0;
+  return u;
+}
+
+sp_mat bmat(const block_sp_mat & B){
+
+  uint b_rows = B.size();
+  assert(b_rows > 0);
+  uint b_cols = B[0].size();
+  assert(b_cols > 0);
+
+  uvec rows = zeros<uvec>(b_rows);  
+  uvec cols = zeros<uvec>(b_cols);
+  uint nnz = 0;
+
+  // Gather block size information
+  for(uint i = 0; i < b_rows; i++){
+    assert(b_cols == B[i].size());
+    for(uint j = 0; j < b_cols; j++){
+      if(rows[i]>0 and std::max(rows[i],B[i][j].n_rows) != rows[i]){
+	cerr << "[BMAT ERROR] Incompatible row dimensions" << endl;
+	exit(1);
+      }
+      if(cols[j]>0 and std::max(cols[i],B[i][j].n_cols) != cols[i]){
+	cerr << "[BMAT ERROR] Incompatible col dimensions" << endl;
+	exit(1);
+      }
+      rows[i] = std::max(rows[i],B[i][j].n_rows);
+      cols[j] = std::max(cols[j],B[i][j].n_cols);
+      nnz += B[i][j].n_nonzero;
+    }
+  }
+
+  uvec cum_rows = cumsum(rows);
+  uvec cum_cols = cumsum(cols);
+  uvec row_off = rshift(cum_rows);
+  uvec col_off = rshift(cum_cols);
+  uint R = last(cum_rows);
+  uint C = last(cum_cols);
+
+  vec values = vec(nnz); // template
+  umat loc = umat(2,nnz);
+  
+  typedef sp_mat::const_iterator sp_iter;
+  uint I = 0;
+  for(uint j = 0; j < b_cols; j++){
+    for(uint i = 0; i < b_rows; i++){
+      for(sp_iter it = B[i][j].begin();
+	  it != B[i][j].end(); ++it){	
+	values(I) = (*it);
+	loc(0,I) = it.row() + row_off(i);
+	loc(1,I) = it.col() + col_off(j);
+	++I;
+      }
+    }
+  }
+  assert(nnz == I);
+  
+  sp_mat ret =  sp_mat(loc,values,R,C);
+  return ret;
+}

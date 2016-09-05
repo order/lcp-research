@@ -15,6 +15,8 @@ using namespace arma;
 struct Archiver{
   bool add_mat(const string & field_name,
 	   const mat & A);
+  bool add_sp_mat(const string & field_name,
+	   const sp_mat & A);
   bool add_vec(const string & field_name,
 	   const vec & v);
   template <typename D>

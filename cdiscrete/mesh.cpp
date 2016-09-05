@@ -17,7 +17,7 @@ ostream& operator<< (ostream& os, const BaryCoord& coord){
   return os;
 }
 
-ElementDist TriMesh::points_to_element_dist(const Points & points){
+ElementDist TriMesh::points_to_element_dist(const Points & points) const{
   // Ignore CSC returns
   uvec row = uvec();
   uvec col = uvec();
@@ -28,7 +28,7 @@ ElementDist TriMesh::points_to_element_dist(const Points & points){
 ElementDist TriMesh::points_to_element_dist(const Points & points,
 					    uvec & row_idx_uvec,
 					    uvec & col_ptr_uvec,
-					    vec & data_vec){
+					    vec & data_vec) const{
   assert(2 == points.n_cols);
   assert(m_frozen);
 
@@ -69,9 +69,9 @@ ElementDist TriMesh::points_to_element_dist(const Points & points,
       // In bounds; add barycentric coords.
       assert(NUMVERT == coord.indices.n_elem);
       assert(NUMVERT == coord.weights.n_elem);
+      
       for(uint v = 0; v < NUMVERT; v++){
 	if(coord.weights(v) < ALMOST_ZERO) continue;
-	
 	row_idx.push_back(coord.indices(v));
 	data.push_back(coord.weights(v));
       }
@@ -88,8 +88,8 @@ ElementDist TriMesh::points_to_element_dist(const Points & points,
   return sp_mat(row_idx_uvec,col_ptr_uvec,data_vec,M,N);
 }
 
-BaryCoord TriMesh::barycentric_coord(const Point & point){  
-  regen_caches();
+BaryCoord TriMesh::barycentric_coord(const Point & point) const{  
+  assert(m_frozen);
 
   double x = point.x();
   double y = point.y();
@@ -104,15 +104,32 @@ BaryCoord TriMesh::barycentric_coord(const Point & point){
     return BaryCoord(true,uvec(),vec()); // Out of bounds
   }
   
-  // Extract vertices
+  // Extract vertices; sort by id
+  /*
+    ID sorting turns out to be important for turning into a sparse matrix later.
+   */
+  vector< tuple<uint, double, double> > vertex_list;
+  set<uint> ids;
+  uint id;
+  double v_x,v_y;
+  for(uint i = 0; i < 3; i++){
+    id = m_vert_reg.at(face->vertex(i));
+    v_x = face->vertex(i)->point().x();
+    v_y = face->vertex(i)->point().y();
+    assert(ids.end() == ids.find(id)); // Unique
+    vertex_list.push_back(make_tuple(id,v_x,v_y));
+  }
+  sort(vertex_list.begin(),vertex_list.end());
+  
   vec X = vec(3);
   vec Y = vec(3);
   uvec idx = uvec(3);
   for(uint i = 0; i < 3; i++){
-    X(i) = face->vertex(i)->point().x();
-    Y(i) = face->vertex(i)->point().y();
-    idx(i) = m_vert_reg[face->vertex(i)];
-  }
+    idx(i) = get<0>(vertex_list[i]);
+    X(i) = get<1>(vertex_list[i]);
+    Y(i) = get<2>(vertex_list[i]);
+  } 
+
 
   // Barycentric voodoo (formula from wikipedia)
   vec c = vec(3);
@@ -130,15 +147,31 @@ BaryCoord TriMesh::barycentric_coord(const Point & point){
   vec recon = vec(2);
   recon(0) = dot(X,c);
   recon(1) = dot(Y,c);
-  assert(approx_equal(recon,p,"absdiff",ALMOST_ZERO));
+  if(accu(abs(recon-p)) > ALMOST_ZERO){
+    cout << "Abs reconstruction error: " << accu(abs(recon-p)) << endl;
+    //assert(approx_equal(recon,p,"absdiff",ALMOST_ZERO));
+  }
   // TODO: return vertex indices too (need vertex registry)
   
   return BaryCoord(false,idx,c);
 }
 
-FaceHandle TriMesh::locate(const Point & p) const{
-  return m_mesh.locate(p);
+FaceHandle TriMesh::locate_face(const Point & p) const{
+  LocateType lt;
+  int li;
+  FaceHandle ret = m_mesh.locate(p,lt,li);
+  assert(lt != CDT::OUTSIDE_CONVEX_HULL);
+  assert(lt != CDT::OUTSIDE_AFFINE_HULL);
+  return ret;
 }
+VertexHandle TriMesh::locate_vertex(const Point & p) const{
+  LocateType lt;
+  int li;
+  FaceHandle face = m_mesh.locate(p,lt,li);
+  assert(lt == CDT::VERTEX);
+  return face->vertex(li);
+}
+
 
 VertexHandle TriMesh::insert(vec & p){
   return insert(Point(p(0),p(1)));
@@ -170,25 +203,25 @@ void TriMesh::lloyd(uint I){
 			      CGAL::parameters::max_iteration_number = I);
 }
 
-Points TriMesh::get_spatial_nodes(){
+Points TriMesh::get_spatial_nodes() const{
   assert(m_frozen);
   return m_nodes.head_rows(number_of_vertices());
 }
 
-Points TriMesh::get_all_nodes(){
+Points TriMesh::get_all_nodes() const{
   assert(m_frozen);
   return m_nodes;
 }
 
-void TriMesh::write(string base_filename){
+void TriMesh::write(string base_filename) const{
   // Write the .node and .ele files. Shewchuk uses these files in Triangle
   // and Stellar
+  assert(m_frozen);
   ofstream node_file,ele_file;
   uint attr = 0; // Number of attributes, will be useful later
   uint bnd = 0; // Boundary marker. Will be important for
 
   // Regenerate all the supporting information
-  regen_caches();
   
   // Write .node header
   string node_filename = base_filename + ".node";
@@ -279,79 +312,3 @@ void TriMesh::regen_caches(){
   m_dirty = false;
 }
 
-void save_mat(const mat & A,
-	      string filename){
-  uint N = A.n_rows;
-  uint D = A.n_cols;
-  uint header = 2;
-  vec data = vec(header + N*D);
-  data(0) = N;
-  data(1) = D;
-  data.tail(N*D) = vectorise(A);
-  data.save(filename,raw_binary);  
-}
-
-void save_vec(const vec & v,
-	      string filename){
-  v.save(filename,raw_binary);  
-}
-
-void save_sp_mat(const sp_mat & A,
-		 string filename){
-
-  uint nnz = A.n_nonzero;
-  uint N = A.n_rows;
-  uint D = A.n_cols;
-
-  uint header = 3;
-  vec data = vec(header + 3*nnz);
-  data(0) = N;
-  data(1) = D;
-  data(2) = nnz;
-
-  typedef sp_mat::const_iterator SpIter;
-  uint idx = 3;
-  for(SpIter it = A.begin(); it != A.end(); ++it){
-    data[idx++] = it.row();
-    data[idx++] = it.col();
-    data[idx++] = (*it);
-  }
-  assert(idx == data.n_elem);
-  data.save(filename,raw_binary);
-}
-
-mat make_points(const vector<vec> & grids)
-{
-  // Makes a mesh out of the D vectors
-  // 'C' style ordering... last column changes most rapidly
-  
-  // Figure out the dimensions of things
-  uint D = grids.size();
-  uint N = 1;
-  for(vector<vec>::const_iterator it = grids.begin();
-      it != grids.end(); ++it){
-    N *= it->n_elem;
-  }
-  mat P = mat(N,D); // Create the matrix
-  
-  uint rep_elem = N; // Element repetition
-  uint rep_cycle = 1; // Pattern rep
-  for(uint d = 0; d < D; d++){
-    uint n = grids[d].n_elem;
-    rep_elem /= n;
-    assert(N == rep_cycle * rep_elem * n);
-    
-    uint I = 0;
-    for(uint c = 0; c < rep_cycle; c++){ // Cycle repeat
-      for(uint i = 0; i < n; i++){ // Element in pattern
-	for(uint e = 0; e < rep_elem; e++){ // Element repeat
-	  assert(I < N);
-	  P(I,d) = grids[d](i);
-	  I++;
-	}
-      }
-    }
-    rep_cycle *= n;
-  }
-  return P;
-}

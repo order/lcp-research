@@ -72,14 +72,15 @@ class TriMesh{
   */
  public:
   TriMesh();
-  ElementDist points_to_element_dist(const Points &);  
+  ElementDist points_to_element_dist(const Points &) const;
   ElementDist points_to_element_dist(const Points &,
 				     uvec & row_idx_uvec,
 				     uvec & col_ptr_uvec,
-				     vec & data_vec);
-  BaryCoord barycentric_coord(const Point &);
+				     vec & data_vec) const;
+  BaryCoord barycentric_coord(const Point &) const;
 
-  FaceHandle locate(const Point &) const;
+  FaceHandle locate_face(const Point &) const;
+  VertexHandle locate_vertex(const Point &) const;
   
   VertexHandle insert(vec &);
   VertexHandle insert(Point);
@@ -88,8 +89,8 @@ class TriMesh{
   void refine(double b,double S);
   void lloyd(uint I);
 
-  Points get_spatial_nodes();
-  Points get_all_nodes();
+  Points get_spatial_nodes() const;
+  Points get_all_nodes() const;
 
   uint number_of_faces() const;
   uint number_of_vertices() const;
@@ -98,7 +99,7 @@ class TriMesh{
 
   void freeze();
   
-  void write(string base_filename); // To node and ele files
+  void write(string base_filename) const; // To node and ele files
   
   //protected:
 

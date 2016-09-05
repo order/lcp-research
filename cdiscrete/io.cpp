@@ -13,6 +13,13 @@ bool Archiver::add_mat(const string & field_name,
   generic_add(name,packed);
 }
 
+bool Archiver::add_sp_mat(const string & field_name,
+		       const sp_mat & A){
+  string name = field_name + ".sp_mat";
+  vec packed = pack_sp_mat(A);
+  generic_add(name,packed);
+}
+
 bool Archiver::add_vec(const string & field_name,
 		       const vec & v){
   string name = field_name + ".vec";

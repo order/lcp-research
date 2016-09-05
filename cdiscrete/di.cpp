@@ -1,34 +1,50 @@
 #include "di.h"
-
+#include "misc.h"
+#include "io.h"
 
 void add_di_bang_bang_curves(TriMesh & mesh,
-			     VertexHandle & v_zero,
-			     VertexHandle & v_upper_left,
-			     VertexHandle & v_lower_right,
+			     const vec & lb,
+			     const vec & ub,
 			     uint num_curve_points){
+  VertexHandle v_zero = mesh.locate_vertex(Point(0,0));
+  VertexHandle v_01 = mesh.locate_vertex(Point(lb(0),ub(1)));
+  VertexHandle v_10 = mesh.locate_vertex(Point(ub(0),lb(1)));
+
   VertexHandle v_old = v_zero;
-  VertexHandle v_new;
+  VertexHandle v_new;  
   double x,y;
   double N = num_curve_points;
   // -ve x, +ve y
+
+  // Figure out the max y within boundaries
+  assert(lb(0) < 0);
+  double max_y = min(ub(1),std::sqrt(-lb(0)));
+  assert(max_y > 0);
   for(double i = 1; i < N; i++){
-    y = i / N; // Uniform over y
+    y = max_y * i / N; // Uniform over y
+    assert(y > 0);
     x = - y * y;
+    if(x <= lb(0)) break;
     v_new = mesh.insert(Point(x,y));
     mesh.insert_constraint(v_old,v_new);
     v_old = v_new;
   }
-  mesh.insert_constraint(v_old,v_upper_left);
+  //mesh.insert_constraint(v_old,v_01);
 
   v_old = v_zero;
+  assert(ub(0) > 0);
+  double min_y = max(lb(1),-std::sqrt(ub(0)));
+  assert(min_y < 0);
   for(double i = 1; i < N; i++){
-    y = -i / N;
+    y = min_y * i / N;
+    assert(y < 0);
     x = y * y;
+    if(x >= ub(0)) break;
     v_new = mesh.insert(Point(x,y));
     mesh.insert_constraint(v_old,v_new);
     v_old = v_new;
   }
-  mesh.insert_constraint(v_old,v_lower_right);
+  //mesh.insert_constraint(v_old,v_10);
 }
 
 void saturate(Points & points,
@@ -80,76 +96,131 @@ vec build_di_state_weights(const Points & points){
   return weight / sum(weight);
 }
 
+sp_mat build_di_transition(const Points & points,
+			   const TriMesh & mesh,
+			   const vec & lb,
+			   const vec & ub,
+			   double action){
+  uint N = points.n_rows;
+  Points p_next = double_integrator(points,action,SIM_STEP);
+  saturate(p_next,lb,ub);
+  ElementDist ret = mesh.points_to_element_dist(p_next);
+
+  
+  // Final row is the OOB row
+  assert(size(N+1,N) == size(ret));
+  // Should be all zero
+  assert(arma::accu(ret.submat(span(N,N),span(0,N-1))) < 1e-15);
+
+  // Crop
+  ret.resize(N,N);
+  return ret;
+}
+
+void build_square_boundary(TriMesh & mesh,
+			   const vec & lb,
+			   const vec & ub){
+  assert(2 == lb.n_elem);
+  assert(2 == ub.n_elem);
+
+  VertexHandle v_00 = mesh.insert(Point(lb(0),lb(1)));
+  VertexHandle v_01 = mesh.insert(Point(lb(0),ub(1)));
+  VertexHandle v_10 = mesh.insert(Point(ub(0),lb(1)));
+  VertexHandle v_11 = mesh.insert(Point(ub(0),ub(1)));
+
+  mesh.insert_constraint(v_00,v_01);
+  mesh.insert_constraint(v_01,v_11);
+  mesh.insert_constraint(v_11,v_10);
+  mesh.insert_constraint(v_10,v_00);
+}
+
+bool check(const sp_mat & A){
+  typedef sp_mat::const_iterator sp_it;
+  set<pair<uint,uint>> S;
+  for(sp_it it = A.begin();
+      it != A.end(); ++it){
+    pair<uint,uint> coord = make_pair(it.row(),it.col());
+    if(S.end() != S.find(coord)){
+      cout << "Violation: (" << it.row() << "," << it.col() << ")\n";
+      assert(S.end() == S.find(coord));
+    }
+    S.emplace(coord);
+  }
+  assert(S.size() == A.n_nonzero);
+}
+
 int main()
 {
+  double B = 5.0; // Boundary
+  double gamma = 0.99;
   TriMesh mesh;
-  
-  VertexHandle v_low_left = mesh.insert(Point(-1,-1));
-  VertexHandle v_low_right = mesh.insert(Point(1,-1));
-  VertexHandle v_up_left = mesh.insert(Point(-1,1));
-  VertexHandle v_up_right = mesh.insert(Point(1,1));
+
+  vec lb = -B*ones<vec>(2);
+  vec ub = B*ones<vec>(2);
+
+  cout << "Initial meshing..."<< endl;  
+  build_square_boundary(mesh,lb,ub);
   VertexHandle v_zero = mesh.insert(Point(0,0));
 
-  //Box boundary
-  mesh.insert_constraint(v_low_left, v_low_right);
-  mesh.insert_constraint(v_low_left, v_up_left);
-  mesh.insert_constraint(v_up_right, v_low_right);
-  mesh.insert_constraint(v_up_right, v_up_left);
-
-  uint num_curve_points = 15;
-  add_di_bang_bang_curves(mesh,v_zero,v_up_left,v_low_right,num_curve_points);
-  
-  mesh.refine(0.125,0.125);
+  uint num_curve_points = 25;
+  add_di_bang_bang_curves(mesh,lb,ub,num_curve_points);
+  cout << "Refining..."<< endl;
+  mesh.refine(0.125,0.5);
+  cout << "Optimizing..."<< endl;
   mesh.lloyd(25);
   mesh.freeze();
   mesh.write("test");
 
-  cout << "Number of vertices: " << mesh.number_of_vertices() << endl;
-  cout << "Number of faces: " << mesh.number_of_faces() << endl;
+  cout << "\tNumber of vertices: " << mesh.number_of_vertices() << endl;
+  cout << "\tNumber of faces: " << mesh.number_of_faces() << endl;
 
   // Generate interp grid
+  /*
   vector<vec> grid;
   uint G = 150;
   grid.push_back(linspace(-1.0,1.0,G));
   grid.push_back(linspace(-1.0,1.0,G));
   Points grid_points = make_points(grid);
   ElementDist interp_weights = mesh.points_to_element_dist(grid_points);
-  
-  save_sp_mat(interp_weights,"test.grid");
- 
-  
+  */
+   
   // Get points
   Points points = mesh.get_spatial_nodes();
-
-  // Run dynamics
-  Points p_pos = double_integrator(points,1,0.05);
-  Points p_neg = double_integrator(points,-1,0.05);
-
-  // Enforce boundary by saturation
-  vec lb = -ones<vec>(2);
-  vec ub = ones<vec>(2);
-  saturate(p_pos,lb,ub);
-  saturate(p_neg,lb,ub);
-
-  // Convert to transition matrices
-  ElementDist P_pos = mesh.points_to_element_dist(p_pos);
-  ElementDist P_neg = mesh.points_to_element_dist(p_neg);
-
-  // Crop out oob row (dealt with by saturation)
   uint N = points.n_rows;
-  P_pos.resize(N,N);
-  P_neg.resize(N,N);
+  
+  cout << "Generating transition matrices..."<< endl;
+  // Get transition matrices
+  ElementDist P_pos = build_di_transition(points,
+					  mesh,
+					  lb,ub,1.0);
+  ElementDist P_neg = build_di_transition(points,
+					  mesh,
+					  lb,ub,-1.0);
+
+  check(P_pos);
+  check(P_neg);
+  sp_mat E_pos = speye(N,N) + ( -gamma * P_pos);
+  sp_mat E_neg = speye(N,N) - gamma * P_neg;
+  check(E_pos);
+  check(E_neg);
+  
+  sp_mat E_pos_t = E_pos.t();
+  cout << "Building LCP..."<< endl;
+  block_sp_row top = block_sp_row{sp_mat(),E_pos,E_neg};
+  block_sp_row middle = block_sp_row{-E_pos.t(),sp_mat(),sp_mat()};
+  block_sp_row bottom = block_sp_row{-E_neg.t(),sp_mat(),sp_mat()};
+  block_sp_mat blk_M = block_sp_mat{top,middle,bottom};
+  sp_mat M = bmat(blk_M);
   
   mat costs = build_di_costs(points);
   vec weights = build_di_state_weights(points);
-  
-  cout << "Discretizing..." << endl;
 
-  //cout << distrib;
+  vec q = join_vert(-weights,vectorise(costs));
+  assert(3*N == q.n_elem);
 
-  save_sp_mat(P_pos,"p_pos.spmat");
-  save_sp_mat(P_neg,"p_neg.spmat");
-  save_mat(costs, "costs.mat");
-  save_vec(weights, "weights.vec");
-  
+  cout << "Writing archive..." << endl;
+  Archiver archiver;
+  archiver.add_sp_mat("M",M);
+  archiver.add_vec("q",q);
+  archiver.write("di.mdp");
 }

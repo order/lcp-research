@@ -65,28 +65,28 @@ if __name__ == "__main__":
     (_,base_file) = sys.argv
     nodes = read_node(base_file + ".node")
     faces = read_ele(base_file + ".ele")
-    dist = read_sp_mat(base_file + ".grid")
+    #dist = read_sp_mat(base_file + ".grid")
 
-    (R,C) = dist.shape
-    print dist.shape
+    #(R,C) = dist.shape
+    #print dist.shape
     print nodes.shape
     
-    G = 150
-    (P,(X,Y)) = make_points([np.linspace(-1,1,G)]*2,True)
+    #G = 150
+    #(P,(X,Y)) = make_points([np.linspace(-1,1,G)]*2,True)
 
-    (N,D) = P.shape
-    assert C == N
-    assert R == (nodes.shape[0])
+    #(N,D) = P.shape
+    #assert C == N
+    #assert R == (nodes.shape[0])
 
     nodes = nodes[:-1,:] # Strip OOB node
 
     # Random values
     #v = np.random.rand(R)
-    v = np.hstack([np.sum(np.abs(nodes),1),2])
-    Z = dist.T.dot(v);
+    #v = np.hstack([np.sum(np.abs(nodes),1),2])
+    #Z = dist.T.dot(v);
 
     #plt.scatter(P[:,0],P[:,1],c=Z,s=15,lw=0,alpha=0.25);
-    plt.pcolormesh(X,Y,np.reshape(Z,(G,G)),lw=0)
+    #plt.pcolormesh(X,Y,np.reshape(Z,(G,G)),lw=0)
     
     plt.triplot(nodes[:,0],
                 nodes[:,1],
