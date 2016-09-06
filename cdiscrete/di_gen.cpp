@@ -1,4 +1,4 @@
-#include "di.h"
+#include "di_gen.h"
 #include "misc.h"
 #include "io.h"
 
@@ -163,14 +163,15 @@ int main()
   build_square_boundary(mesh,lb,ub);
   VertexHandle v_zero = mesh.insert(Point(0,0));
 
-  uint num_curve_points = 25;
-  add_di_bang_bang_curves(mesh,lb,ub,num_curve_points);
+  //uint num_curve_points = 25;
+  //add_di_bang_bang_curves(mesh,lb,ub,num_curve_points);
   cout << "Refining..."<< endl;
-  mesh.refine(0.125,1);
+  mesh.refine(0.125,1.0);
   cout << "Optimizing..."<< endl;
-  mesh.lloyd(25);
+  //mesh.lloyd(25);
   mesh.freeze();
-  mesh.write("test");
+  mesh.write_shewchuk("di");
+  mesh.write_cgal("di.tri");
 
   cout << "\tNumber of vertices: " << mesh.number_of_vertices() << endl;
   cout << "\tNumber of faces: " << mesh.number_of_faces() << endl;

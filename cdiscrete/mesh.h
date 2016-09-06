@@ -70,6 +70,7 @@ class TriMesh{
   */
  public:
   TriMesh();
+  TriMesh(const TriMesh &);
   ElementDist points_to_element_dist(const Points &) const;
   ElementDist points_to_element_dist(const Points &,
 				     uvec & row_idx_uvec,
@@ -82,6 +83,12 @@ class TriMesh{
   
   VertexHandle insert(vec &);
   VertexHandle insert(Point);
+
+  void split(uint fid);
+  void split(FaceHandle & fid);
+  Point center_of_face(uint fid);
+
+  
   void insert_constraint(VertexHandle & a,
 			 VertexHandle & b);
   void refine(double b,double S);
@@ -95,9 +102,16 @@ class TriMesh{
   uint number_of_nodes() const;
   uint oob_node_index() const;
 
+  vec face_diff(const vec & vertex_function) const;
+  vec prism_volume(const vec & vertex_function) const;
+
+  void write_cgal(const string &) const;
+  void read_cgal(const string &); 
+  void write_shewchuk(string base_filename) const; // To node and ele files
+
   void freeze();
+  void print_vert_reg() const;
   
-  void write(string base_filename) const; // To node and ele files
   
   //protected:
 
@@ -115,22 +129,4 @@ class TriMesh{
 };
 
 
-void saturate(Points & points,
-	      const vec &lb,
-	      const vec &ub);
-// Subsume when merge with cdiscrete
-mat make_points(const vector<vec> & grids);
-
-// DI stuff
-void add_di_bang_bang_curves(TriMesh & mesh,
-			     VertexHandle & v_zero,
-			     VertexHandle & v_upper_left,
-			     VertexHandle & v_lower_right,
-			     uint num_curve_points);
-
-Points double_integrator(const Points & points,
-			 double a,double t);
-
-mat build_di_costs(const Points & points);
-vec build_di_state_weights(const Points & points);
 #endif

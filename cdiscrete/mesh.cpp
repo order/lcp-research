@@ -5,8 +5,14 @@
 BaryCoord::BaryCoord():oob(true){}
 BaryCoord::BaryCoord(bool o,uvec i,vec w) :
   oob(o),indices(i),weights(w){}
+
 TriMesh::TriMesh() :
   m_mesh(),m_refiner(m_mesh),m_dirty(true),m_frozen(false){}
+
+TriMesh::TriMesh(const TriMesh & other) :
+  m_mesh(other.m_mesh),m_refiner(m_mesh),m_dirty(true),m_frozen(false){
+  regen_caches();
+}
 
 ostream& operator<< (ostream& os, const BaryCoord& coord){
   if(coord.oob){
@@ -129,8 +135,10 @@ BaryCoord TriMesh::barycentric_coord(const Point & point) const{
     Y(i) = get<2>(vertex_list[i]);
   } 
 
-
+  
+  
   // Barycentric voodoo (formula from wikipedia)
+  // TODO: could have replaced this with stuff from Triangle_coordinates
   vec c = vec(3);
   double Det = (Y(1) - Y(2))*(X(0) - X(2)) + (X(2) - X(1))*(Y(0) - Y(2));
   c(0) = ((Y(1) - Y(2))*(x - X(2)) + (X(2) - X(1))*(y - Y(2))) / Det;
@@ -182,6 +190,27 @@ VertexHandle TriMesh::insert(Point p){
   return m_mesh.insert(p);
 }
 
+void TriMesh::split(uint fid){
+  assert(~m_frozen);
+  cout << "split" << endl;
+  Point c = center_of_face(fid);
+  m_mesh.insert(c);
+}
+
+Point TriMesh::center_of_face(uint fid){
+  uint vid;
+  double x, y;
+  x = y = 0;
+  for(uint i = 0; i < TRI_NUM_VERT; i++){
+    vid = m_faces(fid,i);
+    x += m_nodes(vid,0);
+    y += m_nodes(vid,1);
+  }
+  x /= TRI_NUM_VERT;
+  y /= TRI_NUM_VERT;
+  return Point(x,y);
+}
+
 void TriMesh::insert_constraint(VertexHandle & a, VertexHandle & b){
   assert(not m_frozen);
   m_dirty = true;
@@ -212,9 +241,26 @@ Points TriMesh::get_all_nodes() const{
   return m_nodes;
 }
 
-void TriMesh::write(string base_filename) const{
+void TriMesh::write_cgal(const string & filename) const{
+  assert(m_frozen);
+  ofstream fs(filename);
+  fs << m_mesh;
+  fs.close();
+}
+
+void TriMesh::read_cgal(const string & filename){
+  assert(!m_frozen);
+  ifstream fs(filename);
+  fs >> m_mesh;
+  m_dirty = true;
+  fs.close();
+}
+
+void TriMesh::write_shewchuk(string base_filename) const{
   // Write the .node and .ele files. Shewchuk uses these files in Triangle
   // and Stellar
+  // Mostly for visualization purposes
+  
   assert(m_frozen);
   ofstream node_file,ele_file;
   uint attr = 0; // Number of attributes, will be useful later
@@ -313,3 +359,68 @@ void TriMesh::regen_caches(){
   m_dirty = false;
 }
 
+vec TriMesh::face_diff(const vec & vertex_function) const{
+  assert(m_frozen);
+
+  uint V = number_of_vertices();
+  uint F = number_of_faces();
+  assert(V == vertex_function.n_elem);
+  
+  vec diff = vec(F);
+  uvec val = uvec(TRI_NUM_VERT);
+  VertexHandle vh;
+  uint f = 0;
+  uint vid = 0;
+  for(FaceIterator fit = m_mesh.finite_faces_begin();
+      fit != m_mesh.finite_faces_end(); ++fit){
+    for(uint v = 0; v < TRI_NUM_VERT; v++){
+      vh = fit->vertex(v);
+      vid = m_vert_reg.at(vh);
+      val(v) = vertex_function(vid);
+    }
+    diff(f++) = max(val) - min(val);
+  }
+  assert(f == F);
+  return diff; 
+}
+
+vec TriMesh::prism_volume(const vec & vertex_function) const{
+  // Volumn of a truncated right prism:
+  // V = A * (v_0 + v_1 + v_2) / 3.0
+  assert(m_frozen);
+
+  uint V = number_of_vertices();
+  uint F = number_of_faces();
+  assert(V == vertex_function.n_elem);
+  
+  vec vol = vec(F);
+  VertexHandle vh;
+  uint f = 0;
+  uint vid = 0;
+  double area,mean_fn;
+  CDT::Triangle t;
+  
+  for(FaceIterator fit = m_mesh.finite_faces_begin();
+      fit != m_mesh.finite_faces_end(); ++fit){
+    t = m_mesh.triangle(fit);
+    area = std::abs(t.area());
+    mean_fn = 0;
+    for(uint v = 0; v < TRI_NUM_VERT; v++){
+      vh = fit->vertex(v);
+      vid = m_vert_reg.at(vh);
+      mean_fn = vertex_function(vid) / TRI_NUM_VERT;
+    }
+    vol(f++) = area * mean_fn;
+  }
+  assert(f == F);
+  return vol; 
+}
+
+
+
+void TriMesh::print_vert_reg() const{
+  for(VertexRegistry::const_iterator it = m_vert_reg.begin();
+      it != m_vert_reg.end(); ++it){
+    cout << it->first->point() << ", " << it->second << endl;
+  }
+}
