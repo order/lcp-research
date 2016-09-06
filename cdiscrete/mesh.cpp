@@ -1,4 +1,5 @@
 #include "mesh.h"
+#include "misc.h"
 #include <vector>
 
 BaryCoord::BaryCoord():oob(true){}
@@ -52,8 +53,6 @@ ElementDist TriMesh::points_to_element_dist(const Points & points,
   for(uint i = 0; i < N; i++){
     p = Point(points(i,0),points(i,1));
     coord = barycentric_coord(p);
-
-    //cout << p << endl;
     
     // Start new column here
     col_ptr.push_back(row_idx.size());
@@ -67,10 +66,10 @@ ElementDist TriMesh::points_to_element_dist(const Points & points,
     }
     else{
       // In bounds; add barycentric coords.
-      assert(NUMVERT == coord.indices.n_elem);
-      assert(NUMVERT == coord.weights.n_elem);
+      assert(TRI_NUM_VERT == coord.indices.n_elem);
+      assert(TRI_NUM_VERT == coord.weights.n_elem);
       
-      for(uint v = 0; v < NUMVERT; v++){
+      for(uint v = 0; v < TRI_NUM_VERT; v++){
 	if(coord.weights(v) < ALMOST_ZERO) continue;
 	row_idx.push_back(coord.indices(v));
 	data.push_back(coord.weights(v));
@@ -147,9 +146,9 @@ BaryCoord TriMesh::barycentric_coord(const Point & point) const{
   vec recon = vec(2);
   recon(0) = dot(X,c);
   recon(1) = dot(Y,c);
-  if(accu(abs(recon-p)) > ALMOST_ZERO){
+  if(accu(abs(recon-p)) > PRETTY_SMALL){
     cout << "Abs reconstruction error: " << accu(abs(recon-p)) << endl;
-    //assert(approx_equal(recon,p,"absdiff",ALMOST_ZERO));
+    assert(approx_equal(recon,p,"absdiff",PRETTY_SMALL));
   }
   // TODO: return vertex indices too (need vertex registry)
   
@@ -228,13 +227,15 @@ void TriMesh::write(string base_filename) const{
   node_file.open(node_filename.c_str());
   
   // <# of vertices> <dim> <# of attributes> <# of boundary markers (0 or 1)>
-  node_file << m_nodes.n_rows
-	    << "\t" << NUMDIM
+  // NB: ignore the OOB node (node at infinity)
+  node_file << (m_nodes.n_rows - 1)
+	    << "\t" << TRI_NUM_DIM
 	    << "\t" << attr
 	    << "\t" << bnd << endl;
   
-  // <vertex #> <x> <y> [attributes] [boundary marker] 
-  for(uint i = 0; i < m_nodes.n_rows; i++){
+  // <vertex #> <x> <y> [attributes] [boundary marker]
+  // NB: ignore the OOB node (node at infinity)
+  for(uint i = 0; i < (m_nodes.n_rows-1); i++){
     node_file << i << "\t" << m_nodes.row(i);
   }
   node_file.close();
@@ -244,7 +245,7 @@ void TriMesh::write(string base_filename) const{
   ele_file.open(ele_filename.c_str());
     // <# of triangles> <nodes per triangle> <# of attributes>
   ele_file << m_faces.n_rows
-	   << "\t" << NUMVERT
+	   << "\t" << TRI_NUM_VERT
 	   << "\t" << attr << endl;
   
   for(uint i = 0; i < m_faces.n_rows; i++){
@@ -304,7 +305,7 @@ void TriMesh::regen_caches(){
   for(FaceIterator fit = m_mesh.faces_begin();
       fit != m_mesh.faces_end(); ++fit){
     // Add to face description
-    for(uint v = 0; v < NUMVERT; v++){
+    for(uint v = 0; v < TRI_NUM_VERT; v++){
       m_faces(f_id,v) = m_vert_reg[fit->vertex(v)];
     }
     m_face_reg[fit] = f_id++;

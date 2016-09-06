@@ -1,12 +1,10 @@
-import numpy as np
+from utils.archiver import *
 import matplotlib.pyplot as plt
-import linalg
 
-X = np.random.rand(5,3)
-X = np.hstack([X, np.zeros((5,1))])
-print X
+x = np.arange(15,dtype=np.double)
 
-B = linalg.orthonorm(X)
+arch = Archiver(x=x);
+arch.write('test.foo')
 
-print B.T.dot(B)
-
+unarch = Unarchiver('test.foo')
+print unarch.x

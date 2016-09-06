@@ -85,9 +85,10 @@ mat build_di_costs(const Points & points){
 
   vec l1_norm = sum(abs(points),1);
   assert(N == l1_norm.n_elem);
+  assert(all(l1_norm >= 0));
   
   mat costs = ones(N,2);
-  costs.rows(l1_norm < 0.2).fill(0);  
+  costs.rows(find(l1_norm < 0.2)).fill(0);
   return costs;
 }
 
@@ -152,7 +153,7 @@ bool check(const sp_mat & A){
 int main()
 {
   double B = 5.0; // Boundary
-  double gamma = 0.99;
+  double gamma = 0.997;
   TriMesh mesh;
 
   vec lb = -B*ones<vec>(2);
@@ -165,7 +166,7 @@ int main()
   uint num_curve_points = 25;
   add_di_bang_bang_curves(mesh,lb,ub,num_curve_points);
   cout << "Refining..."<< endl;
-  mesh.refine(0.125,0.5);
+  mesh.refine(0.125,1);
   cout << "Optimizing..."<< endl;
   mesh.lloyd(25);
   mesh.freeze();
@@ -222,5 +223,5 @@ int main()
   Archiver archiver;
   archiver.add_sp_mat("M",M);
   archiver.add_vec("q",q);
-  archiver.write("di.mdp");
+  archiver.write("di.lcp");
 }

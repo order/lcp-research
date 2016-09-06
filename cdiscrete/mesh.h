@@ -44,10 +44,8 @@ typedef umat   VertexIndices;
 typedef sp_mat ElementDist;
 typedef mat    RelDist;
 
-#define NUMDIM  2
-#define NUMVERT 3
-
-#define ALMOST_ZERO 1e-15
+#define TRI_NUM_DIM  2
+#define TRI_NUM_VERT 3
 
 struct BaryCoord{
   /*

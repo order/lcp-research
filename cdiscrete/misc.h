@@ -6,6 +6,8 @@
 #include <chrono>
 #include <vector>
 
+#define ALMOST_ZERO 1e-15
+#define PRETTY_SMALL 1e-12
 //=====================================
 // RANDOM GENERATOR
 extern unsigned SEED;

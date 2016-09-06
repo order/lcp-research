@@ -1,9 +1,15 @@
 import numpy as np
+import scipy as sp
+from scipy.interpolate import griddata
 import scipy.sparse as sps
+
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
 import sys
 
 from utils import make_points
+from utils.archiver import Unarchiver
 
 def remove_comments(lines):
     cleaned = []
@@ -62,39 +68,74 @@ def read_sp_mat(sp_mat_file):
     return S
 
 if __name__ == "__main__":
-    (_,base_file) = sys.argv
+    # Replace with argparse
+    assert len(sys.argv) <= 3
+    if 2 == len(sys.argv):
+        (_,base_file) = sys.argv
+    elif 3 == len(sys.argv):
+        (_,base_file,soln_file) = sys.argv
+        unarch = Unarchiver(soln_file)
+        p = unarch.p
+    else:
+        print "Unknown arguments"
+
+    flat = True
+    mode = 'mesh' # Mesh only, value, log agg flow, policy
+    G = 640 # Grid size for flat image
+       
     nodes = read_node(base_file + ".node")
     faces = read_ele(base_file + ".ele")
-    #dist = read_sp_mat(base_file + ".grid")
 
-    #(R,C) = dist.shape
-    #print dist.shape
-    print nodes.shape
+    (N,d) = nodes.shape
+    assert 2 == d
+    M = p.size
+    assert(0 == M % N)
+    assert(M / N >= 3)
+
+    F = np.reshape(p,(N,M/N),order='F')
     
-    #G = 150
-    #(P,(X,Y)) = make_points([np.linspace(-1,1,G)]*2,True)
+    if mode == 'value':
+        f = F[:,0]
+        cmap = plt.get_cmap('jet')
+    elif mode == 'policy':
+        f = np.argmin(F[:,1:],axis=1)
+        cmap = plt.get_cmap('veridis')
+    elif mode == 'agg':
+        f = np.log(np.sum(F[:,1:],axis=1))
+        cmap = plt.get_cmap('plasma')
+    elif mode == 'mesh':
+        f = np.zeros(N)
+        cmap = plt.get_cmap('Blues')
+    else:
+        print "Mode not recognized"
+    assert(N == f.size)
 
-    #(N,D) = P.shape
-    #assert C == N
-    #assert R == (nodes.shape[0])
+    fig = plt.figure()
+    if flat:
+        (P,(X,Y)) = make_points([np.linspace(np.min(nodes[:,i]),
+                                             np.max(nodes[:,i]),G)
+                                 for i in [0,1]],True)
+        Z = griddata(nodes,f,P,method='linear')
+        Z = np.reshape(Z,(G,G))
+        plt.pcolormesh(X,Y,Z,lw=0,cmap=cmap)
+        if mode == 'mesh':
+            plt.triplot(nodes[:,0],
+                        nodes[:,1],
+                        faces,'-k')
+            plt.plot(nodes[:,0],nodes[:,1],'.k');
 
-    nodes = nodes[:-1,:] # Strip OOB node
+        else:
+            plt.triplot(nodes[:,0],
+                        nodes[:,1],
+                        faces,'-k',alpha=0.2)
+            plt.plot(nodes[:,0],nodes[:,1],'.k',alpha=0.2);
 
-    # Random values
-    #v = np.random.rand(R)
-    #v = np.hstack([np.sum(np.abs(nodes),1),2])
-    #Z = dist.T.dot(v);
+    else:
+        ax = fig.gca(projection='3d')
+        ax.plot_trisurf(nodes[:,0],nodes[:,1],f,
+                        triangles=faces,
+                        cmap=cmap,
+                        alpha=0.75)
 
-    #plt.scatter(P[:,0],P[:,1],c=Z,s=15,lw=0,alpha=0.25);
-    #plt.pcolormesh(X,Y,np.reshape(Z,(G,G)),lw=0)
-    
-    plt.triplot(nodes[:,0],
-                nodes[:,1],
-                '-k',
-                faces,alpha=0.25)
-    plt.plot(nodes[:,0],
-             nodes[:,1],
-             '.k')
-    
     plt.show()
     
