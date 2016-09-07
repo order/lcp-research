@@ -72,13 +72,11 @@ def get_solution(nodes,faces,fn,mode):
     (N,_) = nodes.shape
     (M,) = fn.shape
     assert(0 == M % N)
-    assert(M / N >= 3)
-    
+    assert(M / N >= 3)    
     F = np.reshape(fn,(N,M/N),order='F')
-    
     if mode == 'value':
         f = F[:,0]
-        cmap = plt.get_cmap('spectral')
+        cmap = plt.get_cmap('spectral_r')
     elif mode == 'policy':
         f = np.argmin(F[:,1:],axis=1)
         cmap = plt.get_cmap('Paired')
@@ -102,10 +100,10 @@ def plot_vertices(nodes,faces,fn,cmap=None,G=640):
                              for i in [0,1]],True)
     Z = griddata(nodes,fn,P,method='linear')
     Z = np.reshape(Z,(G,G))
+    plt.gca()
     plt.pcolormesh(X,Y,Z,lw=0,cmap=cmap)
     plt.triplot(nodes[:,0],nodes[:,1],faces,'-k',alpha=0.25)
     plt.colorbar()
-    plt.show()
     
 def plot_faces(nodes,faces,fn,cmap=None):
     fn = np.ma.array(fn,mask=~np.isfinite(fn))
@@ -113,19 +111,17 @@ def plot_faces(nodes,faces,fn,cmap=None):
     if cmap is None:
         cmap = plt.get_cmap('jet')
     cmap.set_bad('w',1.)
+    plt.gca()
     plt.tripcolor(nodes[:,0],nodes[:,1],faces,facecolors=fn,edgecolor='k')
     plt.colorbar()
-    plt.show()
 
 def plot_vertices_3d(nodes,faces,fn,cmap=None):
     assert(fn.size == nodes.shape[0])
     if cmap is None:
         cmap = plt.get_cmap('jet')
-    fig = plt.gcf()
-    ax = fig.gca(projection='3d')
+    ax = plt.gca(projection='3d')
     ax.plot_trisurf(nodes[:,0],nodes[:,1], fn,
                     triangles=faces, cmap=cmap, alpha=0.75)
-    plt.show()
 
 def read_shewchuk(filename):
     nodes = read_node(filename + ".node")
@@ -134,15 +130,43 @@ def read_shewchuk(filename):
     (V,vd) = faces.shape
     assert 2 == nd
     assert 3 == vd
-
     return nodes,faces
 
 def plot_bare_mesh(filename):
     fig = plt.gca()
     (nodes,faces) = read_shewchuk(filename)
     plt.triplot(nodes[:,0],nodes[:,1],faces,'-k')
-    plt.plot(nodes[:,0],nodes[:,1],'.k')   
+    plt.plot(nodes[:,0],nodes[:,1],'.k')
 
+def plot_solution_mesh(mesh_filename,soln_filename,mode,log):
+    (nodes,faces) = read_shewchuk(mesh_filename)
+    (N,nd) = nodes.shape
+
+    unarch = Unarchiver(soln_filename)
+    (fn_data,cmap) = get_solution(nodes,faces,unarch.p,mode)
+    if log:
+        fn_data = np.log(np.abs(fn_data))        
+    assert(N == fn_data.size)
+
+    fig = plt.gca()
+    plot_vertices(nodes,faces,fn_data,cmap)
+
+def plot_raw_binary_mesh(mesh_filename,raw_bin_name,log=False):
+    (nodes,faces) = read_shewchuk(mesh_filename)
+    (N,nd) = nodes.shape
+    (V,vd) = faces.shape
+    
+    fn_data = np.fromfile(raw_bin_name)
+    if log:
+        fn_data = np.log(np.abs(fn_data))
+        fn_data[~np.isfinite(fn_data)] = np.nan
+    assert (N == fn_data.size) or (V == fn_data.size)
+    
+    plt.gca()
+    if (N == fn_data.size):
+        plot_vertices(nodes,faces,fn_data)
+    else:
+        plot_faces(nodes,faces,fn_data)
 
 if __name__ == "__main__":
     # Replace with argparse
@@ -171,30 +195,20 @@ if __name__ == "__main__":
 
     if args.solution is None:
         plt.figure()
-        plt.title(args.raw_binary)
         # Raw binary information
-        fn_data = np.fromfile(args.raw_binary)
-        if args.log:
-            fn_data = np.log(np.abs(fn_data))
-            fn_data[~np.isfinite(fn_data)] = np.nan
-        assert (N == fn_data.size) or (V == fn_data.size)
-        if (N == fn_data.size):
-            plot_vertices(nodes,faces,fn_data)
-        else:
-            plot_faces(nodes,faces,fn_data)
+        plt.title(args.raw_binary)
+        plot_solution_mesh(args.base_file,
+                           args.raw_binary,args.log)
+        plt.show()
         quit()
 
     if args.raw_binary is None:
         # Read primal from archive
-        unarch = Unarchiver(args.solution)
-        (fn_data,cmap) = get_solution(nodes,faces,unarch.p,args.mode)
-        if args.log:
-            fn_data = np.log(np.abs(fn_data))
-        plt.figure()
+        plot_solution_mesh(args.base_file,
+                           args.solution,
+                           args.mode,args.log)
         plt.title(args.solution + ', ' + args.mode)
-        
-        assert(N == fn_data.size)
-        plot_vertices(nodes,faces,fn_data,cmap)
+        plt.show()
         quit()
 
 
