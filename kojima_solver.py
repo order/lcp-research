@@ -13,6 +13,7 @@ from solvers.recording import *
 import time
 import argparse
 import sys
+import os.path
 
 
 ###############################################
@@ -44,15 +45,8 @@ def kojima_solve(lcp,**kwargs):
 
     return (p,d,iterator.data)
 
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser(description='Solve an LCP using Kojima.')
-    parser.add_argument('lcp_file_name', metavar='F', type=str,
-                        help='LCP input file')
-    args = parser.parse_args()
-    
-    #Read LCP file
-    unarch = Unarchiver(args.lcp_file_name)
+def solve_lcp_file(lcp_file):
+    unarch = Unarchiver(lcp_file)
     lcp = LCPObj(unarch.M,unarch.q)
     
     # Augment
@@ -72,6 +66,17 @@ if __name__ == '__main__':
     p = p[:-1]
     d = d[:-1]
 
-    base_file_name = args.lcp_file_name.split('.')[0]
+    filename, file_extension = os.path.splitext(lcp_file)
+    print "Writing solution to ",  filename + '.sol'
     arch = Archiver(p=p,d=d)
-    arch.write(base_file_name + '.sol')
+    arch.write(filename + '.sol')
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='Solve an LCP using Kojima.')
+    parser.add_argument('lcp_file_name', metavar='F', type=str,
+                        help='LCP input file')
+    args = parser.parse_args()
+    
+    #Read LCP file
+    solve_lcp_file(args.lcp_file_name)

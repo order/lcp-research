@@ -1,11 +1,8 @@
-#include <boost/program_options.hpp>
-
 #include "di_gen.h"
 #include "misc.h"
 #include "io.h"
 
-
-
+#include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
 
@@ -185,7 +182,7 @@ void generate_initial_mesh(const po::variables_map & var_map,
   mesh.freeze();
 
   // Write initial mesh to file
-  string filename =  var_map["base_file"].as<string>();
+  string filename =  var_map["outfile_base"].as<string>();
 
   cout << "Writing:"
        << "\n\t" << (filename + ".node") << " (Shewchuk node file)"
@@ -231,7 +228,7 @@ void build_lcp(const po::variables_map & var_map,
   vec q = join_vert(-weights,vectorise(costs));
   assert(3*N == q.n_elem);
 
-  string filename = var_map["base_file"].as<string>() + ".lcp";
+  string filename = var_map["outfile_base"].as<string>() + ".lcp";
   cout << "Writing " << filename << endl;
   Archiver archiver;
   archiver.add_sp_mat("M",M);
@@ -244,9 +241,9 @@ po::variables_map read_command_line(uint argc, char** argv){
   po::options_description desc("Meshing options");
   desc.add_options()
     ("help", "produce help message")
-    ("base_file,o", po::value<string>()->required(),
+    ("outfile_base,o", po::value<string>()->required(),
      "Prefix for all files generated")
-    ("mesh_file", po::value<string>(), "Input mesh file")
+    ("mesh_file,m", po::value<string>(), "Input (CGAL) mesh file")
     ("mesh_angle", po::value<double>()->default_value(0.125),
      "Mesh angle refinement criterion")
     ("mesh_length", po::value<double>()->default_value(0.5),
@@ -285,6 +282,7 @@ int main(int argc, char** argv)
     cout << "Generating initial mesh..." << endl;
     generate_initial_mesh(var_map,mesh);
   }
+  mesh.freeze();
 
   mat bounds = mesh.find_box_boundary();
   vec lb = bounds.col(0);

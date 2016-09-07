@@ -78,10 +78,10 @@ def get_solution(nodes,faces,fn,mode):
     
     if mode == 'value':
         f = F[:,0]
-        cmap = plt.get_cmap('inferno')
+        cmap = plt.get_cmap('spectral')
     elif mode == 'policy':
         f = np.argmin(F[:,1:],axis=1)
-        cmap = plt.get_cmap('jet')
+        cmap = plt.get_cmap('Paired')
     elif mode == 'agg':
         f = np.sum(F[:,1:],axis=1)
         cmap = plt.get_cmap('plasma')
@@ -127,6 +127,23 @@ def plot_vertices_3d(nodes,faces,fn,cmap=None):
                     triangles=faces, cmap=cmap, alpha=0.75)
     plt.show()
 
+def read_shewchuk(filename):
+    nodes = read_node(filename + ".node")
+    faces = read_ele(filename + ".ele")   
+    (N,nd) = nodes.shape
+    (V,vd) = faces.shape
+    assert 2 == nd
+    assert 3 == vd
+
+    return nodes,faces
+
+def plot_bare_mesh(filename):
+    fig = plt.gca()
+    (nodes,faces) = read_shewchuk(filename)
+    plt.triplot(nodes[:,0],nodes[:,1],faces,'-k')
+    plt.plot(nodes[:,0],nodes[:,1],'.k')   
+
+
 if __name__ == "__main__":
     # Replace with argparse
     parser = argparse.ArgumentParser(description='Process some integers.')
@@ -134,7 +151,7 @@ if __name__ == "__main__":
                         help='base file name for .node and .ele files')
     parser.add_argument('-s','--solution', default=None,
                         help='solution file')
-    parser.add_argument('-m','--mode',default=None,
+    parser.add_argument('-m','--mode',default='value',
                         help="value,agg, or policy")
     parser.add_argument('-r','--raw_binary', default=None,
                         help='raw binary function file')
@@ -142,25 +159,12 @@ if __name__ == "__main__":
                         help='apply log(abs(.)) transform')
     args = parser.parse_args()
 
-
-    ############################################
-    # Read in mesh information
-    nodes = read_node(args.base_file + ".node")
-    faces = read_ele(args.base_file + ".ele")   
-    (N,nd) = nodes.shape
-    (V,vd) = faces.shape
-    assert 2 == nd
-    assert 3 == vd
-
     ############################################
     # Read in option function information
     # Make sure that solution and binary are both selected
     assert (args.solution is None) or (args.raw_binary is None)
     if (args.solution is None) and (args.raw_binary is None):
-        # No function information provided. Just show mesh
-        assert args.mode is None
-        plt.triplot(nodes[:,0],nodes[:,1],faces,'-k')
-        plt.plot(nodes[:,0],nodes[:,1],'.k')
+        plot_bare_mesh(args.base_file)
         plt.title('Mesh')
         plt.show()
         quit()
@@ -169,7 +173,6 @@ if __name__ == "__main__":
         plt.figure()
         plt.title(args.raw_binary)
         # Raw binary information
-        assert args.mode is None
         fn_data = np.fromfile(args.raw_binary)
         if args.log:
             fn_data = np.log(np.abs(fn_data))
