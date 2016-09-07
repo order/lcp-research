@@ -1,13 +1,16 @@
 #include <iostream>
 #include <assert.h>
 #include "misc.h"
+#include <wordexp.h>
 
 #include <boost/math/special_functions/sign.hpp>
+
 
 using namespace arma;
 
 unsigned SEED = std::chrono::system_clock::now().time_since_epoch().count();
 std::mt19937 MT_GEN = std::mt19937(SEED);
+
 
 void print_shape(const uvec & u){
   std::cout << '(' << u.n_elem << ')' << std::endl;

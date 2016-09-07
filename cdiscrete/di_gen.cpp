@@ -4,7 +4,10 @@
 #include "misc.h"
 #include "io.h"
 
+
+
 namespace po = boost::program_options;
+
 
 void add_di_bang_bang_curves(TriMesh & mesh,
 			     const vec & lb,
@@ -182,13 +185,14 @@ void generate_initial_mesh(const po::variables_map & var_map,
   mesh.freeze();
 
   // Write initial mesh to file
-  string filename =  var_map["mesh_length"].as<string>();
+  string filename =  var_map["base_file"].as<string>();
+
   cout << "Writing:"
-       << "\n\t" << (filename + "node") << " (Shewchuk node file)"
+       << "\n\t" << (filename + ".node") << " (Shewchuk node file)"
        << "\n\t" << (filename + ".ele") << " (Shewchuk element file)"
        << "\n\t" << (filename + ".tri") << " (CGAL mesh file)" << endl;
-  mesh.write_shewchuk("di");
-  mesh.write_cgal("di.tri");
+  mesh.write_shewchuk(filename);
+  mesh.write_cgal(filename + ".tri");
 }
 
 void build_lcp(const po::variables_map & var_map,
@@ -240,7 +244,7 @@ po::variables_map read_command_line(uint argc, char** argv){
   po::options_description desc("Meshing options");
   desc.add_options()
     ("help", "produce help message")
-    ("base_file", po::value<string>()->required(),
+    ("base_file,o", po::value<string>()->required(),
      "Prefix for all files generated")
     ("mesh_file", po::value<string>(), "Input mesh file")
     ("mesh_angle", po::value<double>()->default_value(0.125),
@@ -292,7 +296,5 @@ int main(int argc, char** argv)
   cout << "\tLower bound:" << lb.t();
   cout << "\tUpper bound:" << ub.t();
 
-  return 1;
-  // Get points
-
+  build_lcp(var_map,mesh);
 }

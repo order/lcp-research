@@ -426,10 +426,11 @@ mat TriMesh::find_box_boundary() const{
   assert(m_frozen);
   mat bounds = mat(2,2);
 
-  bounds(0,0) = min(m_nodes.col(0));
-  bounds(0,1) = max(m_nodes.col(0));
-  bounds(1,0) = min(m_nodes.col(1));
-  bounds(1,1) = max(m_nodes.col(1));
+  uint R = m_nodes.n_rows - 1;
+  bounds(0,0) = min(m_nodes.col(0).head(R));
+  bounds(0,1) = max(m_nodes.col(0).head(R));
+  bounds(1,0) = min(m_nodes.col(1).head(R));
+  bounds(1,1) = max(m_nodes.col(1).head(R));
 
   return bounds;
 }
