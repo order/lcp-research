@@ -192,12 +192,12 @@ VertexHandle TriMesh::insert(Point p){
 
 void TriMesh::split(uint fid){
   assert(~m_frozen);
-  cout << "split" << endl;
+  m_dirty = true;
   Point c = center_of_face(fid);
   m_mesh.insert(c);
 }
 
-Point TriMesh::center_of_face(uint fid){
+Point TriMesh::center_of_face(uint fid) const{
   uint vid;
   double x, y;
   x = y = 0;
@@ -250,9 +250,10 @@ void TriMesh::write_cgal(const string & filename) const{
 
 void TriMesh::read_cgal(const string & filename){
   assert(!m_frozen);
+  m_dirty = true;
+
   ifstream fs(filename);
   fs >> m_mesh;
-  m_dirty = true;
   fs.close();
 }
 
@@ -320,9 +321,13 @@ uint TriMesh::oob_node_index() const{
 }
 
 void TriMesh::freeze(){
+  if(m_frozen){
+    // Make idempotent
+    assert(!m_dirty);
+    return;
+  }  
   regen_caches();
   m_frozen = true;
-
 }
 
 void TriMesh::regen_caches(){
@@ -347,6 +352,7 @@ void TriMesh::regen_caches(){
   m_nodes(v_id,0) = HUGE_VAL;
   m_nodes(v_id,1) = HUGE_VAL;
 
+  // Face cache
   uint f_id = 0;
   for(FaceIterator fit = m_mesh.faces_begin();
       fit != m_mesh.faces_end(); ++fit){
@@ -416,7 +422,17 @@ vec TriMesh::prism_volume(const vec & vertex_function) const{
   return vol; 
 }
 
+mat TriMesh::find_box_boundary() const{
+  assert(m_frozen);
+  mat bounds = mat(2,2);
 
+  bounds(0,0) = min(m_nodes.col(0));
+  bounds(0,1) = max(m_nodes.col(0));
+  bounds(1,0) = min(m_nodes.col(1));
+  bounds(1,1) = max(m_nodes.col(1));
+
+  return bounds;
+}
 
 void TriMesh::print_vert_reg() const{
   for(VertexRegistry::const_iterator it = m_vert_reg.begin();

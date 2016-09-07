@@ -1,23 +1,40 @@
+#include <boost/program_options.hpp>
 #include <iostream>
-#include <string>
-#include <sstream>
-#include <assert.h>
 
-#include <armadillo>
-#include "misc.h"
+namespace po = boost::program_options;
 
 using namespace std;
-using namespace arma;
-
 
 int main(int argc, char** argv)
-{
-  sp_mat A = sp_mat(diagmat(vec({1,2})));
-  sp_mat C = sp_mat(diagmat(vec({3,4})));
-  
-  block_sp_row top {sp_mat(),A};
-  block_sp_row bot {C,sp_mat()};
-  block_sp_mat S {top,bot};
+{  
+  // Declare the supported options.
+  po::options_description desc("Allowed options");
+  desc.add_options()
+    ("help", "produce help message")
+    ("compression", po::value<int>()->default_value(10), "set compression level")
+    ("file", po::value<string>()->default_value("foo.dat"), "filename")
+    ;
 
-  bmat(S);
+  po::variables_map vm;
+  po::store(po::parse_command_line(argc, argv, desc), vm);
+  po::notify(vm);    
+
+  if (vm.count("help")) {
+    cout << desc << "\n";
+    return 1;
+  }
+
+  if (vm.count("compression")) {
+    cout << "Compression level was set to " 
+         << vm["compression"].as<int>() << ".\n";
+  } else {
+    cout << "Compression level was not set.\n";
+  }
+  if (vm.count("file")) {
+    cout << "Filename is " 
+         << vm["file"].as<string>() << ".\n";
+  } else {
+    cout << "Filename was not set.\n";
+  }
+  
 }

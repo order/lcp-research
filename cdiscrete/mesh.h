@@ -86,8 +86,7 @@ class TriMesh{
 
   void split(uint fid);
   void split(FaceHandle & fid);
-  Point center_of_face(uint fid);
-
+  Point center_of_face(uint fid) const;
   
   void insert_constraint(VertexHandle & a,
 			 VertexHandle & b);
@@ -101,6 +100,7 @@ class TriMesh{
   uint number_of_vertices() const;
   uint number_of_nodes() const;
   uint oob_node_index() const;
+  mat find_box_boundary() const;
 
   vec face_diff(const vec & vertex_function) const;
   vec prism_volume(const vec & vertex_function) const;

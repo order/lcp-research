@@ -173,7 +173,6 @@ if __name__ == "__main__":
         fn_data = np.fromfile(args.raw_binary)
         if args.log:
             fn_data = np.log(np.abs(fn_data))
-            print fn_data
             fn_data[~np.isfinite(fn_data)] = np.nan
         assert (N == fn_data.size) or (V == fn_data.size)
         if (N == fn_data.size):
