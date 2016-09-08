@@ -10,11 +10,9 @@ using namespace std;
 
 // DI stuff
 void add_di_bang_bang_curves(TriMesh & mesh,
-			     VertexHandle & v_zero,
-			     VertexHandle & v_upper_left,
-			     VertexHandle & v_lower_right,
-			     uint num_curve_points);
-
+                             const vec & lb,
+                             const vec & ub,
+                             uint num_curve_points);
 Points double_integrator(const Points & points,
 			 double a,double t);
 mat build_di_costs(const Points & points);
@@ -25,8 +23,13 @@ sp_mat build_di_transition(const Points & points,
 			   const vec & ub,
 			   double action);
 
+void saturate(Points & points, 
+              const vec &lb,
+              const vec &ub); // TODO: Should move to a more general file
+
 void build_square_boundary(TriMesh & mesh,
 			   const vec & lb,
-			   const vec & ub);
+			   const vec & ub); // TODO: Should move to a more general file
 
+bool check(const sp_mat & A); // TODO: Should move to a more general file
 #endif

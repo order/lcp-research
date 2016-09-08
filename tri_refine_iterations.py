@@ -10,8 +10,7 @@ CDISCRETE = './cdiscrete'
 
 def run_di_gen_initial(base_file):
     filename = base_file + '.0'
-    cmd = CDISCRETE + '/di_gen --outfile_base ' + filename \
-          + ' --bang_points 25'
+    cmd = CDISCRETE + '/di_gen --outfile_base ' + filename
     print '#'*(len(cmd)+8)
     print 'RUNNING:', cmd
     print '-'*(len(cmd)+8)
@@ -54,7 +53,7 @@ if __name__ == "__main__":
     plt.draw()
 
     show_plots = True
-    iterations = 3
+    iterations = 8
     
     for I in xrange(iterations):
         iter_file = base_file + '.' + str(I)
@@ -80,18 +79,24 @@ if __name__ == "__main__":
         # REFINE
         run_di_refine(base_file,I)
 
-        # PLOT THE HEURISTIC
+        # PLOT THE HEURISTICS
         if show_plots:
             plt.figure(3)
             plt.clf()
-            Names = ['val_diff','vol','heuristic']
+            Names = ["val_diff.vec",
+                     "flow_diff.vec",
+                     "heuristic.vec",
+                     "grad_x.vec",
+                     "grad_y.vec",
+                     "policy.uvec",
+                     "flow_vol.vec"]
             next_iter_file = base_file + '.' + str(I+1)
             for (i,name) in enumerate(Names):
-                plt.subplot(2,2,i+1)
-                vec_file = next_iter_file + '.' + name + '.vec'
+                plt.subplot(3,3,i+1)
+                vec_file = next_iter_file + '.' + name
                 mesh_viewer.plot_raw_binary_mesh(iter_file,
                                                  vec_file,
-                                                 True)
+                                                 False)
                 plt.title(name)
             plt.suptitle(iter_file)
             plt.draw()

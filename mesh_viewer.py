@@ -62,9 +62,7 @@ def read_sp_mat(sp_mat_file):
     C = int(data[1])
     NNZ = int(data[2])
     assert (3 + 3*NNZ,) == data.shape
-
-    data = np.reshape(data[3:],(NNZ,3))
-    
+    data = np.reshape(data[3:],(NNZ,3))    
     S = sps.coo_matrix((data[:,2],(data[:,0], data[:,1])),shape=(R,C))
     return S
 
@@ -112,7 +110,8 @@ def plot_faces(nodes,faces,fn,cmap=None):
         cmap = plt.get_cmap('jet')
     cmap.set_bad('w',1.)
     plt.gca()
-    plt.tripcolor(nodes[:,0],nodes[:,1],faces,facecolors=fn,edgecolor='k')
+    plt.tripcolor(nodes[:,0],nodes[:,1],faces,facecolors=fn,
+                  edgecolor='k',cmap=cmap)
     plt.colorbar()
 
 def plot_vertices_3d(nodes,faces,fn,cmap=None):
@@ -155,8 +154,14 @@ def plot_raw_binary_mesh(mesh_filename,raw_bin_name,log=False):
     (nodes,faces) = read_shewchuk(mesh_filename)
     (N,nd) = nodes.shape
     (V,vd) = faces.shape
-    
-    fn_data = np.fromfile(raw_bin_name)
+
+    # Read in file
+    ext = raw_bin_name.split('.')[-1]
+    if ext == 'uvec':
+        fn_data = np.fromfile(raw_bin_name,dtype=np.integer)
+    else:
+        fn_data = np.fromfile(raw_bin_name,dtype=np.double)
+        
     if log:
         fn_data = np.log(np.abs(fn_data))
         fn_data[~np.isfinite(fn_data)] = np.nan
@@ -197,8 +202,8 @@ if __name__ == "__main__":
         plt.figure()
         # Raw binary information
         plt.title(args.raw_binary)
-        plot_solution_mesh(args.base_file,
-                           args.raw_binary,args.log)
+        plot_raw_binary_mesh(args.base_file,
+                             args.raw_binary,args.log)
         plt.show()
         quit()
 

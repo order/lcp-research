@@ -2,6 +2,12 @@
 #include "misc.h"
 #include <vector>
 
+
+Point convert(const vec & point){
+  assert(2 == point.n_elem);
+  return Point(point(0),point(1));
+}
+
 BaryCoord::BaryCoord():oob(true){}
 BaryCoord::BaryCoord(bool o,uvec i,vec w) :
   oob(o),indices(i),weights(w){}
@@ -93,6 +99,27 @@ ElementDist TriMesh::points_to_element_dist(const Points & points,
   return sp_mat(row_idx_uvec,col_ptr_uvec,data_vec,M,N);
 }
 
+template <typename T> T TriMesh::interpolate(const Points & points,
+                                    const T& data) const{
+  assert(m_frozen);
+  
+  uint N = points.n_rows;
+  uint d = points.n_cols;
+  uint NN = number_of_nodes();
+  assert(data.n_rows == NN);
+  
+  ElementDist D = points_to_element_dist(points);
+  assert(size(D) == size(NN,N));
+
+  T ret = D.t() * data;
+  assert(ret.n_rows == N);
+  assert(ret.n_cols == data.n_cols);
+  return ret;
+}
+template mat TriMesh::interpolate<mat>(const Points &, const mat&) const;
+template vec TriMesh::interpolate<vec>(const Points &, const vec&) const;
+
+
 BaryCoord TriMesh::barycentric_coord(const Point & point) const{  
   assert(m_frozen);
 
@@ -133,9 +160,7 @@ BaryCoord TriMesh::barycentric_coord(const Point & point) const{
     idx(i) = get<0>(vertex_list[i]);
     X(i) = get<1>(vertex_list[i]);
     Y(i) = get<2>(vertex_list[i]);
-  } 
-
-  
+  }
   
   // Barycentric voodoo (formula from wikipedia)
   // TODO: could have replaced this with stuff from Triangle_coordinates
@@ -190,21 +215,27 @@ VertexHandle TriMesh::insert(Point p){
   return m_mesh.insert(p);
 }
 
-void TriMesh::split(uint fid){
-  assert(~m_frozen);
-  m_dirty = true;
-  Point c = center_of_face(fid);
-  m_mesh.insert(c);
-}
-
-Point TriMesh::center_of_face(uint fid) const{
+vec TriMesh::center_of_face(uint fid) const{
+  assert(m_frozen);
   uint vid;
-  double x, y;
-  x = y = 0;
+  vec point = zeros<vec>(2);
   for(uint i = 0; i < TRI_NUM_VERT; i++){
     vid = m_faces(fid,i);
-    x += m_nodes(vid,0);
-    y += m_nodes(vid,1);
+    point += m_nodes.row(vid).t();
+  }
+  point /= TRI_NUM_VERT;
+  return point; 
+}
+
+Point TriMesh::center_of_face(const FaceHandle & face) const{
+  // Doesn't need to be frozen
+  double x, y;
+  x = y = 0;
+  VertexHandle vh;
+  for(uint i = 0; i < TRI_NUM_VERT; i++){
+    vh = face->vertex(0);
+    x += vh->point().x();
+    y += vh->point().y();
   }
   x /= TRI_NUM_VERT;
   y /= TRI_NUM_VERT;
@@ -240,6 +271,17 @@ Points TriMesh::get_all_nodes() const{
   assert(m_frozen);
   return m_nodes;
 }
+
+Points TriMesh::get_face_centers() const{
+  assert(m_frozen);
+  uint F = number_of_faces();
+  Points centers = Points(F,TRI_NUM_DIM);
+  for(uint f = 0; f < F; f++){
+    centers.row(f) = center_of_face(f).t();
+  }
+  return centers;
+}
+
 
 void TriMesh::write_cgal(const string & filename) const{
   assert(m_frozen);
@@ -399,27 +441,73 @@ vec TriMesh::prism_volume(const vec & vertex_function) const{
   uint F = number_of_faces();
   assert(V == vertex_function.n_elem);
   
-  vec vol = vec(F);
+  vec vol = zeros<vec>(F);
   VertexHandle vh;
   uint f = 0;
   uint vid = 0;
   double area,mean_fn;
   CDT::Triangle t;
+
   
-  for(FaceIterator fit = m_mesh.finite_faces_begin();
-      fit != m_mesh.finite_faces_end(); ++fit){
+  for(FaceIterator fit = m_mesh.faces_begin();
+      fit != m_mesh.faces_end(); ++fit){    
     t = m_mesh.triangle(fit);
+    //cout << "Triangle: " << t << endl;
     area = std::abs(t.area());
+    //cout << "\tArea: "<< area << endl;;
     mean_fn = 0;
     for(uint v = 0; v < TRI_NUM_VERT; v++){
       vh = fit->vertex(v);
       vid = m_vert_reg.at(vh);
-      mean_fn = vertex_function(vid) / TRI_NUM_VERT;
+      mean_fn = vertex_function(vid) / (double)TRI_NUM_VERT;
+      //cout << "\t f(" << vh->point() << ") = " << vertex_function(vid) << endl;
     }
+    //cout << "\tMean function: " << mean_fn << endl;
+    //cout << "\tVolume: " << area * mean_fn << endl;
     vol(f++) = area * mean_fn;
   }
   assert(f == F);
   return vol; 
+}
+
+mat TriMesh::face_grad(const vec & vertex_function) const{
+  assert(m_frozen);
+
+  uint V = number_of_vertices();
+  uint F = number_of_faces();
+  assert(V == vertex_function.n_elem);
+  
+  mat grad = mat(F,2);
+  VertexHandle vh;
+  uint vid;
+  vec f = vec(TRI_NUM_VERT);
+  mat points = mat(TRI_NUM_VERT,TRI_NUM_DIM);
+  mat A = mat(TRI_NUM_DIM,TRI_NUM_DIM);
+  vec b = vec(TRI_NUM_DIM);
+
+  uint fid = 0;
+  for(FaceIterator fit = m_mesh.finite_faces_begin();
+      fit != m_mesh.finite_faces_end(); ++fit){
+    // Gather function and point information
+    for(uint v = 0; v < TRI_NUM_VERT; v++){
+      vh = fit->vertex(v);
+      vid = m_vert_reg.at(vh);
+      
+      f(v) = vertex_function(vid);
+      points(v,0) = vh->point().x();
+      points(v,1) = vh->point().y();
+    }
+    // Set up linear equation
+    for(uint i = 0; i < TRI_NUM_DIM; i++){
+      A.row(i) = points.row(i+1) - points.row(0);
+      b(i) = f(i+1) - f(0);
+    }
+
+    // Solve linear equation for gradient
+    grad.row(fid++) = solve(A,b,solve_opts::fast).t();
+  }
+  assert(fid == F);
+  return grad; 
 }
 
 mat TriMesh::find_box_boundary() const{

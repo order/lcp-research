@@ -47,6 +47,8 @@ typedef mat    RelDist;
 #define TRI_NUM_DIM  2
 #define TRI_NUM_VERT 3
 
+Point convert(const vec & point);
+
 struct BaryCoord{
   /*
     Holds the barycentric coordinates. These are the unique weights describing
@@ -76,18 +78,19 @@ class TriMesh{
 				     uvec & row_idx_uvec,
 				     uvec & col_ptr_uvec,
 				     vec & data_vec) const;
+  template <typename T> T interpolate(const Points &,
+                                      const T&) const;
+  
   BaryCoord barycentric_coord(const Point &) const;
-
   FaceHandle locate_face(const Point &) const;
   VertexHandle locate_vertex(const Point &) const;
   
   VertexHandle insert(vec &);
   VertexHandle insert(Point);
 
-  void split(uint fid);
-  void split(FaceHandle & fid);
-  Point center_of_face(uint fid) const;
-  
+  vec center_of_face(uint fid) const;
+  Point center_of_face(const FaceHandle & face) const;
+ 
   void insert_constraint(VertexHandle & a,
 			 VertexHandle & b);
   void refine(double b,double S);
@@ -95,6 +98,7 @@ class TriMesh{
 
   Points get_spatial_nodes() const;
   Points get_all_nodes() const;
+  Points get_face_centers() const;
 
   uint number_of_faces() const;
   uint number_of_vertices() const;
@@ -104,6 +108,7 @@ class TriMesh{
 
   vec face_diff(const vec & vertex_function) const;
   vec prism_volume(const vec & vertex_function) const;
+  mat face_grad(const vec & vertex_function) const;
 
   void write_cgal(const string &) const;
   void read_cgal(const string &); 
