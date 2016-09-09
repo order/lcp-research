@@ -1,5 +1,5 @@
-#ifndef __Z_TRIMESH_INCLUDED__
-#define __Z_TRIMESH_INCLUDED__
+#ifndef __Z_TETMESH_INCLUDED__
+#define __Z_TETMESH_INCLUDED__
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
