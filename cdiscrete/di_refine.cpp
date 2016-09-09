@@ -6,7 +6,7 @@
 
 #include "misc.h"
 #include "io.h"
-#include "mesh.h"
+#include "tri_mesh.h"
 #include "di.h"
 
 #include <boost/program_options.hpp>

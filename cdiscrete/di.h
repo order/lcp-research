@@ -1,7 +1,7 @@
 #ifndef __Z_DI_INCLUDED__
 #define __Z_DI_INCLUDED__
 
-#include "mesh.h"
+#include "tri_mesh.h"
 
 using namespace arma;
 using namespace std;
