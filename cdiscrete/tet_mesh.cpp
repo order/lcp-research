@@ -1,90 +1,78 @@
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-
-#include <CGAL/Mesh_triangulation_3.h>
-#include <CGAL/Mesh_complex_3_in_triangulation_3.h>
-#include <CGAL/Mesh_criteria_3.h>
-
-#include <CGAL/Polyhedral_mesh_domain_3.h>
-#include <CGAL/refine_mesh_3.h>
-#include <CGAL/make_mesh_3.h>
-
+#include <CGAL/Triangulation_3.h>
 #include <CGAL/convex_hull_3.h>
 
 #include <vector>
 #include <iostream>
 #include <fstream>
-// IO
-#include <CGAL/IO/Triangulation_geomview_ostream_3.h>
+#include <list>
+#include <set>
 
-// Domain
+#include <armadillo>
+#include <boost/algorithm/string.hpp>    
+#include <boost/algorithm/string/split.hpp>
+
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef K::Point_3 Point;
-typedef CGAL::Polyhedron_3<K> Polyhedron;
-typedef CGAL::Polyhedral_mesh_domain_3<Polyhedron, K> Mesh_domain;
+typedef CGAL::Triangulation_3<K>      Triangulation;
+typedef Triangulation::Finite_vertices_iterator Finite_vertices_iterator;
+typedef Triangulation::Finite_edges_iterator Finite_edges_iterator;
+typedef Triangulation::Finite_facets_iterator Finite_facets_iterator;
+typedef Triangulation::Finite_cells_iterator Finite_cells_iterator;
+typedef Triangulation::Simplex        Simplex;
+typedef Triangulation::Locate_type    Locate_type;
+typedef Triangulation::Point          Point;
 
-// Triangulation
-typedef CGAL::Mesh_triangulation_3<Mesh_domain>::type Tr;
-typedef CGAL::Mesh_complex_3_in_triangulation_3<Tr> C3t3;
-// Criteria
-typedef CGAL::Mesh_criteria_3<Tr> Mesh_criteria;
-// To avoid verbose function and named parameters call
-using namespace CGAL::parameters;
+using namespace arma;
+using namespace std;
 
-/*
-  Function for building a rectangular prism.
-  This 
-*/
-void build_rect(const std::vector<double> & lb,
-                const std::vector<double> ub,
-                Polyhedron & poly){
-  
-std::vector<Point> points;
-  double p[3];
-  Point P;
-  for(uint b = 0; b < pow(2,3); b++){
-    for(uint i = 0; i < 3; i++){
-      if(b & (1 << i)){
-        p[i] = ub[i];
-      }
-      else{
-        p[i] = lb[i];
-      }
+mat read_vertices(const string & filename){
+  /*
+    A pretty brittle parser for INRIA .mesh files
+    Extract just the vertex information.
+   */
+  ifstream fin(filename);
+  string line;
+  // Find the vertex section
+  bool found = false;
+  while(getline(fin,line)){
+    boost::algorithm::to_lower(line);
+    if(std::string::npos != line.find("vertices")){
+      found = true;
+      break;
     }
-    P = Point(p[0],p[1],p[2]);
-    points.push_back(P);
   }
-  CGAL::convex_hull_3(points.begin(), points.end(), poly);  
+  assert(found);
+  getline(fin,line);
+  uint num_vert = stoul(line);
+
+  mat points = mat(num_vert,3);
+  std::vector<std::string> tokens;
+  for(uint i; i < num_vert; i++){
+    getline(fin,line);
+    cout << line << endl;
+    boost::trim(line);
+    boost::split(tokens, line, boost::is_any_of(" \t"),boost::token_compress_on);
+    cout << tokens.size() << endl;
+    assert(4 == tokens.size());
+    for(uint j = 0; j < 3; ++j){
+      points(i,j) = stod(tokens[j]);
+    }
+  }
+  return points;
 }
 
 int main()
 {
-  std::vector<double> lb;
-  std::vector<double> ub;
-  for(uint d = 0; d < 3; d++){
-    lb.push_back(-1.0);
-    ub.push_back(1.0);
-  }
-  Polyhedron poly;
-  build_rect(lb,ub,poly);
-  
-  // Define functions
-  // Domain (Warning: Sphere_3 constructor uses square radius !)
-  Mesh_domain domain(poly);
-  // Set mesh criteria
-  Mesh_criteria criteria(facet_angle=25, facet_size=0.15, facet_distance=1e-2,
-                         cell_radius_edge_ratio=3);
-  // Mesh generation
-  C3t3 c3t3 = CGAL::make_mesh_3<C3t3>(domain, criteria);
-  
-  // Mesh output
-  std::ofstream medit_file("out.mesh");
-  c3t3.output_to_medit(medit_file);
+  // construction from a list of points :
+  std::list<Point> L;
+  L.push_front(Point(0,0,0));
+  L.push_front(Point(1,0,0));
+  L.push_front(Point(0,1,0));
+  L.push_front(Point(0,1,1));
+  L.push_front(Point(1,1,0));
+  Triangulation T(L.begin(), L.end());
 
-  // Triangulation output and input
-  std::cout << c3t3.triangulation();
-  C3t3 c3t3_read_back;
-  std::cin >> c3t3_read_back.triangulation();
-  //NB: file compiles when these last three lines are commented out.
- 
+  cout << T;
+  
   return 0;
 }

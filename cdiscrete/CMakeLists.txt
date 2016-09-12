@@ -57,9 +57,11 @@ include_directories(${LibArchive_INCLUDE_DIRS})
 include( CGAL_CreateSingleSourceCGALProgram )
 #create_single_source_cgal_program("di_gen.cpp" "misc.cpp" "io.cpp" "tri_mesh.cpp" "di.cpp")
 #create_single_source_cgal_program("di_refine.cpp" "misc.cpp" "io.cpp" "tri_mesh.cpp" "di.cpp")
+create_single_source_cgal_program("foo.cpp")
 create_single_source_cgal_program("tet_mesh.cpp")
 
 #target_link_libraries(di_gen ${ARMADILLO_LIBRARIES} ${LibArchive_LIBRARIES} ${Boost_LIBRARIES})
 #target_link_libraries(di_refine ${ARMADILLO_LIBRARIES} ${LibArchive_LIBRARIES} ${Boost_LIBRARIES})
 
+target_link_libraries(foo)
 target_link_libraries(tet_mesh)
