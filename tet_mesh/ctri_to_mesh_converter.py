@@ -107,7 +107,9 @@ def read_inria_mesh(fileName):
             objs.append(obj)
         exec(name + ' = objs')
     vertices = [[np.nan]*3] + vertices # prepend oob
-    
+    triangles = [list(sorted(tri)) for tri in triangles]
+    tetrahedra = [list(sorted(tet)) for tet in tetrahedra]
+     
     return vertices,triangles,tetrahedra
 
 ########################################33
@@ -210,9 +212,9 @@ def reorient_tetrahedras(vertices,tetrahedra,mirror):
     for (tet_id,tet) in enumerate(tetrahedra):
         if 0 in tet:
             # Mirror world            
-            sign = -1
             mirror_tet = get_mirror_tetrahedra(mirror,tetrahedra,tet_id,0)
             tet_mat = tetrahedra_vertex_matrix(mirror_tet,vertices)
+            sign = -1
         else:
             # Regular world.
             sign = 1
@@ -337,7 +339,7 @@ def generate_infinite_tetrahedra(mirror):
     infinite_tetrahedra = []
     for (key,value) in mirror.items():
         if 1 == len(value):
-            tet = list(key) + [0] # 0 is the "node at infinity"
+            tet = [0] + list(key) # 0 is the "node at infinity"
             infinite_tetrahedra.append(tet)
         else:
             assert 2 == len(value)
@@ -357,15 +359,24 @@ if __name__ == "__main__":
     in_ext = infile.rsplit('.',1)[1]
     mirror = None
     if in_ext == 'ctri':
+        print 'Reading in from CGAL::Triangulation_3 format...'
         (vertices,tetrahedra,neighbors) = read_cgal_tri(infile)
+        print '\tNumber of vertices:',len(vertices)-1
+        print '\tTotal number of tetrahedra:',len(tetrahedra)
         triangles = generate_boundary_triangles(vertices,tetrahedra)
+        print '\tNumber of implied triangles:',len(triangles)
         tetrahedra = remove_infinite_tetrahedra(tetrahedra)
+        print '\tNumber of finite tetrahedra:',len(tetrahedra)
     elif in_ext == 'mesh':
+        print 'Reading in from INRIA .mesh (Medit) format...'
         (vertices,triangles,tetrahedra) = read_inria_mesh(infile)
-        
+        print '\tNumber of vertices:',len(vertices)-1
+        print '\tNumber of triangles:',len(triangles)
+        print '\tNumber of tetrahedra:',len(tetrahedra)
         mirror = build_mirror(tetrahedra)
         infinite_tetrahedra = generate_infinite_tetrahedra(mirror)
         tetrahedra.extend(infinite_tetrahedra)
+        print '\tTotal number of tetrahedra:',len(tetrahedra)
 
         # Rebuild the mirror
         mirror = build_mirror(tetrahedra)
@@ -374,10 +385,17 @@ if __name__ == "__main__":
         print "Unrecognized input extension:",in_ext
         quit()
 
+
     # Ensure that tetrahedra are all in CCW orientation
     if mirror is None:
         mirror = build_mirror(tetrahedra)
     reorient_tetrahedras(vertices,tetrahedra,mirror)
+   
+    for (i,v) in enumerate(vertices):
+        print 'V[{0}] = {1}'.format(i,v)
+    for (i,t) in enumerate(tetrahedra):
+        print 'T[{0}] = {1}'.format(i,t)
+        print tetrahedra_vertex_matrix(t,vertices)
         
     out_ext = outfile.rsplit('.',1)[1]
     assert(out_ext != in_ext) # What's the point of this?
