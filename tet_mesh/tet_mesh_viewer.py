@@ -27,9 +27,9 @@ def read_medit_mesh(filename):
         I += 1
         n = int(lines[I])
         I += 1
-        # Ignore boundary information
+        # Ignore boundary marker information
         objs = [map(float,x.split()[:-1]) for x in lines[I:(I+n)]]
-        objs = np.array(objs)
+        objs = np.array(objs) 
         exec(name + ' = objs')
         I += n
 
