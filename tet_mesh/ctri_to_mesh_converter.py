@@ -301,17 +301,33 @@ def get_mirror_tetrahedra(mirror,tetrahedra,tet_id,vert_id):
     
     return mirror_tet_replace
 
+"""
+Generate the neighbors for each tetrahedra
+Needs to be done in a specific order.
+If the tet is abcd, then the first neighbor must be the
+mirror tet that shares face bcd (e.g. is any even perturbation of b*cd)
+"""
 def generate_neighbors(tetrahedra,mirror):
+    print "#"*25
+    print "# Generating neighbors"
     neighbors = []
     for (tet_id,tet) in enumerate(tetrahedra):
+        print 'Tet[0] = {1}'.format(tet_id,tet)
         tet_adj = []
         keys = face_keys(tet)
-        for key in keys:
+        for (face_id,key) in enumerate(keys):
+            print '\tChecking face {0}:'.format(face_id), list(key)
             assert tet_id in mirror[key]
             mirror_tet_id = mirror[key] - set([tet_id])
             assert 1 == len(mirror_tet_id)
-            tet_adj.append(list(mirror_tet_id)[0])
+            mirror_tet_id = list(mirror_tet_id)[0]
+            print '\tMirror tet [{0}]:'.format(mirror_tet_id),\
+                tetrahedra[mirror_tet_id]
+            tet_adj.append(mirror_tet_id)
+        print 'Tet neighbors:', neighbors
         neighbors.append(tet_adj)
+        
+    print "#"*25
     return neighbors
 
 
@@ -358,6 +374,7 @@ if __name__ == "__main__":
     # Read in files and generate missing information
     in_ext = infile.rsplit('.',1)[1]
     mirror = None
+
     if in_ext == 'ctri':
         print 'Reading in from CGAL::Triangulation_3 format...'
         (vertices,tetrahedra,neighbors) = read_cgal_tri(infile)
@@ -367,6 +384,11 @@ if __name__ == "__main__":
         print '\tNumber of implied triangles:',len(triangles)
         tetrahedra = remove_infinite_tetrahedra(tetrahedra)
         print '\tNumber of finite tetrahedra:',len(tetrahedra)
+
+        # Shouldn't be necessary
+        mirror = build_mirror(tetrahedra)
+        reorient_tetrahedras(vertices,tetrahedra,mirror)
+        
     elif in_ext == 'mesh':
         print 'Reading in from INRIA .mesh (Medit) format...'
         (vertices,triangles,tetrahedra) = read_inria_mesh(infile)
@@ -380,22 +402,20 @@ if __name__ == "__main__":
 
         # Rebuild the mirror
         mirror = build_mirror(tetrahedra)
+        reorient_tetrahedras(vertices,tetrahedra,mirror)
+
         neighbors = generate_neighbors(tetrahedra,mirror)
     else:
         print "Unrecognized input extension:",in_ext
         quit()
-
-
-    # Ensure that tetrahedra are all in CCW orientation
-    if mirror is None:
-        mirror = build_mirror(tetrahedra)
-    reorient_tetrahedras(vertices,tetrahedra,mirror)
    
     for (i,v) in enumerate(vertices):
         print 'V[{0}] = {1}'.format(i,v)
     for (i,t) in enumerate(tetrahedra):
         print 'T[{0}] = {1}'.format(i,t)
         print tetrahedra_vertex_matrix(t,vertices)
+    for (i,n) in enumerate(neighbors):
+        print 'N[{0}] = {1}'.format(i,n)
         
     out_ext = outfile.rsplit('.',1)[1]
     assert(out_ext != in_ext) # What's the point of this?

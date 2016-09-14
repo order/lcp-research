@@ -110,13 +110,10 @@ int main(int argc, char ** argv)
     return -1;
   }
   fin >> tet_mesh;
-
-  
-  uint c_id = 0;
-  for(Cell_iterator cit = tet_mesh.all_cells_begin();
-      cit != tet_mesh.all_cells_end(); ++cit){
-    std::cout << "Checking cell " << c_id++ << std::endl;
-    tet_mesh.is_valid(cit,true);
+  if(!tet_mesh.is_valid()){
+    std::cerr << "tet_mesh invalid. Something messed up with the input file?"
+              << std::endl;
+    tet_mesh.is_valid(true); // Verbose recheck
   }
 
   std::cout << "Number of vertices: "
