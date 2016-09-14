@@ -11,6 +11,14 @@ import matplotlib.pyplot as plt
 
 import importlib
 
+def standardize(v):
+    u = np.max(v)
+    l = np.min(v)
+    if u == l:
+        return np.zeros(v.shape)
+    assert(u > l)
+    return (v - l) / (u - l)
+
 def is_sorted(x):
     """
     Check if an array is sorted

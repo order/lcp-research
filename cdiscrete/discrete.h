@@ -67,7 +67,6 @@ vec get_oob_state(uint oob_idx, const RegGrid & grid);
 //NB: 'C' style ordering: last column changes most rapidly
 vector<vec> vectorize(const RegGrid & grid);
 mat make_points(const RegGrid & grid);
-mat make_points(const vector<vec> & grids);
 
 //=======================================
 // INDEXING

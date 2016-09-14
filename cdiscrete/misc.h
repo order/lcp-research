@@ -19,6 +19,9 @@ void print_shape(const uvec & u);
 void print_shape(const vec & v);
 void print_shape(const mat & A);
 
+// Make points from a grid
+mat make_points(const std::vector<vec> & grids);
+
 //=====================================
 // BOOLEAN
 typedef Col<unsigned char> bvec; // boolean vector; bool doesn't work in arma

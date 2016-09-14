@@ -155,42 +155,6 @@ mat make_points(const RegGrid & grid){
   return make_points(vectorize(grid));
 }
 
-mat make_points(const vector<vec> & grids)
-{
-  // Makes a mesh out of the D vectors
-  // 'C' style ordering... last column changes most rapidly
-  
-  // Figure out the dimensions of things
-  uint D = grids.size();
-  uint N = 1;
-  for(vector<vec>::const_iterator it = grids.begin();
-      it != grids.end(); ++it){
-    N *= it->n_elem;
-  }
-  mat P = mat(N,D); // Create the matrix
-  
-  uint rep_elem = N; // Element repetition
-  uint rep_cycle = 1; // Pattern rep
-  for(uint d = 0; d < D; d++){
-    uint n = grids[d].n_elem;
-    rep_elem /= n;
-    assert(N == rep_cycle * rep_elem * n);
-    
-    uint I = 0;
-    for(uint c = 0; c < rep_cycle; c++){ // Cycle repeat
-      for(uint i = 0; i < n; i++){ // Element in pattern
-	for(uint e = 0; e < rep_elem; e++){ // Element repeat
-	  assert(I < N);
-	  P(I,d) = grids[d](i);
-	  I++;
-	}
-      }
-    }
-    rep_cycle *= n;
-  }
-  return P;
-}
-
 uvec c_order_coef(const RegGrid & grid){
   return c_order_coef(num_grid_points_per_dim(grid));
 }
