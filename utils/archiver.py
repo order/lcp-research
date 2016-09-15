@@ -16,6 +16,10 @@ class Archiver(object):
                    or isinstance(v, sps.spmatrix))
         self.data.update(kwargs)
 
+
+    def clear(self):
+        self.data = {}
+
     def write(self,filename):
         tar = tarfile.open(filename,"w:gz")
         for (k,v) in self.data.items():
@@ -103,4 +107,39 @@ def unpack_sp_mat(A):
     rows = rows.astype(np.integer)
     cols = cols.astype(np.integer)    
     return sps.coo_matrix((data,(rows,cols)),shape=(R,C))
-    
+
+
+def prep_lines(lines):
+    lines = [line.split('#',1)[0].strip() for line in lines]
+    lines = [line for line in lines if line]
+    return list(reversed(lines))
+
+def read_medit_mesh(filename):
+    # Read in file in INRIA's .medit format
+    FH = open(filename,"r")
+    lines = FH.readlines()
+    lines = prep_lines(lines)
+
+    names = ['vertices','edges','triangles','tetrahedra']
+    for name in names:
+        exec(name + ' = []')
+    while lines:
+        line = lines.pop()
+        while lines and line.lower() not in names:
+            line = lines.pop()
+        if not lines:
+            break
+        name = line.lower()
+        assert name in names
+        
+        n = int(lines.pop())
+        objs = []
+        for _ in xrange(n):
+            line = lines.pop()
+            tokens = line.split()
+            obj = map(float,tokens[:-1]) # Ignore boundary marker information
+            objs.append(obj)
+        objs = np.array(objs) 
+        exec(name + ' = objs')
+
+    return vertices,edges,triangles,tetrahedra

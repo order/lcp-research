@@ -26,7 +26,7 @@ Points read_points(const string & point_file){
   cout << "Reading in points from [" << point_file << "]" << endl;
   Unarchiver unarch = Unarchiver(point_file);
   Points points = unarch.load_mat("points");
-  cout << "\tFound points: " << size(points);
+  cout << "\tFound points: " << size(points) << endl;;
   assert(TET_NUM_DIM == points.n_cols);
 
   return points;
@@ -38,7 +38,7 @@ vec read_values(const TetMesh & mesh,
   cout << "Reading in values from [" << value_file << "]" << endl;
   Unarchiver unarch = Unarchiver(value_file);
   vec values = unarch.load_vec("values");
-  cout << "\tFound values: " << size(values);
+  cout << "\tFound values: " << size(values) << endl;;
 
   if(values.n_elem == mesh.number_of_vertices()){
     cout << "Values only provided for vertices, filling in..." << endl;
@@ -53,6 +53,7 @@ void write_interp_to_file(const TetMesh & mesh,
                           const Points & points,
                           const vec & values,
                           const string & out_file){
+  cout << "Interpolating..." << endl;
   uint N = points.n_rows;
   ElementDist dist = mesh.points_to_element_dist(points);
   vec interp = dist.t() * values;
@@ -60,6 +61,7 @@ void write_interp_to_file(const TetMesh & mesh,
   Archiver arch;
   arch.add_vec("interp",interp);
   arch.write(out_file);
+  cout << "\tWrote [" << out_file << "]." << endl;
 }
 
 po::variables_map read_command_line(uint argc, char** argv){
@@ -93,6 +95,5 @@ int main(int argc, char** argv)
   Points points = read_points(var_map["points"].as<string>());
   double oob = var_map["oob"].as<double>();
   vec values = read_values(mesh, var_map["values"].as<string>(),oob);
-
-  
+  write_interp_to_file(mesh, points, values,var_map["out"].as<string>());
 }

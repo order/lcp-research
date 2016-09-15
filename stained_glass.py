@@ -2,7 +2,7 @@ import numpy as np
 
 import itertools
 
-from utils.archiver import Unarchiver
+from utils.archiver import Unarchiver, read_medit_mesh
 from utils import standardize
 
 import matplotlib
@@ -15,47 +15,13 @@ import argparse
 import sys
 import os.path
 
-def prep_lines(lines):
-    lines = [line.split('#',1)[0].strip() for line in lines]
-    lines = [line for line in lines if line]
-    return list(reversed(lines))
-
-# Move to another file
-def read_medit_mesh(filename):
-    # Read in file in INRIA's .medit format
-    FH = open(filename,"r")
-    lines = FH.readlines()
-    lines = prep_lines(lines)
-
-    names = ['vertices','edges','triangles','tetrahedra']
-    for name in names:
-        exec(name + ' = []')
-    while lines:
-        line = lines.pop()
-        while lines and line.lower() not in names:
-            line = lines.pop()
-        if not lines:
-            break
-        name = line.lower()
-        assert name in names
-        
-        n = int(lines.pop())
-        objs = []
-        for _ in xrange(n):
-            line = lines.pop()
-            tokens = line.split()
-            obj = map(float,tokens[:-1]) # Ignore boundary marker information
-            objs.append(obj)
-        objs = np.array(objs) 
-        exec(name + ' = objs')
-
-    return vertices,edges,triangles,tetrahedra
-
 def plot_mesh(F,vertices,edges,triangles,tetrahedra,**kwargs):
     no_function = (F is None)
     if not no_function:      
         std_F = standardize(F) # Between 0 and 1
         assert F.size == vertices.shape[0]
+    else:
+        F = 'k'
     V = vertices.shape[0]
 
     cmap = plt.get_cmap(kwargs.get('cmap','jet'))
@@ -66,7 +32,6 @@ def plot_mesh(F,vertices,edges,triangles,tetrahedra,**kwargs):
     # Plot points
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-         
     p = ax.scatter(vertices[:,0],
                    vertices[:,1],
                    vertices[:,2],
@@ -75,7 +40,8 @@ def plot_mesh(F,vertices,edges,triangles,tetrahedra,**kwargs):
                    alpha=0.25,
                    lw=0,
                    cmap=cmap)
-    fig.colorbar(p)
+    if not no_function:
+        fig.colorbar(p)
 
     # Build line collection
     if not no_mesh:
@@ -97,7 +63,7 @@ def plot_mesh(F,vertices,edges,triangles,tetrahedra,**kwargs):
                     seg_set.add(key)
                     segs.append([vertices[x,:] for x in verts])
         S = len(segs)
-        linecolors = [0.5,0.5,0.5,0.05] # Dark gray
+        linecolors = [0.5,0.5,0.5,0.1] # Dark gray
         print 'Plotting {0} line segments'.format(S)
         seg_collection = Line3DCollection(segs,colors=linecolors)
         ax.add_collection3d(seg_collection)
@@ -164,10 +130,6 @@ if __name__ == "__main__":
                         help='Use dual variables')
     parser.add_argument('-v','--vertex', metavar='F',
                         help='File with vertex values')
-    parser.add_argument('-f','--face', metavar='F', 
-                        help='File with face values')
-    parser.add_argument('-t','--tetra', metavar='F',
-                        help='File with tetrahedral values')
     parser.add_argument('-L','--large',action="store_true",
                         help="Make large values more visible.")
     parser.add_argument('-l','--log', action="store_true",
@@ -176,6 +138,8 @@ if __name__ == "__main__":
                         help="Plot flow policy")
     parser.add_argument('-i','--ignore',type=int, nargs='+',
                         help="Ignore actions in policy plot")
+    parser.add_argument('-n','--no_function',action="store_true",
+                        help="Just plot the skeleton")
     args = parser.parse_args()
 
     meshfile = args.mesh
@@ -206,9 +170,9 @@ if __name__ == "__main__":
         assert not args.ignore
     
     if args.vertex:
-        assert not args.face
-        assert not args.tetra
         assert not args.solution
+        assert not args.no_function
+                
         print 'Reading vertex archive',args.vertex
         unarch = Unarchiver(args.vertex)
         assert(1 == len(unarch.data))
@@ -221,8 +185,7 @@ if __name__ == "__main__":
         
     elif args.solution:
         assert not args.vertex
-        assert not args.face
-        assert not args.tetra
+        assert not args.no_function
         
         print 'Reading LCP solution archive',args.solution
         unarch = Unarchiver(args.solution)
@@ -250,6 +213,10 @@ if __name__ == "__main__":
             assert 0 <= args.action < A
             f = F[:-1,args.action] # Crop oob
         assert (V,) == f.shape
+    elif args.no_function:
+        assert not args.solution
+        assert not args.vertex
+        f = None
     else:
         print "Mode not supported yet"
         quit()
@@ -258,17 +225,18 @@ if __name__ == "__main__":
         f = np.log(np.abs(f) + 1e-25)
 
     if args.large:
-        alpha_fn = lambda x: 0.25*(x)**2
+        alpha_fn = lambda x: 0.15*(x)**1.5
         cmap = 'plasma'
+        
     elif args.policy:
         alpha_fn = lambda x: 0.05
         cmap = 'jet'
     else:
-        alpha_fn = lambda x: 0.25*(1-x)**2
+        alpha_fn = lambda x: 0.15*(1-x)**1.5
         cmap = 'jet'
     
     plot_mesh(f,*tet_mesh,cmap=cmap,
-              no_mesh=True,
+              no_mesh=(not args.no_function),
               alpha_fn=alpha_fn)
     plt.show()
 
