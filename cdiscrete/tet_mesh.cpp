@@ -1,6 +1,7 @@
 #include "tet_mesh.h"
 #include "misc.h"
 #include "io.h"
+#include "car.h"
 
 ////////////////////////////////////////////////
 // CGAL <-> Armadillo conversion routines
@@ -180,6 +181,15 @@ TetBaryCoord TetMesh::barycentric_coord(const Point & point) const{
   CoordVec coords;
   coords(0) = 1.0 - agg;
   coords.tail(3) = partial_coords;
+  
+  // Get rid of tiny entries (for sparsity & numerical reasons)
+  coords(find(abs(coords) < ALMOST_ZERO)).fill(0);
+  coords /= accu(coords); // Rescale to be convex
+  if(not all(coords >= 0)){
+    cerr << "[ERR] Point: " << point
+         << "\n\tCoords: " << coords.t()
+         << "\tVertex mat:\n"<< V;
+  }
   assert(all(coords >= 0));
   assert(all(coords <= 1));
   
@@ -257,6 +267,7 @@ void TetMesh::read_cgal(const string & filename){
 
   ifstream fs(filename);
   fs >> m_mesh;
+  
   assert(m_mesh.is_valid());
   fs.close();
 }
@@ -347,34 +358,3 @@ mat TetMesh::find_box_boundary() const{
   return bounds;
 }
 
-////////////////////////////////////////////////////////
-// MAIN FUNCTION ///////////////////////////////////////
-////////////////////////////////////////////////////////
-
-
-int main(int argc, char ** argv)
-{
-  if(2 != argc){
-    std::cerr << "Usage: tet_mesh [input file]" << std::endl;
-    return -1;
-  }
-  
-  assert(2 == argc);  
-  TetMesh tet_mesh;
-  tet_mesh.read_cgal(argv[1]);
-  tet_mesh.freeze();
-
-  vector<vec> grids;
-  grids.push_back(linspace<vec>(-1,11,32));
-  grids.push_back(linspace<vec>(-1,11,32));
-  grids.push_back(linspace<vec>(-1,11,32));
-                 
-  Points grid_points = make_points(grids);
-  ElementDist dist = tet_mesh.points_to_element_dist(grid_points);
-
-  Archiver arch;
-  arch.add_mat("grid_points",grid_points);
-  arch.add_sp_mat("dist",dist);
-  arch.write("test.out");
-  return 0;
-}

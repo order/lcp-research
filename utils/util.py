@@ -12,12 +12,17 @@ import matplotlib.pyplot as plt
 import importlib
 
 def standardize(v):
-    u = np.max(v)
-    l = np.min(v)
+    mask = np.isnan(v)
+    u = np.max(v[~mask])
+    l = np.min(v[~mask])
     if u == l:
-        return np.zeros(v.shape)
-    assert(u > l)
-    return (v - l) / (u - l)
+        v = np.zeros(v.shape)
+        v[mask] = np.nan
+    else:
+        assert(u > l)
+        v = (v - l) / (u - l)
+    assert(np.all(mask == np.isnan(v)))
+    return v
 
 def is_sorted(x):
     """
