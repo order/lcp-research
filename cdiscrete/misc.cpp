@@ -151,17 +151,16 @@ template <typename M, typename V> M row_divide(const M & A,
 }
 template mat row_divide(const mat & A, const rowvec & b);
 
-
-vec row_2_norm(const mat & A){
-  return sqrt(sum(square(A),1));
+vec lp_norm(const mat & A,double p,uint dir){
+  return pow(sum(pow(A,p),dir),1.0 / p);
 }
 
 vec dist(const mat & A, const mat & B){
-  return row_2_norm(A - B);
+  return lp_norm(A - B,2,1);
 }
 
 vec dist(const mat & A, const rowvec & b){
-  return row_2_norm(A.each_row() - b);
+  return lp_norm(A.each_row() - b,2,1);
 }
 
 double dist(const vec & v, const vec & u){
@@ -271,6 +270,32 @@ uvec col_argmax(const mat & V){
 uvec col_argmin(const mat & V){
   return col_argmax(-V);
 }
+
+double quantile(const vec & v, double q){
+  assert(0 <= q);
+  assert(1 >= q);
+  // Sort the vector
+  vec s = sort(v);
+
+  // Get index associated with
+  // the quantile
+  uint N = v.n_elem;
+  double p = (double) N * q;
+  int i = (uint)floor(p);
+  // Interpolation weights
+  double theta = (p - i);
+  assert(0 <= theta);
+  assert(1 >= theta); 
+  
+  if(i == N-1){
+    assert(theta < ALMOST_ZERO);
+    return s(i);
+  } 
+
+  // Interpolate
+  return (1 - theta)*s(i) + theta * s(i+1);
+}
+
 
 //=================================================
 bvec num2binvec(uint n, uint D){

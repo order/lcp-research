@@ -6,6 +6,8 @@ import scipy.sparse as sps
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+from utils.archiver import read_shewchuk
+
 import sys
 import argparse
 
@@ -21,50 +23,6 @@ def remove_comments(lines):
             cleaned.append(clean)
     return cleaned        
 
-def read_node(node_file):
-    with open(node_file) as FH:
-        lines = FH.readlines()
-    lines = remove_comments(lines)
-
-    (n_vert,D,A,B) = map(int,lines[0].split())
-    assert 2 == D # Dimension
-    assert 0 == A # Attributes
-    assert 0 == B # Boundary markers
-    assert (n_vert + 1 ) == len(lines)
-    
-    vertices = np.empty((n_vert,2))
-    for i in xrange(1,len(lines)):
-        (v_id,x,y) = map(float,lines[i].split())
-        vertices[i-1,0] = x
-        vertices[i-1,1] = y
-    return vertices
-
-def read_ele(ele_file):
-    with open(ele_file) as FH:
-        lines = FH.readlines()
-    lines = remove_comments(lines)    
-
-    (n_faces,vert_per_face,A) = map(int,lines[0].split())
-    assert 3 == vert_per_face
-    assert 0 == A # Attributes
-    assert (n_faces + 1 ) == len(lines)
-
-    faces = np.empty((n_faces,vert_per_face))
-    for i in xrange(1,len(lines)):
-        sp_line = map(float,lines[i].split())
-        assert(4 == len(sp_line))
-        faces[i-1,:] = np.array(sp_line[1:])
-    return faces
-
-def read_sp_mat(sp_mat_file):
-    data = np.fromfile(sp_mat_file)
-    R = int(data[0])
-    C = int(data[1])
-    NNZ = int(data[2])
-    assert (3 + 3*NNZ,) == data.shape
-    data = np.reshape(data[3:],(NNZ,3))    
-    S = sps.coo_matrix((data[:,2],(data[:,0], data[:,1])),shape=(R,C))
-    return S
 
 def get_solution(nodes,faces,fn,mode):
     (N,_) = nodes.shape
@@ -121,15 +79,6 @@ def plot_vertices_3d(nodes,faces,fn,cmap=None):
     ax = plt.gca(projection='3d')
     ax.plot_trisurf(nodes[:,0],nodes[:,1], fn,
                     triangles=faces, cmap=cmap, alpha=0.75)
-
-def read_shewchuk(filename):
-    nodes = read_node(filename + ".node")
-    faces = read_ele(filename + ".ele")   
-    (N,nd) = nodes.shape
-    (V,vd) = faces.shape
-    assert 2 == nd
-    assert 3 == vd
-    return nodes,faces
 
 def plot_bare_mesh(filename):
     fig = plt.gca()

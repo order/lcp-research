@@ -11,6 +11,15 @@ import matplotlib.pyplot as plt
 
 import importlib
 
+def remove_comments(lines):
+    cleaned = []
+    for line in lines:
+        clean = line.partition('#')[0]
+        clean = clean.strip()
+        if len(clean) > 0:
+            cleaned.append(clean)
+    return cleaned 
+
 def standardize(v):
     mask = np.isnan(v)
     u = np.max(v[~mask])

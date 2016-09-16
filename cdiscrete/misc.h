@@ -55,7 +55,7 @@ template <typename M, typename V> M row_diff(const M & A, const V & b);
 template <typename M, typename V> M row_add(const M & A, const V & b);
 template <typename M, typename V> M row_divide(const M & A, const V & b);
 
-vec row_2_norm(const mat & A);
+vec lp_norm(const mat & A,double p,uint dir);
 vec dist(const mat & A, const mat & B);
 vec dist(const mat & A, const rowvec & b);
 
@@ -79,6 +79,8 @@ uint argmax(const uvec & v);
 uint argmin(const uvec & v);
 uvec col_argmax(const mat & V);
 uvec col_argmin(const mat & V);
+
+double quantile(const vec & v, double q);
 
 // Like above, but for a particular column
 // NB: this is to avoid passing A.col(i), which is a special subview type

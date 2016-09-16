@@ -1,3 +1,4 @@
+#include "simulator.h"
 #include "car.h"
 
 Points car(const Points & points,
@@ -12,14 +13,10 @@ Points car(const Points & points,
   new_points.col(2) += SIM_STEP * u1*u2; // theta
 
   // Angle wrap
-  uvec col_idx = uvec{2};
-  uvec row_idx = find(new_points.col(2) > datum::pi);
-  new_points(row_idx,col_idx) -= 2*datum::pi;
-  row_idx = find(new_points.col(2) < -datum::pi);
-  new_points(row_idx,col_idx) += 2*datum::pi;
-
-  assert(all(new_points.col(2) <= datum::pi));
-  assert(all(new_points.col(2) >= -datum::pi));
+  uvec wrap_idx = uvec{2};
+  vec lb = uvec{datum::nan,datum::nan,-datum::pi};
+  vec ub = uvec{datum::nan,datum::nan, datum::pi};
+  wrap(new_points,wrap_idx,lb,ub);
 
   // May be out of bounds
   return new_points;

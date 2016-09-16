@@ -27,6 +27,13 @@ bool Archiver::add_vec(const string & field_name,
   generic_add(name,packed);
 }
 
+bool Archiver::add_uvec(const string & field_name,
+		       const uvec & v){
+  string name = field_name + ".uvec";
+  uvec packed = pack_vec(v);
+  generic_add(name,packed);
+}
+
 template <typename D>
 bool Archiver::generic_add(const string & name,
 			   const Col<D> & data){

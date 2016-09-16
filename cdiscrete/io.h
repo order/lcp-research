@@ -19,6 +19,8 @@ struct Archiver{
 	   const sp_mat & A);
   bool add_vec(const string & field_name,
 	   const vec & v);
+  bool add_uvec(const string & field_name,
+                const uvec & v);
   template <typename D>
   bool generic_add(const string & name,
 		   const Col<D> & data);

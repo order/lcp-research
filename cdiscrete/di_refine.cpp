@@ -42,13 +42,40 @@ po::variables_map read_command_line(uint argc, char** argv){
   return var_map;
 }
 
+vec bellman_residual(const TriMesh & mesh,
+                     const DoubleIntegratorSimulator & di,
+                     const vec & values,
+                     double gamma,
+                     uint samples = 25){
+    
+  // Pad for the oob node
+  double max_val = 1.0 / (1.0 - gamma);
+  vec padded_values = join_vert(values, vec{max_val});
+   
+  Points centers = mesh.get_face_centers();
+  vec v_interp = mesh.interpolate(centers,padded_values);
+  mat Q = estimate_Q(centers,mesh,
+                     &di,
+                     padded_values,
+                     gamma,
+                     samples);
+                       
+  // TODO: think about weighting by flows at center
+  // Combines flow and values
+  vec v_q_est = min(Q,1);
+  uint F = mesh.number_of_faces();
+  assert(F == v_q_est.n_elem);
+  
+  return abs(v_interp - v_q_est);
+}
+
 // Simplest policy; return action with max flow
 uvec flow_policy(const TriMesh & mesh,
                  const mat & flows){
   Points centers = mesh.get_face_centers();
   // Pad with 0 flow at oob node
   mat padded_flows = join_vert(flows,zeros<rowvec>(2));
-  
+ 
   mat interp = mesh.interpolate(centers,padded_flows);
   uvec policy = col_argmax(interp);
   assert(centers.n_rows == policy.n_elem);
@@ -56,11 +83,13 @@ uvec flow_policy(const TriMesh & mesh,
 }
 
 uvec grad_policy(const TriMesh & mesh,
-                 const vec & value){
+                 const DoubleIntegratorSimulator & di,
+                 const vec & value,
+                 uint samples=25){
 
   uint F = mesh.number_of_faces();
   
-  mat bounds = mesh.find_box_boundary();
+  mat bounds = mesh.find_bounding_box();
   vec lb = bounds.col(0);
   vec ub = bounds.col(1);
   
@@ -69,15 +98,20 @@ uvec grad_policy(const TriMesh & mesh,
   
   Points centers = mesh.get_face_centers();
   assert(size(centers) == size(F,TRI_NUM_DIM));
- 
-  Points post_0 = double_integrator(centers,-1,SIM_STEP);
-  saturate(post_0,lb,ub);
-  Points post_1 = double_integrator(centers,1,SIM_STEP);
-  saturate(post_1,lb,ub);
 
-  mat IP = mat(F,2);
-  IP.col(0) = sum(grad % post_0,1);
-  IP.col(1) = sum(grad % post_1,1);
+  assert(2 == di.num_actions());
+  assert(1 == di.dim_actions());
+  uint A = di.num_actions();
+  mat actions = di.get_actions();
+  
+  mat IP = zeros<mat>(F,A);
+  for(uint a = 0; a < A; a++){
+    vec action = actions.row(a).t();
+    for(uint s = 0; s < samples; s++){
+      Points p_next = di.next(centers,action);
+      IP.col(a) += sum(grad % p_next,1);
+    }
+  }
 
   uvec policy = col_argmin(IP);
   assert(F == policy.n_elem);
@@ -85,44 +119,44 @@ uvec grad_policy(const TriMesh & mesh,
 }
 
 uvec q_policy(const TriMesh & mesh,
-              const vec & value,
-              double gamma){
+              const DoubleIntegratorSimulator& di,
+              const vec & values,
+              double gamma,
+              uint samples=25){
 
   uint F = mesh.number_of_faces();
-  
-  mat bounds = mesh.find_box_boundary();
-  vec lb = bounds.col(0);
-  vec ub = bounds.col(1);
-  
-  mat grad = mesh.face_grad(value);
-  assert(size(grad) == size(F,TRI_NUM_DIM));
-  
+  double max_val = 1.0 / (1.0 - gamma);
+  vec padded_values = join_vert(values,
+                                vec{max_val});
+      
   Points centers = mesh.get_face_centers();
   assert(size(centers) == size(F,TRI_NUM_DIM));
-
-  mat Q = build_di_costs(centers);
   
-  Points post_0 = double_integrator(centers,-1,SIM_STEP);
-  saturate(post_0,lb,ub);
-  Points post_1 = double_integrator(centers,1,SIM_STEP);
-  saturate(post_1,lb,ub);
 
-  // Pad for the oob node
-  vec padded_value = join_vert(value,vec({max(value)}));
+  
 
-  Q.col(0) += gamma * mesh.interpolate(post_0,padded_value);
-  Q.col(1) += gamma * mesh.interpolate(post_1,padded_value);
+  mat Q = estimate_Q(centers,mesh,
+                     &di,
+                     padded_values,
+                     gamma,
+                     samples);
 
   uvec policy = col_argmin(Q);
   assert(F == policy.n_elem);
   return policy;
 }
 
+////////////////////////////////////////////////////////////
+// MAIN FUNCTION ///////////////////////////////////////////
+////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv)
 {
   po::variables_map var_map = read_command_line(argc,argv);
 
   string mesh_file = var_map["infile_base"].as<string>() + ".tri";
+
+  // Read in the CGAL mesh
   TriMesh mesh;
   cout << "Reading in cgal mesh file [" << mesh_file << ']'  << endl;
   mesh.read_cgal(mesh_file);
@@ -134,18 +168,21 @@ int main(int argc, char** argv)
        << "\n\tNumber of faces: " << F
        << endl;
 
-  // Find bounds
-  mat bounds = mesh.find_box_boundary();
-  vec lb = bounds.col(0);
-  vec ub = bounds.col(1);
+  // Find boundary from the mesh and create the simulator object
+  mat bbox = mesh.find_bounding_box();
+  vec lb = bbox.col(0);
+  vec ub = bbox.col(1);
   cout << "\tLower bound:" << lb.t()
        << "\tUpper bound:" << ub.t();
+  DoubleIntegratorSimulator di = DoubleIntegratorSimulator(bbox,vec{-1,1});
 
   // Read in solution information
   string soln_file = var_map["infile_base"].as<string>() + ".sol";
   cout << "Reading in LCP solution file [" << soln_file << ']'  << endl;
   Unarchiver unarch(soln_file);
   vec p = unarch.load_vec("p");
+
+  // Make sure that the primal information makes sense
   double p_over_v = ((double)p.n_elem / (double) V);
   uint rem = p.n_elem % V;
   cout << "Blocking primal solution..."
@@ -157,67 +194,62 @@ int main(int argc, char** argv)
   vec value = P.col(0);
   mat flows = P.tail_cols(2);
 
-  string out_file_base = var_map["outfile_base"].as<string>();
-
+  
   // Heuristic calculations
+  Archiver arch;
   cout << "Calculating splitting heuristic..." << endl;
-  cout << "\tValue and flow differences..." << endl;
-  // Difference in flow function
-  vec val_diff = mesh.face_diff(value);
-  vec flow_diff = mesh.face_diff(flows.col(0)) + mesh.face_diff(flows.col(1));
-  val_diff.save(out_file_base + ".val_diff.vec",raw_binary);
-  flow_diff.save(out_file_base + ".flow_diff.vec",raw_binary);
-
-  cout << "\tFace value gradient..."<<endl;
-  mat grad = mesh.face_grad(value);
-  vec grad_x = grad.col(0);
-  vec grad_y = grad.col(1);
-  grad_x.save(out_file_base + ".grad_x.vec",raw_binary);
-  grad_y.save(out_file_base + ".grad_y.vec",raw_binary);
+  cout << "\tBellman residual at centroids..." << endl;
+  vec residual = bellman_residual(mesh,di,value,0.997);
+  arch.add_vec("residual",residual);
 
   cout << "\tFlow volume..." << endl;
   // Volume of the aggregate flow
   vec flow_vol = mesh.prism_volume(sum(flows,1));
-  flow_vol.save(out_file_base +".flow_vol.vec",raw_binary);
-
-  vec heuristic = val_diff % flow_vol;
-  heuristic.save(out_file_base + ".heuristic.vec",raw_binary);
-
+  arch.add_vec("flow_vol",flow_vol);
+  
+  vec heuristic = residual % flow_vol;
   assert(F == heuristic.n_elem);
+  arch.add_vec("heuristic",heuristic);
 
+  // Policy disagreement
   cout << "Finding policies" << endl;
   uvec f_pi = flow_policy(mesh,flows);  
-  uvec g_pi = grad_policy(mesh,value);
-  uvec q_pi = q_policy(mesh,value,0.997);
-
+  uvec g_pi = grad_policy(mesh,di,value);
+  uvec q_pi = q_policy(mesh,di,value,0.997);
   uvec policy_agg = f_pi + 2*g_pi + 4*q_pi;
-  policy_agg.save(out_file_base +".policy.uvec",raw_binary);
+  arch.add_uvec("policy_agg",policy_agg);
   
-  cout << "Finding order statistic..." << endl;  
-  vec sorted = arma::sort(heuristic);
-  uint order = std::min(100,(int) std::ceil(0.05*F));
-  double order_stat = sorted(F-order);
+  cout << "Finding heuristic 0.98 quantile..." << endl;
+  double cutoff = quantile(heuristic,0.98);  
+  cout << "\t Cutoff: " << cutoff
+       << "\n\t Max:" << max(heuristic)
+       << "\n\t Min:" << min(heuristic) << endl;
 
+  // Split the cells if they have a large heuristic or
+  // policies disagree on them.
   TriMesh new_mesh(mesh);  
-
-  cout << "Adding " << order << " new nodes..." << endl;
   Point center;
-
-  policy_agg = vec_mod(policy_agg,7);
+  uint new_nodes = 0;
+  policy_agg = vec_mod(policy_agg,7); // All policies agree
   for(uint f = 0; f < F; f++){
-    if(heuristic(f) > order_stat or policy_agg(f) > 0){
+    if(heuristic(f) > cutoff or policy_agg(f) > 0){
       // Get center from old mesh
       center = convert(mesh.center_of_face(f));
       // Insert center into new mesh.
       new_mesh.insert(center);
+      new_nodes++;
     }
   }
+  cout << "Added " << new_nodes << " new nodes..." << endl;
   
   cout << "Refining..." << endl;
   new_mesh.refine(0.125,1.0);
   new_mesh.lloyd(25);
   new_mesh.freeze();
 
+  // Write out all the information
+  string out_file_base = var_map["outfile_base"].as<string>();
+  arch.write(out_file_base + ".stats");
   cout << "Writing..."
        << "\n\tCGAL mesh file: " << out_file_base << ".tri"
        << "\n\tShewchuk node file: " << out_file_base << ".node"

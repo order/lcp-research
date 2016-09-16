@@ -5,25 +5,37 @@
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
+DoubleIntegratorSimulator build_di_simulator(const po::variables_map & var_map){
+  double B = var_map["boundary"].as<double>();
+  mat bbox = mat(2,2);
+  bbox.col(0).fill(-B);
+  bbox.col(1).fill(B);
+  mat actions = vec{-1,1};
+  return DoubleIntegratorSimulator(bbox,actions);
+}
+
 void generate_initial_mesh(const po::variables_map & var_map,
+                           const DoubleIntegratorSimulator & di,
                            TriMesh & mesh){
-  double B = var_map["boundary"].as<double>();    
   uint num_bang_points = var_map["bang_points"].as<uint>();
   double angle = var_map["mesh_angle"].as<double>();
   double length = var_map["mesh_length"].as<double>();
-  
+
+  double B = var_map["boundary"].as<double>();    
   vec lb = -B*ones<vec>(2);
   vec ub = B*ones<vec>(2);
+  mat bbox = join_horiz(lb,ub);
 
-  cout << "Initial meshing..."<< endl;  
-  build_square_boundary(mesh,lb,ub);
+  cout << "Initial meshing..."<< endl;
+  mesh.build_box_boundary(lb,ub);
   VertexHandle v_zero = mesh.insert(Point(0,0));
 
   if(num_bang_points > 0){
-    add_di_bang_bang_curves(mesh,lb,ub,num_bang_points);
+    di.add_bang_bang_curve(mesh,num_bang_points);
   }
   
-  cout << "Refining based on (" << angle << "," << length <<  ") criterion ..."<< endl;
+  cout << "Refining based on (" << angle
+       << "," << length <<  ") criterion ..."<< endl;
   mesh.refine(angle,length);
   
   cout << "Optimizing (10 rounds of Lloyd)..."<< endl;
@@ -44,37 +56,44 @@ void generate_initial_mesh(const po::variables_map & var_map,
 }
 
 void build_lcp(const po::variables_map & var_map,
+               const DoubleIntegratorSimulator & di,
                const TriMesh & mesh){
-  mat bounds = mesh.find_box_boundary();
-  vec lb = bounds.col(0);
-  vec ub = bounds.col(1);
+  vec lb,ub;
+  mat bounds = di.get_bounding_box();
   
   Points points = mesh.get_spatial_nodes();
   uint N = points.n_rows;
-  
-  cout << "Generating transition matrices..."<< endl;
-  // Get transition matrices
-  ElementDist P_pos = build_di_transition(points,
-					  mesh,
-					  lb,ub,1.0);
-  ElementDist P_neg = build_di_transition(points,
-					  mesh,
-					  lb,ub,-1.0);
 
-  double gamma = var_map["gamma"].as<double>();
-  sp_mat E_pos = speye(N,N) + ( -gamma * P_pos);
-  sp_mat E_neg = speye(N,N) - gamma * P_neg;
+  uint NUM_ACTIONS = 2; // [-1,1]
+  uint NUM_SAMPLES = 150; // Read from var_map?
   
-  sp_mat E_pos_t = E_pos.t();
+  vector<sp_mat> E_vector;
+  double u;
+  sp_mat I = speye(N,N);
+  double gamma = var_map["gamma"].as<double>();
+  std::default_random_engine rand_gen;
+  std::normal_distribution<double> randn(0.0,0.1);
+  cout << "Generating transition matrices..."<< endl;
+  for(uint i = 0; i < NUM_ACTIONS; i++){
+    ElementDist P = ElementDist(N,N);
+    u = 2.0 * i - 1.0;
+    cout << "\tAction [" << i << "]: u = " << u << endl;
+    for(uint j = 0; j < NUM_SAMPLES; j++){
+      P += di.transition_matrix(mesh,vec{u});
+    }
+    P /= (double)NUM_SAMPLES;    
+    E_vector.push_back(I - gamma * P);
+  }  
+
   cout << "Building LCP..."<< endl;
-  block_sp_row top = block_sp_row{sp_mat(),E_neg,E_pos};
-  block_sp_row middle = block_sp_row{-E_neg.t(),sp_mat(),sp_mat()};
-  block_sp_row bottom = block_sp_row{-E_pos.t(),sp_mat(),sp_mat()};
+  block_sp_row top = block_sp_row{sp_mat(),E_vector[0],E_vector[1]};
+  block_sp_row middle = block_sp_row{-E_vector[0].t(),sp_mat(),sp_mat()};
+  block_sp_row bottom = block_sp_row{-E_vector[1].t(),sp_mat(),sp_mat()};
   block_sp_mat blk_M = block_sp_mat{top,middle,bottom};
   sp_mat M = bmat(blk_M);
   
-  mat costs = build_di_costs(points);
-  vec weights = build_di_state_weights(points);
+  mat costs = di.get_costs(points);
+  vec weights = lp_norm_weights(points,2);
 
   vec q = join_vert(-weights,vectorise(costs));
   assert(3*N == q.n_elem);
@@ -122,6 +141,8 @@ int main(int argc, char** argv)
 {
   po::variables_map var_map = read_command_line(argc,argv);
 
+  DoubleIntegratorSimulator di = build_di_simulator(var_map);
+  
   TriMesh mesh;
   if(var_map.count("mesh_file")){
     string mesh_file = var_map["mesh_file"].as<string>();
@@ -130,19 +151,17 @@ int main(int argc, char** argv)
   }
   else{
     cout << "Generating initial mesh..." << endl;
-    generate_initial_mesh(var_map,mesh);
+    generate_initial_mesh(var_map,di,mesh);
   }
   mesh.freeze();
 
-  mat bounds = mesh.find_box_boundary();
-  vec lb = bounds.col(0);
-  vec ub = bounds.col(1);
+  mat bbox = di.get_bounding_box();
   
   cout << "Mesh stats:" << endl;
   cout << "\tNumber of vertices: " << mesh.number_of_vertices() << endl;
   cout << "\tNumber of faces: " << mesh.number_of_faces() << endl;
-  cout << "\tLower bound:" << lb.t();
-  cout << "\tUpper bound:" << ub.t();
+  cout << "\tLower bound:" << bbox.col(0).t();
+  cout << "\tUpper bound:" << bbox.col(1).t();
 
-  build_lcp(var_map,mesh);
+  build_lcp(var_map,di,mesh);
 }

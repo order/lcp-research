@@ -104,7 +104,10 @@ class TriMesh{
   uint number_of_vertices() const;
   uint number_of_nodes() const;
   uint oob_node_index() const;
-  mat find_box_boundary() const;
+  
+  mat find_bounding_box() const;
+  void build_box_boundary(const vec & lb,
+                          const vec & ub);
 
   vec face_diff(const vec & vertex_function) const;
   vec prism_volume(const vec & vertex_function) const;
@@ -116,8 +119,6 @@ class TriMesh{
 
   void freeze();
   void print_vert_reg() const;
-  
-  
   //protected:
 
   bool m_dirty;
@@ -132,6 +133,8 @@ class TriMesh{
 
   void regen_caches(); // Derive from m_mesh
 };
+
+
 
 
 #endif

@@ -1,35 +1,37 @@
 #ifndef __Z_DI_INCLUDED__
 #define __Z_DI_INCLUDED__
 
+#include "simulator.h"
 #include "tri_mesh.h"
 
 using namespace arma;
 using namespace std;
 
-#define SIM_STEP 0.02
+class DoubleIntegratorSimulator : public Simulator{
+ public:
+  DoubleIntegratorSimulator(const mat & bbox,
+                            const mat &actions = vec{-1,1},
+                            double noise_std = 0.1,
+                            double step=0.01);
+  mat get_costs(const Points & points) const;
+  mat get_actions() const;
+  Points next(const Points & points,
+              const vec & actions) const;
+  sp_mat transition_matrix(const TriMesh & mesh,
+                           const vec & action) const;
 
-// DI stuff
-void add_di_bang_bang_curves(TriMesh & mesh,
-                             const vec & lb,
-                             const vec & ub,
-                             uint num_curve_points);
-Points double_integrator(const Points & points,
-			 double a,double t);
-mat build_di_costs(const Points & points);
-vec build_di_state_weights(const Points & points);
-sp_mat build_di_transition(const Points & points,
-			   const TriMesh & mesh,
-			   const vec & lb,
-			   const vec & ub,
-			   double action);
+  void add_bang_bang_curve(TriMesh & mesh,
+                           uint num_curve_points) const;
 
-void saturate(Points & points, 
-              const vec &lb,
-              const vec &ub); // TODO: Should move to a more general file
+  uint num_actions() const;
+  uint dim_actions() const;
 
-void build_square_boundary(TriMesh & mesh,
-			   const vec & lb,
-			   const vec & ub); // TODO: Should move to a more general file
-
-bool check(const sp_mat & A); // TODO: Should move to a more general file
+  mat get_bounding_box() const;
+  
+ protected:
+  mat m_actions;
+  mat m_bbox;
+  double m_step;
+  double m_noise_std;
+};
 #endif

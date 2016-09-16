@@ -510,7 +510,7 @@ mat TriMesh::face_grad(const vec & vertex_function) const{
   return grad; 
 }
 
-mat TriMesh::find_box_boundary() const{
+mat TriMesh::find_bounding_box() const{
   assert(m_frozen);
   mat bounds = mat(2,2);
 
@@ -521,6 +521,22 @@ mat TriMesh::find_box_boundary() const{
   bounds(1,1) = max(m_nodes.col(1).head(R));
 
   return bounds;
+}
+
+void TriMesh::build_box_boundary(const vec & lb,
+                                 const vec & ub){
+  assert(2 == lb.n_elem);
+  assert(2 == ub.n_elem);
+
+  VertexHandle v_00 = m_mesh.insert(Point(lb(0),lb(1)));
+  VertexHandle v_01 = m_mesh.insert(Point(lb(0),ub(1)));
+  VertexHandle v_10 = m_mesh.insert(Point(ub(0),lb(1)));
+  VertexHandle v_11 = m_mesh.insert(Point(ub(0),ub(1)));
+
+  m_mesh.insert_constraint(v_00,v_01);
+  m_mesh.insert_constraint(v_01,v_11);
+  m_mesh.insert_constraint(v_11,v_10);
+  m_mesh.insert_constraint(v_10,v_00);
 }
 
 void TriMesh::print_vert_reg() const{
