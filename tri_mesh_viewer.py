@@ -33,7 +33,7 @@ def get_solution(nodes,faces,fn,mode):
         F = F[:-1,:]
     else:
         assert 0 == M % N
-        assert M / (N+1) >= 3
+        assert M / N >= 3
         F = np.reshape(fn,(N,M/N),order='F')
 
     if mode == 'value':

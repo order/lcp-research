@@ -6,6 +6,7 @@
 
 using namespace arma;
 using namespace std;
+using namespace tri_mesh;
 
 class DoubleIntegratorSimulator : public Simulator{
  public:
@@ -14,11 +15,13 @@ class DoubleIntegratorSimulator : public Simulator{
                             double noise_std = 0.1,
                             double step=0.01);
   mat get_costs(const Points & points) const;
+  vec get_state_weights(const Points & points) const;
   mat get_actions() const;
   Points next(const Points & points,
               const vec & actions) const;
-  sp_mat transition_matrix(const TriMesh & mesh,
-                           const vec & action) const;
+  sp_mat transition_matrix(const Discretizer * disc,
+                           const vec & action,
+                           bool include_oob) const;
 
   void add_bang_bang_curve(TriMesh & mesh,
                            uint num_curve_points) const;

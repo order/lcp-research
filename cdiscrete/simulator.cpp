@@ -1,5 +1,6 @@
 #include "simulator.h"
 #include "misc.h"
+#include <assert.h>
 
 //////////////////////////////////////////
 // Functions for boundary remapping
@@ -109,7 +110,7 @@ vec lp_norm_weights(const Points & points,
 }
  
 mat estimate_Q(const Points & points,
-               const TriMesh & mesh,
+               const Discretizer * disc,
                const Simulator * sim,
                const vec & values,
                double gamma,
@@ -134,7 +135,7 @@ mat estimate_Q(const Points & points,
     // Averages over samples
     for(uint i = 0; i < samples; i++){
       Points next_points = sim->next(points,action);
-      interp_v += mesh.interpolate(next_points,values);
+      interp_v += disc->interpolate(next_points,values);
     }
     interp_v /= (double) samples;
     Q.col(a) += gamma * interp_v;

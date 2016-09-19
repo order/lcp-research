@@ -2,15 +2,11 @@
 #include "misc.h"
 #include <vector>
 
-
-Point convert(const vec & point){
+using namespace tri_mesh;
+Point tri_mesh::convert(const vec & point){
   assert(2 == point.n_elem);
   return Point(point(0),point(1));
 }
-
-BaryCoord::BaryCoord():oob(true){}
-BaryCoord::BaryCoord(bool o,uvec i,vec w) :
-  oob(o),indices(i),weights(w){}
 
 TriMesh::TriMesh() :
   m_mesh(),m_refiner(m_mesh),m_dirty(true),m_frozen(false){}
@@ -51,7 +47,7 @@ ElementDist TriMesh::points_to_element_dist(const Points & points,
 
   uint N = points.n_rows;
   uint oob_idx = oob_node_index();
-  uint M = number_of_nodes();
+  uint M = number_of_all_nodes();
 
   Point p;
   BaryCoord coord;
@@ -99,13 +95,13 @@ ElementDist TriMesh::points_to_element_dist(const Points & points,
   return sp_mat(row_idx_uvec,col_ptr_uvec,data_vec,M,N);
 }
 
-template <typename T> T TriMesh::interpolate(const Points & points,
-                                    const T& data) const{
+template <typename T> T TriMesh::base_interpolate(const Points & points,
+                                                  const T& data) const{
   assert(m_frozen);
   
   uint N = points.n_rows;
   uint d = points.n_cols;
-  uint NN = number_of_nodes();
+  uint NN = number_of_all_nodes();
   assert(data.n_rows == NN);
   
   ElementDist D = points_to_element_dist(points);
@@ -116,8 +112,12 @@ template <typename T> T TriMesh::interpolate(const Points & points,
   assert(ret.n_cols == data.n_cols);
   return ret;
 }
-template mat TriMesh::interpolate<mat>(const Points &, const mat&) const;
-template vec TriMesh::interpolate<vec>(const Points &, const vec&) const;
+vec TriMesh::interpolate(const Points & points, const vec & data) const{
+  return base_interpolate<vec>(points,data);
+}
+mat TriMesh::interpolate(const Points & points, const mat & data) const{
+  return base_interpolate<mat>(points,data);
+}
 
 
 BaryCoord TriMesh::barycentric_coord(const Point & point) const{  
@@ -350,10 +350,14 @@ uint TriMesh::number_of_vertices() const{
   return m_mesh.number_of_vertices();
 }
 
-uint TriMesh::number_of_nodes() const{
+uint TriMesh::number_of_spatial_nodes() const{
+  return number_of_vertices();
+}
+
+uint TriMesh::number_of_all_nodes() const{
   // Number of spatial vertices + 1 oob node
   return number_of_vertices() + 1;
-} 
+}
 
 uint TriMesh::oob_node_index() const{
   /*

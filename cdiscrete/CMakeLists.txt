@@ -55,7 +55,8 @@ include_directories(${LibArchive_INCLUDE_DIRS})
 # ##########################################################
 
 include( CGAL_CreateSingleSourceCGALProgram )
-list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp")
+list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
+  "lcp.cpp" "discretizer.cpp")
 create_single_source_cgal_program("di_gen.cpp" "tri_mesh.cpp" "di.cpp"
         ${COMMON_FILES})
 create_single_source_cgal_program("di_refine.cpp" "tri_mesh.cpp" "di.cpp"

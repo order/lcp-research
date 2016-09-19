@@ -92,7 +92,7 @@ if __name__ == "__main__":
     plt.draw()
 
     show_plots = True
-    iterations = 10
+    iterations = 4
     
     for I in xrange(iterations):
         print 'Iteration',I

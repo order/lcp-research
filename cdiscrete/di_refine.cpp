@@ -54,7 +54,8 @@ vec bellman_residual(const TriMesh & mesh,
    
   Points centers = mesh.get_face_centers();
   vec v_interp = mesh.interpolate(centers,padded_values);
-  mat Q = estimate_Q(centers,mesh,
+  mat Q = estimate_Q(centers,
+                     &mesh,
                      &di,
                      padded_values,
                      gamma,
@@ -135,7 +136,8 @@ uvec q_policy(const TriMesh & mesh,
 
   
 
-  mat Q = estimate_Q(centers,mesh,
+  mat Q = estimate_Q(centers,
+                     &mesh,
                      &di,
                      padded_values,
                      gamma,

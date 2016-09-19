@@ -7,8 +7,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 
-#include "discrete.h"
-
+using namespace std;
 using namespace arma;
 
 

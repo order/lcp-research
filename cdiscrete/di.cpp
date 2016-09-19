@@ -7,10 +7,26 @@ DoubleIntegratorSimulator::DoubleIntegratorSimulator(const mat & bbox,
                                                      double step) :
   m_bbox(bbox),m_actions(actions),m_step(step),m_noise_std(noise_std){}
 
+vec DoubleIntegratorSimulator::get_state_weights(const Points & points) const{
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  assert(TRI_NUM_DIM == D);
+
+  vec l2_norm = lp_norm(points,2,1);
+  assert(N == l2_norm.n_elem);
+  assert(all(l2_norm >= 0));
+
+  vec weight = max(l2_norm) - l2_norm + 1e-3;
+  assert(all(weight >= 0));
+  weight /= accu(weight);
+ 
+  return weight;
+}
+
 mat DoubleIntegratorSimulator::get_costs(const Points & points) const{
   uint N = points.n_rows;
   uint D = points.n_cols;
-  assert(2 == D);
+  assert(TRI_NUM_DIM == D);
 
   vec l2_norm = lp_norm(points,2,1);
   assert(N == l2_norm.n_elem);
@@ -27,8 +43,8 @@ mat DoubleIntegratorSimulator::get_actions() const{
 
 Points DoubleIntegratorSimulator::next(const Points & points,
                                        const vec & actions) const{
-  assert(2 == points.n_cols);
-  assert(1 == actions.n_elem);
+  assert(TRI_NUM_DIM == points.n_cols);
+  assert(dim_actions() == actions.n_elem);
   
   Points new_points = Points(size(points));
   assert(size(points) == size(new_points));
@@ -46,20 +62,30 @@ Points DoubleIntegratorSimulator::next(const Points & points,
   return new_points;
 }
 
-sp_mat DoubleIntegratorSimulator::transition_matrix(const TriMesh & mesh,
-                                                    const vec & action) const{
-  Points points = mesh.get_spatial_nodes();
-  uint N = points.n_rows;
+sp_mat DoubleIntegratorSimulator::transition_matrix(const Discretizer * disc,
+                                                    const vec & action,
+                                                    bool include_oob) const{
+  Points points = disc->get_spatial_nodes();
+  uint n = disc->number_of_spatial_nodes();
+  uint N = disc->number_of_all_nodes();
+  assert(N == n+1); // single oob node
   
   Points p_next = next(points,action);
-  ElementDist P = mesh.points_to_element_dist(p_next);
-  // Final row is the OOB row
-  assert(size(N+1,N) == size(P));
-  // Should be all zero due to saturation
-  assert(arma::accu(P.row(N)) < ALMOST_ZERO);
+  ElementDist P = disc->points_to_element_dist(p_next);
+  assert(size(N,n) == size(P));
 
-  // Crop
-  P.resize(N,N);
+  
+  // Final row is the OOB row
+  if(!include_oob){
+    // Make sure we aren't pruning off important transitions
+    assert(accu(P.tail_rows(1)) < ALMOST_ZERO);
+    P = resize(P,n,n);
+  }
+  else{
+    // Add an all-zero column
+    P = resize(P,N,N);
+    assert(accu(P.tail_cols(1)) < ALMOST_ZERO);
+  }
   return P;
 }
 
