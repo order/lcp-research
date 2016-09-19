@@ -523,6 +523,13 @@ mat TriMesh::find_bounding_box() const{
   return bounds;
 }
 
+void TriMesh::build_box_boundary(const mat & bbox){
+  assert(2 == bbox.n_cols);
+  assert(2 == bbox.n_rows);
+  build_box_boundary(bbox.col(0),
+                     bbox.col(1));
+}
+
 void TriMesh::build_box_boundary(const vec & lb,
                                  const vec & ub){
   assert(2 == lb.n_elem);

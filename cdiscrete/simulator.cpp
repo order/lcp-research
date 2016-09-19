@@ -4,7 +4,7 @@
 //////////////////////////////////////////
 // Functions for boundary remapping
 void saturate(Points & points,
-              const uvec &idx,
+              const uvec &indices,
               const mat &bbox){
   /*
     Project points back onto bounding box.
@@ -13,52 +13,92 @@ void saturate(Points & points,
   uint D = points.n_cols;
   assert(D == bbox.n_rows);
   assert(2 == bbox.n_cols);
-  assert(D >= idx.n_elem);
+  assert(D >= indices.n_elem);
 
   uvec mask;
+  uint I = indices.n_elem;
+  vec lb = bbox.col(0);
+  vec ub = bbox.col(1);
+  uint idx;
   uvec col_idx;
-  uint I = idx.n_elem;
   for(uint i = 0; i < I; i++){
-    col_idx = uvec({i});
-    for(uint j = 0; j < 2; j++){
-      if(j == 0)
-        mask = find(points.col(i) < bbox(i,j));
-      else
-        mask = find(points.col(i) > bbox(i,j));
-      points(mask,col_idx).fill(bbox(i,j));
-    }
+    idx = indices(i);
+    col_idx = uvec{idx};
+    assert(is_finite(bbox.row(idx)));
+    assert(lb(idx) < ub(idx));
+    
+    mask = find(points.col(idx) < lb(idx));
+    points(mask,col_idx).fill(lb(idx) + ALMOST_ZERO);
+    
+    mask = find(points.col(idx) > ub(idx));
+    points(mask,col_idx).fill(ub(idx) - ALMOST_ZERO);
   }
 }
 
+
 void wrap(Points & points,
-          const uvec &idx,
+          const uvec &indices,
           const mat &bbox){
   /*
     Wrap points back onto bounding box.
-    Think "torus"
+    Think "toru"s
   */
   
   uint D = points.n_cols;
   assert(D == bbox.n_rows);
   assert(2 == bbox.n_cols);
-  assert(D >= idx.n_elem);
+  assert(D >= indices.n_elem);
 
   uvec mask;
-  uvec col_idx;
-  uint I = idx.n_elem;
+  uint I = indices.n_elem;
   vec lb = bbox.col(0);
   vec ub = bbox.col(1);
+  uint idx;
   for(uint i = 0; i < I; i++){
-    assert(is_finite(bbox.row(i)));
-    assert(lb(i) < ub(i));
-           points.col(i) -= lb(i); // p - l
-           points.col(i) -= floor(points.col(i)
-                                  / (ub(i) - lb(i))); // (p-l) % (u-l)
-           points.col(i) += lb(i);    // (p-l) % (u-l) + l
+    idx = indices(i);
+    assert(is_finite(bbox.row(idx)));
+    assert(lb(idx) < ub(idx));
     
-           assert(not any(points.col(i) > ub(i)));
-           assert(not any(points.col(i) < lb(i)));
+    points.col(idx) -= lb(idx); // p - l
+    points.col(idx) -= floor(points.col(idx)
+                           / (ub(idx) - lb(idx))); // (p-l) % (u-l)
+    points.col(idx) += lb(idx);    // (p-l) % (u-l) + l
+    
+    assert(not any(points.col(idx) > ub(idx)));
+    assert(not any(points.col(idx) < lb(idx)));
   }   
+}
+
+uvec out_of_bounds(const Points & points,
+                   const uvec & indices,
+                   const mat & bbox){
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  uint I = indices.n_elem;
+  assert(D == bbox.n_rows);
+  assert(2 == bbox.n_cols);
+  assert(D >= indices.n_elem);
+
+  uvec mask;
+  vec lb = bbox.col(0);
+  vec ub = bbox.col(1);
+  
+  uint idx;
+  vector<uword> oob_vec;
+  for(uint i = 0; i < I; i++){
+    idx = indices(i);
+    mask = find(points.col(idx) < lb(idx));
+    oob_vec.insert(oob_vec.end(),mask.begin(),mask.end());
+    
+    mask = find(points.col(idx) > ub(idx));
+    oob_vec.insert(oob_vec.end(),mask.begin(),mask.end());
+
+    mask = find_nonfinite(points.col(idx));
+    oob_vec.insert(oob_vec.end(),mask.begin(),mask.end());
+  }
+
+  uvec oob = uvec(oob_vec);
+  return unique(oob);
 }
 
 vec lp_norm_weights(const Points & points,

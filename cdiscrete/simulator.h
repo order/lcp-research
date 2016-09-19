@@ -3,6 +3,7 @@
 
 #include <armadillo>
 #include "tri_mesh.h"
+#include "misc.h"
 
 class Simulator{
  public:
@@ -20,6 +21,10 @@ void saturate(Points & points,
 void wrap(Points & points,
           const uvec & idx,
           const mat & bbox);
+
+uvec out_of_bounds(const Points & points,
+                   const uvec & idx,
+                   const mat & bbox);
 
 mat find_bounding_box(const TriMesh & mesh);
 

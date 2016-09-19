@@ -55,13 +55,25 @@ include_directories(${LibArchive_INCLUDE_DIRS})
 # ##########################################################
 
 include( CGAL_CreateSingleSourceCGALProgram )
-create_single_source_cgal_program("di_gen.cpp" "misc.cpp" "io.cpp" "tri_mesh.cpp" "di.cpp" "simulator.cpp")
-create_single_source_cgal_program("di_refine.cpp" "misc.cpp" "io.cpp" "tri_mesh.cpp" "di.cpp" "simulator.cpp")
+list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp")
+create_single_source_cgal_program("di_gen.cpp" "tri_mesh.cpp" "di.cpp"
+        ${COMMON_FILES})
+create_single_source_cgal_program("di_refine.cpp" "tri_mesh.cpp" "di.cpp"
+        ${COMMON_FILES})        
+create_single_source_cgal_program("hillcar_gen.cpp" "tri_mesh.cpp" "hillcar.cpp"
+        ${COMMON_FILES})
 
-#create_single_source_cgal_program("car_gen.cpp" "tet_mesh.cpp" "misc.cpp" "io.cpp" "car.cpp" "simulator.cpp")
+#create_single_source_cgal_program("car_gen_3.cpp" "tet_mesh.cpp" "misc.cpp" "io.cpp" "car.cpp" "simulator.cpp")
 #create_single_source_cgal_program("tet_interp.cpp" "tet_mesh.cpp" "misc.cpp" "io.cpp")
 
-target_link_libraries(di_gen ${ARMADILLO_LIBRARIES} ${LibArchive_LIBRARIES} ${Boost_LIBRARIES})
-target_link_libraries(di_refine ${ARMADILLO_LIBRARIES} ${LibArchive_LIBRARIES} ${Boost_LIBRARIES})
-#target_link_libraries(car_gen ${ARMADILLO_LIBRARIES} ${LibArchive_LIBRARIES} ${Boost_LIBRARIES})
-#target_link_libraries(tet_interp ${ARMADILLO_LIBRARIES} ${LibArchive_LIBRARIES} ${Boost_LIBRARIES})
+list(APPEND CDISCRETE_LIBRARIES
+        ${ARMADILLO_LIBRARIES}
+        ${LibArchive_LIBRARIES}
+        ${Boost_LIBRARIES})
+
+target_link_libraries(di_gen ${CDISCRETE_LIBRARIES})
+target_link_libraries(di_refine ${CDISCRETE_LIBRARIES})
+target_link_libraries(hillcar_gen ${CDISCRETE_LIBRARIES})
+
+#target_link_libraries(car_gen_3 ${CDISCRETE_LIBRARIES})
+#target_link_libraries(tet_interp ${CDISCRETE_LIBRARIES})

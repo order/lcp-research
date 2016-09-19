@@ -27,9 +27,15 @@ def remove_comments(lines):
 def get_solution(nodes,faces,fn,mode):
     (N,_) = nodes.shape
     (M,) = fn.shape
-    assert(0 == M % N)
-    assert(M / N >= 3)    
-    F = np.reshape(fn,(N,M/N),order='F')
+    if 0 == M % (N+1):
+        assert M / (N+1) >= 3
+        F = np.reshape(fn,(N+1,M/(N+1)),order='F')
+        F = F[:-1,:]
+    else:
+        assert 0 == M % N
+        assert M / (N+1) >= 3
+        F = np.reshape(fn,(N,M/N),order='F')
+
     if mode == 'value':
         f = F[:,0]
         cmap = plt.get_cmap('spectral_r')
