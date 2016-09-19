@@ -19,10 +19,10 @@ import os.path
 ###############################################
 # Solvers
 def kojima_solve(lcp,**kwargs):
-    thresh   = kwargs.get('thresh',1e-12)
+    thresh   = kwargs.get('thresh',1e-8)
     max_iter = kwargs.get('max_iter',1000)
-    val_reg  = kwargs.get('val_reg',1e-15)
-    flow_reg = kwargs.get('flow_reg',1e-12)
+    val_reg  = kwargs.get('val_reg',1e-12)
+    flow_reg = kwargs.get('flow_reg',1e-10)
     
     (N,) = lcp.q.shape
     x0 = kwargs.get('x0',np.ones(N))

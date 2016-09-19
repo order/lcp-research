@@ -1,6 +1,8 @@
 #include "di.h"
 #include "misc.h"
 
+using namespace tri_mesh;
+
 DoubleIntegratorSimulator::DoubleIntegratorSimulator(const mat & bbox,
                                                      const mat &actions,
                                                      double noise_std,

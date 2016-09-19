@@ -279,9 +279,17 @@ Points TriMesh::get_face_centers() const{
   for(uint f = 0; f < F; f++){
     centers.row(f) = center_of_face(f).t();
   }
-  return centers;
+return centers;
 }
 
+Points TriMesh::get_cell_centers() const{
+  return get_face_centers(); // faces are the cells
+}
+
+
+umat TriMesh::get_cell_node_indices() const{
+  return m_faces;
+}
 
 void TriMesh::write_cgal(const string & filename) const{
   assert(m_frozen);
@@ -349,6 +357,9 @@ uint TriMesh::number_of_faces() const{
 uint TriMesh::number_of_vertices() const{
   return m_mesh.number_of_vertices();
 }
+uint TriMesh::number_of_cells() const{
+  return number_of_faces();
+}
 
 uint TriMesh::number_of_spatial_nodes() const{
   return number_of_vertices();
@@ -365,6 +376,8 @@ uint TriMesh::oob_node_index() const{
    */
   return m_mesh.number_of_vertices();
 }
+
+
 
 void TriMesh::freeze(){
   if(m_frozen){
@@ -474,7 +487,55 @@ vec TriMesh::prism_volume(const vec & vertex_function) const{
   return vol; 
 }
 
-mat TriMesh::face_grad(const vec & vertex_function) const{
+vec TriMesh::prism_max_volume(const vec & vertex_function) const{
+  // Volumn of a truncated right prism:
+  // V = A * (v_0 + v_1 + v_2) / 3.0
+  assert(m_frozen);
+
+  uint V = number_of_vertices();
+  uint F = number_of_faces();
+  assert(V == vertex_function.n_elem);
+  
+  vec vol = zeros<vec>(F);
+  VertexHandle vh;
+  uint f = 0;
+  uint vid = 0;
+  double area,max_fn;
+  CDT::Triangle t;
+  
+  for(FaceIterator fit = m_mesh.faces_begin();
+      fit != m_mesh.faces_end(); ++fit){    
+    t = m_mesh.triangle(fit);
+    area = std::abs(t.area());
+    max_fn = -datum::inf;
+    for(uint v = 0; v < TRI_NUM_VERT; v++){
+      vh = fit->vertex(v);
+      vid = m_vert_reg.at(vh);
+      max_fn = max(max_fn,vertex_function(vid));
+    }
+    vol(f++) = area*max_fn;
+  }
+  assert(f == F);
+  return vol; 
+}
+
+vec TriMesh::cell_area() const{
+  assert(m_frozen);
+  
+  uint F = number_of_faces();  
+  vec area = zeros<vec>(F);
+  CDT::Triangle t;
+  uint f = 0;
+  for(FaceIterator fit = m_mesh.faces_begin();
+      fit != m_mesh.faces_end(); ++fit){    
+    t = m_mesh.triangle(fit);
+    area(f++) = std::abs(t.area());
+  }
+  assert(f == F);
+  return area; 
+}
+
+mat TriMesh::cell_gradient(const vec & vertex_function) const{
   assert(m_frozen);
 
   uint V = number_of_vertices();

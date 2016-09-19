@@ -13,15 +13,17 @@ class HillcarSimulator : public Simulator{
  public:
   HillcarSimulator(const mat & bbox,
                             const mat &actions = vec{-1,1},
-                            double noise_std = 0.1,
+                            double noise_std = 0.25,
                             double step=0.01);
   mat get_costs(const Points & points) const;
+  vec get_state_weights(const Points & points) const;
   mat get_actions() const;
   void enforce_boundary(Points & points) const;
   Points next(const Points & points,
               const vec & actions) const;
-  sp_mat transition_matrix(const TriMesh & mesh,
-                           const vec & action) const;
+  sp_mat transition_matrix(const Discretizer *,
+                           const vec & action,
+                           bool include_oob) const;
 
   uint num_actions() const;
   uint dim_actions() const;

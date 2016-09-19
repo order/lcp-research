@@ -1,11 +1,31 @@
 #include "hillcar.h"
 #include "misc.h"
 
+#include "tri_mesh.h"
+using namespace tri_mesh;
+
 HillcarSimulator::HillcarSimulator(const mat & bbox,
                                                      const mat &actions,
                                                      double noise_std,
                                                      double step) :
   m_bbox(bbox),m_actions(actions),m_step(step),m_noise_std(noise_std){}
+
+vec HillcarSimulator::get_state_weights(const Points & points) const{
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  assert(TRI_NUM_DIM == D);
+
+  rowvec center = {-4.0,0.0};
+  vec l2_norm = lp_norm(points - repmat(center,N,1),2,1);
+  assert(N == l2_norm.n_elem);
+  assert(all(l2_norm >= 0));
+
+  vec weight = max(l2_norm) - l2_norm + 1e-3;
+  assert(all(weight >= 0));
+  weight /= accu(weight);
+  
+  return weight;
+}
 
 mat HillcarSimulator::get_costs(const Points & points) const{
   uint N = points.n_rows;
@@ -16,8 +36,9 @@ mat HillcarSimulator::get_costs(const Points & points) const{
   assert(N == l2_norm.n_elem);
   assert(all(l2_norm >= 0));
 
-  vec cost = min(ones<vec>(N),max(zeros<vec>(N),l2_norm - 0.5));
+  vec cost = min(ones<vec>(N),max(zeros<vec>(N),l2_norm - 0.1));
   mat costs = repmat(cost,1,2);
+  costs.col(0) += 1e-6;
   return costs;
 }
 
@@ -61,19 +82,22 @@ Points HillcarSimulator::next(const Points & points,
   return new_points;
 }
 
-sp_mat HillcarSimulator::transition_matrix(const TriMesh & mesh,
-                                                    const vec & action) const{
-  Points points = mesh.get_spatial_nodes();
-  uint N = points.n_rows;
+sp_mat HillcarSimulator::transition_matrix(const Discretizer * disc,
+                                           const vec & action,
+                                           bool include_oob) const{
+  assert(include_oob);
+  
+  Points points = disc->get_spatial_nodes();
+  uint N = disc->number_of_all_nodes();
+  uint n = disc->number_of_spatial_nodes();
   
   Points p_next = next(points,action);
-  ElementDist P = mesh.points_to_element_dist(p_next);
+  ElementDist P = disc->points_to_element_dist(p_next);
   // Final row is the OOB row
-  assert(size(N+1,N) == size(P));
-
-  sp_mat final_column = sp_mat(N+1,1);
+  assert(size(N,n) == size(P));
+  P = resize(P,N,N);
   
-  return join_horiz(P,sp_mat(N+1,1));
+  return P;
 }
 
 uint HillcarSimulator::num_actions() const{

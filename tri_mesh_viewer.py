@@ -41,10 +41,10 @@ def get_solution(nodes,faces,fn,mode):
         cmap = plt.get_cmap('spectral_r')
     elif mode == 'policy':
         f = np.argmin(F[:,1:],axis=1)
-        cmap = plt.get_cmap('Paired')
+        cmap = plt.get_cmap('spectral_r')
     elif mode == 'agg':
         f = np.sum(F[:,1:],axis=1)
-        cmap = plt.get_cmap('plasma')
+        cmap = plt.get_cmap('jet')
     else:
         print "Mode not recognized"
     assert(N == f.size)
@@ -99,7 +99,7 @@ def plot_solution_mesh(mesh_filename,soln_filename,mode,log):
     unarch = Unarchiver(soln_filename)
     (fn_data,cmap) = get_solution(nodes,faces,unarch.p,mode)
     if log:
-        fn_data = np.log(np.abs(fn_data))        
+        fn_data = np.log(np.abs(fn_data) + 1e-15)        
     assert(N == fn_data.size)
 
     fig = plt.gca()

@@ -46,29 +46,7 @@ void build_lcp(const po::variables_map & var_map,
   assert(4 == a_id);
   uint NUM_ACTIONS = a_id;
   
-  cout << "Building LCP..."<< endl;
-  block_sp_mat blk_M;
-  block_sp_row tmp_row;
-  blk_M.push_back(block_sp_row{sp_mat()}); 
-  for(uint i = 0; i < NUM_ACTIONS; i++){
-    // Build -E.T row
-    tmp_row.clear();
-    tmp_row.push_back(-E_vector.at(i).t());
-    for(uint j = 0; j < NUM_ACTIONS; j++){
-      tmp_row.push_back(sp_mat());
-    }
-    assert(NUM_ACTIONS + 1 == tmp_row.size());
-    // Add to end of growing matrix
-    blk_M.push_back(tmp_row);
-
-    // Add E to top row
-    blk_M.at(0).push_back(E_vector.at(i));
-  }
-  assert(NUM_ACTIONS+1 == blk_M.at(0).size());
-  assert(NUM_ACTIONS+1 == blk_M.size());
-  sp_mat M = bmat(blk_M);
-  assert(M.is_square());
-  assert((NUM_ACTIONS+1)*(N+1) == M.n_rows);
+  
 
   // Get costs for spatial nodes, and add oob node
   double tail_factor = 1.0 / (1.0 - gamma);

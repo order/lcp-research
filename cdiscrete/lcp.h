@@ -20,7 +20,7 @@ vector<sp_mat> build_E_blocks(const Simulator * sim,
                               bool include_oob);
 sp_mat build_M(const vector<sp_mat> & E_blocks);
 
-vec build_q(const Simulator * sim,
+vec build_q_vec(const Simulator * sim,
             const Discretizer * disc,
             double gamma,
             bool include_oob);

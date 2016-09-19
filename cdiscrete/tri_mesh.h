@@ -84,9 +84,12 @@ namespace tri_mesh{
     Points get_spatial_nodes() const;
     Points get_all_nodes() const;
     Points get_face_centers() const;
+    Points get_cell_centers() const;
+    umat get_cell_node_indices() const;
 
     uint number_of_faces() const;
     uint number_of_vertices() const;
+    uint number_of_cells() const;
     
     uint number_of_all_nodes() const;
     uint number_of_spatial_nodes() const;
@@ -100,7 +103,10 @@ namespace tri_mesh{
 
     vec face_diff(const vec & vertex_function) const;
     vec prism_volume(const vec & vertex_function) const;
-    mat face_grad(const vec & vertex_function) const;
+    vec prism_max_volume(const vec & vertex_function) const;
+    vec cell_area() const;
+
+    mat cell_gradient(const vec & vertex_function) const;
 
     void write_cgal(const string &) const;
     void read_cgal(const string &); 

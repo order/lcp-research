@@ -6,7 +6,6 @@
 
 using namespace arma;
 using namespace std;
-using namespace tri_mesh;
 
 class DoubleIntegratorSimulator : public Simulator{
  public:
@@ -23,7 +22,7 @@ class DoubleIntegratorSimulator : public Simulator{
                            const vec & action,
                            bool include_oob) const;
 
-  void add_bang_bang_curve(TriMesh & mesh,
+  void add_bang_bang_curve(tri_mesh::TriMesh & mesh,
                            uint num_curve_points) const;
 
   uint num_actions() const;

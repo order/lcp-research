@@ -7,7 +7,7 @@
 #include "misc.h"
 #include "io.h"
 #include "tri_mesh.h"
-#include "di.h"
+#include "hillcar.h"
 #include "refine.h"
 
 #include <boost/program_options.hpp>
@@ -16,7 +16,6 @@ namespace po = boost::program_options;
 using namespace std;
 using namespace arma;
 using namespace tri_mesh;
-
 
 po::variables_map read_command_line(uint argc, char** argv){
   po::options_description desc("Meshing options");
@@ -60,6 +59,8 @@ int main(int argc, char** argv)
   mesh.read_cgal(mesh_file);
   mesh.freeze();
   uint V = mesh.number_of_vertices();
+  uint N = mesh.number_of_all_nodes();
+  assert(N == V+1);
   uint F = mesh.number_of_faces();
   cout << "Mesh stats:"
        << "\n\tNumber of vertices: " << V
@@ -72,7 +73,7 @@ int main(int argc, char** argv)
   vec ub = bbox.col(1);
   cout << "\tLower bound:" << lb.t()
        << "\tUpper bound:" << ub.t();
-  DoubleIntegratorSimulator di = DoubleIntegratorSimulator(bbox,vec{-1,1});
+  HillcarSimulator hillcar = HillcarSimulator(bbox,vec{-1,1});
 
   // Read in solution information
   string soln_file = var_map["infile_base"].as<string>() + ".sol";
@@ -80,51 +81,54 @@ int main(int argc, char** argv)
   Unarchiver unarch(soln_file);
   vec p = unarch.load_vec("p");
 
+  Archiver arch;
+  
   // Make sure that the primal information makes sense
-  double p_over_v = ((double)p.n_elem / (double) V);
-  uint rem = p.n_elem % V;
+  mat P;
+  assert(0 == p.n_elem % N);
+  uint A = p.n_elem / N;
+  assert(A == 3);
   cout << "Blocking primal solution..."
        << "\n\tLength of primal solution: " << p.n_elem
-       << "\n\tRatio of primal length to vertex number: " << p_over_v
-       << "\n\tRemainder of above: " << rem << endl;
-  assert(p.n_elem == 3*V);  
-  mat P = reshape(p,size(V,3));
+       << "\n\tRatio of primal length to vertex number: " << A << endl;
+  P = reshape(p,size(N,A));
+  P = P.head_rows(V); // Prune off OOB
   vec value = P.col(0);
   mat flows = P.tail_cols(2);
 
-  
   // Heuristic calculations
-  Archiver arch;
   cout << "Calculating splitting heuristic..." << endl;
-
   // Policy disagreement
   cout << "Finding policy disagreements..." << endl;
   uvec f_pi = flow_policy(&mesh,flows);  
-  uvec g_pi = grad_policy(&mesh,&di,value);
-  uvec q_pi = q_policy(&mesh,&di,value,0.997);
-  uvec policy_agg = f_pi + 2*g_pi + 4*q_pi;
+  uvec g_pi = grad_policy(&mesh,&hillcar,value);
+  uvec q_pi = q_policy(&mesh,&hillcar,value,0.997);
+  uvec policy_agg = f_pi + g_pi  + q_pi;
   arch.add_uvec("policy_agg",policy_agg);
-  policy_agg = vec_mod(policy_agg,7); // 0 if all policies agree
+  policy_agg = vec_mod(policy_agg,3); // 0 if all policies agree
 
+  mat grad = mesh.cell_gradient(value);
+  arch.add_vec("grad_x",grad.col(0));
+  arch.add_vec("grad_y",grad.col(1));
 
   // Bellman residual
   cout << "\tBellman residual at centroids..." << endl;
-  vec bell_res = bellman_residual(&mesh,&di,value,0.997,0,25);
+  vec bell_res = bellman_residual(&mesh,&hillcar,value,0.997,0,25);
   arch.add_vec("bellman_residual",bell_res);
 
   // Advantage function
-  vec adv_res = advantage_residual(&mesh,&di,value,0.997,25);
-  arch.add_vec("advantage_residual",adv_res);
-
+  //vec adv_res = advantage_residual(&mesh,&hillcar,value,0.997,15);
+  //arch.add_vec("advantage_residual",adv_res);
+  
+  vec adv_fun = advantage_function(&mesh,&hillcar,value,0.997,0,25);
+  arch.add_vec("advantage_function",adv_fun);
+  
   // Volume of the aggregate flow
   cout << "\tFlow volume..." << endl;
   vec flow_vol = mesh.prism_volume(sum(flows,1));
   arch.add_vec("flow_vol",flow_vol);
 
-  //
-  vec heuristic_1 = bell_res % pow(flow_vol,0.5);
-  heuristic_1(find(policy_agg != 0)) *= 4;
-  assert(F == heuristic_1.n_elem);
+  vec heuristic_1 = bell_res % sqrt(flow_vol);
   arch.add_vec("heuristic_1",heuristic_1);
 
   cout << "Finding heuristic_1 0.95 quantile..." << endl;
@@ -133,17 +137,17 @@ int main(int argc, char** argv)
        << "\n\t Max:" << max(heuristic_1)
        << "\n\t Min:" << min(heuristic_1) << endl;
 
-  vec heuristic_2 = adv_res % pow(flow_vol,0.5);
-  heuristic_2(find(policy_agg != 0)) *= 4;
+  vec heuristic_2 = adv_fun % flow_vol;
+  heuristic_2(find(policy_agg == 0)).fill(0);
   assert(F == heuristic_2.n_elem);
   arch.add_vec("heuristic_2",heuristic_2); 
  
-  cout << "Finding heuristic_2 0.95 quantile..." << endl;
-  double cutoff_2 = quantile(heuristic_2,0.95);
+  cout << "Finding heuristic_2 0.9 quantile..." << endl;
+  double cutoff_2 = quantile(heuristic_2,0.9);
   cout << "\t Cutoff_2: " << cutoff_2
        << "\n\t Max:" << max(heuristic_2)
        << "\n\t Min:" << min(heuristic_2) << endl;
-  
+  cutoff_2 = max(cutoff_2,1e-5);
 
   // Split the cells if they have a large heuristic_1 or
   // policies disagree on them.
@@ -151,7 +155,9 @@ int main(int argc, char** argv)
   Point center;
   uint new_nodes = 0;
   for(uint f = 0; f < F; f++){
-    if(heuristic_1(f) > cutoff_1 or heuristic_2(f) > cutoff_2){
+    if(heuristic_1(f) > cutoff_1
+       or heuristic_2(f) > cutoff_2){
+      //or policy_agg(f) != 0){
       // Get center from old mesh
       center = convert(mesh.center_of_face(f));
       // Insert center into new mesh.

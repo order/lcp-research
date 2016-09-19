@@ -14,11 +14,21 @@ typedef sp_mat ElementDist;
 class Discretizer{
  public:
   virtual Points get_spatial_nodes() const = 0;
+  virtual Points get_cell_centers() const = 0;
+  virtual umat get_cell_node_indices() const = 0;
+
   virtual uint number_of_all_nodes() const = 0;
   virtual uint number_of_spatial_nodes() const = 0;
+  virtual uint number_of_cells() const = 0;
+  
   virtual ElementDist points_to_element_dist(const Points &) const = 0;
   virtual vec interpolate(const Points & points,
                           const vec & values) const = 0;
+  virtual mat interpolate(const Points & points,
+                          const mat & values) const = 0;
+  virtual mat find_bounding_box() const = 0;
+
+  virtual mat cell_gradient(const vec & value) const = 0;
 };
 
   struct BaryCoord{

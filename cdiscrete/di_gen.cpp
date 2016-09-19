@@ -6,6 +6,8 @@
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
+using namespace tri_mesh;
+
 DoubleIntegratorSimulator build_di_simulator(const po::variables_map & var_map){
   double B = var_map["boundary"].as<double>();
   mat bbox = mat(2,2);
@@ -71,7 +73,7 @@ po::variables_map read_command_line(uint argc, char** argv){
      "Discount factor")
     ("boundary,B", po::value<double>()->default_value(5.0),
      "Square boundary box [-B,B]^2")
-    ("bang_points,b", po::value<uint>()->default_value(0),
+    ("bang_points,b", po::value<uint>()->default_value(10),
      "Number of bang-bang curve points to add to initial mesh");
   po::variables_map var_map;
   po::store(po::parse_command_line(argc, argv, desc), var_map);

@@ -40,6 +40,7 @@ mat estimate_Q(const Points & points,
                const Simulator * sim,
                const vec & values,
                double gamma,
-               uint samples);
+               int steps=0,
+               uint samples=25);
 
 #endif
