@@ -4,6 +4,7 @@
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
+using namespace tet_mesh;
 
 TetMesh read_mesh(const string & mesh_file){
   TetMesh mesh;
@@ -14,7 +15,7 @@ TetMesh read_mesh(const string & mesh_file){
   cout << "Mesh stats:" << endl;
   cout << "\tNumber of vertices: " << mesh.number_of_vertices() << endl;
   cout << "\tNumber of tetrahedra: " << mesh.number_of_cells() << endl;
-  mat bounds = mesh.find_box_boundary();
+  mat bounds = mesh.find_bounding_box();
   vec lb = bounds.col(0);
   vec ub = bounds.col(1);
   cout << "\tLower bound:" << lb.t();
@@ -44,7 +45,7 @@ vec read_values(const TetMesh & mesh,
     cout << "Values only provided for vertices, filling in..." << endl;
     values = join_vert(values,vec{oob});
   }
-  assert(values.n_elem == mesh.number_of_nodes());
+  assert(values.n_elem == mesh.number_of_all_nodes());
   
   return values; 
 }

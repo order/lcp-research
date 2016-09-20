@@ -3,44 +3,29 @@
 #include "io.h"
 #include "car.h"
 
+using namespace tet_mesh;
+
 ////////////////////////////////////////////////
 // CGAL <-> Armadillo conversion routines
 
-VertexVec point_to_vertex_vec(const Point & p){
-  return VertexVec {p[0],p[1],p[2]};
+vec tet_mesh::point_to_vertex_vec(const Point & p){
+  return vec {p[0],p[1],p[2]};
 }
 
-template<typename T> Point vec_to_point(const T & point){
+template<typename T> Point tet_mesh::vec_to_point(const T & point){
   assert(TET_NUM_DIM == point.n_elem);
   return Point(point[0],point[1],point[2]);
 }
-template Point vec_to_point<VertexVec>(const VertexVec & point);
-template Point vec_to_point<vec>(const vec & point);
+template Point tet_mesh::vec_to_point<vec>(const vec & point);
 
-VertexMat tet_to_vertex_mat(const CellHandle & tet){
-  VertexMat vertex_mat;
+mat tet_mesh::tet_to_vertex_mat(const CellHandle & tet){
+  mat vertex_mat;
   for(uint v = 0; v < TET_NUM_VERT; v++){
     for(uint d = 0; d < TET_NUM_DIM; d++){
       vertex_mat(v,d) = tet->vertex(v)->point()[d];
     }
   }
   return vertex_mat;
-}
-
-//////////////////////////////////////////////////
-// Barycentric coord structure constructors
-TetBaryCoord::TetBaryCoord():oob(true){}
-TetBaryCoord::TetBaryCoord(bool o, TetVertIndexVec i, CoordVec w) :
-  oob(o),indices(i),weights(w){}
-
-ostream& operator<< (ostream& os, const TetBaryCoord& coord){
-  if(coord.oob){
-    os << "OOB" << endl;
-  }
-  else{
-    os << coord.indices.t() << coord.weights.t();
-  }
-  return os;
 }
 
 /////////////////////////////////////////////////
@@ -75,10 +60,10 @@ ElementDist TetMesh::points_to_element_dist(const Points & points,
 
   uint N = points.n_rows;
   uint oob_idx = oob_node_index();
-  uint M = number_of_nodes();
+  uint M = number_of_all_nodes();
 
   Point p;
-  TetBaryCoord coord;
+  BaryCoord coord;
 
   // Set up sparse matrix via row indices and col pointers.
   // Assume elements are visited in col sorted order,
@@ -124,15 +109,15 @@ ElementDist TetMesh::points_to_element_dist(const Points & points,
   return sp_mat(row_idx_uvec,col_ptr_uvec,data_vec,M,N);
 }
 
-template <typename T> T TetMesh::interpolate(const Points & points,
-                                             const T& data) const{
+template <typename T> T TetMesh::base_interpolate(const Points & points,
+                                                  const T& data) const{
   assert(m_frozen);
   
   uint N = points.n_rows;
   uint d = points.n_cols;
   assert(TET_NUM_DIM == d);
   
-  uint NN = number_of_nodes();
+  uint NN = number_of_all_nodes();
   assert(data.n_rows == NN); // Should include oob info
   
   ElementDist dist = points_to_element_dist(points);
@@ -143,10 +128,14 @@ template <typename T> T TetMesh::interpolate(const Points & points,
   assert(ret.n_cols == data.n_cols);
   return ret;
 }
-template mat TetMesh::interpolate<mat>(const Points &, const mat&) const;
-template vec TetMesh::interpolate<vec>(const Points &, const vec&) const;
+vec TetMesh::interpolate(const Points & points, const vec & data) const{
+  return base_interpolate<vec>(points,data);
+}
+mat TetMesh::interpolate(const Points & points, const mat & data) const{
+  return base_interpolate<mat>(points,data);
+}
 
-TetBaryCoord TetMesh::barycentric_coord(const Point & point) const{  
+BaryCoord TetMesh::barycentric_coord(const Point & point) const{  
   assert(m_frozen);
   // Locate cell
   int li,lj;
@@ -157,28 +146,28 @@ TetBaryCoord TetMesh::barycentric_coord(const Point & point) const{
   if(loc == Triangulation::OUTSIDE_CONVEX_HULL
      or loc == Triangulation::OUTSIDE_AFFINE_HULL
      or m_mesh.is_infinite(tet)){
-    return TetBaryCoord(); // Out of bounds
+    return BaryCoord(true,uvec(),vec()); // Out of bounds
   }
 
   uint tet_id = m_cell_reg.at(tet);
-  TetVertIndexVec vert_idx = m_cells.row(tet_id).t();
+  umat vert_idx = m_cells.row(tet_id).t();
   assert(vert_idx.is_sorted());
-  VertexMat V = get_vertex_mat(tet_id);
+  mat V = get_vertex_mat(tet_id);
 
   // Build the barycentric coordinate system
-  VertexVec v0 = V.row(0).t();
-  arma::mat::fixed<TET_NUM_DIM,TET_NUM_DIM> T;
+  vec v0 = V.row(0).t();
+  mat T;
   T = V.tail_rows(TET_NUM_DIM).t();
   T = T.each_col() - v0;
 
   // Solve the barycentric system
-  VertexVec pvec = point_to_vertex_vec(point);
-  arma::vec::fixed<TET_NUM_DIM> partial_coords = arma::solve(T,pvec-v0);
+  vec pvec = point_to_vertex_vec(point);
+  vec partial_coords = arma::solve(T,pvec-v0);
 
   // Solution only gives the last 3 components of the coordinate system
   // First component is 1 - the sum of the last three
   double agg = arma::sum(partial_coords);
-  CoordVec coords;
+  vec coords;
   coords(0) = 1.0 - agg;
   coords.tail(3) = partial_coords;
   
@@ -194,15 +183,15 @@ TetBaryCoord TetMesh::barycentric_coord(const Point & point) const{
   assert(all(coords <= 1));
   
   // Check the reconstruction error
-  VertexVec recon = V.t() * coords;
+  vec recon = V.t() * coords;
   if(accu(abs(recon-pvec)) > PRETTY_SMALL){
     cout << "Abs reconstruction error: " << accu(abs(recon-pvec)) << endl;
     assert(approx_equal(recon,pvec,"absdiff",PRETTY_SMALL));
   }  
-  return TetBaryCoord(false,vert_idx,coords);
+  return BaryCoord(false,vert_idx,coords);
 }
 
-VertexHandle TetMesh::insert(const VertexVec & pvec){
+VertexHandle TetMesh::insert(const vec & pvec){
   assert(not m_frozen);
   m_dirty = true;
   return insert(Point(pvec(0),pvec(1),pvec(2)));
@@ -214,23 +203,23 @@ VertexHandle TetMesh::insert(const Point & p){
   return m_mesh.insert(p);
 }
 
-VertexMat TetMesh::get_vertex_mat(uint tet_id) const{
+mat TetMesh::get_vertex_mat(uint tet_id) const{
   assert(m_frozen);
   uvec vert_idx = m_cells.row(tet_id).t();
   assert(TET_NUM_VERT == vert_idx.n_elem);
   assert(vert_idx.is_sorted());
   
-  VertexMat V;
+  mat V;
   for(uint v = 0; v < TET_NUM_VERT; v++){
     V.row(v) = m_nodes.row(vert_idx(v));
   }
   return V;
 }
 
-VertexVec TetMesh::center_of_cell(uint tet_id) const{
+vec TetMesh::center_of_cell(uint tet_id) const{
   assert(m_frozen);
 
-  VertexMat V = get_vertex_mat(tet_id);
+  mat V = get_vertex_mat(tet_id);
   return sum(V,0).t() / TET_NUM_VERT;
 }
 
@@ -253,6 +242,109 @@ Points TetMesh::get_cell_centers() const{
   }
   return centers;
 }
+umat TetMesh::get_cell_node_indices() const{
+  return m_cells;
+}
+
+mat TetMesh::find_bounding_box() const{
+  assert(m_frozen);
+  mat bounds = mat(TET_NUM_DIM,2);
+
+  uint spatial_nodes = number_of_vertices();
+  for(uint d = 0; d < TET_NUM_DIM; d++){
+    bounds(d,0) = min(m_nodes.col(d).head(spatial_nodes));
+    bounds(d,1) = max(m_nodes.col(d).head(spatial_nodes));
+  }
+  return bounds;
+}
+
+vec TetMesh::prism_volume(const vec & vertex_function) const{
+  // Volumn of a truncated right prism:
+  // V = A * (v_0 + v_1 + v_2) / 3.0
+  assert(m_frozen);
+
+  uint V = number_of_vertices();
+  uint C = number_of_cells();
+  assert(V == vertex_function.n_elem);
+  
+  vec volume = zeros<vec>(C);
+  VertexHandle vh;
+  uint c = 0;
+  uint vid = 0;
+  double vol,mean_fn;
+  Triangulation::Tetrahedron t;
+  
+  for(CellIterator cit = m_mesh.finite_cells_begin();
+      cit != m_mesh.finite_cells_end(); ++cit){    
+    t = m_mesh.tetrahedron(cit);
+    vol = std::abs(t.volume());
+    mean_fn = 0;
+    for(uint v = 0; v < TET_NUM_VERT; v++){
+      vh = cit->vertex(v);
+      vid = m_vert_reg.at(vh);
+      mean_fn = vertex_function(vid) / (double)TET_NUM_VERT;
+    }
+    volume(c++) = vol * mean_fn;
+  }
+  assert(c == C);
+  return volume; 
+}
+vec TetMesh::cell_volume() const{
+  assert(m_frozen);
+  
+  uint C = number_of_cells();  
+  vec volume = zeros<vec>(C);
+  Triangulation::Tetrahedron t;
+
+  uint c = 0;
+  for(CellIterator cit = m_mesh.finite_cells_begin();
+      cit != m_mesh.finite_cells_end(); ++cit){    
+    t = m_mesh.tetrahedron(cit);
+    volume(c++) = std::abs(t.volume());
+  }
+  assert(c == C);
+  return volume; 
+}
+
+mat TetMesh::cell_gradient(const vec & vertex_function) const{
+  assert(m_frozen);
+
+  uint V = number_of_vertices();
+  uint C = number_of_cells();
+  assert(V == vertex_function.n_elem);
+  
+  mat grad = mat(C,TET_NUM_DIM);
+  VertexHandle vh;
+  uint vid;
+  vec f = vec(TET_NUM_VERT);
+  mat points = mat(TET_NUM_VERT,TET_NUM_DIM);
+  mat A = mat(TET_NUM_DIM,TET_NUM_DIM);
+  vec b = vec(TET_NUM_DIM);
+
+  uint cid = 0;
+  for(CellIterator cit = m_mesh.finite_cells_begin();
+      cit != m_mesh.finite_cells_end(); ++cit){   
+    // Gather function and point information
+    for(uint v = 0; v < TET_NUM_VERT; v++){
+      vh = cit->vertex(v);
+      vid = m_vert_reg.at(vh);
+      f(v) = vertex_function(vid);
+      for(uint d = 0; d < TET_NUM_DIM; d++){
+        points(v,d) = vh->point()[d];
+      }
+    }
+    // Set up linear equation
+    for(uint i = 0; i < TET_NUM_DIM; i++){
+      A.row(i) = points.row(i+1) - points.row(0);
+      b(i) = f(i+1) - f(0);
+    }
+    // Solve linear equation for gradient
+    grad.row(cid++) = solve(A,b,solve_opts::fast).t();
+  }
+  assert(cid == C);
+  return grad; 
+}
+
 
 void TetMesh::write_cgal(const string & filename) const{
   assert(m_frozen);
@@ -279,7 +371,11 @@ uint TetMesh::number_of_vertices() const{
   return m_mesh.number_of_vertices();
 }
 
-uint TetMesh::number_of_nodes() const{
+uint TetMesh::number_of_spatial_nodes() const{
+  return m_mesh.number_of_vertices();
+}
+
+uint TetMesh::number_of_all_nodes() const{
   // Number of spatial vertices + 1 oob node
   return number_of_vertices() + 1;
 } 
@@ -346,15 +442,4 @@ void TetMesh::regen_caches(){
   m_dirty = false;
 }
 
-mat TetMesh::find_box_boundary() const{
-  assert(m_frozen);
-  mat bounds = mat(TET_NUM_DIM,2);
-
-  uint spatial_nodes = number_of_vertices();
-  for(uint d = 0; d < TET_NUM_DIM; d++){
-    bounds(d,0) = min(m_nodes.col(d).head(spatial_nodes));
-    bounds(d,1) = max(m_nodes.col(d).head(spatial_nodes));
-  }
-  return bounds;
-}
 

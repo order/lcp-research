@@ -31,18 +31,18 @@ class Discretizer{
   virtual mat cell_gradient(const vec & value) const = 0;
 };
 
-  struct BaryCoord{
-    /*
-      Holds the barycentric coordinates. These are the unique weights describing
-      a point as a convex combination of vertices in the enclosed face.
-      Also indicates if the 
-    */
-    BaryCoord();
-    BaryCoord(bool,const uvec&,const vec&);
-    bool oob;
-    uvec indices;
-    vec  weights;
-  };
-  ostream& operator<< (ostream& os, const BaryCoord& coord);
+struct BaryCoord{
+  /*
+    Holds the barycentric coordinates. These are the unique weights describing
+    a point as a convex combination of vertices in the enclosed face.
+    Also indicates if the 
+  */
+  BaryCoord();
+  BaryCoord(bool,const uvec&,const vec&);
+  bool oob;
+  uvec indices;
+  vec  weights;
+};
+ostream& operator<< (ostream& os, const BaryCoord& coord);
 
 #endif
