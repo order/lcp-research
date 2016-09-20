@@ -8,16 +8,7 @@ namespace po = boost::program_options;
 
 #include "tri_mesh.h"
 using namespace tri_mesh;
-
-mat hillcar_bounding_box(){
-  return {{-6,2},{-5,5}};
-}
-
-HillcarSimulator build_hillcar_simulator(const po::variables_map & var_map){
-  mat bbox = hillcar_bounding_box();
-  mat actions = vec{-1.5,1.5};
-  return HillcarSimulator(bbox,actions);
-}
+using namespace hillcar;
 
 void generate_initial_mesh(const po::variables_map & var_map,
                            TriMesh & mesh){
@@ -25,8 +16,7 @@ void generate_initial_mesh(const po::variables_map & var_map,
   double length = var_map["mesh_length"].as<double>();
 
   cout << "Initial meshing..."<< endl;
-  mat bbox = hillcar_bounding_box();
-  mesh.build_box_boundary(bbox);
+  mesh.build_box_boundary(HILLCAR_BBOX);
   VertexHandle v_zero = mesh.insert(Point(0,0));
   
   cout << "Refining based on (" << angle
@@ -60,9 +50,7 @@ po::variables_map read_command_line(uint argc, char** argv){
     ("mesh_angle", po::value<double>()->default_value(0.125),
      "Mesh angle refinement criterion")
     ("mesh_length", po::value<double>()->default_value(1),
-     "Mesh edge length refinement criterion")    
-    ("gamma,g", po::value<double>()->default_value(0.999),
-     "Discount factor");
+     "Mesh edge length refinement criterion");
   po::variables_map var_map;
   po::store(po::parse_command_line(argc, argv, desc), var_map);
   po::notify(var_map);
@@ -81,7 +69,7 @@ int main(int argc, char** argv)
 {
   po::variables_map var_map = read_command_line(argc,argv);
 
-  HillcarSimulator hillcar = build_hillcar_simulator(var_map);
+  HillcarSimulator hillcar = HillcarSimulator(HILLCAR_BBOX,HILLCAR_ACTIONS);
   
   TriMesh mesh;
   if(var_map.count("mesh_file")){
@@ -96,18 +84,16 @@ int main(int argc, char** argv)
   mesh.freeze();
 
   mat bbox = hillcar.get_bounding_box();
-  
   cout << "Mesh stats:" << endl;
   cout << "\tNumber of vertices: " << mesh.number_of_vertices() << endl;
   cout << "\tNumber of faces: " << mesh.number_of_faces() << endl;
   cout << "\tLower bound:" << bbox.col(0).t();
   cout << "\tUpper bound:" << bbox.col(1).t();
 
-  double gamma = var_map["gamma"].as<double>();
   bool include_oob = true;
   LCP L = build_lcp(&hillcar,
                     &mesh,
-                    gamma,
+                    HILLCAR_GAMMA,
                     include_oob);
   string filename = var_map["outfile_base"].as<string>() + ".lcp";
   L.write(filename);

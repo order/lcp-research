@@ -6,8 +6,8 @@
 
 #include "misc.h"
 #include "io.h"
-#include "tri_mesh.h"
-#include "hillcar.h"
+#include "tet_mesh.h"
+#include "dubins.h"
 #include "refine.h"
 
 #include <boost/program_options.hpp>
@@ -16,7 +16,6 @@ namespace po = boost::program_options;
 using namespace std;
 using namespace arma;
 using namespace tri_mesh;
-using namespace hillcar;
 
 po::variables_map read_command_line(uint argc, char** argv){
   po::options_description desc("Meshing options");
@@ -69,12 +68,7 @@ int main(int argc, char** argv)
        << endl;
 
   // Find boundary from the mesh and create the simulator object
-  mat bbox = mesh.find_bounding_box();
-  vec lb = bbox.col(0);
-  vec ub = bbox.col(1);
-  cout << "\tLower bound:" << lb.t()
-       << "\tUpper bound:" << ub.t();
-  HillcarSimulator hillcar = HillcarSimulator(bbox,HILLCAR_ACTIONS);
+  HillcarSimulator hillcar = HillcarSimulator(bbox,vec{-1,1});
 
   // Read in solution information
   string soln_file = var_map["infile_base"].as<string>() + ".sol";
@@ -103,7 +97,7 @@ int main(int argc, char** argv)
   cout << "Finding policy disagreements..." << endl;
   uvec f_pi = flow_policy(&mesh,flows);  
   uvec g_pi = grad_policy(&mesh,&hillcar,value);
-  uvec q_pi = q_policy(&mesh,&hillcar,value,HILLCAR_GAMMA);
+  uvec q_pi = q_policy(&mesh,&hillcar,value,0.997);
   uvec policy_agg = f_pi + g_pi  + q_pi;
   arch.add_uvec("policy_agg",policy_agg);
   policy_agg = vec_mod(policy_agg,3); // 0 if all policies agree
@@ -114,14 +108,14 @@ int main(int argc, char** argv)
 
   // Bellman residual
   cout << "\tBellman residual at centroids..." << endl;
-  vec bell_res = bellman_residual(&mesh,&hillcar,value,HILLCAR_GAMMA,0,25);
+  vec bell_res = bellman_residual(&mesh,&hillcar,value,0.997,0,25);
   arch.add_vec("bellman_residual",bell_res);
 
   // Advantage function
-  //vec adv_res = advantage_residual(&mesh,&hillcar,value,HILLCAR_GAMMA,15);
+  //vec adv_res = advantage_residual(&mesh,&hillcar,value,0.997,15);
   //arch.add_vec("advantage_residual",adv_res);
   
-  vec adv_fun = advantage_function(&mesh,&hillcar,value,HILLCAR_GAMMA,0,25);
+  vec adv_fun = advantage_function(&mesh,&hillcar,value,0.997,0,25);
   arch.add_vec("advantage_function",adv_fun);
   
   // Volume of the aggregate flow

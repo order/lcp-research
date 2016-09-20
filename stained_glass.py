@@ -196,6 +196,8 @@ if __name__ == "__main__":
         else:
             v = unarch.p
         # Should be a multiple of (V+1)
+        print v.size
+        print V
         r = v.size % (V+1)
         assert 0 == r
         A = v.size / (V+1)

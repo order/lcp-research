@@ -67,6 +67,10 @@ uvec vec_mod(const uvec & a, uint n){
   return a - (a / n) * n;
 }
 
+vec vec_mod(const vec & a, double n){
+  return a - floor(a / n) * n;
+}
+
 template<typename V> bvec in_interval(const V & x,
 				      double lb,
 				      double ub){

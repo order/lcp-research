@@ -61,8 +61,8 @@ void wrap(Points & points,
     assert(lb(idx) < ub(idx));
     
     points.col(idx) -= lb(idx); // p - l
-    points.col(idx) -= floor(points.col(idx)
-                           / (ub(idx) - lb(idx))); // (p-l) % (u-l)
+    points.col(idx) = vec_mod(points.col(idx),
+                              ub(idx) - lb(idx));
     points.col(idx) += lb(idx);    // (p-l) % (u-l) + l
     
     assert(not any(points.col(idx) > ub(idx)));

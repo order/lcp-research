@@ -3,6 +3,7 @@
 
 #include "tri_mesh.h"
 using namespace tri_mesh;
+using namespace hillcar;
 
 HillcarSimulator::HillcarSimulator(const mat & bbox,
                                                      const mat &actions,
@@ -110,12 +111,12 @@ mat HillcarSimulator::get_bounding_box() const{
   return m_bbox;
 }
 
-vec triangle_wave(vec x, double P, double A){
+vec hillcar::triangle_wave(vec x, double P, double A){
   x /= P;
   return A * ( 2* abs(2 * (x - floor(x + 0.5))) - 1);
 }
 
-vec triangle_slope(vec x){
+vec hillcar::triangle_slope(vec x){
   double P = 8.0; // Period
   double A = 1.0; // Amplitude
   double T = 0.05; // Threshold for soft thresh

@@ -1,7 +1,6 @@
 #include "tet_mesh.h"
 #include "misc.h"
 #include "io.h"
-#include "car.h"
 
 using namespace tet_mesh;
 
@@ -167,7 +166,7 @@ BaryCoord TetMesh::barycentric_coord(const Point & point) const{
   // Solution only gives the last 3 components of the coordinate system
   // First component is 1 - the sum of the last three
   double agg = arma::sum(partial_coords);
-  vec coords;
+  vec coords = vec(TET_NUM_VERT);
   coords(0) = 1.0 - agg;
   coords.tail(3) = partial_coords;
   
@@ -208,12 +207,16 @@ mat TetMesh::get_vertex_mat(uint tet_id) const{
   uvec vert_idx = m_cells.row(tet_id).t();
   assert(TET_NUM_VERT == vert_idx.n_elem);
   assert(vert_idx.is_sorted());
+  uint V = number_of_spatial_nodes();
   
-  mat V;
+  mat vert_mat = mat(TET_NUM_VERT,TET_NUM_DIM);
+  uint v_id;
   for(uint v = 0; v < TET_NUM_VERT; v++){
-    V.row(v) = m_nodes.row(vert_idx(v));
+    v_id = vert_idx(v);
+    assert(v_id < V);
+    vert_mat.row(v) = m_nodes.row(v_id);
   }
-  return V;
+  return vert_mat;
 }
 
 vec TetMesh::center_of_cell(uint tet_id) const{
