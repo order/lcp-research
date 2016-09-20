@@ -124,6 +124,9 @@ must have a mirror tet in CW order; see the mirror tet routines for
 more information
 """
 def write_cgal_tri(filename,vertices,tetrahedra,neighbors):
+    print "Writing to CGAL::TRI file"
+    print "\tVertices",len(vertices)
+    print "\tTetrahedra",len(tetrahedra)
     V = len(vertices)
     assert V > 0
     D = len(vertices[0])
@@ -150,6 +153,9 @@ def write_cgal_tri(filename,vertices,tetrahedra,neighbors):
     fh.close()
 
 def write_inria_mesh(filename,vertices,triangles,tetrahedra):
+    print "Writing to INRIA mesh"
+    print "\tVertices",len(vertices)
+    print "\tTetrahedra",len(tetrahedra)
     names = ['Vertices','Triangles','Tetrahedra']
     SS = []
     SS.append("MeshVersionFormatted 1") # ?
@@ -358,56 +364,56 @@ def remove_infinite_tetrahedra(tetrahedra):
 ##################################################################################
 # Command line stuff
 
+def convert_ctri_to_mesh(ctrifile,meshfile):
+    print 'Reading in from CGAL::Triangulation_3 format...'
+    (vertices,tetrahedra,neighbors) = read_cgal_tri(ctrifile)
+    print '\tNumber of vertices:',len(vertices)-1
+    print '\tTotal number of tetrahedra:',len(tetrahedra)
+    triangles = generate_boundary_triangles(vertices,tetrahedra)
+    print '\tNumber of implied triangles:',len(triangles)
+    tetrahedra = remove_infinite_tetrahedra(tetrahedra)
+    print '\tNumber of finite tetrahedra:',len(tetrahedra)
+    
+    # Shouldn't be necessary
+    mirror = build_mirror(tetrahedra)
+    reorient_tetrahedras(vertices,tetrahedra,mirror)
+
+    ext = meshfile.rsplit('.',1)[1]
+    assert('mesh' == ext)
+    
+    write_inria_mesh(meshfile,vertices,triangles,tetrahedra)
+
+def convert_mesh_to_ctri(meshfile,ctrifile):
+    print 'Reading in from INRIA .mesh (Medit) format...'
+    (vertices,triangles,tetrahedra) = read_inria_mesh(meshfile)
+    print '\tNumber of vertices:',len(vertices)-1
+    print '\tNumber of triangles:',len(triangles)
+    print '\tNumber of tetrahedra:',len(tetrahedra)
+    mirror = build_mirror(tetrahedra)
+    infinite_tetrahedra = generate_infinite_tetrahedra(mirror)
+    tetrahedra.extend(infinite_tetrahedra)
+    print '\tTotal number of tetrahedra:',len(tetrahedra)
+
+    # Rebuild the mirror
+    mirror = build_mirror(tetrahedra)
+    reorient_tetrahedras(vertices,tetrahedra,mirror)
+    neighbors = generate_neighbors(tetrahedra,mirror)
+
+    ext = ctrifile.rsplit('.',1)[1]
+    assert('ctri' == ext)
+    
+    write_cgal_tri(ctrifile,vertices,tetrahedra,neighbors)      
+
 if __name__ == "__main__":
 
     (_,infile,outfile) = sys.argv
 
     # Read in files and generate missing information
     in_ext = infile.rsplit('.',1)[1]
-    mirror = None
-
     if in_ext == 'ctri':
-        print 'Reading in from CGAL::Triangulation_3 format...'
-        (vertices,tetrahedra,neighbors) = read_cgal_tri(infile)
-        print '\tNumber of vertices:',len(vertices)-1
-        print '\tTotal number of tetrahedra:',len(tetrahedra)
-        triangles = generate_boundary_triangles(vertices,tetrahedra)
-        print '\tNumber of implied triangles:',len(triangles)
-        tetrahedra = remove_infinite_tetrahedra(tetrahedra)
-        print '\tNumber of finite tetrahedra:',len(tetrahedra)
-
-        # Shouldn't be necessary
-        mirror = build_mirror(tetrahedra)
-        reorient_tetrahedras(vertices,tetrahedra,mirror)
-        
+        convert_ctri_to_mesh(infile,outfile)
     elif in_ext == 'mesh':
-        print 'Reading in from INRIA .mesh (Medit) format...'
-        (vertices,triangles,tetrahedra) = read_inria_mesh(infile)
-        print '\tNumber of vertices:',len(vertices)-1
-        print '\tNumber of triangles:',len(triangles)
-        print '\tNumber of tetrahedra:',len(tetrahedra)
-        mirror = build_mirror(tetrahedra)
-        infinite_tetrahedra = generate_infinite_tetrahedra(mirror)
-        tetrahedra.extend(infinite_tetrahedra)
-        print '\tTotal number of tetrahedra:',len(tetrahedra)
-
-        # Rebuild the mirror
-        mirror = build_mirror(tetrahedra)
-        reorient_tetrahedras(vertices,tetrahedra,mirror)
-
-        neighbors = generate_neighbors(tetrahedra,mirror)
+        convert_mesh_to_ctri(infile,outfile)
     else:
         print "Unrecognized input extension:",in_ext
-        quit()
-        
-    out_ext = outfile.rsplit('.',1)[1]
-    assert(out_ext != in_ext) # What's the point of this?
-    
-    if out_ext == 'ctri':
-        write_cgal_tri(outfile,vertices,tetrahedra,neighbors)      
-    elif out_ext == 'mesh':
-        
-        write_inria_mesh(outfile,vertices,triangles,tetrahedra)
-    else:
-        print "Unrecognized output extension:",out_ext
         quit()

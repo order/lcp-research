@@ -19,6 +19,8 @@ def plot_mesh(F,vertices,edges,triangles,tetrahedra,**kwargs):
     no_function = (F is None)
     if not no_function:      
         std_F = standardize(F) # Between 0 and 1
+        print 'function size',F.shape
+        print 'vertices',vertices.shape
         assert F.size == vertices.shape[0]
     else:
         F = 'k'
@@ -30,8 +32,8 @@ def plot_mesh(F,vertices,edges,triangles,tetrahedra,**kwargs):
     alpha_fn = kwargs.get('alpha_fn',lambda x : 0.1)
     
     # Plot points
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    fig = plt.gcf()
+    ax = plt.gca()
     p = ax.scatter(vertices[:,0],
                    vertices[:,1],
                    vertices[:,2],
@@ -47,9 +49,10 @@ def plot_mesh(F,vertices,edges,triangles,tetrahedra,**kwargs):
     if not no_mesh:
         segs = []
         seg_set = set()
-        obj_groups = [x.astype(np.integer) for x in [edges,triangles,tetrahedra]]
+        obj_groups = [np.array(x,dtype=np.integer)\
+                      for x in [edges,triangles,tetrahedra]]
         for objs in obj_groups:
-            if objs is None:
+            if 0 == objs.size:
                 continue
             (N,D) = objs.shape
             for i in xrange(N):
@@ -113,9 +116,6 @@ def plot_mesh(F,vertices,edges,triangles,tetrahedra,**kwargs):
                                            edgecolors=edgecolors)
         ax.add_collection3d(poly_collection)
 
-def get_macros():
-    macros = {}
-    macros['value']
 
 if __name__ == "__main__":    
     parser = argparse.ArgumentParser(
@@ -156,6 +156,9 @@ if __name__ == "__main__":
     print '\tFound', V, 'vertices'
     print '\tFound', T, 'tetrahedra'
 
+    fig = plt.figure()
+    fig.add_subplot(111, projection='3d')
+    
     if not args.solution:
         assert not args.action
         assert not args.dual
@@ -196,8 +199,7 @@ if __name__ == "__main__":
         else:
             v = unarch.p
         # Should be a multiple of (V+1)
-        print v.size
-        print V
+        print '\tVector size:', v.size
         r = v.size % (V+1)
         assert 0 == r
         A = v.size / (V+1)
@@ -227,14 +229,14 @@ if __name__ == "__main__":
         f = np.log(np.abs(f) + 1e-25)
 
     if args.large:
-        alpha_fn = lambda x: 0.15*(x)**1.5
+        alpha_fn = lambda x: 0.25*(x)**1.5
         cmap = 'plasma'
         
     elif args.policy:
-        alpha_fn = lambda x: 0.05
+        alpha_fn = lambda x: 0.03
         cmap = 'jet'
     else:
-        alpha_fn = lambda x: 0.15*(1-x)**1.5
+        alpha_fn = lambda x: 0.25*(1-x)**1.5
         cmap = 'jet'
     
     plot_mesh(f,*tet_mesh,cmap=cmap,

@@ -123,7 +123,10 @@ int main(int argc, char** argv)
   
   vec adv_fun = advantage_function(&mesh,&hillcar,value,HILLCAR_GAMMA,0,25);
   arch.add_vec("advantage_function",adv_fun);
-  
+
+  vec area = mesh.cell_area();
+  arch.add_vec("area",area);
+
   // Volume of the aggregate flow
   cout << "\tFlow volume..." << endl;
   vec flow_vol = mesh.prism_volume(sum(flows,1));
@@ -132,8 +135,10 @@ int main(int argc, char** argv)
   vec heuristic_1 = bell_res % sqrt(flow_vol);
   arch.add_vec("heuristic_1",heuristic_1);
 
-  cout << "Finding heuristic_1 0.95 quantile..." << endl;
-  double cutoff_1 = quantile(heuristic_1,0.95);
+  double q1 = 1.0 - 50.0 / (double)V;
+  q1 = min(1.0,max(0.9,q1));
+  cout << "Finding heuristic_1 " << q1 << " quantile..." << endl;
+  double cutoff_1 = quantile(heuristic_1, q1);
   cout << "\t Cutoff: " << cutoff_1
        << "\n\t Max:" << max(heuristic_1)
        << "\n\t Min:" << min(heuristic_1) << endl;
@@ -143,8 +148,10 @@ int main(int argc, char** argv)
   assert(F == heuristic_2.n_elem);
   arch.add_vec("heuristic_2",heuristic_2); 
  
-  cout << "Finding heuristic_2 0.9 quantile..." << endl;
-  double cutoff_2 = quantile(heuristic_2,0.9);
+  double q2 = 1.0 - 100.0 / (double)V;
+  q2 = min(1.0,max(0.9,q1));
+  cout << "Finding heuristic_2 " << q2 << " quantile..." << endl;
+  double cutoff_2 = quantile(heuristic_2,q2);
   cout << "\t Cutoff_2: " << cutoff_2
        << "\n\t Max:" << max(heuristic_2)
        << "\n\t Min:" << min(heuristic_2) << endl;
@@ -156,6 +163,10 @@ int main(int argc, char** argv)
   Point center;
   uint new_nodes = 0;
   for(uint f = 0; f < F; f++){
+    if(area(f) < 0.01){
+      continue;
+    }
+    
     if(heuristic_1(f) > cutoff_1
        or heuristic_2(f) > cutoff_2){
       //or policy_agg(f) != 0){

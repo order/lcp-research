@@ -351,6 +351,9 @@ mat TetMesh::cell_gradient(const vec & vertex_function) const{
 
 void TetMesh::write_cgal(const string & filename) const{
   assert(m_frozen);
+  cout << "Writing to " << filename << endl
+       <<"\tVertices: " << number_of_vertices() << endl
+       <<"\tTetrahedra: " << number_of_cells() << endl;
   ofstream fs(filename);
   fs << m_mesh;
   fs.close();
@@ -368,7 +371,7 @@ void TetMesh::read_cgal(const string & filename){
 }
 
 uint TetMesh::number_of_cells() const{
-  return m_mesh.number_of_cells();
+  return m_mesh.number_of_finite_cells();
 }
 uint TetMesh::number_of_vertices() const{
   return m_mesh.number_of_vertices();
@@ -405,8 +408,10 @@ void TetMesh::regen_caches(){
   assert(not m_frozen);
   
   // Regenerate cell and vertex caches
-  m_nodes = mat(m_mesh.number_of_vertices()+1,TET_NUM_DIM);
-  m_cells = umat(m_mesh.number_of_cells(),TET_NUM_VERT);
+  uint V = number_of_all_nodes();
+  uint C = number_of_cells();
+  m_nodes = mat(V,TET_NUM_DIM);
+  m_cells = umat(C,TET_NUM_VERT);
   m_vert_reg.clear();
   m_cell_reg.clear();
 
@@ -424,6 +429,8 @@ void TetMesh::regen_caches(){
   for(uint d = 0; d < TET_NUM_DIM; d++){
     m_nodes(v_id,d) = HUGE_VAL;
   }
+  assert(v_id == (V-1));
+
 
   // Cell cache
   uint c_id = 0;
@@ -438,6 +445,7 @@ void TetMesh::regen_caches(){
     // Register this cell
     m_cell_reg[cit] = c_id++;
   }
+  assert(c_id == C);
 
   // Sort the vertex indices.
   m_cells = sort(m_cells,"ascend",1);

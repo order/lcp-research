@@ -1,14 +1,14 @@
 #include "dubins.h"
 #include "misc.h"
 #include "io.h"
+#include "lcp.h"
+#include "tet_mesh.h"
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
-#include "lcp.h"
-#include "tet_mesh.h"
 using namespace tet_mesh;
-
+using namespace dubins;
 
 po::variables_map read_command_line(uint argc, char** argv){
   po::options_description desc("Meshing options");
@@ -17,9 +17,7 @@ po::variables_map read_command_line(uint argc, char** argv){
     ("lcp,l", po::value<string>()->required(),
      "LCP out file")
     ("mesh,m", po::value<string>()->required(),
-     "Input (CGAL) mesh file")
-    ("gamma,g", po::value<double>()->default_value(0.997),
-     "Discount factor");
+     "Input (CGAL) mesh file");
   po::variables_map var_map;
   po::store(po::parse_command_line(argc, argv, desc), var_map);
   po::notify(var_map);
@@ -53,17 +51,12 @@ int main(int argc, char** argv)
   cout << "\tLower bound:" << lb.t();
   cout << "\tUpper bound:" << ub.t();
 
-  mat actions = {{0.0,0.0},
-                 {1.0,0.0},
-                 {1.0,1.0},
-                 {1.0,-1.0}};
-  DubinsCarSimulator dubins = DubinsCarSimulator(actions);
+  DubinsCarSimulator dubins = DubinsCarSimulator(DUBINS_ACTIONS);
 
-  double gamma = var_map["gamma"].as<double>();
   bool include_oob = true;
   LCP L = build_lcp(&dubins,
                     &mesh,
-                    gamma,
+                    DUBINS_GAMMA,
                     include_oob);
   string filename = var_map["lcp"].as<string>();
   L.write(filename);

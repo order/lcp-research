@@ -69,6 +69,8 @@ create_single_source_cgal_program("hillcar_refine.cpp" "tri_mesh.cpp"
 
 create_single_source_cgal_program("dubins_gen.cpp" "tet_mesh.cpp" "dubins.cpp"
   ${COMMON_FILES})
+create_single_source_cgal_program("dubins_refine.cpp" "tet_mesh.cpp" "dubins.cpp"
+  "refine.cpp" ${COMMON_FILES})
 create_single_source_cgal_program("tet_interp.cpp" "tet_mesh.cpp" ${COMMON_FILES})
 
 list(APPEND CDISCRETE_LIBRARIES
@@ -82,4 +84,5 @@ target_link_libraries(hillcar_gen ${CDISCRETE_LIBRARIES})
 target_link_libraries(hillcar_refine ${CDISCRETE_LIBRARIES})
 
 target_link_libraries(dubins_gen ${CDISCRETE_LIBRARIES})
+target_link_libraries(dubins_refine ${CDISCRETE_LIBRARIES})
 target_link_libraries(tet_interp ${CDISCRETE_LIBRARIES})

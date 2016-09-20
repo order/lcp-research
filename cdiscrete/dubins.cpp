@@ -1,6 +1,8 @@
 #include "simulator.h"
 #include "dubins.h"
 
+using namespace dubins;
+
 DubinsCarSimulator::DubinsCarSimulator(const mat &actions,
                                        double noise_std,
                                        double step):

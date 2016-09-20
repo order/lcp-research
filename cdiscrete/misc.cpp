@@ -276,8 +276,8 @@ uvec col_argmin(const mat & V){
 }
 
 double quantile(const vec & v, double q){
-  assert(0 <= q);
-  assert(1 >= q);
+  assert(0.0 <= q);
+  assert(1.0 >= q);
   // Sort the vector
   vec s = sort(v);
 

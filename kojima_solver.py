@@ -19,12 +19,13 @@ import os.path
 ###############################################
 # Solvers
 def kojima_solve(lcp,**kwargs):
-    thresh   = kwargs.get('thresh',1e-8)
+    thresh   = kwargs.get('thresh',1e-12)
     max_iter = kwargs.get('max_iter',1000)
-    val_reg  = kwargs.get('val_reg',1e-12)
-    flow_reg = kwargs.get('flow_reg',1e-10)
+    reg  = kwargs.get('reg',1e-7)
     
     (N,) = lcp.q.shape
+    D = np.random.rand(N)
+    #lcp.M += reg * sps.diags(D)
     x0 = kwargs.get('x0',np.ones(N))
     y0 = kwargs.get('y0',np.ones(N))
 
@@ -50,7 +51,7 @@ def solve_lcp_file(lcp_file):
     lcp = LCPObj(unarch.M,unarch.q)
     
     # Augment
-    alcp,x0,y0 = augment_lcp(lcp,1e3)
+    alcp,x0,y0 = augment_lcp(lcp,1e7)
     (N,) = alcp.q.shape
     assert(N == lcp.q.shape[0] + 1) # Augmented
     

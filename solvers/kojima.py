@@ -85,7 +85,7 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         self.data['dx'].append(dir_x)
         self.data['dy'].append(dir_y)
 
-        steplen = steplen_heuristic(x,dir_x,y,dir_y,0.8)
+        steplen = steplen_heuristic(x,dir_x,y,dir_y,0.6)
         print 'Steplen', steplen
         self.data['steplen'].append(steplen)
         self.steplen = steplen

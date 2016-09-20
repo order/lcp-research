@@ -28,7 +28,7 @@ vector<sp_mat> build_E_blocks(const Simulator * sim,
   mat actions = sim->get_actions();
   assert(size(A,Ad) == size(actions));
   
-  uint num_samples = 50;
+  uint num_samples = 25;
   
   vector<sp_mat> E_blocks;
   sp_mat I = speye(N,N);  
