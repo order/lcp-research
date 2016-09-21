@@ -101,5 +101,6 @@ template <typename D> Col<D> rshift(const Col<D> & v);
 typedef std::vector<std::vector<sp_mat>> block_sp_mat;
 typedef std::vector<sp_mat> block_sp_row;
 sp_mat bmat(const block_sp_mat & B);
+sp_mat diags(const block_sp_row & D);
 
 #endif

@@ -31,14 +31,17 @@ struct Archiver{
 
 struct Unarchiver{
   Unarchiver(const string & archive_name);
+  sp_mat load_sp_mat(const string & field_name);
   mat load_mat(const string & field_name);
   vec load_vec(const string & field_name);
   
   template <typename D>
   bool generic_load(const string & filename,
 		    Col<D> & ret);
-  archive * m_archive_ptr;
+  archive* open_archive() const;
+  string m_archive_name;
 };
+ostream& operator<< (ostream& os, const Unarchiver& unarch);
 
 
 // Marshalling and unmarshalling matrices into vectors w/ headers

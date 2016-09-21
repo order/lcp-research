@@ -2,10 +2,10 @@ import numpy as np
 import scipy.sparse as sps
 import matplotlib.pyplot as plt
 
-from lcp import LCPObj
+from lcp import ProjectiveLCPObj
 from utils.archiver import Unarchiver,Archiver
 
-from solvers import augment_lcp,KojimaIPIterator,IterativeSolver
+from solvers import augment_plcp,ProjectiveIPIterator,IterativeSolver
 from solvers.termination import *
 from solvers.notification import *
 from solvers.recording import *
@@ -18,18 +18,17 @@ import os.path
 
 ###############################################
 # Solvers
-def kojima_solve(lcp,**kwargs):
-    thresh   = kwargs.get('thresh',1e-15)
+def projective_solve(plcp,**kwargs):
+    thresh   = kwargs.get('thresh',1e-12)
     max_iter = kwargs.get('max_iter',1000)
     reg  = kwargs.get('reg',1e-7)
     
-    (N,) = lcp.q.shape
-    D = np.random.rand(N)
-    #lcp.M += reg * sps.diags(D)
+    (N,K) = plcp.Phi.shape
     x0 = kwargs.get('x0',np.ones(N))
     y0 = kwargs.get('y0',np.ones(N))
+    w0 = kwargs.get('w0',plcp.Phi.T.dot(plcp.q))
 
-    iterator = KojimaIPIterator(lcp,x0=x0,y0=y0)
+    iterator = ProjectiveIPIterator(plcp,x0=x0,y0=y0,w0=w0)
     solver = IterativeSolver(iterator)
 
     term_conds = [InnerProductTerminationCondition(thresh),
@@ -46,18 +45,23 @@ def kojima_solve(lcp,**kwargs):
 
     return (p,d,iterator.data)
 
-def solve_lcp_file(lcp_file):
-    unarch = Unarchiver(lcp_file)
-    lcp = LCPObj(unarch.M,unarch.q)
+def solve_plcp_file(plcp_file):
+    unarch = Unarchiver(plcp_file)
+    (P,U,r) = (unarch.Phi,unarch.U,unarch.r)
+    q = P.dot(r)
+
+    a = 1e-4
+    plcp = ProjectiveLCPObj(P,a*U,a*U,a*q)
     
     # Augment
-    alcp,x0,y0 = augment_lcp(lcp,1e7)
+    alcp,x0,y0,w0 = augment_plcp(plcp,1e5)
     (N,) = alcp.q.shape
-    assert(N == lcp.q.shape[0] + 1) # Augmented
+    assert(N == plcp.q.shape[0] + 1) # Augmented
     
-    (p,d,data) = kojima_solve(alcp,
-                              x0=np.ones(N),
-                              y0=np.ones(N))
+    (p,d,data) = projective_solve(alcp,
+                                  x0=x0,
+                                  y0=y0,
+                                  w0=w0)
 
     print '#'*20
     print 'FINISHED'
@@ -67,17 +71,18 @@ def solve_lcp_file(lcp_file):
     p = p[:-1]
     d = d[:-1]
 
-    filename, file_extension = os.path.splitext(lcp_file)
-    print "Writing solution to ",  filename + '.sol'
+    filename, file_extension = os.path.splitext(plcp_file)
+    sol_file =  filename + '.psol'
+    print "Writing solution to ", sol_file
     arch = Archiver(p=p,d=d)
-    arch.write(filename + '.sol')
+    arch.write(sol_file)
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='Solve an LCP using Kojima.')
-    parser.add_argument('lcp_file_name', metavar='F', type=str,
-                        help='LCP input file')
+    parser = argparse.ArgumentParser(description='Solve an LCP using Projective.')
+    parser.add_argument('plcp_file_name', metavar='F', type=str,
+                        help='PLCP input file')
     args = parser.parse_args()
     
     #Read LCP file
-    solve_lcp_file(args.lcp_file_name)
+    solve_plcp_file(args.plcp_file_name)

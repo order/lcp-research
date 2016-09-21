@@ -41,7 +41,7 @@ def get_solution(nodes,faces,fn,mode):
         cmap = plt.get_cmap('spectral_r')
     elif mode == 'policy':
         f = np.argmin(F[:,1:],axis=1)
-        cmap = plt.get_cmap('spectral_r')
+        cmap = plt.get_cmap('jet')
     elif mode == 'agg':
         f = np.sum(F[:,1:],axis=1)
         cmap = plt.get_cmap('jet')
@@ -92,7 +92,32 @@ def plot_bare_mesh(filename):
     plt.triplot(nodes[:,0],nodes[:,1],faces,'-k')
     plt.plot(nodes[:,0],nodes[:,1],'.k')
 
-def plot_solution_mesh(mesh_filename,soln_filename,mode,log):
+def plot_archive_mesh(mesh_filename,arch_filename,field,log,three_d):
+    (nodes,faces) = read_shewchuk(mesh_filename)
+    (N,nd) = nodes.shape
+    (F,fd) = faces.shape
+    unarch = Unarchiver(arch_filename)
+    assert field in unarch.data
+    
+    f = unarch.data[field]
+    cmap = plt.get_cmap('jet')
+    
+    if (N+1,) == f.shape:
+        f = f[:-1]
+    if log:
+        f = np.log(np.abs(f))
+    
+    if (N,) == f.shape:
+        if three_d:
+            plot_vertices_3d(nodes,faces,f,cmap)
+        else:
+            plot_vertices(nodes,faces,f,cmap)
+    else:
+        assert (F,) == f.shape
+        plot_faces(nodes,faces,f,cmap)
+
+def plot_solution_mesh(mesh_filename,soln_filename,mode,
+                       log=False,three_d=False):
     (nodes,faces) = read_shewchuk(mesh_filename)
     (N,nd) = nodes.shape
 
@@ -102,31 +127,11 @@ def plot_solution_mesh(mesh_filename,soln_filename,mode,log):
         fn_data = np.log(np.abs(fn_data) + 1e-15)        
     assert(N == fn_data.size)
 
-    fig = plt.gca()
-    plot_vertices(nodes,faces,fn_data,cmap)
-
-def plot_raw_binary_mesh(mesh_filename,raw_bin_name,log=False):
-    (nodes,faces) = read_shewchuk(mesh_filename)
-    (N,nd) = nodes.shape
-    (V,vd) = faces.shape
-
-    # Read in file
-    ext = raw_bin_name.split('.')[-1]
-    if ext == 'uvec':
-        fn_data = np.fromfile(raw_bin_name,dtype=np.integer)
+    if three_d:
+        plot_vertices_3d(nodes,faces,fn_data,cmap)
     else:
-        fn_data = np.fromfile(raw_bin_name,dtype=np.double)
-        
-    if log:
-        fn_data = np.log(np.abs(fn_data))
-        fn_data[~np.isfinite(fn_data)] = np.nan
-    assert (N == fn_data.size) or (V == fn_data.size)
-    
-    plt.gca()
-    if (N == fn_data.size):
-        plot_vertices(nodes,faces,fn_data)
-    else:
-        plot_faces(nodes,faces,fn_data)
+        plot_vertices(nodes,faces,fn_data,cmap)
+
 
 if __name__ == "__main__":
     # Replace with argparse
@@ -137,17 +142,20 @@ if __name__ == "__main__":
                         help='solution file')
     parser.add_argument('-m','--mode',default='value',
                         help="value,agg, or policy")
-    parser.add_argument('-r','--raw_binary', default=None,
-                        help='raw binary function file')
+    parser.add_argument('-a','--archive', default=None,
+                        help='archive function file')
+    parser.add_argument('-f','--field', default=None,
+                        help='archive field')    
     parser.add_argument('-l','--log',action="store_true",
                         help='apply log(abs(.)) transform')
+    parser.add_argument('-t','--three_d',action="store_true")
     args = parser.parse_args()
 
     ############################################
     # Read in option function information
     # Make sure that solution and binary are both selected
-    assert (args.solution is None) or (args.raw_binary is None)
-    if (args.solution is None) and (args.raw_binary is None):
+    assert (args.solution is None) or (args.archive is None)
+    if (args.solution is None) and (args.archive is None):
         plot_bare_mesh(args.base_file)
         plt.title('Mesh')
         plt.show()
@@ -155,18 +163,22 @@ if __name__ == "__main__":
 
     if args.solution is None:
         plt.figure()
-        # Raw binary information
-        plt.title(args.raw_binary)
-        plot_raw_binary_mesh(args.base_file,
-                             args.raw_binary,args.log)
+        plt.title(args.archive)
+        plot_archive_mesh(args.base_file,
+                          args.archive,
+                          args.field,
+                          args.log,
+                          args.three_d)
         plt.show()
         quit()
 
-    if args.raw_binary is None:
+    if args.archive is None:
         # Read primal from archive
         plot_solution_mesh(args.base_file,
                            args.solution,
-                           args.mode,args.log)
+                           args.mode,
+                           args.log,
+                           args.three_d)
         plt.title(args.solution + ', ' + args.mode)
         plt.show()
         quit()

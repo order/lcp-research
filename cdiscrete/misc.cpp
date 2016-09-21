@@ -3,29 +3,31 @@
 #include "misc.h"
 #include <wordexp.h>
 
+#include <vector>
+
 #include <boost/math/special_functions/sign.hpp>
 
-
+using namespace std;
 using namespace arma;
 
-unsigned SEED = std::chrono::system_clock::now().time_since_epoch().count();
-std::mt19937 MT_GEN = std::mt19937(SEED);
+unsigned SEED = chrono::system_clock::now().time_since_epoch().count();
+mt19937 MT_GEN = mt19937(SEED);
 
 
 void print_shape(const uvec & u){
-  std::cout << '(' << u.n_elem << ')' << std::endl;
+  cout << '(' << u.n_elem << ')' << endl;
 }
 
 void print_shape(const vec & v){
-  std::cout << '(' << v.n_elem << ')' << std::endl;
+  cout << '(' << v.n_elem << ')' << endl;
 }
 
 void print_shape(const mat & A){
-  std::cout << '(' << A.n_rows
-	    << ',' << A.n_cols << ')' << std::endl;
+  cout << '(' << A.n_rows
+	    << ',' << A.n_cols << ')' << endl;
 }
 
-mat make_points(const std::vector<vec> & grids)
+mat make_points(const vector<vec> & grids)
 {
   // Makes a mesh out of the D vectors
   // 'C' style ordering... last column changes most rapidly
@@ -33,7 +35,7 @@ mat make_points(const std::vector<vec> & grids)
   // Figure out the dimensions of things
   uint D = grids.size();
   uint N = 1;
-  for(std::vector<vec>::const_iterator it = grids.begin();
+  for(vector<vec>::const_iterator it = grids.begin();
       it != grids.end(); ++it){
     N *= it->n_elem;
   }
@@ -172,7 +174,7 @@ double dist(const vec & v, const vec & u){
 };
 
 double rectify(double x){
-  return std::max(0.0,x);
+  return max(0.0,x);
 }
 
 vec rectify(vec & x){
@@ -182,7 +184,7 @@ vec rectify(vec & x){
 }
 
 double soft_threshold(double x, double thresh){
-  return boost::math::sign(x) * std::max(0.0,std::abs(x) - thresh);
+  return boost::math::sign(x) * max(0.0,abs(x) - thresh);
 }
 
 vec soft_threshold(vec x, double thresh){
@@ -339,7 +341,6 @@ Col<D> rshift(const Col<D> & v){
 }
 
 sp_mat bmat(const block_sp_mat & B){
-
   uint b_rows = B.size();
   assert(b_rows > 0);
   uint b_cols = B[0].size();
@@ -353,16 +354,16 @@ sp_mat bmat(const block_sp_mat & B){
   for(uint i = 0; i < b_rows; i++){
     assert(b_cols == B[i].size());
     for(uint j = 0; j < b_cols; j++){
-      if(rows[i]>0 and std::max(rows[i],B[i][j].n_rows) != rows[i]){
+      if(rows[i]>0 and max(rows[i],B[i][j].n_rows) != rows[i]){
 	cerr << "[BMAT ERROR] Incompatible row dimensions" << endl;
 	exit(1);
       }
-      if(cols[j]>0 and std::max(cols[i],B[i][j].n_cols) != cols[i]){
+      if(cols[j]>0 and max(cols[i],B[i][j].n_cols) != cols[i]){
 	cerr << "[BMAT ERROR] Incompatible col dimensions" << endl;
 	exit(1);
       }
-      rows[i] = std::max(rows[i],B[i][j].n_rows);
-      cols[j] = std::max(cols[j],B[i][j].n_cols);
+      rows[i] = max(rows[i],B[i][j].n_rows);
+      cols[j] = max(cols[j],B[i][j].n_cols);
       nnz += B[i][j].n_nonzero;
     }
   }
@@ -394,4 +395,15 @@ sp_mat bmat(const block_sp_mat & B){
   
   sp_mat ret =  sp_mat(loc,values,R,C);
   return ret;
+}
+
+sp_mat diags(const block_sp_row & D){
+  uint d = D.size();
+  vector<vector<sp_mat>> blocks;
+  blocks.resize(d);
+  for(uint i = 0; i < d; i++){
+    blocks[i].resize(d);
+    blocks[i][i] = D[i];
+  }
+  return bmat(blocks);
 }

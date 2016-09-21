@@ -76,21 +76,30 @@ void Archiver::write(const string & archive_name) {
   archive_write_free(a);
 }
 
-Unarchiver::Unarchiver(const string & archive_name){
-  m_archive_ptr = archive_read_new();
-  archive_read_support_format_all(m_archive_ptr);
-  archive_read_support_filter_all(m_archive_ptr);
+Unarchiver::Unarchiver(const string & archive_name) : m_archive_name(archive_name){}
 
+archive * Unarchiver::open_archive() const{
+  archive * archive_ptr = archive_read_new();
+  archive_read_support_format_all(archive_ptr);
+  archive_read_support_filter_all(archive_ptr);
   int rc;
-  if(rc = archive_read_open_filename(m_archive_ptr,
-				     archive_name.c_str(),
+  if(rc = archive_read_open_filename(archive_ptr,
+				     m_archive_name.c_str(),
 				     16384)){
-    cout << "Cannot open " << archive_name
+    cout << "Cannot open " << m_archive_name
 	 << " (code " << rc << ")" << endl;
     exit(1);
-  }  
+  }
+  return archive_ptr;
 }
 
+sp_mat Unarchiver::load_sp_mat(const string & field_name){
+  string filename = field_name + ".sp_mat";
+  vec raw_vec;
+  bool rc = generic_load<double>(filename,raw_vec);
+  assert(rc);
+  return unpack_sp_mat(raw_vec);
+}
 
 mat Unarchiver::load_mat(const string & field_name){
   string filename = field_name + ".mat";
@@ -111,6 +120,8 @@ vec Unarchiver::load_vec(const string & field_name){
 template <typename D>
 bool Unarchiver::generic_load(const string & filename,
 				Col<D> & ret){
+  
+  archive * archive_ptr = open_archive();
   archive_entry *entry;
   uint rc;
   char data[65536];
@@ -119,12 +130,12 @@ bool Unarchiver::generic_load(const string & filename,
   
   while(true) {
     // Read entry
-    rc = archive_read_next_header(m_archive_ptr, &entry);
+    rc = archive_read_next_header(archive_ptr, &entry);
     if(rc == ARCHIVE_EOF){
       return false;
     }
     if (rc != ARCHIVE_OK){
-      cerr << "[ACHIVE ERROR]" << archive_error_string(m_archive_ptr) << endl;
+      cerr << "[ACHIVE ERROR]" << archive_error_string(archive_ptr) << endl;
       return false;
     }
 
@@ -135,10 +146,10 @@ bool Unarchiver::generic_load(const string & filename,
     }
 
     // Buffered read to stringstream
-    len = archive_read_data(m_archive_ptr,data,sizeof(data));
+    len = archive_read_data(archive_ptr,data,sizeof(data));
     while(len > 0){
       ss.write(data,len);
-      len = archive_read_data(m_archive_ptr,data,sizeof(data));
+      len = archive_read_data(archive_ptr,data,sizeof(data));
     }
 
     // Success! Load the stringstream into the return vector
@@ -147,6 +158,20 @@ bool Unarchiver::generic_load(const string & filename,
   }
   // Should never hit here.
   assert(false);
+}
+
+ostream& operator<< (ostream& os, const Unarchiver& unarch){
+  archive * archive_ptr = unarch.open_archive();
+  archive_entry *entry;
+  uint rc;
+  while(true){
+    rc = archive_read_next_header(archive_ptr, &entry);
+    os << archive_entry_pathname(entry) << endl;
+    if (rc != ARCHIVE_OK){
+      // All out of archive
+      return os;
+    }
+  }
 }
 
 // Packing and unpacking to vectors

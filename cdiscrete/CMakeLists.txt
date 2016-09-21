@@ -38,12 +38,13 @@ if ( NOT Boost_FOUND )
   return()  
 endif()
 
-
+find_package(Eigen3 REQUIRED)
 find_package(LibArchive REQUIRED)
 find_package(Armadillo REQUIRED)
 include_directories( ${Boost_INCLUDE_DIR} )
 include_directories(${ARMADILLO_INCLUDE_DIRS})
 include_directories(${LibArchive_INCLUDE_DIRS})
+include_directories(${EIGEN3_INCLUDE_DIR})
 
 
 # Include for local directory
@@ -65,7 +66,13 @@ create_single_source_cgal_program("di_refine.cpp" "tri_mesh.cpp"
 create_single_source_cgal_program("hillcar_gen.cpp" "tri_mesh.cpp"
   "hillcar.cpp" ${COMMON_FILES})
 create_single_source_cgal_program("hillcar_refine.cpp" "tri_mesh.cpp"
-  "hillcar.cpp" "refine.cpp" ${COMMON_FILES})  
+  "hillcar.cpp" "refine.cpp" ${COMMON_FILES})
+
+create_single_source_cgal_program("min_gen.cpp" "tri_mesh.cpp"
+  ${COMMON_FILES})
+create_single_source_cgal_program("min_refine.cpp" "tri_mesh.cpp"
+  "refine.h" ${COMMON_FILES})
+create_single_source_cgal_program("min_approx.cpp" "tri_mesh.cpp" ${COMMON_FILES})
 
 create_single_source_cgal_program("dubins_gen.cpp" "tet_mesh.cpp" "dubins.cpp"
   ${COMMON_FILES})
@@ -76,13 +83,20 @@ create_single_source_cgal_program("tet_interp.cpp" "tet_mesh.cpp" ${COMMON_FILES
 list(APPEND CDISCRETE_LIBRARIES
         ${ARMADILLO_LIBRARIES}
         ${LibArchive_LIBRARIES}
-        ${Boost_LIBRARIES})
+        ${Boost_LIBRARIES}
+        ${EIGEN3_LIBRARIES})
 
 target_link_libraries(di_gen ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_refine ${CDISCRETE_LIBRARIES})
+
 target_link_libraries(hillcar_gen ${CDISCRETE_LIBRARIES})
 target_link_libraries(hillcar_refine ${CDISCRETE_LIBRARIES})
 
+target_link_libraries(min_gen ${CDISCRETE_LIBRARIES})
+target_link_libraries(min_refine ${CDISCRETE_LIBRARIES})
+target_link_libraries(min_approx ${CDISCRETE_LIBRARIES})
+
 target_link_libraries(dubins_gen ${CDISCRETE_LIBRARIES})
 target_link_libraries(dubins_refine ${CDISCRETE_LIBRARIES})
+
 target_link_libraries(tet_interp ${CDISCRETE_LIBRARIES})

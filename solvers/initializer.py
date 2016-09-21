@@ -96,14 +96,12 @@ def augment_plcp(plcp,scale,**kwargs):
     y = np.hstack([y,y0])
     # w doesn't have to be +ve
 
-
     assert (N+1,K+1) == new_P.shape
     assert (K+1,N+1) == new_U.shape
     assert (N+1,) == new_q.shape
     assert (N+1,) == x.shape
     assert (N+1,) == y.shape
     assert (K+1,) == w.shape
-    
     
     return ProjectiveLCPObj(new_P,new_U,new_PtPU,new_q),x,y,w
 

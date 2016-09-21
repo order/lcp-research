@@ -80,7 +80,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
 
         self.iteration = 0
 
-        self.verbose = False
+        self.verbose = True
         
     def next_iteration(self):
         """
@@ -283,6 +283,11 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
 
         h = A.dot(g) + PtPU.dot(x) + Ptq - Phi.T.dot(y)
         assert((k,) == h.shape)
+
+        if sparse:
+            G+= 1e-9*sps.eye(k)
+        else:
+            G += 1e-9*np.eye(k)
         
         return (G,g,h)
 
