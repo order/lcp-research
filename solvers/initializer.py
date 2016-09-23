@@ -86,7 +86,6 @@ def augment_plcp(plcp,scale,**kwargs):
     # [0 s]
     new_U = sps.bmat([[U,b[:,np.newaxis]],
                       [None,scale*np.ones((1,1))]])
-    new_PtPU = new_P.T.dot(new_P.dot(new_U))
     new_q = np.hstack([q,0])
 
     # Pw = u - u + q = q; w = Ptq
@@ -103,7 +102,7 @@ def augment_plcp(plcp,scale,**kwargs):
     assert (N+1,) == y.shape
     assert (K+1,) == w.shape
     
-    return ProjectiveLCPObj(new_P,new_U,new_PtPU,new_q),x,y,w
+    return ProjectiveLCPObj(new_P,new_U,new_q),x,y,w
 
 def generate_initial_feasible_points(M,q):
     """

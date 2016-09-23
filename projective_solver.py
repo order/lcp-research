@@ -50,8 +50,8 @@ def solve_plcp_file(plcp_file):
     (P,U,r) = (unarch.Phi,unarch.U,unarch.r)
     q = P.dot(r)
 
-    a = 1e-4
-    plcp = ProjectiveLCPObj(P,a*U,a*U,a*q)
+    a = 1
+    plcp = ProjectiveLCPObj(P,a*U,a*q)
     
     # Augment
     alcp,x0,y0,w0 = augment_plcp(plcp,1e5)

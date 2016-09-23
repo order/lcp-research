@@ -181,6 +181,7 @@ int main(int argc, char** argv)
   cout << "Refining..." << endl;
   new_mesh.refine(0.125,1.0);
   new_mesh.lloyd(10);
+  //new_mesh.insert(Point(0,0));
   new_mesh.freeze();
 
   // Write out all the information

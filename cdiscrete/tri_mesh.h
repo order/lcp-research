@@ -97,6 +97,9 @@ namespace tri_mesh{
     uint oob_node_index() const;
   
     mat find_bounding_box() const;
+    void build_circle(const vec & center,
+                      uint T,
+                      double radius);
     void build_box_boundary(const mat & bbox);
     void build_box_boundary(const vec & lb,
                             const vec & ub);

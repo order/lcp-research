@@ -68,11 +68,11 @@ create_single_source_cgal_program("hillcar_gen.cpp" "tri_mesh.cpp"
 create_single_source_cgal_program("hillcar_refine.cpp" "tri_mesh.cpp"
   "hillcar.cpp" "refine.cpp" ${COMMON_FILES})
 
-create_single_source_cgal_program("min_gen.cpp" "tri_mesh.cpp"
-  ${COMMON_FILES})
-create_single_source_cgal_program("min_refine.cpp" "tri_mesh.cpp"
-  "refine.h" ${COMMON_FILES})
-create_single_source_cgal_program("min_approx.cpp" "tri_mesh.cpp" ${COMMON_FILES})
+#create_single_source_cgal_program("minop_gen.cpp" "tri_mesh.cpp"
+#  ${COMMON_FILES})
+#create_single_source_cgal_program("minop_refine.cpp" "tri_mesh.cpp"
+#  "refine.h" ${COMMON_FILES})
+create_single_source_cgal_program("minop_approx.cpp" "tri_mesh.cpp" ${COMMON_FILES})
 
 create_single_source_cgal_program("dubins_gen.cpp" "tet_mesh.cpp" "dubins.cpp"
   ${COMMON_FILES})
@@ -92,9 +92,9 @@ target_link_libraries(di_refine ${CDISCRETE_LIBRARIES})
 target_link_libraries(hillcar_gen ${CDISCRETE_LIBRARIES})
 target_link_libraries(hillcar_refine ${CDISCRETE_LIBRARIES})
 
-target_link_libraries(min_gen ${CDISCRETE_LIBRARIES})
-target_link_libraries(min_refine ${CDISCRETE_LIBRARIES})
-target_link_libraries(min_approx ${CDISCRETE_LIBRARIES})
+#target_link_libraries(min_gen ${CDISCRETE_LIBRARIES})
+#target_link_libraries(min_refine ${CDISCRETE_LIBRARIES})
+target_link_libraries(minop_approx ${CDISCRETE_LIBRARIES})
 
 target_link_libraries(dubins_gen ${CDISCRETE_LIBRARIES})
 target_link_libraries(dubins_refine ${CDISCRETE_LIBRARIES})

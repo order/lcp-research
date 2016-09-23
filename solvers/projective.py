@@ -32,6 +32,7 @@ def solve_system(A,b):
 # Start of the iterator
 class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
     def __init__(self,plcp,**kwargs):
+        print "Initializing projective solver..."
         self.mdp_obj = kwargs.get('mdp_obj',None)
         self.lcp_obj = kwargs.get('lcp_obj',None)
                 
@@ -39,19 +40,18 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         
         Phi = plcp.Phi
         U = plcp.U
-        PtPU = plcp.PtPU
         q = plcp.q
         
         (N,K) = Phi.shape
         assert (K,N) == U.shape
-        assert (K,N) == PtPU.shape
         assert (N,) == q.shape
 
         self.q = plcp.q
         self.Ptq = Phi.T.dot(self.q)
         assert (K,) == self.Ptq.shape
-        
-        self.update_P_PtPU(Phi,U,PtPU)
+
+        print "Updating matrices..."
+        self.update_P_PtPU(Phi,U)
 
         self.x = kwargs.get('x0',np.ones(N))
         self.y = kwargs.get('y0',np.ones(N))
@@ -218,9 +218,10 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
     def get_step_len(self):
         return self.steplen        
 
-    def update_P_PtPU(self,Phi,U,PtPU):        
+    def update_P_PtPU(self,Phi,U):        
         self.Phi = Phi
         self.U = U
+        PtPU = (Phi.T.dot(Phi)).dot(U)
         self.PtPU = PtPU
         (N,K) = Phi.shape            
 
@@ -285,9 +286,9 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         assert((k,) == h.shape)
 
         if sparse:
-            G+= 1e-9*sps.eye(k)
+            G+= 1e-15*sps.eye(k)
         else:
-            G += 1e-9*np.eye(k)
+            G += 1e-15*np.eye(k)
         
         return (G,g,h)
 

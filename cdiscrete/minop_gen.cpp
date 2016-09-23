@@ -24,13 +24,15 @@ void generate_initial_mesh(const po::variables_map & var_map,
 
   cout << "Initial meshing..."<< endl;
   mesh.build_box_boundary({{-1,1},{-1,1}});
-  
+  mesh.build_circle(zeros<vec>(2),50,1.0/sqrt(2.0));
+  mesh.build_circle(zeros<vec>(2),50,1.0);
+
   cout << "Refining based on (" << angle
        << "," << length <<  ") criterion ..."<< endl;
   mesh.refine(angle,length);
   
   cout << "Optimizing (10 rounds of Lloyd)..."<< endl;
-  mesh.lloyd(10);
+  mesh.lloyd(25);
   mesh.refine(angle,length);
 
   mesh.freeze();
@@ -46,28 +48,7 @@ void generate_initial_mesh(const po::variables_map & var_map,
   mesh.write_cgal(filename + ".tri");
 }
 
-LCP build_min_op_lcp(const TriMesh &mesh){
-  uint N = mesh.number_of_spatial_nodes();
-  Points points = mesh.get_spatial_nodes();
 
-  vec a = ones<vec>(N) / (double) N;
-  vec sq_dist = sum(pow(points,2),1);
-  vec b = sq_dist;
-  vec c = max(zeros<vec>(N),1 - sq_dist);
-  
-  assert(a.n_elem == b.n_elem);
-  vec q = join_vert(-a,join_vert(b,c));
-  assert(3*N == q.n_elem);
- 
-  vector<sp_mat> E;
-  E.push_back(speye(N,N));
-  E.push_back(speye(N,N));
-  sp_mat M = build_M(E);
-  assert(M.is_square());
-  assert(3*N == M.n_rows);
-
-  return LCP(M,q);
-}
 
 po::variables_map read_command_line(uint argc, char** argv){
   po::options_description desc("Meshing options");

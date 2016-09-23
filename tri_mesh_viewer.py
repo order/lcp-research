@@ -117,12 +117,16 @@ def plot_archive_mesh(mesh_filename,arch_filename,field,log,three_d):
         plot_faces(nodes,faces,f,cmap)
 
 def plot_solution_mesh(mesh_filename,soln_filename,mode,
-                       log=False,three_d=False):
+                       log=False,three_d=False,dual=False):
     (nodes,faces) = read_shewchuk(mesh_filename)
     (N,nd) = nodes.shape
 
     unarch = Unarchiver(soln_filename)
-    (fn_data,cmap) = get_solution(nodes,faces,unarch.p,mode)
+    if dual:
+        (fn_data,cmap) = get_solution(nodes,faces,unarch.d,mode)
+    else:
+        (fn_data,cmap) = get_solution(nodes,faces,unarch.p,mode)
+ 
     if log:
         fn_data = np.log(np.abs(fn_data) + 1e-15)        
     assert(N == fn_data.size)
@@ -149,6 +153,8 @@ if __name__ == "__main__":
     parser.add_argument('-l','--log',action="store_true",
                         help='apply log(abs(.)) transform')
     parser.add_argument('-t','--three_d',action="store_true")
+    parser.add_argument('-d','--dual',action="store_true")
+
     args = parser.parse_args()
 
     ############################################
@@ -178,7 +184,8 @@ if __name__ == "__main__":
                            args.solution,
                            args.mode,
                            args.log,
-                           args.three_d)
+                           args.three_d,
+                           args.dual)
         plt.title(args.solution + ', ' + args.mode)
         plt.show()
         quit()

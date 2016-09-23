@@ -588,6 +588,28 @@ mat TriMesh::find_bounding_box() const{
   return bounds;
 }
 
+void TriMesh::build_circle(const vec & center,
+                           uint T,
+                           double radius){
+  double theta;
+  VertexHandle v_start,v_curr,v_last;
+  Point p;
+  for(uint t = 0; t < T; t++){
+    theta = 2.0 * datum::pi * (double) t / (double) T;
+    p = Point(radius*cos(theta) + center(0),
+              radius*sin(theta) + center(1));
+    v_curr = m_mesh.insert(p);
+    if(0 == t){
+      v_start = v_curr;
+    }
+    else{
+      m_mesh.insert_constraint(v_last,v_curr);
+    }
+    v_last = v_curr;
+  }
+  m_mesh.insert_constraint(v_curr,v_start);
+}
+
 void TriMesh::build_box_boundary(const mat & bbox){
   assert(2 == bbox.n_cols);
   assert(2 == bbox.n_rows);

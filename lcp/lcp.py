@@ -31,17 +31,15 @@ class ProjectiveLCPObj(LCPObj):
     monotone linear complementarity problems" 
     (http://arxiv.org/pdf/1212.6958v1.pdf)  
     """
-    def __init__(self,Phi,U,PtPU,q,**kwargs):
+    def __init__(self,Phi,U,q,**kwargs):
         self.Phi = Phi
         self.U = U
-        self.PtPU = PtPU # <P,PU>
         self.q = q
 
         # Shape checking
         (N,) = q.shape
         assert(N == Phi.shape[0])
         (_,K) = Phi.shape
-        assert((K,N) == PtPU.shape)
         
         self.name = kwargs.get('name','Unnamed')
 
