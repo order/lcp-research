@@ -50,7 +50,7 @@ def get_solution(nodes,faces,fn,mode):
     assert(N == f.size)
     return (f,cmap)
 
-def plot_vertices(nodes,faces,fn,cmap=None,G=640):
+def plot_vertices(nodes,faces,fn,cmap=None,interp='linear',G=640):
     fn = np.ma.array(fn,mask=~np.isfinite(fn))
     assert(fn.size == nodes.shape[0])
     if cmap is None:
@@ -60,7 +60,7 @@ def plot_vertices(nodes,faces,fn,cmap=None,G=640):
     (P,(X,Y)) = make_points([np.linspace(np.min(nodes[:,i]),
                                          np.max(nodes[:,i]),G)
                              for i in [0,1]],True)
-    Z = griddata(nodes,fn,P,method='linear')
+    Z = griddata(nodes,fn,P,method=interp)
     Z = np.reshape(Z,(G,G))
     plt.gca()
     plt.pcolormesh(X,Y,Z,lw=0,cmap=cmap)
