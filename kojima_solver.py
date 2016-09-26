@@ -20,7 +20,7 @@ import os.path
 # Solvers
 def kojima_solve(lcp,**kwargs):
     thresh   = kwargs.get('thresh',1e-15)
-    max_iter = kwargs.get('max_iter',1000)
+    max_iter = kwargs.get('max_iter',500)
     reg  = kwargs.get('reg',1e-7)
     
     (N,) = lcp.q.shape
@@ -51,13 +51,13 @@ def solve_lcp_file(lcp_file):
     lcp = LCPObj(unarch.M,unarch.q)
     
     # Augment
-    alcp,x0,y0 = augment_lcp(lcp,1e7)
+    alcp,x0,y0 = augment_lcp(lcp,1e4)
     (N,) = alcp.q.shape
     assert(N == lcp.q.shape[0] + 1) # Augmented
     
     (p,d,data) = kojima_solve(alcp,
-                              x0=np.ones(N),
-                              y0=np.ones(N))
+                              x0=x0,
+                              y0=y0)
 
     print '#'*20
     print 'FINISHED'

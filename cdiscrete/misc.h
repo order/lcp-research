@@ -19,7 +19,7 @@ void print_shape(const uvec & u);
 void print_shape(const vec & v);
 void print_shape(const mat & A);
 
-// Make points from a grid
+// Make points from a grdi
 mat make_points(const std::vector<vec> & grids);
 
 //=====================================
@@ -99,8 +99,9 @@ template <typename D> Col<D> rshift(const Col<D> & v);
 
 //Sparse stuff
 typedef std::vector<std::vector<sp_mat>> block_sp_mat;
-typedef std::vector<sp_mat> block_sp_row;
-sp_mat bmat(const block_sp_mat & B);
-sp_mat diags(const block_sp_row & D);
+typedef std::vector<sp_mat> block_sp_vec;
 
+sp_mat block_mat(const block_sp_mat & B);
+sp_mat block_diag(const block_sp_vec & D);
+sp_mat spdiag(const vec & v);
 #endif

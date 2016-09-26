@@ -11,6 +11,8 @@
 #include "tri_mesh.h"
 #include "lcp.h"
 #include "basis.h"
+#include "solver.h"
+
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
@@ -143,9 +145,16 @@ int main(int argc, char** argv)
   vec c = max(zeros<vec>(V),1 - sq_dist) + off;
   
   LCP lcp = build_minop_lcp(mesh,-a,b,c);
+  KojimaSolver ksolver;
+  cout << "Solving..." << endl;
+  pd_pair sol = ksolver.aug_solve(lcp);
+  cout << "Done." << endl;
+ 
   string lcp_file = filename + ".lcp";
   cout << "Writing to " << lcp_file << endl;
   lcp.write(lcp_file);
+
+  return 0;
 
   uint num_fourier = var_map["Fourier"].as<uint>();
   mat value_basis = make_radial_fourier_basis(points,
@@ -160,12 +169,11 @@ int main(int argc, char** argv)
                                       centers);
   flow_basis = orth(flow_basis);
 
-  vector<sp_mat> D;
-  D.push_back(sp_mat(value_basis));
-  D.push_back(sp_mat(flow_basis));
-  D.push_back(sp_mat(flow_basis));
+  block_sp_vec D = {sp_mat(value_basis),
+                    sp_mat(flow_basis),
+                    sp_mat(flow_basis)};
   
-  sp_mat Phi = diags(D);
+  sp_mat Phi = block_diag(D);
   sp_mat U = Phi.t() * (lcp.M + 1e-8 * speye(3*V,3*V));// * Phi * Phi.t();
   vec r =  Phi.t() * lcp.q;
 

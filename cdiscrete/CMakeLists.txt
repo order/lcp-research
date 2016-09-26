@@ -17,7 +17,7 @@ project( mesh )
 set (CMAKE_CXX_STANDARD 11)
 
 # Explicitly set some flags
-set(CMAKE_CXX_FLAGS "-O -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2  -frounding-math")
+set(CMAKE_CXX_FLAGS "-O3 -fstack-protector -Wformat -Werror=format-security -Wdate-time -frounding-math")
 
 # CGAL and its components
 find_package( CGAL QUIET COMPONENTS  )
@@ -38,13 +38,24 @@ if ( NOT Boost_FOUND )
   return()  
 endif()
 
-find_package(Eigen3 REQUIRED)
+#find_package(Eigen3 REQUIRED)
 find_package(LibArchive REQUIRED)
 find_package(Armadillo REQUIRED)
+find_package(LAPACK REQUIRED)
+message(STATUS "Manually configuring SuperLU")
+set(SUPERLU_INCLUDE_DIR /user/include/superlu)
+set(SUPERLU_LIBRARIES /usr/lib/x86_64-linux-gnu/libsuperlu.so)
+message(STATUS "Manually configuring OpenBLAS")
+set(OPENBLAS_INCLUDE_DIR /user/include/openblas)
+set(OPENBLAS_LIBRARIES /usr/lib/libopenblas.so)
+
 include_directories( ${Boost_INCLUDE_DIR} )
 include_directories(${ARMADILLO_INCLUDE_DIRS})
 include_directories(${LibArchive_INCLUDE_DIRS})
-include_directories(${EIGEN3_INCLUDE_DIR})
+include_directories(${LAPACK_INCLUDE_DIR})
+#include_directories(${EIGEN3_INCLUDE_DIR})
+include_directories(${SUPERLU_INCLUDE_DIR})
+include_directories(${OPENBLAS_INCLUDE_DIR})
 
 
 # Include for local directory
@@ -72,7 +83,8 @@ create_single_source_cgal_program("hillcar_refine.cpp" "tri_mesh.cpp"
 #  ${COMMON_FILES})
 #create_single_source_cgal_program("minop_refine.cpp" "tri_mesh.cpp"
 #  "refine.h" ${COMMON_FILES})
-create_single_source_cgal_program("minop_approx.cpp" "tri_mesh.cpp" "basis.cpp"
+create_single_source_cgal_program("minop_approx.cpp" "tri_mesh.cpp"
+  "basis.cpp" "solver.cpp"
   ${COMMON_FILES})
 
 create_single_source_cgal_program("dubins_gen.cpp" "tet_mesh.cpp" "dubins.cpp"
@@ -85,7 +97,11 @@ list(APPEND CDISCRETE_LIBRARIES
         ${ARMADILLO_LIBRARIES}
         ${LibArchive_LIBRARIES}
         ${Boost_LIBRARIES}
-        ${EIGEN3_LIBRARIES})
+        ${EIGEN3_LIBRARIES}
+        ${SUPERLU_LIBRARIES}
+        ${OPENBLAS_LIBRARIES}
+        ${LAPACK_LIBRARIES})
+message(STATUS "Libraries: ${CDISCRETE_LIBRARIES}")
 
 target_link_libraries(di_gen ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_refine ${CDISCRETE_LIBRARIES})

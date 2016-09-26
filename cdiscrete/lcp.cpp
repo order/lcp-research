@@ -12,6 +12,18 @@ void LCP::write(const string & filename){
   arch.write(filename);
 }
 
+PLCP::PLCP(const sp_mat & aP,
+           const sp_mat & aU,
+           const vec & aq) : P(aP),U(aU),q(aq){}
+
+void PLCP::write(const string & filename){
+  Archiver arch;
+  arch.add_sp_mat("P",P);
+  arch.add_sp_mat("U",U);
+  arch.add_vec("q",q);
+  arch.write(filename);
+}
+
 vector<sp_mat> build_E_blocks(const Simulator * sim,
                               const Discretizer * disc,
                               double gamma,
@@ -50,8 +62,8 @@ vector<sp_mat> build_E_blocks(const Simulator * sim,
 
 sp_mat build_M(const vector<sp_mat> & E_blocks){
   block_sp_mat blk_M;
-  block_sp_row tmp_row;
-  blk_M.push_back(block_sp_row{sp_mat()});
+  block_sp_vec tmp_row;
+  blk_M.push_back(block_sp_vec{sp_mat()});
   uint A = E_blocks.size();
   for(vector<sp_mat>::const_iterator it = E_blocks.begin();
       it != E_blocks.end(); ++it){
@@ -71,7 +83,7 @@ sp_mat build_M(const vector<sp_mat> & E_blocks){
   assert(A+1 == blk_M.at(0).size());
   assert(A+1 == blk_M.size());
   
-  sp_mat M = bmat(blk_M);
+  sp_mat M = block_mat(blk_M);
   assert(M.is_square());
   return M;
 }
@@ -125,3 +137,77 @@ LCP build_lcp(const Simulator * sim,
 
   return LCP(M,q);
 }
+
+
+LCP augment_lcp(const LCP & original,
+                vec & x,
+                vec & y,
+                double scale){
+  
+  uint N = original.q.n_elem;
+  x = ones<vec>(N);
+  y = ones<vec>(N);
+  
+  vec r = y - (original.M * x + original.q); // Initial residual
+  double s = scale; // Absolute scale
+  //[M r]
+  //[0 s]
+  sp_mat M = sp_mat(N+1,N+1);
+  M(span(0,N-1),span(0,N-1)) = original.M;
+  M(span(0,N-1),N) = r;
+  M(N,N) = s;
+
+  vec q = vec(N+1);
+  q.head(N) = original.q;
+  q(N) = 0;
+
+  x.resize(N+1);
+  x(N) = 1;
+  y.resize(N+1);
+  y(N) = scale;
+
+  return LCP(M,q);
+}
+
+
+PLCP augment_plcp(const PLCP & original,
+                  vec & x,
+                  vec & y,
+                  vec & w,
+                  double scale){
+  
+  uint N = original.P.n_rows;
+  uint K = original.P.n_cols;
+  assert(size(K,N) == size(original.U));
+  
+  sp_mat P = sp_mat(original.P);
+  sp_mat U = sp_mat(original.U);
+  vec q = vec(original.q);
+  
+  x = ones<vec>(N);
+  y = ones<vec>(N);
+  w = P.t() * q;
+
+  vec b = -U*x + P.t()*(x - q);
+  assert((K+1) == b.n_elem);
+  
+  P.resize(N+1,K+1);
+  U.resize(K+1,N+1);
+  q.resize(N+1);
+  
+  P(N,K) = 1.0;
+  U(span(0,K-1),N) = b;
+  U(K,N) = scale;
+  q(N) = 0;
+
+  x.resize(N+1);
+  y.resize(N+1);
+  w.resize(K+1);
+
+  x(N) = 1;
+  y(N) = scale;
+  w(K) = 1.0 - scale;
+  
+  return PLCP(P,U,q);
+}
+

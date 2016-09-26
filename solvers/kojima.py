@@ -38,7 +38,7 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         Uses a log-barrier w/centering parameter
         (How is this different than the basic scheme a la Nocedal and Wright?)
         """
-        
+
         M = self.lcp.M
         q = self.lcp.q
         n = self.lcp.dim
@@ -62,7 +62,7 @@ class KojimaIPIterator(IPIterator,LCPIterator):
 
         sigma = self.sigma
         
-        r = (M.dot(x) + q) - y 
+        r = (M.dot(x) + q) - y
         dot = x.dot(y)
 
         #self.data['res_norm'].append(np.linalg.norm(r))
@@ -76,7 +76,8 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         A = sps.bmat([[Y,X],
                       [-M,I]],format='csc')          
         b = np.concatenate([sigma * dot / float(n) * np.ones(n) - x*y, r])
-        
+        print "DEBUG",  np.sum(dot / float(n) * np.ones(n))
+
         Del = sps.linalg.spsolve(A,b)
         dir_x = Del[:n]
         dir_y = Del[n:]

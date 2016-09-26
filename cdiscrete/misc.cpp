@@ -340,7 +340,7 @@ Col<D> rshift(const Col<D> & v){
   return u;
 }
 
-sp_mat bmat(const block_sp_mat & B){
+sp_mat block_mat(const block_sp_mat & B){
   uint b_rows = B.size();
   assert(b_rows > 0);
   uint b_cols = B[0].size();
@@ -397,13 +397,20 @@ sp_mat bmat(const block_sp_mat & B){
   return ret;
 }
 
-sp_mat diags(const block_sp_row & D){
+sp_mat block_diag(const block_sp_vec & D){
   uint d = D.size();
-  vector<vector<sp_mat>> blocks;
+  block_sp_mat blocks;
   blocks.resize(d);
   for(uint i = 0; i < d; i++){
     blocks[i].resize(d);
     blocks[i][i] = D[i];
   }
-  return bmat(blocks);
+  return block_mat(blocks);
+}
+
+sp_mat spdiag(const vec & v){
+  uint N = v.n_elem;
+  return sp_mat(regspace<uvec>(0,N-1),
+                regspace<uvec>(0,N),
+                v,N,N);
 }

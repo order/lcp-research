@@ -12,6 +12,8 @@ def steplen_heuristic(x,dir_x,y,dir_y,scale):
     x_step = max_steplen(x,dir_x)
     y_step = max_steplen(y,dir_y)
 
+    #1D minimization:
+    #<x+a*dx,y+a*dy> = <x,y> + a<x,dy> + a<y,dx> + a*a*<dx,dy> 
     alpha = -(x.dot(dir_y) + y.dot(dir_x)) / dir_x.dot(dir_y)
     if alpha > 0:
         return min([1.0,alpha,scale*x_step, scale*y_step])
