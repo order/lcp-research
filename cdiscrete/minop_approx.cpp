@@ -146,15 +146,13 @@ int main(int argc, char** argv)
   
   LCP lcp = build_minop_lcp(mesh,-a,b,c);
   KojimaSolver ksolver;
-  cout << "Solving..." << endl;
-  pd_pair sol = ksolver.aug_solve(lcp);
+  cout << "Solving LCP with Kojima..." << endl;
+  //pd_pair sol = ksolver.aug_solve(lcp);
   cout << "Done." << endl;
  
   string lcp_file = filename + ".lcp";
   cout << "Writing to " << lcp_file << endl;
   lcp.write(lcp_file);
-
-  return 0;
 
   uint num_fourier = var_map["Fourier"].as<uint>();
   mat value_basis = make_radial_fourier_basis(points,
@@ -173,14 +171,21 @@ int main(int argc, char** argv)
                     sp_mat(flow_basis),
                     sp_mat(flow_basis)};
   
-  sp_mat Phi = block_diag(D);
-  sp_mat U = Phi.t() * (lcp.M + 1e-8 * speye(3*V,3*V));// * Phi * Phi.t();
-  vec r =  Phi.t() * lcp.q;
+  sp_mat P = block_diag(D);
+  sp_mat U = P.t() * (lcp.M + 1e-8 * speye(3*V,3*V));// * P * P.t();
+  vec r =  P.t() * lcp.q;
 
+  PLCP plcp = PLCP(P,U,P*r);
+  ProjectiveSolver psolver;
+  cout << "Solving projective LCP..." << endl;
+  pd_pair psol = psolver.aug_solve(plcp);
+  cout << "Done." << endl;
+
+  // PLCP file with some extra information
   string plcp_file = filename + ".plcp";
   cout << "Writing to " << plcp_file << endl;
   Archiver plcp_arch;
-  plcp_arch.add_sp_mat("Phi",Phi);
+  plcp_arch.add_sp_mat("P",P);
   plcp_arch.add_sp_mat("U",U);
   plcp_arch.add_vec("r",r);
   plcp_arch.add_vec("a",a);

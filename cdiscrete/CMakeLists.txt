@@ -17,7 +17,7 @@ project( mesh )
 set (CMAKE_CXX_STANDARD 11)
 
 # Explicitly set some flags
-set(CMAKE_CXX_FLAGS "-O3 -fstack-protector -Wformat -Werror=format-security -Wdate-time -frounding-math")
+#set(CMAKE_CXX_FLAGS "-O3 -fstack-protector -Wformat -Werror=format-security -Wdate-time -frounding-math -FORTIFY_SOURCE=1")
 
 # CGAL and its components
 find_package( CGAL QUIET COMPONENTS  )

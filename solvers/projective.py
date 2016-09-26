@@ -19,7 +19,9 @@ def solve_system(A,b):
         fillin = float(A.nnz) / float(A.size)
     else:
         fillin = 1.0
-    
+
+    print "System fillin:",fillin
+        
     if fillin > 0.1:
         if isinstance(A,sps.spmatrix):
             A = A.toarray()

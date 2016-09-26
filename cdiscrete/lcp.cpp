@@ -189,7 +189,7 @@ PLCP augment_plcp(const PLCP & original,
   w = P.t() * q;
 
   vec b = -U*x + P.t()*(x - q);
-  assert((K+1) == b.n_elem);
+  assert(K == b.n_elem);
   
   P.resize(N+1,K+1);
   U.resize(K+1,N+1);

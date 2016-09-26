@@ -19,7 +19,7 @@ import os.path
 ###############################################
 # Solvers
 def projective_solve(plcp,**kwargs):
-    thresh   = kwargs.get('thresh',1e-12)
+    thresh   = kwargs.get('thresh',1e-15)
     max_iter = kwargs.get('max_iter',1000)
     reg  = kwargs.get('reg',1e-7)
     
@@ -47,7 +47,7 @@ def projective_solve(plcp,**kwargs):
 
 def solve_plcp_file(plcp_file):
     unarch = Unarchiver(plcp_file)
-    (P,U,r) = (unarch.Phi,unarch.U,unarch.r)
+    (P,U,r) = (unarch.P,unarch.U,unarch.r)
     q = P.dot(r)
 
     a = 1
