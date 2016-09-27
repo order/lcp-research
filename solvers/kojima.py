@@ -74,9 +74,9 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         Y = sps.diags(y,0)
         I = sps.eye(n)
         A = sps.bmat([[Y,X],
-                      [-M,I]],format='csc')          
+                      [-M,I]],format='csc')
+
         b = np.concatenate([sigma * dot / float(n) * np.ones(n) - x*y, r])
-        print "DEBUG",  np.sum(dot / float(n) * np.ones(n))
 
         Del = sps.linalg.spsolve(A,b)
         dir_x = Del[:n]

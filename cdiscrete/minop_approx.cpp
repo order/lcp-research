@@ -149,11 +149,13 @@ int main(int argc, char** argv)
   cout << "Solving LCP with Kojima..." << endl;
   //pd_pair sol = ksolver.aug_solve(lcp);
   cout << "Done." << endl;
- 
+
+
   string lcp_file = filename + ".lcp";
   cout << "Writing to " << lcp_file << endl;
   lcp.write(lcp_file);
 
+  
   uint num_fourier = var_map["Fourier"].as<uint>();
   mat value_basis = make_radial_fourier_basis(points,
                                               num_fourier,

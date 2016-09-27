@@ -189,10 +189,10 @@ void ProjectiveSolver::solve(const PLCP & plcp,
   
   double sparsity,mean_comp, steplen, sigma, regularizer;
   sigma = 0.99;
-  regularizer = 1e-9;
+  regularizer = 1e-12;
   
   superlu_opts slu_opts;
-  slu_opts.equilibrate = true;
+  slu_opts.equilibrate = true; // This is important for conditioning
   slu_opts.permutation = superlu_opts::NATURAL;
   slu_opts.refine = superlu_opts::REF_NONE;
   
@@ -234,8 +234,9 @@ void ProjectiveSolver::solve(const PLCP & plcp,
     //   // dense solve
     // }
     
-    
-    dw = arma::solve(G,h);
+
+    // Options don't make much difference
+    dw = arma::solve(G,h,solve_opts::equilibrate);
     assert(K == dw.n_elem);
 
     // Recover dy
@@ -255,8 +256,7 @@ void ProjectiveSolver::solve(const PLCP & plcp,
     w += steplen * dw;
 
     if(verbose){
-      cout <<"\tSparsity: " << sparsity
-           <<"\n\tMean complementarity: " << mean_comp
+      cout <<"\tMean complementarity: " << mean_comp
            <<"\n\tStep length: " << steplen
            <<"\n\tCentering sigma: " << sigma << endl;
     }
