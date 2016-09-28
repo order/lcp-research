@@ -2,6 +2,7 @@
 #include "io.h"
 #include <assert.h>
 
+LCP::LCP(){}
 LCP::LCP(const sp_mat & aM,
          const vec & aq) : M(aM),q(aq){}
 
@@ -12,6 +13,7 @@ void LCP::write(const string & filename){
   arch.write(filename);
 }
 
+PLCP::PLCP(){}
 PLCP::PLCP(const sp_mat & aP,
            const sp_mat & aU,
            const vec & aq) : P(aP),U(aU),q(aq){}
@@ -183,12 +185,16 @@ PLCP augment_plcp(const PLCP & original,
   sp_mat P = sp_mat(original.P);
   sp_mat U = sp_mat(original.U);
   vec q = vec(original.q);
-  
-  x = ones<vec>(N);
-  y = ones<vec>(N);
-  w = P.t() * q;
 
-  vec b = -U*x + P.t()*(x - q);
+  assert(all(x > 0));
+  assert(all(y > 0));
+  assert(N == x.n_elem);
+  assert(N == y.n_elem);
+  w = P.t() * (x - y + q);
+  assert(norm(P*w - x + y - q) < PRETTY_SMALL);
+
+  
+  vec b = P.t()*x - U*x - w;
   assert(K == b.n_elem);
   
   P.resize(N+1,K+1);

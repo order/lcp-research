@@ -1,27 +1,33 @@
 import numpy as np
+import scipy.sparse as sps
+from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+from utils.archiver import Unarchiver,read_shewchuk
+import tri_mesh_viewer as tmv
 
-from utils import make_points
+unarch = Unarchiver("/home/epz/data/minop/sensitivity.sens")
+(nodes,faces) = read_shewchuk("/home/epz/data/minop/sensitivity")
 
-G = 160
-grids = [np.linspace(-1,1,G)]*2
-[P,[X,Y]] = make_points(grids,True)
+(N,_) = nodes.shape
 
-sqnorm = lambda x: np.sum(x**2,1)
-norm = lambda x: np.sqrt(sqnorm(x))
+p = unarch.p
+twiddle = unarch.twiddle
+jitter = unarch.jitter
+noise = unarch.noise
 
-b = 5
-f = np.cos(b*b*norm(P)) * np.exp(-b*sqnorm(P))
+value_diff = jitter - p[:,np.newaxis]
+noise_diff = noise - np.mean(noise,0)[np.newaxis,:]
 
-Z = np.reshape(f,(G,G))
+R = np.zeros(N)
+for i in xrange(N):
+    (r,p) = pearsonr(value_diff[i,:],noise_diff[i,:])
+    if p < 0.005:
+        R[i] = r 
 
-cmap = plt.get_cmap("jet")
+plt.figure();
+plt.subplot(1,2,1)
+tmv.plot_vertices(nodes,faces,twiddle)
+plt.subplot(1,2,2)
+tmv.plot_vertices(nodes,faces,R)
 
-fig = plt.figure()
-ax = fig.add_subplot(111,projection='3d')
-ax.plot_surface(X,Y,Z,
-                rstride=1,
-                cstride=1,
-                cmap=cmap,lw=0)
 plt.show()

@@ -36,7 +36,7 @@ double steplen_heuristic(const vec & x,
 }
 double sigma_heuristic(double sigma,
                        double steplen){
-  double max_sigma = 0.995;
+  double max_sigma = 0.999;
   double min_sigma = 0.1;
   if(steplen >= 0.8)
     sigma *= 0.975;
@@ -47,31 +47,33 @@ double sigma_heuristic(double sigma,
   return max(min_sigma,min(max_sigma,sigma));
 }
 
+SolverResult::SolverResult(){}
+SolverResult::SolverResult(const vec & ap,
+                           const vec & ad,
+                           uint aiter) : p(ap),d(ad),iter(aiter){}
+
 ////////////////////////////////////////////////////////
 // Kojima
 
 KojimaSolver::KojimaSolver(){
-  comp_thresh = 1e-15;
+  comp_thresh = 1e-8;
   max_iter = 500;
   verbose = true;
+  regularizer = 1e-8;
 }
 
 // Really should be always using this.
-pd_pair KojimaSolver::aug_solve(const LCP & lcp) const{
+SolverResult KojimaSolver::aug_solve(const LCP & lcp) const{
   uint N = lcp.q.n_elem;
   double scale = 1.0 * (double) N; // Balance feasibility and complementarity
   vec x,y;
   LCP alcp = augment_lcp(lcp,x,y,scale);
-  solve(alcp,x,y);
-  return make_pair(x,y);
+  return solve(alcp,x,y);
 }
 
-void KojimaSolver::solve(const LCP & lcp,
-                            vec & x,
-                            vec & y) const{
-  
-  double regularizer = 1e-9;
-
+SolverResult KojimaSolver::solve(const LCP & lcp,
+                                 vec & x,
+                                 vec & y) const{
   superlu_opts opts;
   opts.equilibrate = true;
   opts.permutation = superlu_opts::NATURAL;
@@ -93,7 +95,10 @@ void KojimaSolver::solve(const LCP & lcp,
 
   vec b = vec(2*N);
   double mean_comp, steplen, sigma = 0.95;
-  for(uint i = 0; i < max_iter; i++){
+  uint iter;
+  for(iter = 0; iter < max_iter; iter++){
+    if(verbose)
+      cout << "---Iteration " << iter << "---" << endl;
     // Mean complementarity
     mean_comp = dot(x,y) / (double) N;
     if(mean_comp < comp_thresh)
@@ -122,8 +127,7 @@ void KojimaSolver::solve(const LCP & lcp,
     y += steplen * dy;
 
     if(verbose){
-      cout << "Iteration " << i
-           <<"\n\t Mean complementarity: " << mean_comp
+      cout <<"\t Mean complementarity: " << mean_comp
            <<"\n\t Step length: " << steplen
            <<"\n\t Centering sigma: " << sigma << endl;
     }
@@ -132,6 +136,7 @@ void KojimaSolver::solve(const LCP & lcp,
     cout << "Finished"
          <<"\n\t Final mean complementarity: " << mean_comp << endl;
   }
+  return SolverResult(x,y,iter);
 }
 
 
@@ -139,25 +144,41 @@ void KojimaSolver::solve(const LCP & lcp,
 // PROJECTIVE
 
 ProjectiveSolver::ProjectiveSolver(){
-  comp_thresh = 1e-15;
+  comp_thresh = 1e-8;
   max_iter = 500;
   verbose = true;
+  regularizer = 1e-8;
 }
 
 // Really should be always using this.
-pd_pair ProjectiveSolver::aug_solve(const PLCP & plcp) const{
+
+
+SolverResult ProjectiveSolver::aug_solve(const PLCP & plcp) const{
   uint N = plcp.P.n_rows;
-  double scale = 1.0 * (double) N; // Balance feasibility and complementarity
-  vec x,y,w;
+  uint K = plcp.P.n_cols;
+  double scale = 0.5 * (double) N; // Balance feasibility and complementarity
+  vec x = ones<vec>(N);
+  vec y = ones<vec>(N);
+  vec w;
   PLCP aplcp = augment_plcp(plcp,x,y,w,scale);
-  solve(aplcp,x,y,w);
-  return make_pair(x,y);
+  return solve(aplcp,x,y,w);
 }
 
-void ProjectiveSolver::solve(const PLCP & plcp,
-                             vec & x,
-                             vec & y,
-                             vec & w) const{
+SolverResult ProjectiveSolver::aug_solve(const PLCP & plcp,
+                                         vec & x,
+                                         vec & y ) const{
+  uint N = plcp.P.n_rows;
+  uint K = plcp.P.n_cols;
+  double scale = 0.5 * (double) N; // Balance feasibility and complementarity
+  vec w;
+  PLCP aplcp = augment_plcp(plcp,x,y,w,scale);
+  return solve(aplcp,x,y,w);
+}
+
+SolverResult ProjectiveSolver::solve(const PLCP & plcp,
+                            vec & x,
+                            vec & y,
+                            vec & w) const{
   sp_mat P = plcp.P;
   sp_mat U = plcp.U;
   vec q = plcp.q;
@@ -187,18 +208,18 @@ void ProjectiveSolver::solve(const PLCP & plcp,
   vec dx,dy,dw,g,h,Pdw,S;
   mat A,G;
   
-  double sparsity,mean_comp, steplen, sigma, regularizer;
-  sigma = 0.99;
-  regularizer = 1e-12;
+  double sparsity,mean_comp, steplen, sigma;
+  sigma = 0.95;
   
   superlu_opts slu_opts;
   slu_opts.equilibrate = true; // This is important for conditioning
   slu_opts.permutation = superlu_opts::NATURAL;
   slu_opts.refine = superlu_opts::REF_NONE;
-  
-  for(uint i = 0; i < max_iter; i++){
+
+  uint iter;
+  for(iter = 0; iter < max_iter; iter++){
     if(verbose)
-      cout << "---Iteration " << i << "---" << endl;
+      cout << "---Iteration " << iter << "---" << endl;
     // Mean complementarity
     mean_comp = dot(x,y) / (double) N;
     if(mean_comp < comp_thresh)
@@ -265,4 +286,5 @@ void ProjectiveSolver::solve(const PLCP & plcp,
     cout << "Finished"
          <<"\n\t Final mean complementarity: " << mean_comp << endl;
   }
+  return SolverResult(x,y,iter);
 }

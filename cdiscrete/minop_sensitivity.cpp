@@ -31,7 +31,6 @@ void generate_minop_mesh(TriMesh & mesh,
   mesh.build_circle(zeros<vec>(2),30,1.0/sqrt(2.0));
   mesh.build_circle(zeros<vec>(2),25,0.25);
 
-
   cout << "Refining based on (" << angle
        << "," << edge_length <<  ") criterion ..."<< endl;
   mesh.refine(angle,edge_length);
@@ -53,6 +52,7 @@ void generate_minop_mesh(TriMesh & mesh,
 // Generate the LCP
 
 void build_minop_lcp(const TriMesh &mesh,
+                     const vec & a,
                      LCP & lcp,
                      vec & ans){
   double off = 1.0; // +ve offset
@@ -60,7 +60,6 @@ void build_minop_lcp(const TriMesh &mesh,
   uint N = points.n_rows;
   vec sq_dist = sum(pow(points,2),1);
 
-  vec a = ones<vec>(N) / (double)N;
   vec b = sq_dist + off;
   vec c = max(zeros<vec>(N),1 - sq_dist) + off;
   
@@ -89,10 +88,6 @@ po::variables_map read_command_line(uint argc, char** argv){
     ("help", "produce help message")
     ("outfile_base,o", po::value<string>()->required(),
      "Output experimental result file")
-    ("mode,m", po::value<string>()->required(),
-     "Basis mode")
-    ("params,p",po::value<vector<double> >()->multitoken(),
-     "Parameters for the basis mode")
     ("edge_length,e", po::value<double>()->default_value(0.15),
      "Max length of triangle edge");
   
@@ -123,110 +118,97 @@ int main(int argc, char** argv)
   mesh.freeze();
 
   // Stats
-  uint V = mesh.number_of_vertices();
+  uint N = mesh.number_of_vertices();
   uint F = mesh.number_of_faces();
   cout << "Mesh stats:"
-       << "\n\tNumber of vertices: " << V
+       << "\n\tNumber of vertices: " << N
        << "\n\tNumber of faces: " << F
        << endl;
 
-  // Build LCP
-  LCP lcp;
-  vec ans;
-  build_minop_lcp(mesh,lcp,ans);
-
   // Build value basis
-  uint num_fourier = 25;
+  uint num_value_basis = 25;
+  uint num_flow_basis = 10;
   Points points = mesh.get_spatial_nodes();
-  uint N = points.n_rows;
   mat value_basis = make_radial_fourier_basis(points,
-                                              num_fourier,
-                                              (double)num_fourier);
+                                              num_value_basis,
+                                              (double)num_value_basis);
   value_basis = orth(value_basis);
   sp_mat sp_value_basis = sp_mat(value_basis);
-
-  uint min_k = 10;
-  uint max_k = 150;
-  uvec num_basis = regspace<uvec>(min_k,2,max_k);
-
-  uint K = num_basis.n_elem;
-  uint R = 5;
   
-  mat res_data = mat(K,R);
-  mat iter_data = mat(K,R);
+  Points centers = 2 * randu(10,2) - 1;
+  mat flow_basis = make_voronoi_basis(points,
+                                      centers);
+  flow_basis = orth(flow_basis);
+  sp_mat sp_flow_basis = sp_mat(flow_basis);
+                                         
+  vec ref_weights = ones<vec>(N) / (double)N;
+  LCP ref_lcp;
+  vec ans;
+  build_minop_lcp(mesh,ref_weights,ref_lcp,ans);
 
-  string mode = var_map["mode"].as<string>();
-  vector<double> params;
-  if(var_map.count("params") > 0){
-    params = var_map["params"].as<vector<double> >();
+  block_sp_vec D = {sp_value_basis,
+                    sp_flow_basis,
+                    sp_flow_basis};  
+  sp_mat P = block_diag(D);
+  sp_mat U = P.t() * (ref_lcp.M + 1e-8 * speye(3*N,3*N));
+  vec q =  P *(P.t() * ref_lcp.q);
+
+  PLCP ref_plcp = PLCP(P,U,q);
+  ProjectiveSolver psolver;
+  psolver.comp_thresh = 1e-8;
+  psolver.max_iter = 250;
+  psolver.regularizer = 1e-8;
+  psolver.verbose = false;
+
+  cout << "Reference solve..." << endl;
+  SolverResult ref_sol = psolver.aug_solve(ref_plcp);
+  cout << "\tDone." << endl;
+  
+  psolver.comp_thresh = 1e-6;
+  // Exactish
+  vec twiddle = vec(N);
+  for(uint i = 0; i < N; i++){
+    cout << "Component: " << i << endl;
+    LCP twiddle_lcp;
+    vec et = zeros<vec>(N);
+    et(i) += 1.0 / (double) N;
+    assert(size(ref_weights) == size(et));
+    build_minop_lcp(mesh,ref_weights + et,twiddle_lcp,ans);
+    vec twiddle_q =  P *(P.t() * twiddle_lcp.q);
+
+    PLCP twiddle_plcp = PLCP(P,U,twiddle_q);
+    /*vec x = ref_sol.p.head(3*N);
+    vec y = ref_sol.d.head(3*N);
+    y(i) += 1.0 / (double) N;*/
+    SolverResult twiddle_sol = psolver.aug_solve(twiddle_plcp);
+                                                 
+    twiddle(i) = twiddle_sol.p(i) - ref_sol.p(i);
+  }
+
+  uint R = 50;
+  mat jitter = mat(N,R);
+  mat noise = mat(N,R);
+  for(uint i = 0; i < R; i++){
+    cout << "Jitter round: " << i << endl;
+    LCP jitter_lcp;
+    noise.col(i) = max(1e-4*ones<vec>(N),0.05 * randn<vec>(N));
+    build_minop_lcp(mesh,ref_weights + noise.col(i),jitter_lcp,ans);
+    vec jitter_q =  P *(P.t() * jitter_lcp.q);
+
+    PLCP jitter_plcp = PLCP(P,U,jitter_q);
+    /*vec x = ref_sol.p.head(3*N);
+    vec y = ref_sol.d.head(3*N);
+    y(i) += 1.0 / (double) N;*/
+    SolverResult jitter_sol = psolver.aug_solve(jitter_plcp);
+                                                 
+    jitter.col(i) = jitter_sol.p.head(N); 
   }
   
-  for(uint i = 0; i < K; i++){
-    uint k = num_basis(i);
-    cout << mode << " basis size: " << k << endl;
-    cout << "\tRun:";
-    for(uint r = 0; r < R; r++){
-      cout << " " << r;
-      cout.flush();
-      sp_mat sp_flow_basis;
-      if(0 == mode.compare("voronoi")){
-        assert(0 == params.size());
-        Points centers = 2 * randu(k,2) - 1;
-        mat flow_basis = make_voronoi_basis(points,
-                                            centers);
-        flow_basis = orth(flow_basis);
-        sp_flow_basis = sp_mat(flow_basis);
-      }
-      else if (0 == mode.compare("sample")){
-        assert(0 == params.size());
-        sp_flow_basis = make_sample_basis(N,k);
-        mat flow_basis = mat(sp_flow_basis);
-        flow_basis = orth(flow_basis);
-        sp_flow_basis = sp_mat(flow_basis);
-      }
-      else if (0 == mode.compare("balls")){
-        assert(1 == params.size());
-        uint radius = (uint) params[0];
-        Points centers = 2 * randu(k,2) - 1;
-        sp_flow_basis = make_ball_basis(points,centers,radius);
-        mat flow_basis = mat(sp_flow_basis);
-        flow_basis = orth(flow_basis);
-        sp_flow_basis = sp_mat(flow_basis);
-      }
-      else if (0 == mode.compare("rbf")){
-        assert(1 == params.size());
-        double bandwidth = (double) params[0];
-        Points centers = 2 * randu(k,2) - 1;
-        mat flow_basis = make_rbf_basis(points,centers,bandwidth);
-        sp_flow_basis = sp_mat(flow_basis);
-      }
-      else{
-        assert(false);
-      }      
-      
-      block_sp_vec D = {sp_value_basis,
-                        sp_flow_basis,
-                        sp_flow_basis};  
-      sp_mat P = block_diag(D);
-      sp_mat U = P.t() * (lcp.M + 1e-8 * speye(3*V,3*V));
-      vec q =  P *(P.t() * lcp.q);
-
-      PLCP plcp = PLCP(P,U,q);
-      ProjectiveSolver psolver;
-      psolver.comp_thresh = 1e-6;
-      psolver.max_iter = 250;
-      psolver.regularizer = 1e-8;
-      psolver.verbose = false;
-      
-      SolverResult sol = psolver.aug_solve(plcp);
-      res_data(i,r) = norm(sol.p.head(N) - ans);
-      iter_data(i,r) = sol.iter;
-    }
-    cout << endl; // For the run print out;
-  }
   Archiver arch;
-  arch.add_mat("res_data",res_data);
-  arch.add_mat("iter_data",iter_data);
-  arch.add_uvec("num_basis",num_basis);
-  arch.write(file_base + ".exp_res");
+  arch.add_vec("p",ref_sol.p.head(N));
+  arch.add_vec("twiddle",twiddle);
+  arch.add_mat("jitter",jitter);
+  arch.add_mat("noise",noise);
+  arch.write(file_base + ".sens");
+  
 }

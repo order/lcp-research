@@ -17,29 +17,39 @@ double steplen_heuristic(const vec & x,
 double sigma_heuristic(double sigma,
                        double steplen);
 
-typedef pair<vec,vec> pd_pair; // primal/dual pair
+struct SolverResult{
+  vec p;
+  vec d;
+  uint iter;
+  SolverResult();
+  SolverResult(const vec & p, const vec & d, uint iter);
+};
 
 class KojimaSolver{
  public:
   KojimaSolver();
-  void solve(const LCP & lcp,vec & x, vec & y) const;
-  pd_pair aug_solve(const LCP & lcp) const;
- protected:
+  SolverResult aug_solve(const LCP & lcp) const;
+  SolverResult solve(const LCP & lcp, vec & x, vec & y) const;
+
   double comp_thresh;
   uint max_iter;
   bool verbose;
+  double regularizer;
 };
 
 class ProjectiveSolver{
  public:
   ProjectiveSolver();
-  void solve(const PLCP & plcp,vec& x, vec& y, vec& w) const;
-  pd_pair aug_solve(const PLCP & plcp) const;
-  
- protected:
+  SolverResult aug_solve(const PLCP & plcp) const;
+  SolverResult aug_solve(const PLCP & plcp,vec & x,vec & y) const;
+
+  SolverResult solve(const PLCP & plcp,vec& x, vec& y, vec& w) const;
+
   double comp_thresh;
   uint max_iter;
   bool verbose;
+  double regularizer;
+
 };
 
 #endif

@@ -10,12 +10,14 @@ using namespace arma;
 struct LCP{
   LCP(const sp_mat &,
       const vec &);
+  LCP();
   sp_mat M;
   vec q;
   void write(const string &);
 };
 
 struct PLCP{
+  PLCP();
   PLCP(const sp_mat &,
        const sp_mat &,
        const vec &);
