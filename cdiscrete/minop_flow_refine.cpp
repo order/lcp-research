@@ -146,63 +146,63 @@ int main(int argc, char** argv)
   vec ans;
   build_minop_lcp(mesh,ref_weights,ref_lcp,ans);
 
-  block_sp_vec D = {sp_value_basis,
-                    sp_flow_basis,
-                    sp_flow_basis};  
-  sp_mat P = block_diag(D);
-  sp_mat U = P.t() * (ref_lcp.M + 1e-8 * speye(3*N,3*N));
-  vec q =  P *(P.t() * ref_lcp.q);
 
-  PLCP ref_plcp = PLCP(P,U,q);
   ProjectiveSolver psolver;
   psolver.comp_thresh = 1e-8;
   psolver.max_iter = 250;
   psolver.regularizer = 1e-8;
   psolver.verbose = false;
 
-  cout << "Reference solve..." << endl;
-  SolverResult ref_sol = psolver.aug_solve(ref_plcp);
-  cout << "\tDone." << endl;
-  
+
+
+  uint max_iter = 25;
+  uint jitter_rounds = 75;
   psolver.comp_thresh = 1e-6;
-  // Exactish
-  vec twiddle = vec(N);
-  for(uint i = 0; i < N; i++){
-    cout << "Component: " << i << endl;
-    LCP twiddle_lcp;
-    vec et = zeros<vec>(N);
-    et(i) += 1.0 / (double) N;
-    assert(size(ref_weights) == size(et));
-    build_minop_lcp(mesh,ref_weights + et,twiddle_lcp,ans);
-    vec twiddle_q =  P *(P.t() * twiddle_lcp.q);
+  mat jitter = mat(N,jitter_rounds);
+  mat noise = mat(N,jitter_rounds);
+  vec pearson = vec(N);
+  
+  for(uint I = 0; I < max_iter; I++){
+    block_sp_vec D = {sp_value_basis,
+                      sp_flow_basis,
+                      sp_flow_basis};  
+    sp_mat P = block_diag(D);
+    sp_mat U = P.t() * (ref_lcp.M + 1e-8 * speye(3*N,3*N));
+    vec q =  P *(P.t() * ref_lcp.q);
 
-    PLCP twiddle_plcp = PLCP(P,U,twiddle_q);
-    /*vec x = ref_sol.p.head(3*N);
-    vec y = ref_sol.d.head(3*N);
-    y(i) += 1.0 / (double) N;*/
-    SolverResult twiddle_sol = psolver.aug_solve(twiddle_plcp);
-                                                 
-    twiddle(i) = twiddle_sol.p(i) - ref_sol.p(i);
+    PLCP ref_plcp = PLCP(P,U,q);
+    cout << "Reference solve..." << endl;
+    SolverResult ref_sol = psolver.aug_solve(ref_plcp);
+    cout << "\tDone." << endl;
+    
+    cout << "Iteration: " << I << endl;
+    for(uint j = 0; j < jitter_rounds; j++){
+      cout << "Jitter round: " << j << endl;
+      noise.col(i) = max(1e-4*ones<vec>(N), 0.075 * randn<vec>(N));
+
+      LCP jitter_lcp;
+      build_minop_lcp(mesh,ref_weights + noise.col(i),jitter_lcp,ans);
+      vec jitter_q =  P *(P.t() * jitter_lcp.q);      
+      PLCP jitter_plcp = PLCP(P,U,jitter_q);
+      
+      SolverResult jitter_sol = psolver.aug_solve(jitter_plcp);
+      jitter.col(i) = jitter_sol.p.head(N);
+      
+    }
+    for(uint i = 0; i < N; i++){
+      double mu_x = mean(jitter.row(i));
+      double mu_y = mean(noise.row(i));
+      double std_x = std(jitter.row(i));
+      double std_y = std(noise.row(i));
+
+      pearson(i) = sum((jitter.row(i) - mu_x) % (noise.row(i) - mu_y));
+      pearson(i) /= std_x * std_y;
+    }
+    uint refine_node = abs(pearson).index_max();
+
+    
   }
 
-  uint R = 75;
-  mat jitter = mat(N,R);
-  mat noise = mat(N,R);
-  for(uint i = 0; i < R; i++){
-    cout << "Jitter round: " << i << endl;
-    LCP jitter_lcp;
-    noise.col(i) = max(1e-4*ones<vec>(N), 0.075 * randn<vec>(N));
-    build_minop_lcp(mesh,ref_weights + noise.col(i),jitter_lcp,ans);
-    vec jitter_q =  P *(P.t() * jitter_lcp.q);
-
-    PLCP jitter_plcp = PLCP(P,U,jitter_q);
-    /*vec x = ref_sol.p.head(3*N);
-    vec y = ref_sol.d.head(3*N);
-    y(i) += 1.0 / (double) N;*/
-    SolverResult jitter_sol = psolver.aug_solve(jitter_plcp);
-                                                 
-    jitter.col(i) = jitter_sol.p.head(N); 
-  }
   
   Archiver arch;
   arch.add_vec("p",ref_sol.p.head(N));

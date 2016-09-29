@@ -21,8 +21,11 @@ noise_diff = noise - np.mean(noise,0)[np.newaxis,:]
 R = np.zeros(N)
 for i in xrange(N):
     (r,p) = pearsonr(value_diff[i,:],noise_diff[i,:])
-    if p < 0.005:
-        R[i] = r 
+    if p < 0.05:
+        R[i] = r
+#sR = np.sort(R)
+#thresh = sR[-5]
+#R[R < thresh] = 0;
 
 plt.figure();
 plt.subplot(1,2,1)

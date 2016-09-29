@@ -193,3 +193,78 @@ mat make_radial_fourier_basis(const Points & points,
   basis.col(K).fill(1/sqrt(N));
   return basis;
 }
+
+IndexPartition voronoi_partition(const Points & points,
+                                 const Points & centers){
+  uint N = points.n_rows;
+  uint K = centers.n_rows;
+  assert(points.n_cols == centers.n_cols);
+  
+  mat dist = mat(N,K);  
+  for(uint k = 0; k < K; k++){
+    dist.col(k) = lp_norm(points.each_row() - centers.row(k),2,1);
+  }
+  uvec P = col_argmin(dist); // partition index
+
+  // Assign indices to partitions
+  IndexPartition partition;
+  partition.resize(K); 
+  for(uint k = 0; k < K; k++){
+    uvec idx = find(P == k);
+    for(uint i = 0; i < idx.n_elem; i++){
+      partition[k].insert(idx(i));
+    }
+  }
+
+  // Remove empty bases
+  uint c = 0;
+  while(c < partition.size()){
+    if(0 == partition[c].size())
+      partition.erase(partition.begin() + c);
+    else
+      c++;
+  }
+  return partition;
+}
+
+set<uint> ball_indices(const Points & points,
+                       const vec & center,
+                       uint R){
+    vec dist = lp_norm(points.each_row() - center,2,1);
+    double r = find_radius(dist,R);
+    uvec idx = find(dist < r);
+
+    set<uint> basis;
+    for(uint i = 0; i < idx.n_elem; i++){
+      basis.insert(idx(i));
+    }
+}
+
+void add_basis(IndexPartition & partition,
+                         const set<uint> & basis){
+  for(IndexIterator it = partition.begin();
+      it != partition.end(); it++){
+    vector<uint> overlap;
+    set_intersection(it->begin(),it->end(),
+                     basis.begin(),basis.end(),
+                     back_inserter(overlap));
+    for(vector<uint>::iterator oit = overlap.begin();
+        oit != overlap.end(); oit++){
+      it->erase(*oit);
+    }
+  }
+  partition.push_back(basis);
+}
+
+sp_mat build_basis_from_partition(const IndexPartition & partition,uint N){
+  uint K = partition.size();
+  sp_mat basis = sp_mat(N,K);
+  for(uint k = 0; k < K; k++){
+    double v = 1.0 * sqrt(partition[k].size());
+    for(set<uint>::const_iterator it = partition[k].begin();
+        it != partition[k].end(); it++){
+      basis(*it,k) = v;
+    }
+  }
+  return basis;
+}

@@ -90,6 +90,9 @@ create_single_source_cgal_program("minop_sensitivity.cpp" "tri_mesh.cpp"
   "basis.cpp" "solver.cpp"
   ${COMMON_FILES})
 
+create_single_source_cgal_program("basis_gen.cpp" "tri_mesh.cpp"
+  "basis.cpp" ${COMMON_FILES})
+
 create_single_source_cgal_program("dubins_gen.cpp" "tet_mesh.cpp" "dubins.cpp"
   ${COMMON_FILES})
 create_single_source_cgal_program("dubins_refine.cpp" "tet_mesh.cpp" "dubins.cpp"
@@ -116,6 +119,7 @@ target_link_libraries(hillcar_refine ${CDISCRETE_LIBRARIES})
 #target_link_libraries(min_refine ${CDISCRETE_LIBRARIES})
 target_link_libraries(minop_approx ${CDISCRETE_LIBRARIES})
 target_link_libraries(minop_sensitivity ${CDISCRETE_LIBRARIES})
+target_link_libraries(basis_gen ${CDISCRETE_LIBRARIES})
 
 target_link_libraries(dubins_gen ${CDISCRETE_LIBRARIES})
 target_link_libraries(dubins_refine ${CDISCRETE_LIBRARIES})

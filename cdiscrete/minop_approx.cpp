@@ -93,7 +93,7 @@ po::variables_map read_command_line(uint argc, char** argv){
      "Basis mode")
     ("params,p",po::value<vector<double> >()->multitoken(),
      "Parameters for the basis mode")
-    ("edge_length,e", po::value<double>()->default_value(0.15),
+    ("edge_length,e", po::value<double>()->default_value(0.1),
      "Max length of triangle edge");
   
   po::variables_map var_map;

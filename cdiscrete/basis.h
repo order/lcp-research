@@ -4,6 +4,8 @@
 #include "discretizer.h"
 
 #include <armadillo>
+#include <set>
+#include <vector>
 
 
 using namespace std;
@@ -30,5 +32,19 @@ mat make_voronoi_basis(const Points & points,
 
 mat make_radial_fourier_basis(const Points & points,
                               uint K, double max_freq);
+
+
+
+typedef vector<set<uint> > IndexPartition;
+typedef IndexPartition::iterator IndexIterator;
+
+IndexPartition voronoi_partition(const Points & points,
+                                 const Points & centers);
+set<uint> ball_indices(const Points & points,
+                       const vec & center,
+                       uint R);
+void add_basis(IndexPartition & partition,
+                         const set<uint> & basis);
+sp_mat build_basis_from_partition(const IndexPartition &,uint);
 
 #endif
