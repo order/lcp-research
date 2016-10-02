@@ -389,6 +389,10 @@ void TriMesh::freeze(){
   m_frozen = true;
 }
 
+void TriMesh::unfreeze(){
+  m_frozen = false;
+}
+
 void TriMesh::regen_caches(){
   if(!m_dirty) return;
   assert(not m_frozen);

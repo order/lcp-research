@@ -4,7 +4,14 @@
 
 LCP::LCP(){}
 LCP::LCP(const sp_mat & aM,
-         const vec & aq) : M(aM),q(aq){}
+         const vec & aq) : M(aM),q(aq){
+  free_vars = zeros<bvec>(q.n_elem);
+}
+LCP::LCP(const sp_mat & aM,
+         const vec & aq,
+         const bvec & afree_vars) :
+  M(aM),q(aq),free_vars(afree_vars){}
+
 
 void LCP::write(const string & filename){
   Archiver arch;
@@ -16,7 +23,15 @@ void LCP::write(const string & filename){
 PLCP::PLCP(){}
 PLCP::PLCP(const sp_mat & aP,
            const sp_mat & aU,
-           const vec & aq) : P(aP),U(aU),q(aq){}
+           const vec & aq) : P(aP),U(aU),q(aq){
+  free_vars = zeros<bvec>(q.n_elem);
+}
+PLCP::PLCP(const sp_mat & aP,
+           const sp_mat & aU,
+           const vec & aq,
+           const bvec & afree_vars) :
+  P(aP),U(aU),q(aq),free_vars(afree_vars){}
+
 
 void PLCP::write(const string & filename){
   Archiver arch;
@@ -128,7 +143,8 @@ vec build_q_vec(const Simulator * sim,
 LCP build_lcp(const Simulator * sim,
               const Discretizer * disc,
               double gamma,
-              bool include_oob){
+              bool include_oob,
+              bool value_nonneg){
   cout << "Generating transition matrices..."<< endl;
   vector<sp_mat> E_blocks = build_E_blocks(sim,disc,
                                            gamma,include_oob);
@@ -137,7 +153,21 @@ LCP build_lcp(const Simulator * sim,
   assert(q.n_elem == M.n_rows);
   assert(q.n_elem == M.n_cols);
 
-  return LCP(M,q);
+  if(value_nonneg)
+    return LCP(M,q);
+
+  uint A = sim->num_actions();
+  uint N;
+  if(include_oob)
+    N= disc->number_of_all_nodes();
+  else
+    N= disc->number_of_spatial_nodes();
+
+  bvec free_vars = zeros<bvec>((A+1)*N);
+  assert(size(q) == size(free_vars));
+  
+  free_vars.head(N).fill(1);
+  return LCP(M,q,free_vars);
 }
 
 
@@ -168,7 +198,12 @@ LCP augment_lcp(const LCP & original,
   y.resize(N+1);
   y(N) = scale;
 
-  return LCP(M,q);
+  // New variable is non-negative; all others same.
+  bvec free_vars = bvec(N+1);
+  free_vars.head(N) = original.free_vars;
+  free_vars(N) = 0;
+  
+  return LCP(M,q,free_vars);
 }
 
 

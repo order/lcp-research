@@ -209,7 +209,7 @@ int main(int argc, char** argv)
   arch.add_vec("twiddle",twiddle);
   arch.add_mat("jitter",jitter);
   arch.add_mat("noise",noise);
-  arch.add_sp_mat("flow_basis",flow_basis);
+  arch.add_sp_mat("flow_basis",sp_flow_basis);
   arch.write(file_base + ".sens");
   
 }

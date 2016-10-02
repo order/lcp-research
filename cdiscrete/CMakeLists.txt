@@ -69,11 +69,9 @@ include_directories(${OPENBLAS_INCLUDE_DIR})
 include( CGAL_CreateSingleSourceCGALProgram )
 list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
   "lcp.cpp" "discretizer.cpp")
-create_single_source_cgal_program("di_gen.cpp" "tri_mesh.cpp" "di.cpp"
-  ${COMMON_FILES})
-create_single_source_cgal_program("di_refine.cpp" "tri_mesh.cpp"
-  "di.cpp" "refine.cpp"
-  ${COMMON_FILES})        
+create_single_source_cgal_program("di_refine.cpp" "tri_mesh.cpp" "di.cpp"
+  "refine.cpp" "solver.cpp"
+  ${COMMON_FILES})      
 create_single_source_cgal_program("hillcar_gen.cpp" "tri_mesh.cpp"
   "hillcar.cpp" ${COMMON_FILES})
 create_single_source_cgal_program("hillcar_refine.cpp" "tri_mesh.cpp"
@@ -109,7 +107,6 @@ list(APPEND CDISCRETE_LIBRARIES
         ${LAPACK_LIBRARIES})
 message(STATUS "Libraries: ${CDISCRETE_LIBRARIES}")
 
-target_link_libraries(di_gen ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_refine ${CDISCRETE_LIBRARIES})
 
 target_link_libraries(hillcar_gen ${CDISCRETE_LIBRARIES})

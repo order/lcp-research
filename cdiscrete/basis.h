@@ -6,14 +6,19 @@
 #include <armadillo>
 #include <set>
 #include <vector>
-
+#include "misc.h"
 
 using namespace std;
 using namespace arma;
 
+double find_radius(const vec & dist,
+                   uint target);
+double find_radius(const vec & dist,
+                   const bvec & mask,
+                   uint target);
+
 mat make_ring_basis(const Points & points,
                     uint S);
-
 sp_mat make_sample_basis(uint N,uint K);
 sp_mat make_ball_basis(const Points & points,
                        const Points & centers,

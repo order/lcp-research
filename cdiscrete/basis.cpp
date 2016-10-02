@@ -1,8 +1,5 @@
 #include <assert.h>
-
 #include "basis.h"
-#include "misc.h"
-#include <set>
 
 mat make_ring_basis(const Points & points,
                uint S){
@@ -58,6 +55,13 @@ mat make_rbf_basis(const Points & points,
   }
   basis = orth(basis);
   return basis;
+}
+
+double find_radius(const vec & dist,
+                   uint target){
+  uint N = dist.n_rows;
+  bvec mask = zeros<bvec>(N);
+  return find_radius(dist,mask,target);
 }
 
 double find_radius(const vec & dist,
@@ -205,7 +209,6 @@ IndexPartition voronoi_partition(const Points & points,
     dist.col(k) = lp_norm(points.each_row() - centers.row(k),2,1);
   }
   uvec P = col_argmin(dist); // partition index
-
   // Assign indices to partitions
   IndexPartition partition;
   partition.resize(K); 
@@ -215,42 +218,44 @@ IndexPartition voronoi_partition(const Points & points,
       partition[k].insert(idx(i));
     }
   }
-
   // Remove empty bases
   uint c = 0;
+  uint agg = 0;
   while(c < partition.size()){
+    agg += partition[c].size();
+    cout << "Partition size: " << partition[c].size() << endl;
     if(0 == partition[c].size())
       partition.erase(partition.begin() + c);
     else
       c++;
   }
+  assert(N == agg);
   return partition;
 }
 
 set<uint> ball_indices(const Points & points,
                        const vec & center,
                        uint R){
-    vec dist = lp_norm(points.each_row() - center,2,1);
-    double r = find_radius(dist,R);
-    uvec idx = find(dist < r);
-
-    set<uint> basis;
-    for(uint i = 0; i < idx.n_elem; i++){
-      basis.insert(idx(i));
-    }
+  vec dist = lp_norm(points.each_row() - center.t(),2,1);
+  double r = find_radius(dist,R);
+  uvec idx = find(dist < r);
+  
+  set<uint> basis;
+  for(uint i = 0; i < idx.n_elem; i++){
+    basis.insert(idx(i));
+  }
+  return basis;
 }
 
 void add_basis(IndexPartition & partition,
                          const set<uint> & basis){
   for(IndexIterator it = partition.begin();
       it != partition.end(); it++){
-    vector<uint> overlap;
-    set_intersection(it->begin(),it->end(),
-                     basis.begin(),basis.end(),
-                     back_inserter(overlap));
-    for(vector<uint>::iterator oit = overlap.begin();
-        oit != overlap.end(); oit++){
-      it->erase(*oit);
+    for(set<uint>::const_iterator bit = basis.begin();
+        bit != basis.end(); bit++){
+      if(it->count(*bit) > 0){
+          it->erase(*bit);
+      }
     }
   }
   partition.push_back(basis);
@@ -259,10 +264,11 @@ void add_basis(IndexPartition & partition,
 sp_mat build_basis_from_partition(const IndexPartition & partition,uint N){
   uint K = partition.size();
   sp_mat basis = sp_mat(N,K);
+  
   for(uint k = 0; k < K; k++){
-    double v = 1.0 * sqrt(partition[k].size());
+    double v = 1.0 / sqrt(partition[k].size());
     for(set<uint>::const_iterator it = partition[k].begin();
-        it != partition[k].end(); it++){
+        it != partition[k].end();++it){
       basis(*it,k) = v;
     }
   }

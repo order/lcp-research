@@ -52,6 +52,18 @@ SolverResult::SolverResult(const vec & ap,
                            const vec & ad,
                            uint aiter) : p(ap),d(ad),iter(aiter){}
 
+void SolverResult::trim_final(){
+  uint N = p.n_elem;
+  p.resize(N-1);
+  d.resize(N-1);
+}
+
+void SolverResult::write(const string & filename) const{
+  Archiver arch;
+  arch.add_vec("p",p);
+  arch.add_vec("d",d);
+  arch.write(filename);
+}
 ////////////////////////////////////////////////////////
 // Kojima
 
@@ -60,15 +72,19 @@ KojimaSolver::KojimaSolver(){
   max_iter = 500;
   verbose = true;
   regularizer = 1e-8;
+  aug_rel_scale = 0.75;
 }
 
 // Really should be always using this.
 SolverResult KojimaSolver::aug_solve(const LCP & lcp) const{
   uint N = lcp.q.n_elem;
-  double scale = 1.0 * (double) N; // Balance feasibility and complementarity
+  double scale = aug_rel_scale * (double) N;
+  // Balance feasibility and complementarity
   vec x,y;
   LCP alcp = augment_lcp(lcp,x,y,scale);
-  return solve(alcp,x,y);
+  SolverResult sol = solve(alcp,x,y);
+  sol.trim_final();
+  return sol;
 }
 
 SolverResult KojimaSolver::solve(const LCP & lcp,
@@ -76,8 +92,8 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
                                  vec & y) const{
   superlu_opts opts;
   opts.equilibrate = true;
-  opts.permutation = superlu_opts::NATURAL;
-  opts.refine = superlu_opts::REF_NONE;
+  opts.permutation = superlu_opts::COLAMD;
+  opts.refine = superlu_opts::REF_SINGLE;
   
   vec q = lcp.q;  
   uint N = q.n_elem;
@@ -85,13 +101,26 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
   assert(N == x.n_elem);
   assert(N == y.n_elem);
 
+  // Figure out what is free (-inf,inf)
+  // and what is bound to be non-negative [0,inf)
+  bvec free_vars = lcp.free_vars;
+  uvec bound_idx = find(0 == free_vars);
+  uvec free_idx = find(1 == free_vars);
+  assert(N == bound_idx.n_elem + free_idx.n_elem);
+  uint NB = bound_idx.n_elem; // number bound
+  
   vec dx,dy,dir;
-
+  // A matrix:
+  // [Y  X]
+  // [-M I]
+  // Overwrite the Y,X diagonals every iteration
+  // Zero out Y,X rows associated with free variables
   sp_mat A;
   vector<vector<sp_mat>> block_A;
   block_A.push_back(vector<sp_mat>{sp_mat(N,N),sp_mat(N,N)});
-  block_A.push_back(vector<sp_mat>{-lcp.M,speye(N,N)});
-  A = block_mat(block_A) + regularizer*speye(2*N,2*N);
+  block_A.push_back(vector<sp_mat>{-lcp.M - regularizer * speye(N,N),
+        speye(N,N)});
+  A = block_mat(block_A);
 
   vec b = vec(2*N);
   double mean_comp, steplen, sigma = 0.95;
@@ -100,27 +129,35 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
     if(verbose)
       cout << "---Iteration " << iter << "---" << endl;
     // Mean complementarity
-    mean_comp = dot(x,y) / (double) N;
+    mean_comp = dot(x(bound_idx),y(bound_idx)) / (double) NB;
     if(mean_comp < comp_thresh)
       break;
 
     // Update A inplace
-    for(uint i = 0; i < N; i++){
-      A(i,i) = y(i);
-      A(i,i+N) = x (i);
+    // Only fill in bound indices
+    for(uint i = 0; i < NB; i++){
+      uint idx = bound_idx(i);
+      A(idx,idx) = y(idx);
+      A(idx,idx+N) = x(idx);
     }
-    
+                    
     // Form RHS from residual and complementarity
     b.head(N) = sigma * mean_comp - x % y;
+    b(free_idx).fill(0); //Explicitly zero-out
     b.tail(N) = lcp.M * x + q - y;
 
     // Solve and extract directions
-    dir = spsolve(A,b,"superlu",opts);
+    dir = spsolve(A,
+                  b,"superlu",opts);
     assert(2*N == dir.n_elem);
     dx = dir.head(N);
     dy = dir.tail(N);    
 
-    steplen = steplen_heuristic(x,y,dx,dy,0.9);
+    steplen = steplen_heuristic(x(bound_idx),
+                                y(bound_idx),
+                                dx(bound_idx),
+                                dy(bound_idx),
+                                0.9);
     sigma = sigma_heuristic(sigma,steplen);
 
     x += steplen * dx;
@@ -148,6 +185,8 @@ ProjectiveSolver::ProjectiveSolver(){
   max_iter = 500;
   verbose = true;
   regularizer = 1e-8;
+  aug_rel_scale = 0.75;
+
 }
 
 // Really should be always using this.
@@ -156,12 +195,15 @@ ProjectiveSolver::ProjectiveSolver(){
 SolverResult ProjectiveSolver::aug_solve(const PLCP & plcp) const{
   uint N = plcp.P.n_rows;
   uint K = plcp.P.n_cols;
-  double scale = 0.5 * (double) N; // Balance feasibility and complementarity
+  double scale = aug_rel_scale * (double) N;
+  // Balance feasibility and complementarity
   vec x = ones<vec>(N);
   vec y = ones<vec>(N);
   vec w;
   PLCP aplcp = augment_plcp(plcp,x,y,w,scale);
-  return solve(aplcp,x,y,w);
+  SolverResult sol = solve(aplcp,x,y,w);
+  sol.trim_final();
+  return sol;
 }
 
 SolverResult ProjectiveSolver::aug_solve(const PLCP & plcp,

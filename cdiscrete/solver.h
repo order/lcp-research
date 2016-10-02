@@ -23,6 +23,8 @@ struct SolverResult{
   uint iter;
   SolverResult();
   SolverResult(const vec & p, const vec & d, uint iter);
+  void trim_final();
+  void write(const string & filename) const;
 };
 
 class KojimaSolver{
@@ -35,6 +37,7 @@ class KojimaSolver{
   uint max_iter;
   bool verbose;
   double regularizer;
+  double aug_rel_scale;
 };
 
 class ProjectiveSolver{
@@ -49,6 +52,7 @@ class ProjectiveSolver{
   uint max_iter;
   bool verbose;
   double regularizer;
+  double aug_rel_scale;
 
 };
 

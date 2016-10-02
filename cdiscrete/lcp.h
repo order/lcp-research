@@ -8,11 +8,15 @@
 using namespace arma;
 
 struct LCP{
+  LCP();
   LCP(const sp_mat &,
       const vec &);
-  LCP();
+  LCP(const sp_mat &,
+      const vec &,
+      const bvec &);  
   sp_mat M;
   vec q;
+  bvec free_vars;
   void write(const string &);
 };
 
@@ -21,9 +25,14 @@ struct PLCP{
   PLCP(const sp_mat &,
        const sp_mat &,
        const vec &);
+  PLCP(const sp_mat &,
+       const sp_mat &,
+       const vec &,
+       const bvec &);
   sp_mat P;
   sp_mat U;
   vec q;
+  bvec free_vars;
   void write(const string &);
 };
 
@@ -40,7 +49,8 @@ vec build_q_vec(const Simulator * sim,
 LCP build_lcp(const Simulator * sim,
               const Discretizer * disc,
               double gamma,
-              bool include_oob);
+              bool include_oob = false,
+              bool value_nonneg = true);
 
 // Augmented LCP
 // Use this LCP if feasible start isn't known.

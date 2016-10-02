@@ -1,38 +1,34 @@
-#include <iostream>
-#include <string>
-#include <sstream>
-#include <assert.h>
-#include <armadillo>
-
+#include "di.h"
 #include "misc.h"
 #include "io.h"
-#include "tri_mesh.h"
-#include "di.h"
+#include "lcp.h"
+#include "solver.h"
 #include "refine.h"
+
+#define CGAL_MESH_2_OPTIMIZER_VERBOSE
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
-using namespace std;
-using namespace arma;
 using namespace tri_mesh;
-
 
 po::variables_map read_command_line(uint argc, char** argv){
   po::options_description desc("Meshing options");
   desc.add_options()
     ("help", "produce help message")
-    ("infile_base,i", po::value<string>()->required(), "Input file base")
     ("outfile_base,o", po::value<string>()->required(),
-     "Output (CGAL) mesh file base")
-    ("mesh_angle", po::value<double>()->default_value(0.125),
+     "Base for all files generated (lcp, mesh)")
+    ("mesh_file,m", po::value<string>(), "Input (CGAL) mesh file")
+    ("mesh_angle", po::value<double>()->default_value(0.11),
      "Mesh angle refinement criterion")
-    ("mesh_length", po::value<double>()->default_value(0.5),
+    ("mesh_length", po::value<double>()->default_value(1),
      "Mesh edge length refinement criterion")    
-    ("max_expansion", po::value<int>()->default_value(100),
-     "Max number of cells to split")
-    ("perc_expansion",po::value<double>()->default_value(0.1),
-     "Percentage of cells to expand");
+    ("gamma,g", po::value<double>()->default_value(0.997),
+     "Discount factor")
+    ("boundary,B", po::value<double>()->default_value(5.0),
+     "Square boundary box [-B,B]^2")
+    ("bang_points,b", po::value<uint>()->default_value(0),
+     "Number of bang-bang curve points to add to initial mesh");
   po::variables_map var_map;
   po::store(po::parse_command_line(argc, argv, desc), var_map);
   po::notify(var_map);
@@ -44,135 +40,225 @@ po::variables_map read_command_line(uint argc, char** argv){
   return var_map;
 }
 
-////////////////////////////////////////////////////////////
-// MAIN FUNCTION ///////////////////////////////////////////
-////////////////////////////////////////////////////////////
+DoubleIntegratorSimulator build_di_simulator(const po::variables_map & var_map){
+  double B = var_map["boundary"].as<double>();
+  mat bbox = mat(2,2);
+  bbox.col(0).fill(-B);
+  bbox.col(1).fill(B);
+  mat actions = vec{-1,1};
+  return DoubleIntegratorSimulator(bbox,actions);
+}
+
+void generate_initial_mesh(const po::variables_map & var_map,
+                           const DoubleIntegratorSimulator & di,
+                           TriMesh & mesh){
+  uint num_bang_points = var_map["bang_points"].as<uint>();
+  double angle = var_map["mesh_angle"].as<double>();
+  double length = var_map["mesh_length"].as<double>();
+
+  double B = var_map["boundary"].as<double>();    
+  vec lb = -B*ones<vec>(2);
+  vec ub = B*ones<vec>(2);
+  mat bbox = join_horiz(lb,ub);
+
+  cout << "Initial meshing..."<< endl;
+  mesh.build_box_boundary(lb,ub);
+  VertexHandle v_zero = mesh.insert(Point(0,0));
+
+  if(num_bang_points > 0){
+    di.add_bang_bang_curve(mesh,num_bang_points);
+  }
+  
+  cout << "Refining based on (" << angle
+       << "," << length <<  ") criterion ..."<< endl;
+  mesh.refine(angle,length);
+  
+  cout << "Optimizing (10 rounds of Lloyd)..."<< endl;
+  mesh.lloyd(10);
+  mesh.refine(angle,length);
+
+  mesh.freeze();
+}
+
+umat generate_policy_mat(const TriMesh & mesh,
+                         const DoubleIntegratorSimulator & di,
+                         const vec & value,
+                         const mat & flows,
+                         double gamma){
+  uint F = mesh.number_of_faces();
+  
+  uvec f_pi = flow_policy(&mesh,flows);  
+  uvec g_pi = grad_policy(&mesh,&di,value);
+  uvec q_pi = q_policy(&mesh,&di,value,gamma);
+
+  umat policies = umat(F,3);
+  policies.col(0) = f_pi;
+  policies.col(1) = g_pi;
+  policies.col(2) = q_pi;
+  return policies;
+}
+
+bvec find_policy_disagreement(const umat & policies){
+  uint N = policies.n_rows;
+  uint C = policies.n_cols;
+  uvec agg = sum(policies,1);
+  assert(N == agg.n_elem);
+  bvec disagree = ones<bvec>(N);
+  disagree(find(0 == agg)).fill(0);
+  disagree(find(C == agg)).fill(0);
+  return disagree;
+}
+
+vec residual_heuristic(const TriMesh & mesh,
+                                const DoubleIntegratorSimulator & di,
+                                const vec & value,
+                                const vec & flow_vol,
+                                double gamma){
+  uint N = mesh.number_of_spatial_nodes();
+  assert(N == value.n_elem);
+  
+  uint F = mesh.number_of_faces();
+  assert(F == flow_vol.n_elem);
+  
+  vec bell_res = bellman_residual(&mesh,&di,value,gamma,0,25);
+  assert(F == bell_res.n_elem);
+
+  vec H = bell_res % pow(flow_vol,0.5);
+  assert(F == H.n_elem);
+  return H;
+}
+
+vec policy_disagreement_heuristic(const TriMesh & mesh,
+                                           const DoubleIntegratorSimulator & di,
+                                           const vec & value,
+                                           const vec & flow_vol,
+                                           const bvec & disagree,
+                                           double gamma){
+  uint F = mesh.number_of_faces();
+  vec adv_fun = advantage_function(&mesh,&di,value,gamma,0,25);
+  assert(F == adv_fun.n_elem);
+  vec H = adv_fun % flow_vol;
+  H(find(0 == disagree)).fill(0);
+  assert(F == H.n_elem);
+  return H;
+}
+
+uint refine_mesh(const po::variables_map & var_map,
+                 TriMesh & mesh,
+                 const vec & res_heur,
+                 const vec & pol_heur){
+  double angle = var_map["mesh_angle"].as<double>();
+  double length = var_map["mesh_length"].as<double>();
+
+  uint N = mesh.number_of_spatial_nodes();
+  uint F = mesh.number_of_faces();
+  assert(F == res_heur.n_rows);
+  assert(F == pol_heur.n_rows);
+  
+  double res_cutoff = quantile(res_heur,0.95);
+  double pol_cutoff = quantile(pol_heur,0.95);
+  vec area = mesh.cell_area();
+
+  // Identify the centers we want to expand
+  vector<Point> new_points;
+  for(uint f = 0; f < F; f++){
+    if(area(f) < 0.01)
+      continue; // Too small
+    
+    if(res_heur(f) > res_cutoff
+       or pol_heur(f) > pol_cutoff){
+      Point new_point = convert(mesh.center_of_face(f));
+      new_points.push_back(new_point);
+    }
+  }
+  mesh.unfreeze();
+  
+  // Add these centers (two steps to avoid indexing issues)
+  cout << "\tAdding " << new_points.size() << " new points..." << endl;
+  for(vector<Point>::const_iterator it = new_points.begin();
+      it != new_points.end();++it){
+    mesh.insert(*it);
+  }
+
+  cout << "\tOptimizing node position..." << endl;
+  mesh.lloyd(250);
+  cout << "\tRefining split cells..." << endl;
+  mesh.refine(angle,length);
+  mesh.freeze();
+
+  return mesh.number_of_spatial_nodes() - N;
+}
+
+//===========================================================
+// Main function
 
 int main(int argc, char** argv)
 {
+  // Parse command line
   po::variables_map var_map = read_command_line(argc,argv);
 
-  string mesh_file = var_map["infile_base"].as<string>() + ".tri";
-
-  // Read in the CGAL mesh
+  cout << "Generating initial mesh..." << endl;
   TriMesh mesh;
-  cout << "Reading in cgal mesh file [" << mesh_file << ']'  << endl;
-  mesh.read_cgal(mesh_file);
+  DoubleIntegratorSimulator di = build_di_simulator(var_map);
+  generate_initial_mesh(var_map,di,mesh);
   mesh.freeze();
-  uint V = mesh.number_of_vertices();
-  uint F = mesh.number_of_faces();
-  cout << "Mesh stats:"
-       << "\n\tNumber of vertices: " << V
-       << "\n\tNumber of faces: " << F
-       << endl;
 
-  // Find boundary from the mesh and create the simulator object
-  mat bbox = mesh.find_bounding_box();
-  vec lb = bbox.col(0);
-  vec ub = bbox.col(1);
-  cout << "\tLower bound:" << lb.t()
-       << "\tUpper bound:" << ub.t();
-  DoubleIntegratorSimulator di = DoubleIntegratorSimulator(bbox,vec{-1,1});
+  double gamma = var_map["gamma"].as<double>();
 
-  // Read in solution information
-  string soln_file = var_map["infile_base"].as<string>() + ".sol";
-  cout << "Reading in LCP solution file [" << soln_file << ']'  << endl;
-  Unarchiver unarch(soln_file);
-  vec p = unarch.load_vec("p");
+  cout << "Initializing solver..." << endl;
+  KojimaSolver solver;
+  solver.comp_thresh = 1e-8;
+  solver.max_iter = 500;
+  solver.regularizer = 1e-8;
+  solver.verbose = true;
+  solver.aug_rel_scale = 10;
 
-  // Make sure that the primal information makes sense
-  double p_over_v = ((double)p.n_elem / (double) V);
-  uint rem = p.n_elem % V;
-  cout << "Blocking primal solution..."
-       << "\n\tLength of primal solution: " << p.n_elem
-       << "\n\tRatio of primal length to vertex number: " << p_over_v
-       << "\n\tRemainder of above: " << rem << endl;
-  assert(p.n_elem == 3*V);  
-  mat P = reshape(p,size(V,3));
-  vec value = P.col(0);
-  mat flows = P.tail_cols(2);
+  string filebase = var_map["outfile_base"].as<string>();
+  uint A = 2;
+  for(uint i = 0; i < 1; i++){
+    string iter_filename = filebase + "." + to_string(i);
+    
+    uint N = mesh.number_of_spatial_nodes();
+    uint F = mesh.number_of_faces();
 
-  
-  // Heuristic calculations
-  Archiver arch;
-  cout << "Calculating splitting heuristic..." << endl;
+    // These are the mesh files for this iteration
+    cout << "Writing:"
+         << "\n\t" << (iter_filename + ".node") << " (Shewchuk node file)"
+         << "\n\t" << (iter_filename + ".ele") << " (Shewchuk element file)"
+         << "\n\t" << (iter_filename + ".tri") << " (CGAL mesh file)" << endl;
+    mesh.write_shewchuk(iter_filename);
+    mesh.write_cgal(iter_filename + ".tri");
 
-  // Policy disagreement
-  cout << "Finding policy disagreements..." << endl;
-  uvec f_pi = flow_policy(&mesh,flows);  
-  uvec g_pi = grad_policy(&mesh,&di,value);
-  uvec q_pi = q_policy(&mesh,&di,value,0.997);
-  uvec policy_agg = f_pi + 2*g_pi + 4*q_pi;
-  arch.add_uvec("policy_agg",policy_agg);
-  policy_agg = vec_mod(policy_agg,7); // 0 if all policies agree
+    cout << "Building LCP..." << endl;
+    bool include_oob = false;
+    bool value_nonneg = true;
+    LCP lcp = build_lcp(&di,&mesh,gamma,include_oob,value_nonneg);
+    
+    cout << "Solving iteration " << i << " LCP..." << endl;
+    SolverResult sol = solver.aug_solve(lcp);
+    assert((A+1)*N == sol.p.n_elem);
+    sol.write(iter_filename + ".sol");
+    cout << "Sol len: " << sol.p.n_elem << endl;
+    
+    mat P = reshape(sol.p,size(N,(A+1)));
+    vec value = P.col(0);
+    mat flows = P.tail_cols(2);
+
+    cout << "Calculating heuristics..." << endl;
+    umat policies =  generate_policy_mat(mesh, di, value, flows, gamma);
+    bvec disagree = find_policy_disagreement(policies);
+    vec flow_vol = mesh.prism_volume(sum(flows,1));
+    vec res_heur = residual_heuristic(mesh,di,value,flow_vol,gamma);
+    vec pol_heur = policy_disagreement_heuristic(mesh,di,value,
+                                                 flow_vol,
+                                                 disagree,gamma);
 
 
-  // Bellman residual
-  cout << "\tBellman residual at centroids..." << endl;
-  vec bell_res = bellman_residual(&mesh,&di,value,0.997,0,25);
-  arch.add_vec("bellman_residual",bell_res);
-
-  // Advantage function
-  vec adv_res = advantage_residual(&mesh,&di,value,0.997,25);
-  arch.add_vec("advantage_residual",adv_res);
-
-  // Volume of the aggregate flow
-  cout << "\tFlow volume..." << endl;
-  vec flow_vol = mesh.prism_volume(sum(flows,1));
-  arch.add_vec("flow_vol",flow_vol);
-
-  //
-  vec heuristic_1 = bell_res % pow(flow_vol,0.5);
-  heuristic_1(find(policy_agg != 0)) *= 4;
-  assert(F == heuristic_1.n_elem);
-  arch.add_vec("heuristic_1",heuristic_1);
-
-  cout << "Finding heuristic_1 0.95 quantile..." << endl;
-  double cutoff_1 = quantile(heuristic_1,0.95);
-  cout << "\t Cutoff: " << cutoff_1
-       << "\n\t Max:" << max(heuristic_1)
-       << "\n\t Min:" << min(heuristic_1) << endl;
-
-  vec heuristic_2 = adv_res % pow(flow_vol,0.5);
-  heuristic_2(find(policy_agg != 0)) *= 4;
-  assert(F == heuristic_2.n_elem);
-  arch.add_vec("heuristic_2",heuristic_2); 
- 
-  cout << "Finding heuristic_2 0.95 quantile..." << endl;
-  double cutoff_2 = quantile(heuristic_2,0.95);
-  cout << "\t Cutoff_2: " << cutoff_2
-       << "\n\t Max:" << max(heuristic_2)
-       << "\n\t Min:" << min(heuristic_2) << endl;
-  
-
-  // Split the cells if they have a large heuristic_1 or
-  // policies disagree on them.
-  TriMesh new_mesh(mesh);  
-  Point center;
-  uint new_nodes = 0;
-  for(uint f = 0; f < F; f++){
-    if(heuristic_1(f) > cutoff_1 or heuristic_2(f) > cutoff_2){
-      // Get center from old mesh
-      center = convert(mesh.center_of_face(f));
-      // Insert center into new mesh.
-      new_mesh.insert(center);
-      new_nodes++;
-    }
+    cout << "Refining mesh..." << endl;
+    uint num_new_nodes = refine_mesh(var_map,
+                                     mesh,
+                                     res_heur,
+                                     pol_heur);
+    cout << "Added " << num_new_nodes << " new nodes.";
   }
-  cout << "Added " << new_nodes << " new nodes..." << endl;
-  
-  cout << "Refining..." << endl;
-  new_mesh.refine(0.125,1.0);
-  new_mesh.lloyd(25);
-  new_mesh.freeze();
-
-  // Write out all the information
-  string out_file_base = var_map["outfile_base"].as<string>();
-  arch.write(out_file_base + ".stats");
-  cout << "Writing..."
-       << "\n\tCGAL mesh file: " << out_file_base << ".tri"
-       << "\n\tShewchuk node file: " << out_file_base << ".node"
-       << "\n\tShewchuk ele file: " << out_file_base << ".ele" << endl;
-  new_mesh.write_cgal(out_file_base + ".tri");
-  new_mesh.write_shewchuk(out_file_base);
 }

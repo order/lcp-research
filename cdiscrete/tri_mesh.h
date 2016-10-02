@@ -116,6 +116,7 @@ namespace tri_mesh{
     void write_shewchuk(string base_filename) const; // To node and ele files
 
     void freeze();
+    void unfreeze();
     void print_vert_reg() const;
 
     //protected:
