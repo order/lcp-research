@@ -414,3 +414,47 @@ sp_mat spdiag(const vec & v){
                 regspace<uvec>(0,N),
                 v,N,N);
 }
+
+sp_mat sp_submatrix(const sp_mat & A,
+                          const uvec & row_idx,
+                          const uvec & col_idx){
+  // Apparently non-contiguous sub-matrixing is not supported yet
+  assert(row_idx.is_sorted());
+  assert(col_idx.is_sorted());
+  
+  sp_mat ret = sp_mat(row_idx.n_elem,
+                      col_idx.n_elem);
+
+  for(sp_mat::const_iterator it = A.begin();
+      it !=  A.end(); ++it){
+
+    uvec I = find(row_idx == it.row());
+    if(0 == I.n_elem){
+      continue; // Not in this submatrix
+    }
+    uvec J = find(col_idx == it.col());
+    if(0 == J.n_elem){
+      continue; // Not in this submatrix
+    }
+    assert(1 == I.n_elem);
+    assert(1 == J.n_elem);
+    ret(I(0),J(0)) = *it;
+  }
+  return ret;
+}
+
+block_sp_mat sp_partition(const sp_mat & A,
+                          const uvec & idx_1,
+                          const uvec & idx_2){
+  block_sp_mat ret = block_sp_mat(2);
+  ret[0].resize(2);
+  ret[1].resize(2);
+
+  vector<uvec> idxs = {idx_1,idx_2};
+  for(uint i = 0; i < 2; i++){
+    for(uint j = 0; j < 2; j++){
+      ret[i][j] = sp_submatrix(A,idxs[i],idxs[j]);
+    }
+  }
+  return ret;
+}

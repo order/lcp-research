@@ -7,7 +7,7 @@
 #include <vector>
 
 #define ALMOST_ZERO 1e-15
-#define PRETTY_SMALL 1e-12
+#define PRETTY_SMALL 1e-9
 //=====================================
 // RANDOM GENERATOR
 extern unsigned SEED;
@@ -104,4 +104,13 @@ typedef std::vector<sp_mat> block_sp_vec;
 sp_mat block_mat(const block_sp_mat & B);
 sp_mat block_diag(const block_sp_vec & D);
 sp_mat spdiag(const vec & v);
+
+
+sp_mat sp_submatrix(const sp_mat & A,
+                          const uvec & row_idx,
+                          const uvec & col_idx);
+
+block_sp_mat sp_partition(const sp_mat & A,
+                          const uvec & idx_1,
+                          const uvec & idx_2);
 #endif

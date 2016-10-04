@@ -5,8 +5,6 @@
 #include "solver.h"
 #include "refine.h"
 
-#define CGAL_MESH_2_OPTIMIZER_VERBOSE
-
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
@@ -19,7 +17,7 @@ po::variables_map read_command_line(uint argc, char** argv){
     ("outfile_base,o", po::value<string>()->required(),
      "Base for all files generated (lcp, mesh)")
     ("mesh_file,m", po::value<string>(), "Input (CGAL) mesh file")
-    ("mesh_angle", po::value<double>()->default_value(0.11),
+    ("mesh_angle", po::value<double>()->default_value(0.125),
      "Mesh angle refinement criterion")
     ("mesh_length", po::value<double>()->default_value(1),
      "Mesh edge length refinement criterion")    
@@ -156,36 +154,39 @@ uint refine_mesh(const po::variables_map & var_map,
   assert(F == pol_heur.n_rows);
   
   double res_cutoff = quantile(res_heur,0.95);
-  double pol_cutoff = quantile(pol_heur,0.95);
+  double pol_cutoff = quantile(pol_heur,0.9);
   vec area = mesh.cell_area();
 
   // Identify the centers we want to expand
-  vector<Point> new_points;
+  vector<vec> new_points;
   for(uint f = 0; f < F; f++){
     if(area(f) < 0.01)
-      continue; // Too small
-    
+      continue; // Too small    
     if(res_heur(f) > res_cutoff
        or pol_heur(f) > pol_cutoff){
-      Point new_point = convert(mesh.center_of_face(f));
-      new_points.push_back(new_point);
+      new_points.push_back(mesh.center_of_face(f));
     }
   }
   mesh.unfreeze();
   
   // Add these centers (two steps to avoid indexing issues)
-  cout << "\tAdding " << new_points.size() << " new points..." << endl;
-  for(vector<Point>::const_iterator it = new_points.begin();
-      it != new_points.end();++it){
-    mesh.insert(*it);
+
+  for(uint f = 0; f < new_points.size(); f++){
+    mesh.insert(convert(new_points[f]));
   }
 
   cout << "\tOptimizing node position..." << endl;
-  mesh.lloyd(250);
   cout << "\tRefining split cells..." << endl;
-  mesh.refine(angle,length);
-  mesh.freeze();
+  mesh.refine(0.125,1);
+  mesh.lloyd(25);
 
+  string tmp_file = "/tmp/tmp.tri";
+  mesh.freeze();
+  mesh.write_cgal(tmp_file);
+  mesh.unfreeze();
+  mesh.read_cgal(tmp_file);
+  mesh.freeze();
+ 
   return mesh.number_of_spatial_nodes() - N;
 }
 
@@ -207,15 +208,15 @@ int main(int argc, char** argv)
 
   cout << "Initializing solver..." << endl;
   KojimaSolver solver;
-  solver.comp_thresh = 1e-8;
-  solver.max_iter = 500;
+  solver.comp_thresh = 1e-12;
+  solver.max_iter = 150;
   solver.regularizer = 1e-8;
-  solver.verbose = true;
+  solver.verbose = false;
   solver.aug_rel_scale = 10;
 
   string filebase = var_map["outfile_base"].as<string>();
   uint A = 2;
-  for(uint i = 0; i < 1; i++){
+  for(uint i = 0; i <= 20; i++){
     string iter_filename = filebase + "." + to_string(i);
     
     uint N = mesh.number_of_spatial_nodes();
@@ -231,14 +232,14 @@ int main(int argc, char** argv)
 
     cout << "Building LCP..." << endl;
     bool include_oob = false;
-    bool value_nonneg = true;
+    bool value_nonneg = false;
     LCP lcp = build_lcp(&di,&mesh,gamma,include_oob,value_nonneg);
-    
+    //lcp.write("test.lcp");
     cout << "Solving iteration " << i << " LCP..." << endl;
     SolverResult sol = solver.aug_solve(lcp);
     assert((A+1)*N == sol.p.n_elem);
     sol.write(iter_filename + ".sol");
-    cout << "Sol len: " << sol.p.n_elem << endl;
+    cout << "Writing solution to " << iter_filename << ".sol" << endl;
     
     mat P = reshape(sol.p,size(N,(A+1)));
     vec value = P.col(0);
@@ -259,6 +260,9 @@ int main(int argc, char** argv)
                                      mesh,
                                      res_heur,
                                      pol_heur);
-    cout << "Added " << num_new_nodes << " new nodes.";
+    cout << "Added " << num_new_nodes << " new nodes." << endl;
+    if (0 == num_new_nodes){
+      break;
+    }
   }
 }

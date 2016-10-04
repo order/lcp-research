@@ -55,7 +55,7 @@ void build_minop_lcp(const TriMesh &mesh,
                      const vec & a,
                      LCP & lcp,
                      vec & ans){
-  double off = 1.0; // +ve offset
+  double off = 0.0; // +ve offset
   Points points = mesh.get_spatial_nodes();
   uint N = points.n_rows;
   vec sq_dist = sum(pow(points,2),1);
@@ -145,24 +145,35 @@ int main(int argc, char** argv)
   LCP ref_lcp;
   vec ans;
   build_minop_lcp(mesh,ref_weights,ref_lcp,ans);
-
+  assert(N == ans.n_elem);
+  
   block_sp_vec D = {sp_value_basis,
                     sp_flow_basis,
                     sp_flow_basis};  
   sp_mat P = block_diag(D);
   sp_mat U = P.t() * (ref_lcp.M + 1e-8 * speye(3*N,3*N));
   vec q =  P *(P.t() * ref_lcp.q);
+  assert(3*N == P.n_rows);
+  assert(3*N == q.n_rows);
 
-  PLCP ref_plcp = PLCP(P,U,q);
+  bvec free_vars = zeros<bvec>(3*N);
+  free_vars.head(N).fill(1);
+  
+  PLCP ref_plcp = PLCP(P,U,q,free_vars);
   ProjectiveSolver psolver;
   psolver.comp_thresh = 1e-8;
   psolver.max_iter = 250;
   psolver.regularizer = 1e-8;
-  psolver.verbose = false;
+  psolver.verbose = true;
 
   cout << "Reference solve..." << endl;
   SolverResult ref_sol = psolver.aug_solve(ref_plcp);
   cout << "\tDone." << endl;
+  cout << "Reference solution error: "
+       << norm(ans - ref_sol.p.head(N)) << endl;
+  assert(PRETTY_SMALL > norm(ref_sol.d.head(N))); // Essentially zero
+
+  exit(1);
   
   psolver.comp_thresh = 1e-6;
   // Exactish

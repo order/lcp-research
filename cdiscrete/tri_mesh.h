@@ -2,6 +2,8 @@
 #define __Z_TRIMESH_INCLUDED__
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Exact_predicates_exact_constructions_kernel_with_sqrt.h>
+#include <CGAL/Cartesian.h>
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
 #include <CGAL/Delaunay_mesher_2.h>
 #include <CGAL/Delaunay_mesh_vertex_base_2.h>
@@ -24,7 +26,9 @@ using namespace std;
 namespace tri_mesh{
   
   // CGAL typedefs
-  typedef CGAL::Exact_predicates_inexact_constructions_kernel       Kernel;
+  //typedef CGAL::Exact_predicates_inexact_constructions_kernel       Kernel;
+  //typedef CGAL::Exact_predicates_exact_constructions_kernel_with_sqrt Kernel;
+  typedef CGAL::Cartesian<long double>                              Kernel;
   typedef CGAL::Delaunay_mesh_vertex_base_2<Kernel>                 VertexBase;
   typedef CGAL::Delaunay_mesh_face_base_2<Kernel>                   FaceBase;
   typedef CGAL::Triangulation_data_structure_2<VertexBase,FaceBase> TDS;

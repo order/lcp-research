@@ -146,14 +146,11 @@ int main(int argc, char** argv)
   vec ans;
   build_minop_lcp(mesh,ref_weights,ref_lcp,ans);
 
-
   ProjectiveSolver psolver;
   psolver.comp_thresh = 1e-8;
   psolver.max_iter = 250;
   psolver.regularizer = 1e-8;
   psolver.verbose = false;
-
-
 
   uint max_iter = 25;
   uint jitter_rounds = 75;

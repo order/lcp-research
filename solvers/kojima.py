@@ -3,6 +3,7 @@ import scipy.sparse as sps
 
 from solvers import IPIterator,LCPIterator,potential
 from steplen import *
+from utils.archiver import Unarchiver
 
 from collections import defaultdict
 
@@ -63,6 +64,7 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         sigma = self.sigma
         
         r = (M.dot(x) + q) - y
+        print "Residual norm",np.linalg.norm(r)
         dot = x.dot(y)
 
         #self.data['res_norm'].append(np.linalg.norm(r))
@@ -75,8 +77,10 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         I = sps.eye(n)
         A = sps.bmat([[Y,X],
                       [-M,I]],format='csc')
-
         b = np.concatenate([sigma * dot / float(n) * np.ones(n) - x*y, r])
+        #unarch = Unarchiver("cdiscrete/test.sys")
+        #print "A error: ", np.linalg.norm(A.toarray() - unarch.G.toarray())
+        #print "b error: ", np.linalg.norm(b - unarch.h)
 
         Del = sps.linalg.spsolve(A,b)
         dir_x = Del[:n]
@@ -86,7 +90,7 @@ class KojimaIPIterator(IPIterator,LCPIterator):
         self.data['dx'].append(dir_x)
         self.data['dy'].append(dir_y)
 
-        steplen = steplen_heuristic(x,dir_x,y,dir_y,0.6)
+        steplen = steplen_heuristic(x,dir_x,y,dir_y,0.9)
         print 'Steplen', steplen
         self.data['steplen'].append(steplen)
         self.steplen = steplen

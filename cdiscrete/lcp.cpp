@@ -30,8 +30,10 @@ PLCP::PLCP(const sp_mat & aP,
            const sp_mat & aU,
            const vec & aq,
            const bvec & afree_vars) :
-  P(aP),U(aU),q(aq),free_vars(afree_vars){}
-
+  P(aP),U(aU),q(aq),free_vars(afree_vars){
+  assert(PRETTY_SMALL > norm(conv_to<vec>::from(free_vars)
+                             - conv_to<vec>::from(afree_vars)));
+}
 
 void PLCP::write(const string & filename){
   Archiver arch;
@@ -66,7 +68,7 @@ vector<sp_mat> build_E_blocks(const Simulator * sim,
   for(uint i = 0; i < A; i++){
     P = ElementDist(N,N);
     u = actions.row(i).t();
-    cout << "\tAction [" << i << "]: u = " << u.t() << endl;
+    cout << "\tAction [" << i << "]: u = " << u.t();
     for(uint j = 0; j < num_samples; j++){
       P += sim->transition_matrix(disc,u,include_oob);
     }
@@ -179,6 +181,7 @@ LCP augment_lcp(const LCP & original,
   uint N = original.q.n_elem;
   x = ones<vec>(N);
   y = ones<vec>(N);
+  y(find(1 == original.free_vars)).fill(0);
   
   vec r = y - (original.M * x + original.q); // Initial residual
   double s = scale; // Absolute scale
@@ -216,13 +219,16 @@ PLCP augment_plcp(const PLCP & original,
   uint N = original.P.n_rows;
   uint K = original.P.n_cols;
   assert(size(K,N) == size(original.U));
+
   
   sp_mat P = sp_mat(original.P);
   sp_mat U = sp_mat(original.U);
   vec q = vec(original.q);
 
-  assert(all(x > 0));
-  assert(all(y > 0));
+  x = ones<vec>(N);
+  y = ones<vec>(N);
+  y(find(1 == original.free_vars)).fill(0);
+
   assert(N == x.n_elem);
   assert(N == y.n_elem);
   w = P.t() * (x - y + q);
@@ -249,6 +255,10 @@ PLCP augment_plcp(const PLCP & original,
   y(N) = scale;
   w(K) = 1.0 - scale;
   
-  return PLCP(P,U,q);
+  bvec free_vars = bvec(N+1);
+  free_vars.head(N) = original.free_vars;
+  free_vars(N) = 0;
+  
+  return PLCP(P,U,q,free_vars);
 }
 
