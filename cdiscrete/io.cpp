@@ -6,6 +6,13 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/convenience.hpp>
 
+bool Archiver::add_umat(const string & field_name,
+		       const umat & A){
+  string name = field_name + ".umat";
+  uvec packed = pack_mat(A);
+  generic_add(name,packed);
+}
+
 bool Archiver::add_mat(const string & field_name,
 		       const mat & A){
   string name = field_name + ".mat";

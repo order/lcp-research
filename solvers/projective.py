@@ -4,6 +4,7 @@ import scipy.sparse as sps
 
 from solvers import *
 from steplen import *
+from utils.archiver import *
 
 import utils
 import matplotlib.pyplot as plt
@@ -67,7 +68,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         #print 'W residual', np.linalg.norm(w_res)
         #assert(np.linalg.norm(w_res) < 1e-12)
 
-        self.sigma = 0.5
+        self.sigma = 0.95
         self.steplen = np.nan
         
         self.dir_x = np.full(N,np.nan)
@@ -82,7 +83,7 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
 
         self.iteration = 0
 
-        self.verbose = True
+        self.verbose = False
         
     def next_iteration(self):
         """
@@ -284,14 +285,10 @@ class ProjectiveIPIterator(LCPIterator,IPIterator,BasisIterator):
         G = ((A * Y).dot(Phi) - PtPUP)
         assert((k,k) == G.shape)
 
-        h = A.dot(g) + PtPU.dot(x) + Ptq - Phi.T.dot(y)
+        r = PtPU.dot(x) + Ptq - Phi.T.dot(y)
+        h = A.dot(g) + r
         assert((k,) == h.shape)
 
-        if sparse:
-            G+= 1e-15*sps.eye(k)
-        else:
-            G += 1e-15*np.eye(k)
-        
         return (G,g,h)
 
     def form_M(self):

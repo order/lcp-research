@@ -89,7 +89,7 @@ po::variables_map read_command_line(uint argc, char** argv){
     ("help", "produce help message")
     ("outfile_base,o", po::value<string>()->required(),
      "Output experimental result file")
-    ("edge_length,e", po::value<double>()->default_value(0.075),
+    ("edge_length,e", po::value<double>()->default_value(0.05),
      "Max length of triangle edge");
   
   po::variables_map var_map;
@@ -128,7 +128,7 @@ int main(int argc, char** argv)
 
   // Build value basis
   uint num_value_basis = 25;
-  uint num_flow_basis = 10;
+  uint num_flow_basis = 30;
   Points points = mesh.get_spatial_nodes();
   cout << "Generating Radial Fourier basis for value..." << endl;
   mat value_basis = make_radial_fourier_basis(points,
@@ -137,39 +137,13 @@ int main(int argc, char** argv)
   cout << "\tOrthogonalizing..." << endl;
   value_basis = orth(value_basis);
 
-  cout << "Generating Voronoi basis for flow..." << endl;
-  sp_mat sp_value_basis = sp_mat(value_basis);
-  
-  Points centers = 2 * randu(10,2) - 1;
-  mat flow_basis = make_voronoi_basis(points,
-                                      centers);
-  cout << "\tOrthogonalizing..." << endl;
-  flow_basis = orth(flow_basis);
-  sp_mat sp_flow_basis = sp_mat(flow_basis);
-
   cout << "Building LCP..." << endl;
-  vec ref_weights = ones<vec>(N) / (double)N;
-  LCP ref_lcp;
+  vec weights = ones<vec>(N) / (double)N;
+  LCP lcp;
   vec ans;
-  build_minop_lcp(mesh,ref_weights,ref_lcp,ans);
+  build_minop_lcp(mesh,weights,lcp,ans);
   assert(N == ans.n_elem);
 
-  cout << "Building PLCP..." << endl;
-  block_sp_vec D = {sp_value_basis,
-                    sp_flow_basis,
-                    sp_flow_basis};  
-  sp_mat P = block_diag(D);
-  double regularizer = 1e-12;
-  sp_mat U = P.t() * (ref_lcp.M + regularizer*speye(size(ref_lcp.M)));
-  vec q =  P *(P.t() * ref_lcp.q);
-  assert(3*N == P.n_rows);
-  assert(3*N == q.n_rows);
-
-  bvec free_vars = zeros<bvec>(3*N);
-  free_vars.head(N).fill(1);
-  
-  PLCP ref_plcp = PLCP(P,U,q,free_vars);
-  ref_plcp.write(file_base + ".plcp");
   ProjectiveSolver psolver;
   psolver.comp_thresh = 1e-12;
   psolver.max_iter = 250;
@@ -177,53 +151,55 @@ int main(int argc, char** argv)
   psolver.verbose = false;
   psolver.initial_sigma = 0.3;
 
-  cout << "Starting reference solve..." << endl;
-  SolverResult ref_sol = psolver.aug_solve(ref_plcp);
-  cout << "\tDone." << endl;
-  cout << "Reference solution error: "
-       << norm(ans - ref_sol.p.head(N)) << endl;
-  assert(ALMOST_ZERO > norm(ref_sol.d.head(N))); // Essentially zero
-  ref_sol.write(file_base + ".sol");
+  double regularizer = 1e-12;
+
+  bvec free_vars = zeros<bvec>(3*N);
+  free_vars.head(N).fill(1);
+
+  uint Runs = 300;
+  mat residual = mat(Runs,2);
+  umat iterations = umat(Runs,2);
+  for(uint i = 0; i < Runs; i++){
+    cout << "---Iteration " << i << "---" << endl;
+    cout << "Generating Voronoi basis for flow..." << endl;
+    sp_mat sp_value_basis = sp_mat(value_basis);
   
-  psolver.comp_thresh = 1e-8;
-  // Exactish
-  vec twiddle = vec(N);
-  for(uint i = 0; i < N; i++){
-    cout << "Component: " << i << endl;
-    LCP twiddle_lcp;
-    vec et = zeros<vec>(N);
-    et(i) += 1.0 / (double) N;
-    assert(size(ref_weights) == size(et));
-    build_minop_lcp(mesh,ref_weights + et,twiddle_lcp,ans);
-    vec twiddle_q =  P *(P.t() * twiddle_lcp.q);
+    Points centers = 2 * randu(10,2) - 1;
+    mat flow_basis = make_voronoi_basis(points,
+                                        centers);
+    cout << "\tOrthogonalizing..." << endl;
+    flow_basis = orth(flow_basis);
+    sp_mat sp_flow_basis = sp_mat(flow_basis);
 
-    PLCP twiddle_plcp = PLCP(P,U,twiddle_q,free_vars);
-    SolverResult twiddle_sol = psolver.aug_solve(twiddle_plcp);
-    twiddle(i) = twiddle_sol.p(i) - ref_sol.p(i);
-  }
+    cout << "Building PLCPs..." << endl;
+    block_sp_vec D = {sp_value_basis,
+                      sp_flow_basis,
+                      sp_flow_basis};  
+    sp_mat P = block_diag(D);
+    sp_mat U = P.t() * (lcp.M + regularizer*speye(size(lcp.M)));
+    vec q =  P *(P.t() * lcp.q);
 
-  uint R = 75;
-  mat jitter = mat(N,R);
-  mat noise = mat(N,R);
-  for(uint i = 0; i < R; i++){
-    cout << "Jitter round: " << i << endl;
-    LCP jitter_lcp;
-    noise.col(i) = max(1e-4*ones<vec>(N), 0.075 * randn<vec>(N));
-    build_minop_lcp(mesh,ref_weights + noise.col(i),jitter_lcp,ans);
-    vec jitter_q =  P *(P.t() * jitter_lcp.q);
+    cout << "Solving free LCP..." << endl;
+    PLCP free_plcp = PLCP(P,U,q,free_vars);
+    SolverResult free_sol = psolver.aug_solve(free_plcp);
+    double free_res = norm(ans - free_sol.p.head(N));
+    cout << "\tResidual: " << free_res << endl;
+    cout << "\tIteration: " << free_sol.iter << endl;
 
-    PLCP jitter_plcp = PLCP(P,U,jitter_q,free_vars);
-    SolverResult jitter_sol = psolver.aug_solve(jitter_plcp);
-                                                 
-    jitter.col(i) = (jitter_sol.p.head(N) - ref_sol.p.head(N)); 
+    cout << "Solving bound LCP..." << endl;
+    PLCP bound_plcp = PLCP(P,U,q);
+    SolverResult bound_sol = psolver.aug_solve(bound_plcp);
+    double bound_res = norm(ans - bound_sol.p.head(N));
+    cout << "\tResidual: " << bound_res << endl;
+    cout << "\tIteration: " << bound_sol.iter << endl;
+
+    residual.row(i) = rowvec{free_res,bound_res};
+    iterations.row(i) = urowvec{free_sol.iter,bound_sol.iter};
   }
   
   Archiver arch;
-  arch.add_vec("p",ref_sol.p.head(N));
-  arch.add_vec("twiddle",twiddle);
-  arch.add_mat("jitter",jitter);
-  arch.add_mat("noise",noise);
-  arch.add_sp_mat("flow_basis",sp_flow_basis);
+  arch.add_mat("residual",residual);
+  arch.add_umat("iterations",iterations);
   arch.write(file_base + ".exp_res");
   
 }

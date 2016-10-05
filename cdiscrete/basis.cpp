@@ -1,5 +1,6 @@
 #include <assert.h>
 #include "basis.h"
+#include "misc.h"
 
 mat make_ring_basis(const Points & points,
                uint S){
@@ -273,4 +274,56 @@ sp_mat build_basis_from_partition(const IndexPartition & partition,uint N){
     }
   }
   return basis;
+}
+
+mat dist_mat(const Points & A, const Points & B){
+  assert(A.n_cols == B.n_cols);
+  uint N = A.n_rows;
+  uint M = B.n_rows;
+  mat dist = mat(N,M);  
+  for(uint i = 0; i < M; i++){
+    dist.col(i) = lp_norm(A.each_row() - B.row(i),2,1);
+  }
+  return dist;
+}
+
+VoronoiBasis::VoronoiBasis(const Points & points): m_points(points){
+  n_basis = 0;
+  n_dim = points.n_cols;
+  n_points = points.n_rows;
+};
+VoronoiBasis::VoronoiBasis(const Points & points,
+                           const Points & centers): m_centers(centers){
+  m_dist = dist_mat(m_points,m_centers);
+  n_basis = centers.n_rows;
+  n_dim = points.n_cols;
+  n_points = points.n_rows;
+  assert(n_dim == centers.n_cols);
+}
+
+void VoronoiBasis::add_center(const vec & center){
+  n_basis++;
+  m_dist.resize(n_points,n_basis);
+  m_centers.resize(n_basis,n_dim);
+  replace_last_center(center);
+}
+
+void VoronoiBasis::replace_last_center(const vec & center){
+  m_dist.col(n_basis-1) = lp_norm(m_points.each_row() - center,2,1);
+  m_centers.row(n_basis-1) = center.t();
+}
+
+void VoronoiBasis::count(uint k) const{
+  uvec P = col_argmin(m_dist); // Partition assignment
+  return find(P == k).n_elem;
+}
+
+sp_mat VoronoiBasis::get_basis() const{
+  umat loc = umat(2,n_points);
+  uvec P = col_argmin(m_dist); // Partition assignment
+  loc.row(0) = regspace<urowvec>(0,n_points-1).eval();
+  loc.row(1) = P.t();
+  vec data = ones(n_points);
+  sp_mat basis = sp_mat(loc,data);
+  return sp_normalise(basis,2,0); // l2 normalize each column
 }

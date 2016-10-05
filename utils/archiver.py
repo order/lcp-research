@@ -89,6 +89,9 @@ def unpack_mat(vec):
 
     return np.reshape(vec[2:],(N,D),order='F')
 
+def unpack_umat(vec):
+    return unpack_mat(vec).astype(np.integer)
+
 def unpack_sp_mat(A):
     assert A.size >= 3
     assert is_int(A[:3])

@@ -68,7 +68,8 @@ include_directories(${OPENBLAS_INCLUDE_DIR})
 
 include( CGAL_CreateSingleSourceCGALProgram )
 list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
-  "lcp.cpp" "discretizer.cpp")
+  "lcp.cpp" "discretizer.cpp" "solver.cpp" "basis.cpp")
+
 create_single_source_cgal_program("di_refine.cpp" "tri_mesh.cpp" "di.cpp"
   "refine.cpp" "solver.cpp"
   ${COMMON_FILES})      
@@ -77,25 +78,22 @@ create_single_source_cgal_program("hillcar_gen.cpp" "tri_mesh.cpp"
 create_single_source_cgal_program("hillcar_refine.cpp" "tri_mesh.cpp"
   "hillcar.cpp" "refine.cpp" ${COMMON_FILES})
 
-#create_single_source_cgal_program("minop_gen.cpp" "tri_mesh.cpp"
-#  ${COMMON_FILES})
-#create_single_source_cgal_program("minop_refine.cpp" "tri_mesh.cpp"
-#  "refine.h" ${COMMON_FILES})
 create_single_source_cgal_program("minop_approx.cpp" "tri_mesh.cpp"
-  "basis.cpp" "solver.cpp"
   ${COMMON_FILES})
 create_single_source_cgal_program("minop_sensitivity.cpp" "tri_mesh.cpp"
-  "basis.cpp" "solver.cpp"
+  ${COMMON_FILES})
+create_single_source_cgal_program("minop_free_vs_bound.cpp" "tri_mesh.cpp"
   ${COMMON_FILES})
 
 create_single_source_cgal_program("basis_gen.cpp" "tri_mesh.cpp"
-  "basis.cpp" ${COMMON_FILES})
+  ${COMMON_FILES})
 
 create_single_source_cgal_program("dubins_gen.cpp" "tet_mesh.cpp" "dubins.cpp"
   ${COMMON_FILES})
 create_single_source_cgal_program("dubins_refine.cpp" "tet_mesh.cpp" "dubins.cpp"
   "refine.cpp" ${COMMON_FILES})
 create_single_source_cgal_program("tet_interp.cpp" "tet_mesh.cpp" ${COMMON_FILES})
+
 
 list(APPEND CDISCRETE_LIBRARIES
         ${ARMADILLO_LIBRARIES}
@@ -116,6 +114,9 @@ target_link_libraries(hillcar_refine ${CDISCRETE_LIBRARIES})
 #target_link_libraries(min_refine ${CDISCRETE_LIBRARIES})
 target_link_libraries(minop_approx ${CDISCRETE_LIBRARIES})
 target_link_libraries(minop_sensitivity ${CDISCRETE_LIBRARIES})
+target_link_libraries(minop_free_vs_bound ${CDISCRETE_LIBRARIES})
+
+
 target_link_libraries(basis_gen ${CDISCRETE_LIBRARIES})
 
 target_link_libraries(dubins_gen ${CDISCRETE_LIBRARIES})

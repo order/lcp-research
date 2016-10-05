@@ -458,3 +458,26 @@ block_sp_mat sp_partition(const sp_mat & A,
   }
   return ret;
 }
+
+sp_mat sp_normalise(const sp_mat & A,
+                    uint p,uint d){
+  if(1 == d)
+    return sp_normalise(A.t(),p,0);
+  
+  assert(0 == d); // Column-wise
+  sp_mat B = sp_mat(size(A));
+  
+  uint C = A.n_cols;
+  for(uint c = 0; c < C; c++){
+    // determine column norm
+    double z = 0;
+    for(sp_mat::const_iterator it = A.begin_col(c);
+        it != A.end_col(c); ++it){
+      z += pow(*it,p);   
+    }
+    assert(z > 0);
+    z =  pow(z,1.0 / (double) p);
+    B.col(c) = A.col(c) / z;
+  }
+  return B;
+}

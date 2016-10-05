@@ -1,36 +1,29 @@
 import numpy as np
-import scipy.sparse as sps
-from scipy.stats import pearsonr
 import matplotlib.pyplot as plt
-from utils.archiver import Unarchiver,read_shewchuk
+from utils.archiver import *
+from scipy.stats import pearsonr
+
 import tri_mesh_viewer as tmv
 
-unarch = Unarchiver("/home/epz/data/minop/sensitivity.sens")
 (nodes,faces) = read_shewchuk("/home/epz/data/minop/sensitivity")
+unarch = Unarchiver("/home/epz/data/minop/sensitivity.exp_res")
 
-(N,_) = nodes.shape
+(N,D) = nodes.shape
 
-p = unarch.p
-twiddle = unarch.twiddle
-jitter = unarch.jitter
-noise = unarch.noise
+assert(N == unarch.twiddle.size)
 
-value_diff = jitter - p[:,np.newaxis]
-noise_diff = noise - np.mean(noise,0)[np.newaxis,:]
-
-R = np.zeros(N)
-for i in xrange(N):
-    (r,p) = pearsonr(value_diff[i,:],noise_diff[i,:])
-    if p < 0.05:
-        R[i] = r
-#sR = np.sort(R)
-#thresh = sR[-5]
-#R[R < thresh] = 0;
-
-plt.figure();
 plt.subplot(1,2,1)
-tmv.plot_vertices(nodes,faces,twiddle)
-plt.subplot(1,2,2)
-tmv.plot_vertices(nodes,faces,R)
+tmv.plot_vertices(nodes,faces,unarch.twiddle)
 
+J = unarch.jitter
+R = unarch.noise
+
+P = np.zeros(N)
+for i in xrange(N):
+    (r,p) = pearsonr(J[i,:],R[i,:])
+    if(p < 0.01):
+        P[i] = r
+
+plt.subplot(1,2,2)
+tmv.plot_vertices(nodes,faces,P)
 plt.show()

@@ -38,8 +38,6 @@ mat make_voronoi_basis(const Points & points,
 mat make_radial_fourier_basis(const Points & points,
                               uint K, double max_freq);
 
-
-
 typedef vector<set<uint> > IndexPartition;
 typedef IndexPartition::iterator IndexIterator;
 
@@ -51,5 +49,24 @@ set<uint> ball_indices(const Points & points,
 void add_basis(IndexPartition & partition,
                          const set<uint> & basis);
 sp_mat build_basis_from_partition(const IndexPartition &,uint);
+
+
+class VoronoiBasis{
+ public:
+  VoronoiBasis(const Points & points);
+  VoronoiBasis(const Points & points,
+               const Points & centers);
+
+  void add_center(const vec & center);
+  sp_mat get_basis() const;
+
+  Points m_points;
+  Points m_centers;
+  mat m_dist;
+
+  uint n_dim;
+  uint n_basis;
+  uint n_points;
+};
 
 #endif

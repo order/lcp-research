@@ -47,16 +47,14 @@ def projective_solve(plcp,**kwargs):
 
 def solve_plcp_file(plcp_file):
     unarch = Unarchiver(plcp_file)
-    (P,U,r) = (unarch.P,unarch.U,unarch.r)
-    q = P.dot(r)
-
-    a = 1
-    plcp = ProjectiveLCPObj(P,a*U,a*q)
+    (P,U,q) = (unarch.P,unarch.U,unarch.q)
+    (n,) = q.shape
+    plcp = ProjectiveLCPObj(P,U,q)
     
     # Augment
-    alcp,x0,y0,w0 = augment_plcp(plcp,1e5)
+    alcp,x0,y0,w0 = augment_plcp(plcp,5 * n)
     (N,) = alcp.q.shape
-    assert(N == plcp.q.shape[0] + 1) # Augmented
+    assert(N == n + 1) # Augmented
     
     (p,d,data) = projective_solve(alcp,
                                   x0=x0,

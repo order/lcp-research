@@ -38,6 +38,7 @@ class KojimaSolver{
   bool verbose;
   double regularizer;
   double aug_rel_scale;
+  double initial_sigma;
 };
 
 class ProjectiveSolver{
@@ -53,7 +54,7 @@ class ProjectiveSolver{
   bool verbose;
   double regularizer;
   double aug_rel_scale;
-
+  double initial_sigma;
 };
 
 #endif

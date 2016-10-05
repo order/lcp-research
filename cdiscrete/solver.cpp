@@ -66,6 +66,7 @@ KojimaSolver::KojimaSolver(){
   verbose = true;
   regularizer = 1e-8;
   aug_rel_scale = 0.75;
+  initial_sigma = 0.95;
 }
 
 // Really should be always using this.
@@ -137,7 +138,8 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
   block_G.push_back(block_sp_vec{-M_part[1][0],-M_part[1][1],speye(NB,NB)});
  
   // Start iteration
-  double mean_comp, steplen, sigma = 0.95;
+  double mean_comp, steplen;
+  double sigma = initial_sigma;
   uint iter;  
   for(iter = 0; iter < max_iter; iter++){
     if(verbose)
@@ -216,7 +218,7 @@ ProjectiveSolver::ProjectiveSolver(){
   verbose = true;
   regularizer = 1e-8;
   aug_rel_scale = 0.75;
-
+  initial_sigma = 0.95;
 }
 
 // Really should be always using this.
@@ -239,7 +241,7 @@ SolverResult ProjectiveSolver::aug_solve(const PLCP & plcp,
                                          vec & y ) const{
   uint N = plcp.P.n_rows;
   uint K = plcp.P.n_cols;
-  double scale = 0.5 * (double) N; // Balance feasibility and complementarity
+  double scale = aug_rel_scale * (double) N;
   vec w;
   PLCP aplcp = augment_plcp(plcp,x,y,w,scale);
   return solve(aplcp,x,y,w);
@@ -264,6 +266,11 @@ SolverResult ProjectiveSolver::solve(const PLCP & plcp,
   uint NF = free_idx.n_elem; // number of free vars
   assert(NF == accu(conv_to<uvec>::from(free_vars)));
 
+  assert(N == x.n_elem);
+  assert(N == y.n_elem);
+  assert(K == w.n_elem);
+  assert(ALMOST_ZERO > norm(y(free_idx)));
+
   if(verbose)
     cout << "Free variables: \t" << NF << endl
          << "Non-neg variables:\t" << NB << endl;
@@ -285,13 +292,9 @@ SolverResult ProjectiveSolver::solve(const PLCP & plcp,
   vec Ptq = P.t() * q;
   if(verbose)
     cout << "Done..." << endl;
+
   
-  assert(N == x.n_elem);
-  assert(N == y.n_elem);
-  assert(K == w.n_elem);
-  
-  double steplen, sigma;
-  sigma = 0.95;
+  double sigma = initial_sigma;
   
   superlu_opts slu_opts;
   slu_opts.equilibrate = true; // This is important for conditioning
@@ -319,7 +322,7 @@ SolverResult ProjectiveSolver::solve(const PLCP & plcp,
     mat A = Pt_PtPU * J * spdiag(1.0 / C);
     assert(size(K,NB) == size(A));
      
-    mat G = (A * spdiag(s)) * J.t() * P - PtPUP;
+    mat G = PtPUP + (A * spdiag(s)) * J.t() * P;
     assert(size(K,K) == size(G));
 
     vec Ptr = P.t() * (J *  s) - PtPU*x - Ptq;
@@ -327,27 +330,28 @@ SolverResult ProjectiveSolver::solve(const PLCP & plcp,
     assert(K == h.n_elem);
 
     // Options don't make much difference
-    vec dw = arma::solve(G,h,solve_opts::equilibrate);
+    vec dw = arma::solve(G,h,
+                         solve_opts::equilibrate);
     assert(K == dw.n_elem);
 
     // Recover dy
-    vec JPdw = J * P * dw;
-    assert(NB == JPdw.n_elem);
-    vec ds = (g - s % JPdw) / C;
+    vec Pdw = P * dw;
+    vec JtPdw = J.t() * Pdw;
+    assert(NB == JtPdw.n_elem);
+    vec ds = (g - s % JtPdw) / C;
     assert(NB == ds.n_elem);
     
     // Recover dx
-    vec dx = (J * ds) + (P * dw);
+    vec dx = (J * ds) + (Pdw);
     assert(N == dx.n_elem);    
 
-    steplen = steplen_heuristic(x(bound_idx),s,dx(bound_idx),ds,0.9);
+    double steplen = steplen_heuristic(x(bound_idx),s,dx(bound_idx),ds,0.9);
     sigma = sigma_heuristic(sigma,steplen);
 
     x += steplen * dx;
     s += steplen * ds;
     y(bound_idx) = s;
     w += steplen * dw;
-    assert(PRETTY_SMALL > norm(y(free_idx)));
 
     if(verbose){
       cout <<"\tMean complementarity: " << mean_comp

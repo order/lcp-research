@@ -21,66 +21,9 @@ using namespace std;
 using namespace arma;
 using namespace tri_mesh;
 
-void generate_minop_mesh(TriMesh & mesh,
-                         const string & filename,
-                         double edge_length){
-  double angle = 0.125;
-  cout << "Initial meshing..."<< endl;
-  mesh.build_box_boundary({{-1.1,1.1},{-1.1,1.1}});
-  mesh.build_circle(zeros<vec>(2),50,1.0);
-  mesh.build_circle(zeros<vec>(2),30,1.0/sqrt(2.0));
-  mesh.build_circle(zeros<vec>(2),25,0.25);
-
-  cout << "Refining based on (" << angle
-       << "," << edge_length <<  ") criterion ..."<< endl;
-  mesh.refine(angle,edge_length);
-  
-  cout << "Optimizing (25 rounds of Lloyd)..."<< endl;
-  mesh.lloyd(25);
-  mesh.freeze();
-
-  // Write initial mesh to file
-  cout << "Writing:"
-       << "\n\t" << (filename + ".node") << " (Shewchuk node file)"
-       << "\n\t" << (filename + ".ele") << " (Shewchuk element file)"
-       << "\n\t" << (filename + ".tri") << " (CGAL mesh file)" << endl;
-  mesh.write_shewchuk(filename);
-  mesh.write_cgal(filename + ".tri");
-}
 
 ////////////////////////////////////////
 // Generate the LCP
-
-void build_minop_lcp(const TriMesh &mesh,
-                     const vec & a,
-                     LCP & lcp,
-                     vec & ans){
-  double off = 1.0; // +ve offset
-  Points points = mesh.get_spatial_nodes();
-  uint N = points.n_rows;
-  vec sq_dist = sum(pow(points,2),1);
-
-  vec b = sq_dist + off;
-  vec c = max(zeros<vec>(N),1 - sq_dist) + off;
-  
-  ans = arma::max(zeros<vec>(N), arma::min(b,c));
-  
-  assert(a.n_elem == b.n_elem);
-  vec q = join_vert(-a,
-                    join_vert(b,c));
-  assert(3*N == q.n_elem);
-  assert(not all(q >= 0));
- 
-  vector<sp_mat> E;
-  E.push_back(speye(N,N));
-  E.push_back(speye(N,N));
-  sp_mat M = build_M(E);
-  assert(M.is_square());
-  assert(3*N == M.n_rows);
-
-  lcp = LCP(M,q);
-}
-
 
 po::variables_map read_command_line(uint argc, char** argv){
   po::options_description desc("Meshing options");
@@ -88,6 +31,10 @@ po::variables_map read_command_line(uint argc, char** argv){
     ("help", "produce help message")
     ("outfile_base,o", po::value<string>()->required(),
      "Output experimental result file")
+    ("bound,b", po::value<bool>()->default_value(false),
+     "Value variables non-negatively bound")
+    ("jitter,j" po::value<uint>()->default_value(25),
+     "Number of jitter rounds")
     ("edge_length,e", po::value<double>()->default_value(0.1),
      "Max length of triangle edge");
   
@@ -100,6 +47,105 @@ po::variables_map read_command_line(uint argc, char** argv){
     exit(1);
   }
   return var_map;
+}
+
+vec jitter_experiment_run(const TriMesh & mesh,
+                          const po::variables_map var_map){
+  uint num_value_basis = 25;
+  uint num_flow_basis = 10;
+  uint max_iter =  var_map["max_iter"].as<uint>();
+  uint max_basis = var_map["max_basis"].as<uint>();
+  uint N = mesh.number_of_vertices();
+  uint jitter_rounds = var_map["jitter"].as<uint>();
+
+  // Build value basis
+  Points points = mesh.get_spatial_nodes();
+  mat value_basis = make_radial_fourier_basis(points,
+                                              num_value_basis,
+                                              (double)num_value_basis);
+  value_basis = orth(value_basis);
+  sp_mat sp_value_basis = sp_mat(value_basis);
+
+  // Build initial flow_basis
+  Points centers = 2 * randu(num_flow_basis,2) - 1;
+  VoronoiBasis flow_basis = VoronoiBasis(points,centers);             
+
+  // Solver set up
+  ProjectiveSolver psolver;
+  psolver.comp_thresh = 1e-8;
+  psolver.max_iter = 250;
+  psolver.aug_rel_scale = 5;
+  psolver.regularizer = 1e-8;
+  psolver.verbose = false;
+  psolver.initial_sigma = 0.3;
+
+  double regularizer = 1e-12;
+
+  // Free variables
+  bvec free_vars = zeros<bvec>(3*N);
+  if(not var_map["bound"].as<bool>())
+    free_vars.head(N).fill(1);
+
+  // Reference LCP
+  vec ref_weights = ones<vec>(N) / (double)N;
+  LCP ref_lcp;
+  vec ans;
+  build_minop_lcp(mesh,ref_weights,ref_lcp,ans);
+
+  vec residual = vec(max_iter);
+  for(uint I = 0; I < max_iter; I++){
+    cout << "---Iteration: " << I << "---" endl;
+
+    cout << "Forming new flow basis..." << endl;
+    sp_mat sp_flow_basis = flow_basis.get_basis();
+    block_sp_vec D = {sp_value_basis,
+                      sp_flow_basis,
+                      sp_flow_basis};
+    vec rand_basis_vec = sp_flow_basis * rand(flow_basis.n_basis);
+    cout << "\tWriting random vector in span to file..." << endl;
+    
+    sp_mat P = block_diag(D);
+    sp_mat U = P.t() * (ref_lcp.M + regularizer * speye(3*N,3*N));
+    vec q =  P *(P.t() * ref_lcp.q);
+
+    PLCP ref_plcp = PLCP(P,U,q,free_vars);
+    cout << "Reference solve..." << endl;
+    SolverResult ref_sol = psolver.aug_solve(ref_plcp);
+    double res = norm(ans - ref_sol.p.head(N));
+    cout << "\tResidual:" << res << endl;
+
+    // Add a new center
+    vec new_center = 2*randu<vec>(2) - 1;
+    flow_basis.add_center(new_center);
+    if(jitter_rounds){
+      // Perturb objective function, use correlation between
+      // Modified objective value and objective noise
+      cout << "Jittering..." <<endl;
+      mat jitter = mat(N,jitter_rounds);
+      mat noise = mat(N,jitter_rounds);
+      jitter_solve(mesh,ref_plcp,ref_weights,
+                   jitter, noise, jitter_rounds);
+      
+      // Subtract off reference solution
+      jitter = (jitter.each_col() - ref_sol.head(N));
+
+      // Calculate correlation
+      vec rho = pearson_rho(jitter,noise);
+
+      // Refine the highest absolute rho node
+      uint refine_node = abs(rho).index_max();
+      while(true){
+        // Use a perturbed version of the selected node
+        new_center = points.row(refine_node).t() + 0.5 * randn(2);
+        flow_basis.replace_last_center(new_center);
+        if(0 < flow_basis.count(n_basis-1))
+          break; // Covers at least one node.
+        cout << "\tResampling Voronoi center..." << endl;
+      } 
+    }
+    else
+      cout << "Using random center." << endl;
+  }
 }
 
 ////////////////////////////////////////////////////////////
@@ -117,96 +163,16 @@ int main(int argc, char** argv)
   generate_minop_mesh(mesh,file_base,edge_length);
   mesh.freeze();
 
-  // Stats
-  uint N = mesh.number_of_vertices();
-  uint F = mesh.number_of_faces();
-  cout << "Mesh stats:"
-       << "\n\tNumber of vertices: " << N
-       << "\n\tNumber of faces: " << F
-       << endl;
-
-  // Build value basis
-  uint num_value_basis = 25;
-  uint num_flow_basis = 10;
-  Points points = mesh.get_spatial_nodes();
-  mat value_basis = make_radial_fourier_basis(points,
-                                              num_value_basis,
-                                              (double)num_value_basis);
-  value_basis = orth(value_basis);
-  sp_mat sp_value_basis = sp_mat(value_basis);
+  uint max_iter =  var_map["max_iter"].as<uint>();
+  uint min_basis = var_map["max_basis"].as<uint>();
   
-  Points centers = 2 * randu(10,2) - 1;
-  mat flow_basis = make_voronoi_basis(points,
-                                      centers);
-  flow_basis = orth(flow_basis);
-  sp_mat sp_flow_basis = sp_mat(flow_basis);
-                                         
-  vec ref_weights = ones<vec>(N) / (double)N;
-  LCP ref_lcp;
-  vec ans;
-  build_minop_lcp(mesh,ref_weights,ref_lcp,ans);
-
-  ProjectiveSolver psolver;
-  psolver.comp_thresh = 1e-8;
-  psolver.max_iter = 250;
-  psolver.regularizer = 1e-8;
-  psolver.verbose = false;
-
-  uint max_iter = 25;
-  uint jitter_rounds = 75;
-  psolver.comp_thresh = 1e-6;
-  mat jitter = mat(N,jitter_rounds);
-  mat noise = mat(N,jitter_rounds);
-  vec pearson = vec(N);
-  
-  for(uint I = 0; I < max_iter; I++){
-    block_sp_vec D = {sp_value_basis,
-                      sp_flow_basis,
-                      sp_flow_basis};  
-    sp_mat P = block_diag(D);
-    sp_mat U = P.t() * (ref_lcp.M + 1e-8 * speye(3*N,3*N));
-    vec q =  P *(P.t() * ref_lcp.q);
-
-    PLCP ref_plcp = PLCP(P,U,q);
-    cout << "Reference solve..." << endl;
-    SolverResult ref_sol = psolver.aug_solve(ref_plcp);
-    cout << "\tDone." << endl;
-    
-    cout << "Iteration: " << I << endl;
-    for(uint j = 0; j < jitter_rounds; j++){
-      cout << "Jitter round: " << j << endl;
-      noise.col(i) = max(1e-4*ones<vec>(N), 0.075 * randn<vec>(N));
-
-      LCP jitter_lcp;
-      build_minop_lcp(mesh,ref_weights + noise.col(i),jitter_lcp,ans);
-      vec jitter_q =  P *(P.t() * jitter_lcp.q);      
-      PLCP jitter_plcp = PLCP(P,U,jitter_q);
-      
-      SolverResult jitter_sol = psolver.aug_solve(jitter_plcp);
-      jitter.col(i) = jitter_sol.p.head(N);
-      
-    }
-    for(uint i = 0; i < N; i++){
-      double mu_x = mean(jitter.row(i));
-      double mu_y = mean(noise.row(i));
-      double std_x = std(jitter.row(i));
-      double std_y = std(noise.row(i));
-
-      pearson(i) = sum((jitter.row(i) - mu_x) % (noise.row(i) - mu_y));
-      pearson(i) /= std_x * std_y;
-    }
-    uint refine_node = abs(pearson).index_max();
-
-    
+  mat residuals = mat(max_iter,max_basis);
+  for(uint I = 0; I < max_iter;++I){
+    vec run_residual= jitter_experiment_run(mesh,
+                                            var_map);
+    residuals.row(i) = run_residual;
   }
-
-  
   Archiver arch;
-  arch.add_vec("p",ref_sol.p.head(N));
-  arch.add_vec("twiddle",twiddle);
-  arch.add_mat("jitter",jitter);
-  arch.add_mat("noise",noise);
-  arch.add_sp_mat("flow_basis",flow_basis);
-  arch.write(file_base + ".sens");
-  
+  arch.add_mat("residuals",residuals);
+  arch.write(file_base + ".exp_res");
 }

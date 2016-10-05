@@ -12,14 +12,17 @@ using namespace arma;
 
 
 struct Archiver{
+  bool add_umat(const string & field_name,
+                const umat & A);
   bool add_mat(const string & field_name,
-	   const mat & A);
+               const mat & A);
   bool add_sp_mat(const string & field_name,
-	   const sp_mat & A);
+                  const sp_mat & A);
   bool add_vec(const string & field_name,
-	   const vec & v);
+               const vec & v);
   bool add_uvec(const string & field_name,
                 const uvec & v);
+
   template <typename D>
   bool generic_add(const string & name,
 		   const Col<D> & data);

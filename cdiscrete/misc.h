@@ -113,4 +113,6 @@ sp_mat sp_submatrix(const sp_mat & A,
 block_sp_mat sp_partition(const sp_mat & A,
                           const uvec & idx_1,
                           const uvec & idx_2);
+
+sp_mat sp_normalise(const sp_mat & A,uint p,uint d);
 #endif
