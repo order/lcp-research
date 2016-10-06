@@ -5,26 +5,30 @@
 #include "misc.h"
 #include "tri_mesh.h"
 #include "lcp.h"
+#include "solver.h"
 
 using namespace std;
 using namespace arma;
 
-void generate_minop_mesh(TriMesh & mesh,
+void generate_minop_mesh(tri_mesh::TriMesh & mesh,
                          const string & filename,
                          double edge_length,
                          double min_angle);
-void build_minop_lcp(const TriMesh &mesh,
+void build_minop_lcp(const tri_mesh::TriMesh &mesh,
                      const vec & a,
                      LCP & lcp,
                      vec & ans);
 
-double person_rho(const vec &,
+double pearson_rho(const vec &,
                   const vec &);
-vec person_rho(const mat &,
+vec pearson_rho(const mat &,
                const mat &);
 
-vec jitter_solve(const TriMesh & mesh,
+vec jitter_solve(const tri_mesh::TriMesh & mesh,
+                 const ProjectiveSolver & solver,
+                 const PLCP & ref_plcp,
                  const vec & ref_weights,
                  mat & jitter,
-                 mat & weight_noise);
+                 mat & weight_noise,
+                 uint jitter_rounds);
 #endif

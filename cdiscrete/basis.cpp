@@ -293,7 +293,9 @@ VoronoiBasis::VoronoiBasis(const Points & points): m_points(points){
   n_points = points.n_rows;
 };
 VoronoiBasis::VoronoiBasis(const Points & points,
-                           const Points & centers): m_centers(centers){
+                           const Points & centers):
+  m_points(points),m_centers(centers){
+  assert(points.n_cols == centers.n_cols);
   m_dist = dist_mat(m_points,m_centers);
   n_basis = centers.n_rows;
   n_dim = points.n_cols;
@@ -309,14 +311,20 @@ void VoronoiBasis::add_center(const vec & center){
 }
 
 void VoronoiBasis::replace_last_center(const vec & center){
-  m_dist.col(n_basis-1) = lp_norm(m_points.each_row() - center,2,1);
+  m_dist.col(n_basis-1) = lp_norm(m_points.each_row() - center.t(),2,1);
   m_centers.row(n_basis-1) = center.t();
 }
 
-void VoronoiBasis::count(uint k) const{
+uint VoronoiBasis::count(uint k) const{
+  assert(k < n_basis);
   uvec P = col_argmin(m_dist); // Partition assignment
-  return find(P == k).n_elem;
+  return find(P == k).eval().n_elem;
 }
+
+uint VoronoiBasis::count_last() const{
+  return count(n_basis - 1);
+}
+
 
 sp_mat VoronoiBasis::get_basis() const{
   umat loc = umat(2,n_points);

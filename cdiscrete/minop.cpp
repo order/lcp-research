@@ -1,5 +1,7 @@
 #include "minop.h"
 
+using namespace tri_mesh;
+
 void generate_minop_mesh(TriMesh & mesh,
                          const string & filename,
                          double edge_length,
@@ -61,8 +63,8 @@ double pearson_rho(const vec & a,
                    const vec & b){
   double mu_a = mean(a);
   double mu_b = mean(b);
-  double std_a = std(a);
-  double std_b = std(b);
+  double std_a = stddev(a);
+  double std_b = stddev(b);
 
   return sum((a - mu_a) % (b - mu_b)) / (std_a * std_b);
 }
@@ -72,35 +74,39 @@ vec pearson_rho(const mat & A,
   assert(size(A) == size(B));
   uint N = A.n_rows;
 
-  vec rho = vec(N);
-  for(uint i = 0; i < N; i++){
-    rho(i) = pearson_rho(A.row(i).t(),
-                         B.row(i).t());
-  }
+vec rho = vec(N);
+for(uint i = 0; i < N; i++){
+rho(i) = pearson_rho(conv_to<vec>::from(A.row(i)),
+                       conv_to<vec>::from(B.row(i)));
+}
   return rho;
 }
 
 vec jitter_solve(const TriMesh & mesh,
+                 const ProjectiveSolver & solver,
                  const PLCP & ref_plcp,
                  const vec & ref_weights,
                  mat & jitter,
-                 mat & weight_noise,
+                 mat & noise,
                  uint jitter_rounds){
   uint N = mesh.number_of_spatial_nodes();
   sp_mat P = ref_plcp.P;
   sp_mat U = ref_plcp.U;
   vec q = ref_plcp.q;
-  
+  vec ans;
   for(uint j = 0; j < jitter_rounds; j++){      
     cout << "Jitter round: " << j << endl;
-    noise.col(i) = max(1e-4*ones<vec>(N), 0.075 * randn<vec>(N));
-    
+    vec perturb = max(1e-4*ones<vec>(N), 0.075 * randn<vec>(N));
+    noise.col(j) = perturb;
+
+    // Build the LCP to get new q (kludge-y)
     LCP jitter_lcp;
-    build_minop_lcp(mesh,ref_weights + noise.col(i),jitter_lcp,ans);
+    build_minop_lcp(mesh,ref_weights + perturb,jitter_lcp,ans);
+
     vec jitter_q =  P *(P.t() * jitter_lcp.q);      
-    PLCP jitter_plcp = PLCP(P,U,jitter_q,free_vars);
+    PLCP jitter_plcp = PLCP(P,U,jitter_q,ref_plcp.free_vars);
     
-    SolverResult jitter_sol = psolver.aug_solve(jitter_plcp);
-    jitter.col(i) = jitter_sol.p.head(N);      
+    SolverResult jitter_sol = solver.aug_solve(jitter_plcp);
+    jitter.col(j) = jitter_sol.p.head(N);      
   }
 }

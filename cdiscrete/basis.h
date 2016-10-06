@@ -58,6 +58,10 @@ class VoronoiBasis{
                const Points & centers);
 
   void add_center(const vec & center);
+  void replace_last_center(const vec & center);
+  uint count(uint k) const;
+  uint count_last() const;
+
   sp_mat get_basis() const;
 
   Points m_points;
