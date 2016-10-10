@@ -27,7 +27,7 @@ else()
 endif()
 
 # Explicitly set some flags
-set(CMAKE_CXX_FLAGS "-O3 -fstack-protector -Wformat -Werror=format-security -Wdate-time -frounding-math -FORTIFY_SOURCE=1 -fext-numeric-literals")
+set(CMAKE_CXX_FLAGS "-O3 -fstack-protector -Wformat -Werror=format-security -frounding-math -FORTIFY_SOURCE=1 -fext-numeric-literals")
 
 # CGAL and its components
 find_package( CGAL QUIET COMPONENTS  )
