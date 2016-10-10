@@ -8,10 +8,6 @@
 
 #define ALMOST_ZERO 1e-15
 #define PRETTY_SMALL 1e-9
-//=====================================
-// RANDOM GENERATOR
-extern unsigned SEED;
-extern std::mt19937 MT_GEN;
 
 using namespace arma;
 

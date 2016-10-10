@@ -10,10 +10,6 @@
 using namespace std;
 using namespace arma;
 
-unsigned SEED = chrono::system_clock::now().time_since_epoch().count();
-mt19937 MT_GEN = mt19937(SEED);
-
-
 void print_shape(const uvec & u){
   cout << '(' << u.n_elem << ')' << endl;
 }
