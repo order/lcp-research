@@ -13,21 +13,9 @@ if(CCACHE_PROGRAM)
 endif()
 project( mesh )
 
-# Use C++ 11
-set (CMAKE_CXX_STANDARD 11)
-include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-if(COMPILER_SUPPORTS_CXX11)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-elseif(COMPILER_SUPPORTS_CXX0X)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-else()
-        message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
-endif()
 
 # Explicitly set some flags
-set(CMAKE_CXX_FLAGS "-O3 -fstack-protector -Wformat -Werror=format-security -frounding-math -FORTIFY_SOURCE=1 -fext-numeric-literals")
+set(CMAKE_CXX_FLAGS "-O3 -fstack-protector -Wformat -Werror=format-security -frounding-math -FORTIFY_SOURCE=1 -fext-numeric-literals -std=c++11")
 
 # CGAL and its components
 find_package( CGAL QUIET COMPONENTS  )
