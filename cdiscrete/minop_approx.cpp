@@ -102,9 +102,11 @@ int main(int argc, char** argv)
   VoronoiBasis voronoi = VoronoiBasis(points,centers);  
   sp_mat flow_basis = voronoi.get_basis();
   
-  block_sp_vec D = {value_basis,
-                    flow_basis,
-                    flow_basis};  
+  block_sp_vec D;
+  D.push_back(value_basis);
+  D.push_back(flow_basis);
+  D.push_back(flow_basis);
+  
   sp_mat P = block_diag(D);
   sp_mat U = P.t() * (lcp.M + 1e-8 * speye(3*V,3*V));
   vec q =  P *(P.t() * lcp.q);

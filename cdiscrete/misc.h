@@ -98,7 +98,7 @@ template <typename D> Col<D> rshift(const Col<D> & v);
 
 
 //Sparse stuff
-typedef std::vector<std::vector<sp_mat>> block_sp_mat;
+typedef std::vector<std::vector<sp_mat> > block_sp_mat;
 typedef std::vector<sp_mat> block_sp_vec;
 
 sp_mat block_mat(const block_sp_mat & B);
