@@ -2,62 +2,6 @@
 #include "basis.h"
 #include "misc.h"
 
-mat make_ring_basis(const Points & points,
-               uint S){
-  
-  vec dist = lp_norm(points,2,1);
-
-  uint V = points.n_rows;
-  mat basis = zeros<mat>(V,S);
-  double l,u;
-  double inc_rad = 1.0 / (double) S;
-  uvec mask;
-  for(uint s = 0; s < S; s++){
-    l = inc_rad * s;
-    u = inc_rad * (s + 1);
-    if(s == S-1) u += 1e-12;
-    mask = find(dist >= l and dist < u);
-    if(0 == mask.n_elem)
-      basis.col(s).randu();
-    else
-      basis(mask, uvec{s}).fill(1);
-  }
-  basis = orth(basis);
-  return basis;
-}
-
-sp_mat make_sample_basis(uint N,
-                        uint K){
-  sp_mat basis = sp_mat(N,K);
-  set<uword> keys;
-  uvec samples = randi<uvec>(K,distr_param(0,N-1));
-  for(uint k = 0; k < K; k++){
-    while(keys.count(samples(k)) > 0){
-      samples(k) = randi<uvec>(1,distr_param(0,N-1))(0);
-    }
-    basis(samples(k),k) = 1;
-    keys.insert(samples(k));
-  }
-  return basis;
-}
-
-mat make_rbf_basis(const Points & points,
-                   const Points & centers,
-                   double bandwidth){
-  uint N = points.n_rows;
-  uint K = centers.n_rows;
-  mat basis = zeros<mat>(N,K);
-  double value_thresh = 1e-8;
-  double dist_thresh = std::sqrt(-bandwidth * std::log(value_thresh));
-  for(uint k = 0; k < K; k++){
-    vec dist = lp_norm(points.each_row() - centers.row(k),2,1);
-    uvec idx = find(dist <= dist_thresh);
-    basis(idx,uvec{k}) = exp(-dist(idx)/bandwidth);
-  }
-  basis = orth(basis);
-  return basis;
-}
-
 double find_radius(const vec & dist,
                    uint target){
   uint N = dist.n_rows;
@@ -92,6 +36,34 @@ double find_radius(const vec & dist,
   return u; // Can't pip the target; better to return too many.
 }
 
+
+mat dist_mat(const Points & A, const Points & B){
+  assert(A.n_cols == B.n_cols);
+  uint N = A.n_rows;
+  uint M = B.n_rows;
+  mat dist = mat(N,M);  
+  for(uint i = 0; i < M; i++){
+    dist.col(i) = lp_norm(A.each_row() - B.row(i),2,1);
+  }
+  return dist;
+}
+
+sp_mat make_sample_basis(uint N,
+                        uint K){
+  sp_mat basis = sp_mat(N,K);
+  set<uword> keys;
+  uvec samples = randi<uvec>(K,distr_param(0,N-1));
+  for(uint k = 0; k < K; k++){
+    while(keys.count(samples(k)) > 0){
+      samples(k) = randi<uvec>(1,distr_param(0,N-1))(0);
+    }
+    basis(samples(k),k) = 1;
+    keys.insert(samples(k));
+  }
+  assert(K == accu(basis));
+  return basis; // Should be orthonormal by default
+}
+
 sp_mat make_ball_basis(const Points & points,
                        const Points & centers,
                        uint R){
@@ -123,66 +95,33 @@ sp_mat make_ball_basis(const Points & points,
     }
     
     mask(idx).fill(1); // Add to mask
-    basis.col(k) /= norm(basis.col(k),2);
     if(N == sum(mask)){
       break;
     }
   }
   basis.resize(N,k); // Avoid all zero
+  basis = sp_normalise(basis,2,0); // Should be almost ortho
   return basis;
 }
 
-mat make_grid_basis(const Points & points,
-                       const mat & bbox,
-                       uint X, uint Y){
-  uint V = points.n_rows;
-  double dx = (bbox(0,1) - bbox(0,0)) / (double)X;
-  double dy = (bbox(1,1) - bbox(1,0)) / (double)Y;
-  mat basis = zeros<mat>(V,X*Y);
-  uint b = 0;
-  uvec mask;
-  double xl,yl,xh,yh;
-  for(uint i = 0; i < X;i++){
-    assert(b < X*Y);
-    xl = (double)i*dx + bbox(0,0);
-    xh = xl + dx;
-    if(i == X-1) xh += 1e-12;
-    for(uint j = 0; j < Y; j++){
-      yl = (double)j*dy + bbox(1,0);
-      yh = yl + dy;
-      if(j == Y-1) yh += 1e-12;
-      mask = find(points.col(0) >= xl
-                  and points.col(0) < xh
-                  and points.col(1) >= yl
-                  and points.col(1) < yh);
-      basis(mask,uvec{b}).fill(1);
-      b++;
-    }
-  }
-  basis = orth(basis);
-  return basis;
-}
-
-mat make_voronoi_basis(const Points & points,
-                       const Points & centers){
+sp_mat make_rbf_basis(const Points & points,
+                   const Points & centers,
+                   double bandwidth){
   uint N = points.n_rows;
-  uint C = centers.n_rows;
-  assert(points.n_cols == centers.n_cols);
-  
-  mat dist = mat(N,C);
-  for(uint c = 0; c < C; c++){
-    dist.col(c) = lp_norm(points.each_row() - centers.row(c),2,1);
+  uint K = centers.n_rows;
+  mat basis = zeros<mat>(N,K);
+  double value_thresh = 1e-8;
+  double dist_thresh = std::sqrt(-bandwidth * std::log(value_thresh));
+  for(uint k = 0; k < K; k++){
+    vec dist = lp_norm(points.each_row() - centers.row(k),2,1);
+    uvec idx = find(dist <= dist_thresh);
+    basis(idx,uvec{k}) = exp(-dist(idx)/bandwidth);
   }
-  uvec partition = col_argmin(dist);
-
-  mat basis = zeros<mat>(N,C);
-  for(uint c = 0; c < C; c++){
-    basis(find(partition == c),uvec{c}).fill(1);
-  }
-  return basis;
+  basis = orth(basis); // Not ortho at all; need to do explicitly
+  return sp_mat(basis);
 }
 
-mat make_radial_fourier_basis(const Points & points,
+sp_mat make_radial_fourier_basis(const Points & points,
                         uint K,double max_freq){
   uint N = points.n_rows;
   mat basis = mat(N,2*K+1);
@@ -196,96 +135,10 @@ mat make_radial_fourier_basis(const Points & points,
     basis.col(K+k+1) = cos(omega*r);
   }
   basis.col(K).fill(1/sqrt(N));
-  return basis;
+  basis = orth(basis); // Explicitly orthonormalize
+  return sp_mat(basis);
 }
 
-IndexPartition voronoi_partition(const Points & points,
-                                 const Points & centers){
-  uint N = points.n_rows;
-  uint K = centers.n_rows;
-  assert(points.n_cols == centers.n_cols);
-  
-  mat dist = mat(N,K);  
-  for(uint k = 0; k < K; k++){
-    dist.col(k) = lp_norm(points.each_row() - centers.row(k),2,1);
-  }
-  uvec P = col_argmin(dist); // partition index
-  // Assign indices to partitions
-  IndexPartition partition;
-  partition.resize(K); 
-  for(uint k = 0; k < K; k++){
-    uvec idx = find(P == k);
-    for(uint i = 0; i < idx.n_elem; i++){
-      partition[k].insert(idx(i));
-    }
-  }
-  // Remove empty bases
-  uint c = 0;
-  uint agg = 0;
-  while(c < partition.size()){
-    agg += partition[c].size();
-    cout << "Partition size: " << partition[c].size() << endl;
-    if(0 == partition[c].size())
-      partition.erase(partition.begin() + c);
-    else
-      c++;
-  }
-  assert(N == agg);
-  return partition;
-}
-
-set<uint> ball_indices(const Points & points,
-                       const vec & center,
-                       uint R){
-  vec dist = lp_norm(points.each_row() - center.t(),2,1);
-  double r = find_radius(dist,R);
-  uvec idx = find(dist < r);
-  
-  set<uint> basis;
-  for(uint i = 0; i < idx.n_elem; i++){
-    basis.insert(idx(i));
-  }
-  return basis;
-}
-
-void add_basis(IndexPartition & partition,
-                         const set<uint> & basis){
-  for(IndexIterator it = partition.begin();
-      it != partition.end(); it++){
-    for(set<uint>::const_iterator bit = basis.begin();
-        bit != basis.end(); bit++){
-      if(it->count(*bit) > 0){
-          it->erase(*bit);
-      }
-    }
-  }
-  partition.push_back(basis);
-}
-
-sp_mat build_basis_from_partition(const IndexPartition & partition,uint N){
-  uint K = partition.size();
-  sp_mat basis = sp_mat(N,K);
-  
-  for(uint k = 0; k < K; k++){
-    double v = 1.0 / sqrt(partition[k].size());
-    for(set<uint>::const_iterator it = partition[k].begin();
-        it != partition[k].end();++it){
-      basis(*it,k) = v;
-    }
-  }
-  return basis;
-}
-
-mat dist_mat(const Points & A, const Points & B){
-  assert(A.n_cols == B.n_cols);
-  uint N = A.n_rows;
-  uint M = B.n_rows;
-  mat dist = mat(N,M);  
-  for(uint i = 0; i < M; i++){
-    dist.col(i) = lp_norm(A.each_row() - B.row(i),2,1);
-  }
-  return dist;
-}
 
 VoronoiBasis::VoronoiBasis(const Points & points): m_points(points){
   n_basis = 0;
@@ -341,4 +194,40 @@ sp_mat VoronoiBasis::get_basis() const{
   vec data = ones(n_points);
   sp_mat basis = sp_mat(loc,data);
   return sp_normalise(basis,2,0); // l2 normalize each column
+}
+
+
+sp_mat make_basis(const string & mode,
+                  const vector<double> & params,
+                  const Points & points,
+                  uint k){
+  uint N = points.n_rows;
+  sp_mat basis;  
+  if(0 == mode.compare("voronoi")){
+    // VORONOI
+    assert(0 == params.size());
+    Points centers = 2 * randu(k,2) - 1;
+    VoronoiBasis vb = VoronoiBasis(points,centers);
+    basis = vb.get_basis();
+  }
+  else if (0 == mode.compare("sample")){
+    assert(0 == params.size());
+    basis = make_sample_basis(N,k);
+  }
+  else if (0 == mode.compare("balls")){
+    assert(1 == params.size());
+    uint radius = (uint) params[0];
+    Points centers = 2 * randu(k,2) - 1;
+    basis = make_ball_basis(points,centers,radius);
+  }
+  else if (0 == mode.compare("rbf")){
+    assert(1 == params.size());
+    double bandwidth = (double) params[0];
+    Points centers = 2 * randu(k,2) - 1;
+    basis = make_rbf_basis(points,centers,bandwidth);
+  }
+  else{
+    assert(false);
+  }
+  return basis;
 }

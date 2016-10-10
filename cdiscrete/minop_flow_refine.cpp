@@ -73,15 +73,13 @@ vec jitter_experiment_run(const TriMesh & mesh,
 
   // Build value basis
   Points points = mesh.get_spatial_nodes();
-  mat value_basis = make_radial_fourier_basis(points,
+  sp_mat value_basis = make_radial_fourier_basis(points,
                                               NUM_VALUE_BASIS,
                                               (double)NUM_VALUE_BASIS);
-  value_basis = orth(value_basis); // Orthonormalize (expansive)
-  sp_mat sp_value_basis = sp_mat(value_basis);
 
   // Build initial flow_basis
   Points centers = 2 * randu(MIN_FLOW_BASIS,2) - 1;
-  VoronoiBasis flow_basis = VoronoiBasis(points,centers);             
+  VoronoiBasis voronoi = VoronoiBasis(points,centers);             
 
   // Set up solver parameters
   ProjectiveSolver psolver;
@@ -113,10 +111,10 @@ vec jitter_experiment_run(const TriMesh & mesh,
     cout << "---Iteration: " << I << "---" << endl;
 
     cout << "Forming new flow basis..." << endl;
-    sp_mat sp_flow_basis = flow_basis.get_basis();
-    block_sp_vec D = {sp_value_basis,
-                      sp_flow_basis,
-                      sp_flow_basis};
+    sp_mat flow_basis = voronoi.get_basis();
+    block_sp_vec D = {value_basis,
+                      flow_basis,
+                      flow_basis};
 
     // Build the projective matrices
     sp_mat P = block_diag(D);
@@ -132,15 +130,15 @@ vec jitter_experiment_run(const TriMesh & mesh,
 
     // Add a new random center
     vec new_center = 2*randu<vec>(2) - 1;
-    flow_basis.add_center(new_center);
+    voronoi.add_center(new_center);
 
     // If we're not jittering, just use this
     if(0 == jitter_rounds){
       while(true){
         // Use a perturbed version of the selected node
         new_center = 2*randu<vec>(2) - 1;
-        flow_basis.replace_last_center(new_center);
-        if(0 < flow_basis.min_count())
+        voronoi.replace_last_center(new_center);
+        if(0 < voronoi.min_count())
           break;
         cout << "\tResampling Voronoi center..." << endl;
       }
@@ -168,8 +166,8 @@ vec jitter_experiment_run(const TriMesh & mesh,
     while(true){
       // Use a perturbed version of the selected node
       new_center = points.row(refine_node).t() + 0.5 * randn(2);
-      flow_basis.replace_last_center(new_center);
-      if(0 < flow_basis.min_count())
+      voronoi.replace_last_center(new_center);
+      if(0 < voronoi.min_count())
         break;
       cout << "\tResampling Voronoi center..." << endl;
     } 

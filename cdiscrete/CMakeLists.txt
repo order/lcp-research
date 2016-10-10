@@ -27,7 +27,7 @@ else()
 endif()
 
 # Explicitly set some flags
-#set(CMAKE_CXX_FLAGS "-O3 -fstack-protector -Wformat -Werror=format-security -Wdate-time -frounding-math -FORTIFY_SOURCE=1")
+set(CMAKE_CXX_FLAGS "-O3 -fstack-protector -Wformat -Werror=format-security -Wdate-time -frounding-math -FORTIFY_SOURCE=1 -fext-numeric-literals")
 
 # CGAL and its components
 find_package( CGAL QUIET COMPONENTS  )
@@ -88,8 +88,8 @@ list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
 #create_single_source_cgal_program("hillcar_refine.cpp" "tri_mesh.cpp"
 #  "hillcar.cpp" "refine.cpp" ${COMMON_FILES})
 
-#create_single_source_cgal_program("minop_approx.cpp" "tri_mesh.cpp"
-#  ${COMMON_FILES})
+create_single_source_cgal_program("minop_approx.cpp" "tri_mesh.cpp"
+  "minop.cpp" ${COMMON_FILES})
 #create_single_source_cgal_program("minop_sensitivity.cpp" "tri_mesh.cpp"
 #  ${COMMON_FILES})
 #create_single_source_cgal_program("minop_free_vs_bound.cpp" "tri_mesh.cpp"
@@ -124,7 +124,7 @@ message(STATUS "Libraries: ${CDISCRETE_LIBRARIES}")
 
 #target_link_libraries(min_gen ${CDISCRETE_LIBRARIES})
 #target_link_libraries(min_refine ${CDISCRETE_LIBRARIES})
-#target_link_libraries(minop_approx ${CDISCRETE_LIBRARIES})
+target_link_libraries(minop_approx ${CDISCRETE_LIBRARIES})
 #target_link_libraries(minop_sensitivity ${CDISCRETE_LIBRARIES})
 #target_link_libraries(minop_free_vs_bound ${CDISCRETE_LIBRARIES})
 target_link_libraries(minop_flow_refine ${CDISCRETE_LIBRARIES})

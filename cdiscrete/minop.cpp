@@ -100,7 +100,7 @@ void jitter_solve(const TriMesh & mesh,
   vec ans;
   for(uint j = 0; j < jitter_rounds; j++){      
     cout << "Jitter round: " << j << endl;
-    vec perturb = 0.75*(2.0*randu<vec>(N)-1) / (double) N;
+    vec perturb = 0.5*(2.0*randu<vec>(N)-1) / (double) N;
     noise.col(j) = perturb;
     q.head(N) = -1.0/(double)N - perturb;
     assert(all(q.head(N) < 0));
