@@ -20,6 +20,10 @@ void generate_minop_mesh(TriMesh & mesh,
   mesh.lloyd(25);
   mesh.freeze();
 
+  cout << "Number of vertices: " << mesh.number_of_vertices() << endl;
+  cout << "Number of faces: " << mesh.number_of_faces() << endl;
+ 
+
   // Write initial mesh to file
   cout << "Writing:"
        << "\n\t" << (filename + ".node") << " (Shewchuk node file)"
@@ -82,7 +86,7 @@ rho(i) = pearson_rho(conv_to<vec>::from(A.row(i)),
   return rho;
 }
 
-vec jitter_solve(const TriMesh & mesh,
+void jitter_solve(const TriMesh & mesh,
                  const ProjectiveSolver & solver,
                  const PLCP & ref_plcp,
                  const vec & ref_weights,
@@ -96,14 +100,12 @@ vec jitter_solve(const TriMesh & mesh,
   vec ans;
   for(uint j = 0; j < jitter_rounds; j++){      
     cout << "Jitter round: " << j << endl;
-    vec perturb = max(1e-4*ones<vec>(N), 0.075 * randn<vec>(N));
+    vec perturb = 0.75*(2.0*randu<vec>(N)-1) / (double) N;
     noise.col(j) = perturb;
-
-    // Build the LCP to get new q (kludge-y)
-    LCP jitter_lcp;
-    build_minop_lcp(mesh,ref_weights + perturb,jitter_lcp,ans);
-
-    vec jitter_q =  P *(P.t() * jitter_lcp.q);      
+    q.head(N) = -1.0/(double)N - perturb;
+    assert(all(q.head(N) < 0));
+      
+    vec jitter_q =  P *(P.t() * q);      
     PLCP jitter_plcp = PLCP(P,U,jitter_q,ref_plcp.free_vars);
     
     SolverResult jitter_sol = solver.aug_solve(jitter_plcp);

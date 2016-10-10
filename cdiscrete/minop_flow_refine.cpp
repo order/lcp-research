@@ -36,13 +36,13 @@ po::variables_map read_command_line(uint argc, char** argv){
      "Output experimental result file")
     ("bound,b", po::value<bool>()->default_value(false),
      "Value variables non-negatively bound")
-    ("jitter,j", po::value<uint>()->default_value(25),
+    ("jitter,j", po::value<uint>()->default_value(5),
      "Number of jitter rounds")
-    ("refine,r", po::value<uint>()->default_value(25),
+    ("refine,r", po::value<uint>()->default_value(5),
      "Number of refinement rounds")
-    ("experiment_runs,E", po::value<uint>()->required(),
+    ("experiment_runs,E", po::value<uint>()->default_value(1),
      "Number of experiment runs")
-    ("edge_length,e", po::value<double>()->default_value(0.1),
+    ("edge_length,e", po::value<double>()->default_value(0.125),
      "Max length of triangle edge");
   
   po::variables_map var_map;
@@ -90,7 +90,7 @@ vec jitter_experiment_run(const TriMesh & mesh,
   psolver.aug_rel_scale = 5;
   psolver.regularizer = 1e-8;
   psolver.verbose = false;
-  psolver.initial_sigma = 0.3;
+  psolver.initial_sigma = 0.8;
 
   // Regularization of LCP problem
   double regularizer = 1e-12;
@@ -135,8 +135,17 @@ vec jitter_experiment_run(const TriMesh & mesh,
     flow_basis.add_center(new_center);
 
     // If we're not jittering, just use this
-    if(0 == jitter_rounds)
-      continue;
+    if(0 == jitter_rounds){
+      while(true){
+        // Use a perturbed version of the selected node
+        new_center = 2*randu<vec>(2) - 1;
+        flow_basis.replace_last_center(new_center);
+        if(0 < flow_basis.min_count())
+          break;
+        cout << "\tResampling Voronoi center..." << endl;
+      }
+      continue;     
+    }
     
     // Perturb objective function, use correlation between
     // Modified objective value and objective noise
@@ -144,7 +153,7 @@ vec jitter_experiment_run(const TriMesh & mesh,
     mat jitter = mat(N,jitter_rounds);
     mat noise = mat(N,jitter_rounds);
     jitter_solve(mesh,psolver,ref_plcp,ref_weights,
-                 jitter, noise, jitter_rounds);
+                 jitter,noise,jitter_rounds);
       
     // Subtract off reference solution
     jitter = (jitter.each_col() - ref_sol.p.head(N));
@@ -160,7 +169,7 @@ vec jitter_experiment_run(const TriMesh & mesh,
       // Use a perturbed version of the selected node
       new_center = points.row(refine_node).t() + 0.5 * randn(2);
       flow_basis.replace_last_center(new_center);
-      if(0 < flow_basis.count_last())
+      if(0 < flow_basis.min_count())
         break;
       cout << "\tResampling Voronoi center..." << endl;
     } 
@@ -199,5 +208,6 @@ int main(int argc, char** argv)
   arch.add_uvec("num_basis",regspace<uvec>(MIN_FLOW_BASIS,
                                            MIN_FLOW_BASIS + refine_rounds));
   arch.add_mat("residuals",residuals);
+  cout << "WRITING TO FILE " << file_base << ".exp_res" << endl;
   arch.write(file_base + ".exp_res");
 }

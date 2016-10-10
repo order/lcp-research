@@ -5,25 +5,27 @@ from scipy.stats import pearsonr
 
 import tri_mesh_viewer as tmv
 
-(nodes,faces) = read_shewchuk("/home/epz/data/minop/sensitivity")
-unarch = Unarchiver("/home/epz/data/minop/sensitivity.exp_res")
+def iqr(x,Y,marker):
+    plt.gca()
+    plt.plot(x,np.median(Y,0),'-' + marker,lw=2)
+    plt.plot(x,np.percentile(Y,25,axis=0),'--' + marker,lw=2)
+    plt.plot(x,np.percentile(Y,75,axis=0),'--' + marker,lw=2)
 
-(N,D) = nodes.shape
 
-assert(N == unarch.twiddle.size)
+dir = '/home/epz/data/minop/'
+files = [dir + 'flow_refine_0_false.exp_res',
+         dir + 'flow_refine_10_false.exp_res',
+         dir + 'flow_refine_15_false.exp_res']
+colors = ['b','r','g']
 
-plt.subplot(1,2,1)
-tmv.plot_vertices(nodes,faces,unarch.twiddle)
+plt.figure()
+for (C,F) in zip(colors,files):
+    unarch = Unarchiver(F)
+    nb = unarch.num_basis[:-1]
+    res = unarch.residuals
+    (I,R) = res.shape
 
-J = unarch.jitter
-R = unarch.noise
-
-P = np.zeros(N)
-for i in xrange(N):
-    (r,p) = pearsonr(J[i,:],R[i,:])
-    if(p < 0.01):
-        P[i] = r
-
-plt.subplot(1,2,2)
-tmv.plot_vertices(nodes,faces,P)
+    for i in xrange(I):
+        plt.plot(nb, res[i,:], C+'-',alpha=0.15)    
+    iqr(nb,res,C)
 plt.show()

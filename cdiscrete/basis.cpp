@@ -325,6 +325,13 @@ uint VoronoiBasis::count_last() const{
   return count(n_basis - 1);
 }
 
+uint VoronoiBasis::min_count() const{
+  uint mc = INT_MAX;
+  for(uint k = 0; k < n_basis; k++){
+    mc = min(mc,count(k));
+  }
+  return mc;
+}
 
 sp_mat VoronoiBasis::get_basis() const{
   umat loc = umat(2,n_points);

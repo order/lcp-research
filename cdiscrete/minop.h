@@ -24,7 +24,7 @@ double pearson_rho(const vec &,
 vec pearson_rho(const mat &,
                const mat &);
 
-vec jitter_solve(const tri_mesh::TriMesh & mesh,
+void jitter_solve(const tri_mesh::TriMesh & mesh,
                  const ProjectiveSolver & solver,
                  const PLCP & ref_plcp,
                  const vec & ref_weights,
