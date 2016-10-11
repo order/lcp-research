@@ -13,7 +13,8 @@ using namespace arma;
 void generate_minop_mesh(tri_mesh::TriMesh & mesh,
                          const string & filename,
                          double edge_length,
-                         double min_angle);
+                         double min_angle,
+                         bool write=false);
 void build_minop_lcp(const tri_mesh::TriMesh &mesh,
                      const vec & a,
                      LCP & lcp,

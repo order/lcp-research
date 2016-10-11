@@ -6,6 +6,7 @@ from utils.multi_core import *
 def minop_tgf(I,**kwargs):
     T = task('./cdiscrete/minop_approx',**kwargs)
     T.params['o'] = '/home/epz/data/minop/vf_' + str(I)
+    T.params['b'] = 'true'
     return T
 
 

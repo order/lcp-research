@@ -112,8 +112,13 @@ int main(int argc, char** argv)
   vec q =  P *(P.t() * lcp.q);
 
   bvec free_vars = zeros<bvec>(3*N);
-  if(not var_map["bound"].as<bool>())
+  if(not var_map["bound"].as<bool>()){
     free_vars.head(N).fill(1);
+    cout << "Value variables free" << endl;
+  }
+  else{
+    cout << "Value variables non-negative" << endl;
+  }
   
   PLCP plcp = PLCP(P,U,q,free_vars);
   

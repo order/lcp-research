@@ -5,7 +5,8 @@ using namespace tri_mesh;
 void generate_minop_mesh(TriMesh & mesh,
                          const string & filename,
                          double edge_length,
-                         double angle){
+                         double angle,
+                         bool write){
   cout << "Initial meshing..."<< endl;
   mesh.build_box_boundary({{-1.1,1.1},{-1.1,1.1}});
   mesh.build_circle(zeros<vec>(2),50,1.0);
@@ -25,12 +26,14 @@ void generate_minop_mesh(TriMesh & mesh,
  
 
   // Write initial mesh to file
-  cout << "Writing:"
-       << "\n\t" << (filename + ".node") << " (Shewchuk node file)"
-       << "\n\t" << (filename + ".ele") << " (Shewchuk element file)"
-       << "\n\t" << (filename + ".tri") << " (CGAL mesh file)" << endl;
-  mesh.write_shewchuk(filename);
-  mesh.write_cgal(filename + ".tri");
+  if(write){
+    cout << "Writing:"
+         << "\n\t" << (filename + ".node") << " (Shewchuk node file)"
+         << "\n\t" << (filename + ".ele") << " (Shewchuk element file)"
+         << "\n\t" << (filename + ".tri") << " (CGAL mesh file)" << endl;
+    mesh.write_shewchuk(filename);
+    mesh.write_cgal(filename + ".tri");
+  }
 }
 
 void build_minop_lcp(const TriMesh &mesh,
