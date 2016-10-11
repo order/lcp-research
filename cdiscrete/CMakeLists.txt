@@ -88,8 +88,8 @@ create_single_source_cgal_program("minop_flow_refine.cpp" "tri_mesh.cpp"
 #create_single_source_cgal_program("basis_gen.cpp" "tri_mesh.cpp"
 #  ${COMMON_FILES})
 
-#create_single_source_cgal_program("dubins_gen.cpp" "tet_mesh.cpp" "dubins.cpp"
-#  ${COMMON_FILES})
+create_single_source_cgal_program("dubins_roundabout.cpp" "tet_mesh.cpp" "dubins.cpp"
+  ${COMMON_FILES})
 #create_single_source_cgal_program("dubins_refine.cpp" "tet_mesh.cpp" "dubins.cpp"
 #  "refine.cpp" ${COMMON_FILES})
 #create_single_source_cgal_program("tet_interp.cpp" "tet_mesh.cpp" ${COMMON_FILES})
@@ -120,7 +120,7 @@ target_link_libraries(minop_flow_refine ${CDISCRETE_LIBRARIES})
 
 #target_link_libraries(basis_gen ${CDISCRETE_LIBRARIES})
 
-#target_link_libraries(dubins_gen ${CDISCRETE_LIBRARIES})
+target_link_libraries(dubins_roundabout ${CDISCRETE_LIBRARIES})
 #target_link_libraries(dubins_refine ${CDISCRETE_LIBRARIES})
 
 #target_link_libraries(tet_interp ${CDISCRETE_LIBRARIES})

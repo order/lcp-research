@@ -14,8 +14,6 @@ po::variables_map read_command_line(uint argc, char** argv){
   po::options_description desc("Meshing options");
   desc.add_options()
     ("help", "produce help message")
-    ("lcp,l", po::value<string>()->required(),
-     "LCP out file")
     ("mesh,m", po::value<string>()->required(),
      "Input (CGAL) mesh file");
   po::variables_map var_map;
@@ -51,13 +49,16 @@ int main(int argc, char** argv)
   cout << "\tLower bound:" << lb.t();
   cout << "\tUpper bound:" << ub.t();
 
-  DubinsCarSimulator dubins = DubinsCarSimulator(DUBINS_ACTIONS);
 
+  RoundaboutDubinsCarSimulator dubins = RoundaboutDubinsCarSimulator(DUBINS_ACTIONS);
   bool include_oob = true;
   LCP L = build_lcp(&dubins,
                     &mesh,
                     DUBINS_GAMMA,
                     include_oob);
-  string filename = var_map["lcp"].as<string>();
+  //string filename = var_map["lcp"].as<string>();
+  //L.write(filename);
+
+  string filename = "/home/epz/data/dubins.lcp";
   L.write(filename);
 }
