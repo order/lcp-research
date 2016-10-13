@@ -147,6 +147,34 @@ def read_medit_mesh(filename):
 
     return vertices,edges,triangles,tetrahedra
 
+def read_ctri(filename):
+    FH = open(filename,"r")
+    lines = FH.readlines()
+    lines = prep_lines(lines)  
+
+    
+    header = lines.pop()
+    (N,F,D) = map(int,header.split())
+    assert 2 == D
+
+    parse = lambda x : map(float,x.split())
+    nodes = []
+    faces = []
+    for i in xrange(N-1):
+        node = parse(lines.pop())
+        assert 2 == len(node)
+        nodes.append(node)
+
+    parse = lambda x: map(lambda y: int(y)-1, x.split())
+    for i in xrange(F):
+        face = parse(lines.pop())
+        assert 3 == len(face)
+        if -1 in face:
+            continue
+        faces.append(face)
+
+    return (np.array(nodes),np.array(faces))
+                     
 def read_shewchuk(filename):
     nodes = read_node(filename + ".node")
     faces = read_ele(filename + ".ele")   

@@ -110,12 +110,13 @@ sp_mat make_rbf_basis(const Points & points,
   uint N = points.n_rows;
   uint K = centers.n_rows;
   mat basis = zeros<mat>(N,K);
+  basis.col(0) = ones<vec>(N);
   double value_thresh = 1e-8;
-  double dist_thresh = std::sqrt(-bandwidth * std::log(value_thresh));
-  for(uint k = 0; k < K; k++){
+  double dist_thresh = std::sqrt(-std::log(value_thresh) / bandwidth);
+  for(uint k = 1; k < K; k++){
     vec dist = lp_norm(points.each_row() - centers.row(k),2,1);
     uvec idx = find(dist <= dist_thresh);
-    basis(idx,uvec{k}) = exp(-dist(idx)/bandwidth);
+    basis(idx,uvec{k}) = exp(-bandwidth * dist(idx));
   }
   basis = orth(basis); // Not ortho at all; need to do explicitly
   return sp_mat(basis);
@@ -135,6 +136,27 @@ sp_mat make_radial_fourier_basis(const Points & points,
     basis.col(K+k+1) = cos(omega*r);
   }
   basis.col(K).fill(1/sqrt(N));
+  basis = orth(basis); // Explicitly orthonormalize
+  return sp_mat(basis);
+}
+
+sp_mat make_fourier_basis(const Points & points,
+                        uint K,double max_freq){
+  uint N = points.n_rows;
+  mat basis = mat(N,K);
+
+  basis.col(0) = ones<vec>(N);
+  basis.col(1) = sin(datum::pi*sum(points,1));
+  basis.col(2) = sin(datum::pi*(points.col(0) - points.col(1)));
+  for(uint i = 3; i < K; i++){
+    vec freq = 2.0*datum::pi * randi<vec>(2, distr_param(1,(uint)max_freq));
+    vec flip = randn<vec>(1);
+    if(flip(0) > 0.5)
+      basis.col(i) = sin(points * freq);
+    else
+      basis.col(i) = cos(points * freq);
+  }
+
   basis = orth(basis); // Explicitly orthonormalize
   return sp_mat(basis);
 }

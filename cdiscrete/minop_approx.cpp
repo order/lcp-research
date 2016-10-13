@@ -35,6 +35,8 @@ po::variables_map read_command_line(uint argc, char** argv){
      "Parameters for the basis mode")
     ("bound,b", po::value<bool>()->default_value(false),
      "Value variables non-negatively bound")
+    ("save_sol,s", po::value<bool>()->default_value(false),
+     "Save solution to file")
     ("num_val,v",po::value<uint>()->required(),
      "Number of value bases to use")
     ("num_flow,f",po::value<uint>()->required(),
@@ -67,6 +69,10 @@ int main(int argc, char** argv)
   double edge_length = var_map["edge_length"].as<double>();
   double angle = 0.125;
   generate_minop_mesh(mesh,file_base,edge_length,angle);
+  if(var_map["save_sol"].as<bool>()){
+    cout << "Writing mesh file " << file_base << ".mesh" << endl;
+    mesh.write_cgal(file_base + ".mesh");
+  }
   mesh.freeze();
 
   // Stats
@@ -76,29 +82,37 @@ int main(int argc, char** argv)
        << "\n\tNumber of vertices: " << V
        << "\n\tNumber of faces: " << F
        << endl;
+  Points points = mesh.get_spatial_nodes();
+  uint N = points.n_rows;
+  assert(V == N);
+
 
   // Build LCP
   LCP lcp;
   vec ans;
   vec weights =  ones<vec>(V) / (double)V;
-  build_minop_lcp(mesh,weights,lcp,ans);
+  vec q = bumpy_q(points,
+                    weights);
+  build_minop_lcp(mesh,q,lcp,ans);
 
-  // Build value basis
+  // Build random Fourier for value basis
   uint num_value = var_map["num_val"].as<uint>();
-  Points points = mesh.get_spatial_nodes();
-  uint N = points.n_rows;
-  sp_mat value_basis = make_radial_fourier_basis(points,
-                                              num_value,
-                                              (double)num_value);
+  sp_mat value_basis = make_fourier_basis(points,
+                                          num_value,
+                                          16);
+
+  /*mat rbf_centers = 2*randu<mat>(num_value,2) - 1;
+  double bandwidth = 10;
+  sp_mat value_basis = make_rbf_basis(points,
+                                      rbf_centers,
+                                      bandwidth);*/
   uint num_flow = var_map["num_flow"].as<uint>();
   string mode = var_map["mode"].as<string>();
   vector<double> params;
-  if(var_map.count("params") > 0){
-    params = var_map["params"].as<vector<double> >();
-  }
+
+  // Make Voronoi basis for flow
   assert("voronoi" == mode);
-  //sp_mat flow_basis = make_basis(mode,params,points,num_flow);
-  Points centers = 2 * randu(num_flow,2) - 1;
+  Points centers = 2 * randu<mat>(num_flow,2) - 1;
   VoronoiBasis voronoi = VoronoiBasis(points,centers);  
   sp_mat flow_basis = voronoi.get_basis();
   
@@ -108,8 +122,8 @@ int main(int argc, char** argv)
   D.push_back(flow_basis);
   
   sp_mat P = block_diag(D);
-  sp_mat U = P.t() * (lcp.M + 1e-8 * speye(3*V,3*V));
-  vec q =  P *(P.t() * lcp.q);
+  sp_mat U = P.t() * (lcp.M + 1e-12 * speye(3*V,3*V));
+  vec pq =  P *(P.t() * lcp.q);
 
   bvec free_vars = zeros<bvec>(3*N);
   if(not var_map["bound"].as<bool>()){
@@ -120,16 +134,27 @@ int main(int argc, char** argv)
     cout << "Value variables non-negative" << endl;
   }
   
-  PLCP plcp = PLCP(P,U,q,free_vars);
+  PLCP plcp = PLCP(P,U,pq,free_vars);
   
   ProjectiveSolver psolver;
-  psolver.comp_thresh = 1e-8;
+  psolver.comp_thresh = 1e-12;
   psolver.max_iter = 500;
   psolver.verbose = false;
+
+  KojimaSolver ksolver;
+  ksolver.comp_thresh = 1e-12;
+  ksolver.max_iter = 500;
+  ksolver.verbose = true;
       
   SolverResult sol = psolver.aug_solve(plcp);
+  //SolverResult sol = ksolver.aug_solve(lcp);
   double res = norm(sol.p.head(N) - ans);
   cout << "Residual: " << res << endl;
+
+  if(var_map["save_sol"].as<bool>()){
+    cout << "Writing solution file " << file_base << ".sol" << endl;
+    sol.write(file_base + ".sol");
+  }
   
   vec data = vec(4 + params.size());
   data(0) = num_value;
@@ -142,4 +167,6 @@ int main(int argc, char** argv)
   arch.add_vec("data", data);
   arch.add_mat("centers",centers);
   arch.write(file_base + ".exp_res");
+
+  
 }

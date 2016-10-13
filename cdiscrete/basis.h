@@ -30,6 +30,9 @@ sp_mat make_rbf_basis(const Points & points,
 sp_mat make_radial_fourier_basis(const Points & points,
                               uint K, double max_freq);
 
+sp_mat make_fourier_basis(const Points & points,
+                          uint K, double max_freq);
+
 class VoronoiBasis{
  public:
   VoronoiBasis(const Points & points);

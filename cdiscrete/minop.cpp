@@ -9,9 +9,9 @@ void generate_minop_mesh(TriMesh & mesh,
                          bool write){
   cout << "Initial meshing..."<< endl;
   mesh.build_box_boundary({{-1.1,1.1},{-1.1,1.1}});
-  mesh.build_circle(zeros<vec>(2),50,1.0);
-  mesh.build_circle(zeros<vec>(2),30,1.0/sqrt(2.0));
-  mesh.build_circle(zeros<vec>(2),25,0.25);
+  //mesh.build_circle(zeros<vec>(2),50,1.0);
+  //mesh.build_circle(zeros<vec>(2),30,1.0/sqrt(2.0));
+  //mesh.build_circle(zeros<vec>(2),25,0.25);
 
   cout << "Refining based on (" << angle
        << "," << edge_length <<  ") criterion ..."<< endl;
@@ -36,26 +36,53 @@ void generate_minop_mesh(TriMesh & mesh,
   }
 }
 
+vec caldera_q(const Points & points,
+              const vec & a){
+  uint N = a.n_elem;
+  assert(N == points.n_rows);
+
+  assert(all(a > 0));
+
+  vec d2 = sum(pow(points,2),1);
+  
+  vec q = vec(3*N);
+  q.head(N) = -a;
+  q.subvec(N,size(a)) = d2;
+  q.tail(N) = max(zeros<vec>(N), 1.0-d2);
+  
+  return q;
+}
+
+vec bumpy_q(const Points & points, const vec & a){
+  uint N = a.n_elem;
+  assert(N == points.n_rows);
+
+  assert(all(a > 0));
+    
+  vec q = vec(3*N);
+  q.head(N) = -a;
+  q.subvec(N,size(a)) = sin(datum::pi*sum(points,1)) + 1;
+  q.tail(N) = sin(datum::pi*(points.col(0) - points.col(1))) + 1;
+  //q.tail(N).fill(2);
+  return q;  
+}
+
 void build_minop_lcp(const TriMesh &mesh,
-                     const vec & a,
+                     const vec & q,
                      LCP & lcp,
                      vec & ans){
   double off = 1.0; // +ve offset
   Points points = mesh.get_spatial_nodes();
   uint N = points.n_rows;
-  vec sq_dist = sum(pow(points,2),1);
+  vec sq_dist = sum(pow(points,2),1); 
+  
+  assert(3*N == q.n_elem);    
+  assert(all(q.head(N) < 0));
 
-  vec b = sq_dist + off;
-  vec c = max(zeros<vec>(N),1 - sq_dist) + off;
-  
+  vec b = q.subvec(N,2*N-1); 
+  vec c = q.tail(N);
   ans = arma::max(zeros<vec>(N), arma::min(b,c));
-  
-  assert(a.n_elem == b.n_elem);
-  vec q = join_vert(-a,
-                    join_vert(b,c));
-  assert(3*N == q.n_elem);
-  assert(not all(q >= 0));
- 
+
   vector<sp_mat> E;
   E.push_back(speye(N,N));
   E.push_back(speye(N,N));

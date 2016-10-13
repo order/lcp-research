@@ -232,6 +232,7 @@ PLCP augment_plcp(const PLCP & original,
   assert(N == x.n_elem);
   assert(N == y.n_elem);
   w = P.t() * (x - y + q);
+  cout << norm(P*w - x + y - q) << endl;
   assert(norm(P*w - x + y - q) < PRETTY_SMALL);
 
   
