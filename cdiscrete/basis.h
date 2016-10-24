@@ -33,6 +33,12 @@ sp_mat make_radial_fourier_basis(const Points & points,
 sp_mat make_fourier_basis(const Points & points,
                           uint K, double max_freq);
 
+vec gabor_wavelet(const Points & points,
+                  const vec & center,
+                  const vec & freq,
+                  const double bandwidth,
+                  const double shift);
+
 class VoronoiBasis{
  public:
   VoronoiBasis(const Points & points);

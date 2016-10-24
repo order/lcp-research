@@ -22,10 +22,19 @@ vec caldera_q(const Points & points,
 vec bumpy_q(const Points & points,
             const vec & a);
 
+sp_mat build_smoothed_identity(const Points & points,
+                             const double bandwidth);
+
 void build_minop_lcp(const tri_mesh::TriMesh &mesh,
                      const vec & a,
                      LCP & lcp,
                      vec & ans);
+void build_smoothed_minop_lcp(const tri_mesh::TriMesh &mesh,
+                              const vec & a,
+                              const double bandwidth,
+                              LCP & lcp,
+                              vec & ans,
+                              sp_mat & I);
 
 double pearson_rho(const vec &,
                   const vec &);

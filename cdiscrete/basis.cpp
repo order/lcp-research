@@ -2,6 +2,24 @@
 #include "basis.h"
 #include "misc.h"
 
+vec gabor_wavelet(const Points & points,
+                  const vec & center,
+                  const vec & freq,
+                  const double bandwidth,
+                  const double shift){
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  assert(D == center.n_elem);
+  assert(D == freq.n_elem);
+  
+  // Gabor wavelet (real valued frequencies only)
+  vec sqdist = sum(pow(points.each_row() - center.t(),2),1);
+  vec gauss = exp(-bandwidth*sqdist);
+  vec wave = sin(2.0 * datum::pi * (points * freq) + shift);
+  
+  return gauss % wave;
+}
+
 double find_radius(const vec & dist,
                    uint target){
   uint N = dist.n_rows;
@@ -47,6 +65,7 @@ mat dist_mat(const Points & A, const Points & B){
   }
   return dist;
 }
+
 
 sp_mat make_sample_basis(uint N,
                         uint K){

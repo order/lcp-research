@@ -224,17 +224,26 @@ PLCP augment_plcp(const PLCP & original,
   sp_mat P = sp_mat(original.P);
   sp_mat U = sp_mat(original.U);
   vec q = vec(original.q);
+  assert(all(q(find(1 == original.free_vars)) <= 0));
 
-  x = ones<vec>(N);
-  y = ones<vec>(N);
+
+  vec q_neg = min(zeros<vec>(N),q);
+  vec q_pos = max(zeros<vec>(N),q);
+  x = ones<vec>(N) - q_neg;
+  y = ones<vec>(N) + q_pos;
   y(find(1 == original.free_vars)).fill(0);
-
+  assert(norm(q_pos(find(1 == original.free_vars))) < ALMOST_ZERO);
+  
   assert(N == x.n_elem);
   assert(N == y.n_elem);
-  w = P.t() * (x - y + q);
-  cout << norm(P*w - x + y - q) << endl;
-  assert(norm(P*w - x + y - q) < PRETTY_SMALL);
+  assert(all(x >= 0));
+  assert(all(y >= 0));
 
+  vec res = x - y + q;
+  w = spsolve(P.t()*P + 1e-15*speye(K,K),P.t()*(x - y + q));
+
+  vec w_res = P * w - res;
+  assert(norm(w_res) < PRETTY_SMALL);
   
   vec b = P.t()*x - U*x - w;
   assert(K == b.n_elem);

@@ -93,6 +93,63 @@ void build_minop_lcp(const TriMesh &mesh,
   lcp = LCP(M,q);
 }
 
+sp_mat build_smoothed_identity(const Points & points,
+                             const double bandwidth){
+  uint N = points.n_rows;
+
+  // Get distance (should be symmetric)
+  mat D = pdist(points);
+  assert(size(N,N) == size(D));
+
+  // Gaussian
+  mat gauss = exp(-bandwidth*pow(D,2));
+  assert(size(N,N) == size(gauss));
+
+  // Zero-one small entries for sparsity
+  double thresh = 1e-2; // Threshold for zeroing out
+  gauss(find(gauss < thresh)).fill(0);
+
+  // Normalize rows (MDP interp)
+  gauss = normalise(gauss,1,1);
+  
+  return sp_mat(gauss);
+}
+
+void build_smoothed_minop_lcp(const TriMesh &mesh,
+                              const vec & q,
+                              const double bandwidth,
+                              LCP & lcp,
+                              vec & ans,
+                              sp_mat & smooth_I){
+  
+  double off = 1.0; // +ve offset
+  Points points = mesh.get_spatial_nodes();
+  uint N = points.n_rows;
+  vec sq_dist = sum(pow(points,2),1); 
+  
+  assert(3*N == q.n_elem);    
+  assert(all(q.head(N) < 0));
+
+  smooth_I = build_smoothed_identity(points,
+                                     bandwidth);
+
+  mat Q = reshape(q,size(N,3));
+  Q.col(1) = smooth_I * Q.col(1);
+  Q.col(2) = smooth_I * Q.col(2);
+  ans = arma::max(zeros<vec>(N), arma::min(Q.col(1),Q.col(2)));
+  
+  vec new_q = vectorise(Q);
+
+  vector<sp_mat> E;
+  E.push_back(smooth_I);
+  E.push_back(smooth_I);
+  sp_mat M = build_M(E);
+  assert(M.is_square());
+  assert(3*N == M.n_rows);
+
+  lcp = LCP(M,new_q);
+}
+
 double pearson_rho(const vec & a,
                    const vec & b){
   double mu_a = mean(a);

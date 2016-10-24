@@ -157,6 +157,18 @@ vec lp_norm(const mat & A,double p,uint dir){
   return pow(sum(pow(A,p),dir),1.0 / p);
 }
 
+mat pdist(const mat& A){
+  uint N = A.n_rows;
+  mat D = mat(N,N);
+  
+  for(uint i = 0; i < N; i++){
+    // Subview nonsense preventing easily doing efficient thing
+    vec d = lp_norm(A.each_row() - A.row(i),2,1);
+    D.col(i) = d;
+  }
+  return D;
+}
+
 vec dist(const mat & A, const mat & B){
   return lp_norm(A - B,2,1);
 }
@@ -173,10 +185,8 @@ double rectify(double x){
   return max(0.0,x);
 }
 
-vec rectify(vec & x){
-  vec t = x;
-  t(find(t < 0.0)).fill(0.0);
-  return t;
+vec rectify(const vec & x){
+  return max(zeros<vec>(x.n_elem),x);
 }
 
 double soft_threshold(double x, double thresh){
@@ -476,4 +486,8 @@ sp_mat sp_normalise(const sp_mat & A,
     B.col(c) = A.col(c) / z;
   }
   return B;
+}
+
+double sparsity(const sp_mat & A){
+  return (double)A.n_nonzero / (double) A.n_elem;
 }

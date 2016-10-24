@@ -8,7 +8,7 @@ from sklearn import neighbors
 from parsers import KwargParser
 
 import numpy as np
-from discrete import make_points
+from utils import make_points
 
 ##########################
 # Animate a rank 3 tensor along the first dimension

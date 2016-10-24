@@ -53,11 +53,12 @@ template <typename M, typename V> M row_add(const M & A, const V & b);
 template <typename M, typename V> M row_divide(const M & A, const V & b);
 
 vec lp_norm(const mat & A,double p,uint dir);
+mat pdist(const mat & A); // 
 vec dist(const mat & A, const mat & B);
 vec dist(const mat & A, const rowvec & b);
 
 double rectify(double x);
-vec rectify(vec & x);
+vec rectify(const vec & x);
 double soft_threshold(double x, double thresh);
 vec soft_threshold(vec x, double thresh);
 
@@ -111,4 +112,6 @@ block_sp_mat sp_partition(const sp_mat & A,
                           const uvec & idx_2);
 
 sp_mat sp_normalise(const sp_mat & A,uint p,uint d);
+
+double sparsity(const sp_mat & A);
 #endif

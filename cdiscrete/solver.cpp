@@ -295,11 +295,6 @@ SolverResult ProjectiveSolver::solve(const PLCP & plcp,
 
   
   double sigma = initial_sigma;
-  
-  superlu_opts slu_opts;
-  slu_opts.equilibrate = true; // This is important for conditioning
-  slu_opts.permutation = superlu_opts::COLAMD;
-  slu_opts.refine = superlu_opts::REF_SINGLE;
 
   uint iter;
   double mean_comp;
@@ -330,7 +325,7 @@ SolverResult ProjectiveSolver::solve(const PLCP & plcp,
     assert(K == h.n_elem);
 
     // Options don't make much difference
-    vec dw = arma::solve(G,h,
+    vec dw = arma::solve(G+1e-15*eye(K,K),h,
                          solve_opts::equilibrate);
     assert(K == dw.n_elem);
 

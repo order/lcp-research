@@ -13,7 +13,7 @@ import os,re
 
 if __name__ == '__main__':
     # Make sure that
-    filedir = "/home/epz/data/minop/vf_free/"
+    filedir = "/home/epz/data/minop/vf_bumpy_free/"
     summary_file = filedir + "summary.npy"
 
     

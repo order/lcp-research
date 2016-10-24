@@ -40,6 +40,11 @@ vector<sp_mat> build_E_blocks(const Simulator * sim,
                               const Discretizer * disc,
                               double gamma,
                               bool include_oob);
+
+// Build skew-symmetric matrix out of blocks.
+// [0     E1 E2]
+// [-E1.T 0  0 ]
+// [-E2.T 0  0 ]
 sp_mat build_M(const vector<sp_mat> & E_blocks);
 
 vec build_q_vec(const Simulator * sim,
