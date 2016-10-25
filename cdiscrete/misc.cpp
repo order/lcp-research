@@ -415,10 +415,20 @@ sp_mat block_diag(const block_sp_vec & D){
 }
 
 sp_mat spdiag(const vec & v){
-  uint N = v.n_elem;
-  return sp_mat(regspace<uvec>(0,N-1),
-                regspace<uvec>(0,N),
-                v,N,N);
+  return spdiag(v,0);
+}
+
+sp_mat spdiag(const vec & v, const int d){
+  uint n = v.n_elem;
+  uint N = n + abs(d);
+
+  umat loc = umat(2,n);
+  uint r_start = max(0,-d);
+  uint c_start = max(0,d);
+  loc.row(0) = regspace<urowvec>(r_start,r_start+n-1);
+  loc.row(1) = regspace<urowvec>(c_start,c_start+n-1);
+  
+  return sp_mat(loc,v,N,N);
 }
 
 sp_mat sp_submatrix(const sp_mat & A,

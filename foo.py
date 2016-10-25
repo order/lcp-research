@@ -1,20 +1,18 @@
 import numpy as np
+from utils.archiver import Unarchiver
 import matplotlib.pyplot as plt
 
-data = np.load("test.npz")
-mu = data['mu']
-d = data['dims']
-
+unarch = Unarchiver('cdiscrete/test.sol')
 
 plt.figure()
-plt.plot(d,mu,'.-')
-plt.xlabel('size')
-plt.ylabel('mu')
-plt.title('l1-norm mu')
+plt.imshow(unarch.M.toarray(),interpolation='nearest')
+plt.colorbar()
+
+p = unarch.p
+N = p.size / 4
+P = np.reshape(unarch.p,(N,4),order='F');
 
 plt.figure()
-plt.plot(np.diff(mu),'o-')
-plt.ylabel('mu difference')
-plt.title('l1-norm mu difference')
+plt.plot(P[:,0])
 
 plt.show()

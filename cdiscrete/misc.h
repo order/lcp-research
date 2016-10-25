@@ -101,6 +101,7 @@ typedef std::vector<sp_mat> block_sp_vec;
 sp_mat block_mat(const block_sp_mat & B);
 sp_mat block_diag(const block_sp_vec & D);
 sp_mat spdiag(const vec & v);
+sp_mat spdiag(const vec & v,const int d);
 
 
 sp_mat sp_submatrix(const sp_mat & A,

@@ -94,6 +94,8 @@ create_single_source_cgal_program("dubins_roundabout.cpp" "tet_mesh.cpp" "dubins
 #  "refine.cpp" ${COMMON_FILES})
 #create_single_source_cgal_program("tet_interp.cpp" "tet_mesh.cpp" ${COMMON_FILES})
 
+add_executable (hallway_approx hallway_approx.cpp hallway.cpp ${COMMON_FILES})
+
 
 list(APPEND CDISCRETE_LIBRARIES
         ${ARMADILLO_LIBRARIES}
@@ -124,3 +126,4 @@ target_link_libraries(dubins_roundabout ${CDISCRETE_LIBRARIES})
 #target_link_libraries(dubins_refine ${CDISCRETE_LIBRARIES})
 
 #target_link_libraries(tet_interp ${CDISCRETE_LIBRARIES})
+target_link_libraries(hallway_approx ${CDISCRETE_LIBRARIES})
