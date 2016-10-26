@@ -11,6 +11,25 @@
 using namespace std;
 using namespace arma;
 
+// TODO: non-isometric versions
+vec gabor_wavelet(const vec & points,
+                  const double center,
+                  const double freq,
+                  const double bandwidth,
+                  const double shift);
+vec gabor_wavelet(const Points & points,
+                  const vec & center,
+                  const vec & freq,
+                  const double bandwidth,
+                  const double shift);
+vec gaussian(const vec & points,
+             const double center,
+             const double bandwidth);
+vec gaussian(const Points & points,
+             const vec & center,
+             const double bandwidth);
+
+
 double find_radius(const vec & dist,
                    uint target);
 double find_radius(const vec & dist,
@@ -33,11 +52,7 @@ sp_mat make_radial_fourier_basis(const Points & points,
 sp_mat make_fourier_basis(const Points & points,
                           uint K, double max_freq);
 
-vec gabor_wavelet(const Points & points,
-                  const vec & center,
-                  const vec & freq,
-                  const double bandwidth,
-                  const double shift);
+
 
 class VoronoiBasis{
  public:

@@ -12,14 +12,19 @@ using namespace std;
 sp_mat build_hallway_P(const uint N,
                        const double p_stick,
                        const int action);
-sp_mat build_hallway_M(const uint N,
-                       const double p_stick,
-                       const double gamma);
+vector<sp_mat> build_hallway_blocks(const uint N,
+                                    const double p_stick,
+                                    const double gamma);
 
-vec build_hallway_q(const uint N);
+mat build_hallway_q(const uint N);
 
 LCP build_hallway_lcp(const uint N,
                       const double p_stick,
                       const double gamma);
 
+sp_mat build_smoothed_identity(uint N,double p);
+LCP build_smoothed_hallway_lcp(const uint N,
+                               const double p_stick,
+                               const double p_smooth,
+                               const double gamma);
 #endif
