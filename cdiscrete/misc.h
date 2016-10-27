@@ -98,6 +98,8 @@ template <typename D> Col<D> rshift(const Col<D> & v);
 typedef std::vector<std::vector<sp_mat> > block_sp_mat;
 typedef std::vector<sp_mat> block_sp_vec;
 
+block_sp_vec block_mult(const sp_mat & A, const block_sp_vec & Bs);
+
 sp_mat block_mat(const block_sp_mat & B);
 sp_mat block_diag(const block_sp_vec & D);
 sp_mat spdiag(const vec & v);

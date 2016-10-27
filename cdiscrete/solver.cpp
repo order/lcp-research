@@ -94,7 +94,6 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
   vec q = lcp.q;
   sp_mat M = lcp.M + regularizer * speye(size(lcp.M));
   uint N = q.n_elem;
-  cout << "Initial residual: " << norm(M*x + q - y) << endl;
 
   assert(N == x.n_elem);
   assert(N == y.n_elem);

@@ -9,7 +9,7 @@ sp_mat make_value_basis(const vec & points){
   uint N = points.n_elem;
 
   uint k = 15;
-  uint K = k+2;
+  uint K = k+1;
 
   vec centers = linspace(0,1,k);
   
@@ -17,8 +17,6 @@ sp_mat make_value_basis(const vec & points){
   mat basis = mat(N,K);
   uint I = 0;
   basis.col(I++) = ones<vec>(N);
-  basis.col(I) = zeros<vec>(N);
-  basis(N/2,I++) = 1;
   for(uint w = 0; w < k; w++){
     basis.col(I++) = gaussian(points,centers(w),bw);
   }
@@ -26,64 +24,25 @@ sp_mat make_value_basis(const vec & points){
   return sp_mat(orth(basis));
 }
 
-vector<sp_mat> make_flow_bases(const sp_mat & value_basis,
-                               const vector<sp_mat> p_blocks){
-  // TODO: think more carefully about q
-  vector<sp_mat> flow_bases;
-  uint A = p_blocks.size();
-  for(uint a = 0; a < A; a++){
-    sp_mat raw_basis = p_blocks.at(a) * value_basis;
-    flow_bases.push_back(sp_mat(orth(mat(raw_basis)))); // Orthonorm
+mat perturb_q(const mat & Q, const double noise_std){
+  uint N = Q.n_rows;
+  uint A = Q.n_cols;
+
+  mat tildeQ = mat(size(Q));
+  tildeQ.col(0) = Q.col(0); // Same weights
+  for(uint a = 1; a < A; a++){
+    tildeQ.col(a) = Q.col(a) + noise_std * randn<vec>(N);
   }
-  return flow_bases;
+  return tildeQ;
 }
 
-
-// Should be pretty generic; put in a more general file
-PLCP approx_hallway_lcp(const vec & points,
-                        const LCP & lcp,
-                        const vector<sp_mat> & p_blocks){
-  /* Build the approximate PLCP based on:
-     1) An MDP LCP specificied via the P blocks
-     2) A value bases (make_value_basis)
-  */
-  
-  uint N = points.n_elem;
-  uint A = p_blocks.size();
-  cout << "(N,A): (" << N << "," << A << ")" << endl;
-  // Make the value bases
-  sp_mat value_basis = make_value_basis(points);
-  cout << "Value basis size: " << size(value_basis) << endl;
-    
-  // Build the flow bases
-  // This is the "freebie basis" for the flow based on the
-  // Smoothed LCP
-  vector<sp_mat> flow_bases = make_flow_bases(value_basis,
-                                              p_blocks);
-  assert(A == flow_bases.size());
-  
-  block_sp_vec b_blocks;
-  b_blocks.reserve(A + 1);
-  b_blocks.push_back(value_basis);
-  b_blocks.insert(b_blocks.end(),
-                  flow_bases.begin(),
-                  flow_bases.end());
-  assert((A+1) == b_blocks.size());
-  sp_mat P = block_diag(b_blocks);
-  cout << "P: " << size(P) << endl;
-
-  // Build the U vector based on 
-  uint V = lcp.q.n_elem;
-  cout << "q: " << size(lcp.q) << endl;
-  cout << "M: " << size(lcp.M) << endl;
-  sp_mat M = lcp.M + 1e-10 * speye(V,V); // Regularize
-  sp_mat U = P.t() * M * P * P.t();
-  vec q = P *(P.t() * lcp.q);
-
-  bvec free_vars = zeros<bvec>(V); // TODO
-  PLCP plcp = PLCP(P,U,q,free_vars);
-
-  return plcp;
+vec sinc(const vec & x){
+  vec s = vec(size(x));
+  uvec mask = find(x != 0);
+  s(mask) = sin(2.0*datum::pi*x(mask)) / x(mask);
+  mask = find(x == 0);
+  s(mask).fill(1);
+  return s;
 }
 
 int main(int argc, char** argv)
@@ -97,27 +56,47 @@ int main(int argc, char** argv)
 
   // Build the LCP
   double p_stick = 0.25;
-  double p_smooth = 0.99;
-  double gamma = 0.997;
+  double p_smooth = 0.55;
+  double gamma = 0.99;
 
-  LCP lcp = build_hallway_lcp(N,p_stick,gamma);
+  // Build the reference blocks
   vector<sp_mat> blocks = build_hallway_blocks(N,p_stick,gamma);
-  assert(A == blocks.size());
-  
-  LCP slcp = build_smoothed_hallway_lcp(N,p_stick,p_smooth,gamma);
-  vector<sp_mat> sblocks;
-  sp_mat smoother = build_smoothed_identity(N,p_smooth);
-  for(uint a = 0; a< A; a++)
-    sblocks.push_back(smoother * blocks[a]);
-  
-  PLCP plcp = approx_hallway_lcp(points,lcp,blocks);
-  PLCP splcp = approx_hallway_lcp(points,slcp,sblocks);
 
+  // Smooth out the blocks with a convolver
+  vec x = linspace(-1,1,9);
+  //vec g = exp(-5*abs(x));
+  vec g = exp(-5*x%x);
+  //vec g = sinc(3*x);
+  g /= accu(abs(g));
+  cout << "Smoothing vector: " << g.t() << endl;
+  sp_mat smoother = build_convolution_matrix(N,g);
+
+  vector<sp_mat> sblocks = block_mult(smoother,blocks);
+
+  // Build and pertrub the q
+  mat Q = build_hallway_q(N);
+  mat tildeQ = perturb_q(Q,0.25);
+  mat smoothQ = smoother * tildeQ;
+
+  // TODO: perturb the operator
+  
+  bvec free_vars = zeros<bvec>((A+1)*N);
+  free_vars.head(N).fill(1);
+
+  LCP rlcp = LCP(build_M(blocks),vectorise(Q),free_vars);
+  LCP lcp = LCP(build_M(blocks),vectorise(tildeQ),free_vars);
+  LCP slcp = LCP(build_M(sblocks),vectorise(smoothQ),free_vars);
+
+  sp_mat value_basis = make_value_basis(points);
+  PLCP plcp = approx_lcp(points,value_basis,blocks,tildeQ,free_vars);
+  PLCP splcp = approx_lcp(points,value_basis,sblocks,smoothQ,free_vars);
 
   // Solve the problem
   KojimaSolver solver = KojimaSolver();
   solver.verbose = false;
   ProjectiveSolver psolver = ProjectiveSolver();
+  psolver.verbose = false;
+  SolverResult rsol = solver.aug_solve(rlcp);
   SolverResult sol = solver.aug_solve(lcp);
   SolverResult ssol = solver.aug_solve(slcp);
   SolverResult psol = psolver.aug_solve(plcp);
@@ -127,6 +106,8 @@ int main(int argc, char** argv)
 
   // Record the solution and problem data
   Archiver arch = Archiver();
+  arch.add_vec("ref_p",rsol.p);
+  arch.add_vec("ref_d",rsol.d);
   arch.add_vec("p",sol.p);
   arch.add_vec("d",sol.d);
   arch.add_vec("sp",ssol.p);

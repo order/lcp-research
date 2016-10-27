@@ -346,6 +346,19 @@ Col<D> rshift(const Col<D> & v){
   return u;
 }
 
+block_sp_vec block_mult(const sp_mat & A,
+                        const block_sp_vec & Bs){
+
+  uint n = Bs.size();
+  block_sp_vec Cs;
+  Cs.reserve(n);
+  for(uint i = 0; i < n; i++){
+    Cs.push_back(A * Bs[i]);
+  }
+  return Cs;
+}
+
+
 sp_mat block_mat(const block_sp_mat & B){
   uint b_rows = B.size();
   assert(b_rows > 0);
