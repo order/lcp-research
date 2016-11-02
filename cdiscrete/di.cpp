@@ -70,7 +70,7 @@ mat DoubleIntegratorSimulator::q_mat(const Discretizer * disc) const{
   uint A = num_actions();
   
   mat Q = mat(N,A+1);
-  Q.col(0) = get_state_weights(points);
+  Q.col(0) = -get_state_weights(points);
   Q.tail_cols(A) = get_costs(points);
   return Q;
 }
@@ -106,20 +106,21 @@ sp_mat DoubleIntegratorSimulator::transition_matrix(const Discretizer * disc,
 vector<sp_mat> DoubleIntegratorSimulator::transition_blocks(const Discretizer * disc) const{
   vector<sp_mat> blocks;
   uint A = num_actions();
-  assert(A == m_action.n_rows());
   
   bool include_oob = false;
   for(uint a = 0; a < A; a++){
-    blocks.push_back(disc,m_actions.row(a).t(),include_oob);
+    sp_mat T = transition_matrix(disc,m_actions.row(a).t(),include_oob);
+    blocks.push_back(T);
   }
+  return blocks;
 }
 
-vector<sp_mat> DoubleIntegratorSimulator::lcp_locks(const Discretizer * disc,
-                                                    const double gamma){
+vector<sp_mat> DoubleIntegratorSimulator::lcp_blocks(const Discretizer * disc,
+						     const double gamma) const{
   uint A = num_actions();
-  uint N = disc->get_spatial_nodes(); // Not using oob
+  uint N = disc->number_of_spatial_nodes(); // Not using oob
   vector<sp_mat> blocks = transition_blocks(disc);
-  assert(A == block.size());
+  assert(A == blocks.size());
 
   for(uint a = 0; a < A; a++){
     assert(size(N,N) == size(blocks[a]));
@@ -184,7 +185,7 @@ mat DoubleIntegratorSimulator::get_bounding_box() const{
 }
 
 
-TriMesh generate_initial_mesh(double angle, double length, const & mat bbox){
+TriMesh generate_initial_mesh(double angle, double length, const mat & bbox){
   TriMesh mesh;
   mesh.build_box_boundary(bbox);
   
@@ -192,8 +193,10 @@ TriMesh generate_initial_mesh(double angle, double length, const & mat bbox){
        << "," << length <<  ") criterion ..."<< endl;
   mesh.refine(angle,length);
   
-  cout << "Optimizing (10 rounds of Lloyd)..."<< endl;
-  mesh.lloyd(10);
+  cout << "Optimizing (25 rounds of Lloyd)..."<< endl;
+  mesh.lloyd(25);
+  
+  cout << "Re-refining.."<< endl;
   mesh.refine(angle,length);
 
   mesh.freeze();

@@ -7,10 +7,6 @@
 using namespace arma;
 using namespace std;
 
-tri_mesh::TriMesh generate_initial_mesh(double angle,
-                                        double length,
-                                        const mat & bbox);
-
 class DoubleIntegratorSimulator : public Simulator{
  public:
   DoubleIntegratorSimulator(const mat & bbox,
@@ -27,7 +23,8 @@ class DoubleIntegratorSimulator : public Simulator{
                            bool include_oob) const;
 
   vector<sp_mat> transition_blocks(const Discretizer * disc) const;
-  vector<sp_mat> lcp_blocks(const Discretizer * disc,const double gamma) const;
+  vector<sp_mat> lcp_blocks(const Discretizer * disc,
+			    const double gamma) const;
   mat q_mat(const Discretizer * disc) const;
 
   void add_bang_bang_curve(tri_mesh::TriMesh & mesh,
@@ -44,4 +41,9 @@ class DoubleIntegratorSimulator : public Simulator{
   double m_step;
   double m_noise_std;
 };
+
+tri_mesh::TriMesh generate_initial_mesh(double angle,
+                                        double length,
+                                        const mat & bbox);
+
 #endif

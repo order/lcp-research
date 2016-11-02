@@ -1,4 +1,6 @@
 #include "smooth.h"
+#include "basis.h"
+
 sp_mat gaussian_smoother(const Points & points,
                          const double bandwidth,
                          const double zero_thresh){
@@ -10,19 +12,19 @@ sp_mat gaussian_smoother(const Points & points,
     uvec idx = find(g > zero_thresh); // Threshold
     
     for(uint i = 0; i < idx.n_elem; i++){
-      uint row = idx(j);
+      uint row = idx(i);
       double value = g(row);
-      triples.pushback(make_tuple(row,col,value));
+      triples.push_back(make_tuple(row,col,value));
     }
   }
 
   uint nnz = triples.size();
-  mat loc = mat(2,nnz);
+  umat loc = umat(2,nnz);
   vec data = vec(nnz);
   for(uint i = 0; i < nnz; i++){
-    loc(0,i) = triples[i].get(0);
-    loc(1,i) = triples[i].get(1);
-    data(i) = triples[i].get(2);
+    loc(0,i) = get<0>(triples[i]);
+    loc(1,i) = get<1>(triples[i]);
+    data(i) = get<2>(triples[i]);
   }
 
   return sp_mat(loc,data,N,N);
