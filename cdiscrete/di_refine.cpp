@@ -47,10 +47,8 @@ DoubleIntegratorSimulator build_di_simulator(const po::variables_map & var_map){
   return DoubleIntegratorSimulator(bbox,actions);
 }
 
-void generate_initial_mesh(const po::variables_map & var_map,
-                           const DoubleIntegratorSimulator & di,
+TriMesh generate_initial_mesh(const po::variables_map & var_map,
                            TriMesh & mesh){
-  uint num_bang_points = var_map["bang_points"].as<uint>();
   double angle = var_map["mesh_angle"].as<double>();
   double length = var_map["mesh_length"].as<double>();
 
@@ -59,23 +57,7 @@ void generate_initial_mesh(const po::variables_map & var_map,
   vec ub = B*ones<vec>(2);
   mat bbox = join_horiz(lb,ub);
 
-  cout << "Initial meshing..."<< endl;
-  mesh.build_box_boundary(lb,ub);
-  VertexHandle v_zero = mesh.insert(Point(0,0));
-
-  if(num_bang_points > 0){
-    di.add_bang_bang_curve(mesh,num_bang_points);
-  }
-  
-  cout << "Refining based on (" << angle
-       << "," << length <<  ") criterion ..."<< endl;
-  mesh.refine(angle,length);
-  
-  cout << "Optimizing (10 rounds of Lloyd)..."<< endl;
-  mesh.lloyd(10);
-  mesh.refine(angle,length);
-
-  mesh.freeze();
+  return generate_initial_mesh(angle,length,bbox);
 }
 
 umat generate_policy_mat(const TriMesh & mesh,

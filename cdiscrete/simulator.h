@@ -15,6 +15,12 @@ class Simulator{
   virtual sp_mat transition_matrix(const Discretizer *,
                                    const vec & action,
                                    bool include_oob) const = 0;
+
+  virtual mat q_mat(const Discretizer *) const = 0;
+  virtual vector<sp_mat> transition_blocks(const Discretizer *) const = 0;
+  virtual vector<sp_mat> lcp_blocks(const Discretizer *,
+                                    const double gamma) const = 0;
+
   virtual uint num_actions() const = 0;
   virtual uint dim_actions() const = 0;
 };

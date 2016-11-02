@@ -64,6 +64,17 @@ Points DoubleIntegratorSimulator::next(const Points & points,
   return new_points;
 }
 
+mat DoubleIntegratorSimulator::q_mat(const Discretizer * disc) const{
+  Points points = disc->get_spatial_nodes();
+  uint N = disc->number_of_spatial_nodes();
+  uint A = num_actions();
+  
+  mat Q = mat(N,A+1);
+  Q.col(0) = get_state_weights(points);
+  Q.tail_cols(A) = get_costs(points);
+  return Q;
+}
+
 sp_mat DoubleIntegratorSimulator::transition_matrix(const Discretizer * disc,
                                                     const vec & action,
                                                     bool include_oob) const{
@@ -78,6 +89,7 @@ sp_mat DoubleIntegratorSimulator::transition_matrix(const Discretizer * disc,
 
   
   // Final row is the OOB row
+  assert(!include_oob);
   if(!include_oob){
     // Make sure we aren't pruning off important transitions
     assert(accu(P.tail_rows(1)) < ALMOST_ZERO);
@@ -89,6 +101,31 @@ sp_mat DoubleIntegratorSimulator::transition_matrix(const Discretizer * disc,
     assert(accu(P.tail_cols(1)) < ALMOST_ZERO);
   }
   return P;
+}
+
+vector<sp_mat> DoubleIntegratorSimulator::transition_blocks(const Discretizer * disc) const{
+  vector<sp_mat> blocks;
+  uint A = num_actions();
+  assert(A == m_action.n_rows());
+  
+  bool include_oob = false;
+  for(uint a = 0; a < A; a++){
+    blocks.push_back(disc,m_actions.row(a).t(),include_oob);
+  }
+}
+
+vector<sp_mat> DoubleIntegratorSimulator::lcp_locks(const Discretizer * disc,
+                                                    const double gamma){
+  uint A = num_actions();
+  uint N = disc->get_spatial_nodes(); // Not using oob
+  vector<sp_mat> blocks = transition_blocks(disc);
+  assert(A == block.size());
+
+  for(uint a = 0; a < A; a++){
+    assert(size(N,N) == size(blocks[a]));
+    blocks[a] = speye(N,N) - gamma * blocks[a];
+  }
+  return blocks;
 }
 
 void DoubleIntegratorSimulator::add_bang_bang_curve(TriMesh & mesh,
@@ -146,3 +183,19 @@ mat DoubleIntegratorSimulator::get_bounding_box() const{
   return m_bbox;
 }
 
+
+TriMesh generate_initial_mesh(double angle, double length, const & mat bbox){
+  TriMesh mesh;
+  mesh.build_box_boundary(bbox);
+  
+  cout << "Refining based on (" << angle
+       << "," << length <<  ") criterion ..."<< endl;
+  mesh.refine(angle,length);
+  
+  cout << "Optimizing (10 rounds of Lloyd)..."<< endl;
+  mesh.lloyd(10);
+  mesh.refine(angle,length);
+
+  mesh.freeze();
+  return mesh;
+}
