@@ -40,6 +40,7 @@ class DoubleIntegratorSimulator : public Simulator{
   mat m_bbox;
   double m_step;
   double m_noise_std;
+  double m_damp;
 };
 
 tri_mesh::TriMesh generate_initial_mesh(double angle,

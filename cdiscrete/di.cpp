@@ -7,21 +7,15 @@ DoubleIntegratorSimulator::DoubleIntegratorSimulator(const mat & bbox,
                                                      const mat &actions,
                                                      double noise_std,
                                                      double step) :
-  m_bbox(bbox),m_actions(actions),m_step(step),m_noise_std(noise_std){}
+  m_bbox(bbox),m_actions(actions),m_step(step),m_noise_std(noise_std),
+  m_damp(1e-4){}
 
 vec DoubleIntegratorSimulator::get_state_weights(const Points & points) const{
   uint N = points.n_rows;
   uint D = points.n_cols;
   assert(TRI_NUM_DIM == D);
-
-  vec l2_norm = lp_norm(points,2,1);
-  assert(N == l2_norm.n_elem);
-  assert(all(l2_norm >= 0));
-
-  vec weight = max(l2_norm) - l2_norm + 1e-3;
-  assert(all(weight >= 0));
-  weight /= accu(weight);
- 
+  
+  vec weight = ones<vec>(N) / (double) N;
   return weight;
 }
 
@@ -55,7 +49,7 @@ Points DoubleIntegratorSimulator::next(const Points & points,
   double u = actions(0) + noise(0);
   
   new_points.col(0) = points.col(0) + t*points.col(1) + 0.5*t*t*u;
-  new_points.col(1) = points.col(1) + t*u;
+  new_points.col(1) = (1.0 - m_damp)*points.col(1) + t*u;
 
   saturate(new_points,
            uvec{0,1},
@@ -99,7 +93,7 @@ sp_mat DoubleIntegratorSimulator::transition_matrix(const Discretizer * disc,
     // Add an all-zero column
     P = resize(P,N,N);
     assert(accu(P.tail_cols(1)) < ALMOST_ZERO);
-  }
+  }  
   return P;
 }
 

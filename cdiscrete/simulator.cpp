@@ -10,29 +10,33 @@ void saturate(Points & points,
   /*
     Project points back onto bounding box.
     Think "perfectly inelastic collision"
+
+    "indices" are the dimensions that we want 
+    to saturate along
+
+    bbox is a Dx2 matrix [lb, ub]
   */  
   uint D = points.n_cols;
   assert(D == bbox.n_rows);
   assert(2 == bbox.n_cols);
-  assert(D >= indices.n_elem);
+  assert(indices.n_elem <= D);
 
   uvec mask;
   uint I = indices.n_elem;
   vec lb = bbox.col(0);
   vec ub = bbox.col(1);
-  uint idx;
-  uvec col_idx;
   for(uint i = 0; i < I; i++){
-    idx = indices(i);
-    col_idx = uvec{idx};
+    uint idx = indices(i); // Which dimension
+    uvec col_idx = uvec{idx};
+    
     assert(is_finite(bbox.row(idx)));
     assert(lb(idx) < ub(idx));
     
-    mask = find(points.col(idx) < lb(idx));
-    points(mask,col_idx).fill(lb(idx) + ALMOST_ZERO);
+    mask = find(points.col(idx) < lb(idx) + PRETTY_SMALL);
+    points(mask,col_idx).fill(lb(idx) + PRETTY_SMALL);
     
-    mask = find(points.col(idx) > ub(idx));
-    points(mask,col_idx).fill(ub(idx) - ALMOST_ZERO);
+    mask = find(points.col(idx) > ub(idx) - PRETTY_SMALL);
+    points(mask,col_idx).fill(ub(idx) - PRETTY_SMALL);
   }
 }
 

@@ -11,8 +11,28 @@ namespace po = boost::program_options;
 
 using namespace tri_mesh;
 
+#define B 5.0
+
+sp_mat make_value_basis(const Points & points){
+
+  uint N = points.n_rows;
+  
+  uint k = 9;
+  vec grid = linspace<vec>(-B,B,k);
+  vector<vec> grids;
+  grids.push_back(grid);
+  grids.push_back(grid);
+
+  mat centers = make_points(grids);
+  double bandwidth = 50;
+  mat basis = make_rbf_basis(points,centers,bandwidth);
+
+  basis = orth(join_horiz(ones<vec>(N),basis));
+  
+  return sp_mat(basis);
+}
+
 mat build_bbox(){
-  double B = 5;
   mat bbox = mat(2,2);
   bbox.col(0).fill(-B);
   bbox.col(1).fill(B);
@@ -21,7 +41,7 @@ mat build_bbox(){
 
 TriMesh generate_initial_mesh(){
   double angle = 0.125;
-  double length = 0.1;
+  double length = 0.3;
   mat bbox = build_bbox();
   return generate_initial_mesh(angle,length,bbox);
 }
@@ -56,11 +76,11 @@ int main(int argc, char** argv)
   assert(A == blocks.size());
   assert(size(N,N) == size(blocks.at(0)));
   
-  double bandwidth = 15;
+  double bandwidth = 75;
   double thresh = 1e-3;  
-  //sp_mat smoother = gaussian_smoother(points,bandwidth,thresh);
-  //assert(size(N,N) == size(smoother));
-  //vector<sp_mat> sblocks = block_mult(smoother,blocks);
+  sp_mat smoother = gaussian_smoother(points,bandwidth,thresh);
+  assert(size(N,N) == size(smoother));
+  vector<sp_mat> sblocks = block_mult(smoother,blocks);
 
   // Build and pertrub the q
   mat Q = di.q_mat(&mesh);
@@ -73,17 +93,22 @@ int main(int argc, char** argv)
 
   cout << "Assembling blocks into LCP..." << endl;
   cout << "\tBuilding M..." << endl;
-  sp_mat M = build_M(blocks);
+  sp_mat M = build_M(sblocks);
   cout << "\tVectorizing Q..." << endl;
   vec q = vectorise(Q);
   cout << "\tBuilding LCP object..." << endl;
-  LCP rlcp = LCP(M,q,free_vars);
+  LCP lcp = LCP(M,q,free_vars);
+
+  sp_mat value_basis = make_value_basis(points);
+  PLCP plcp = approx_lcp(points,value_basis,blocks,Q,free_vars);
+  
 
   // Solve the problem
   cout << "Initializing Kojima solver..." << endl;
-  KojimaSolver solver = KojimaSolver();
+  ProjectiveSolver solver = ProjectiveSolver();
+  solver.comp_thresh = 1e-12;
   cout << "Starting augmented LCP solve..."  << endl;
-  SolverResult rsol = solver.aug_solve(rlcp);
+  SolverResult rsol = solver.aug_solve(plcp);
 
   // Build the PLCP problem
 

@@ -42,10 +42,9 @@ sp_mat make_sample_basis(uint N,uint K);
 sp_mat make_ball_basis(const Points & points,
                        const Points & centers,
                        uint R);
-sp_mat make_rbf_basis(const Points & points,
+mat make_rbf_basis(const Points & points,
                    const Points & centers,
                    double bandwidth);
-
 sp_mat make_radial_fourier_basis(const Points & points,
                               uint K, double max_freq);
 

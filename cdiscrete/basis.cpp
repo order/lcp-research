@@ -156,7 +156,7 @@ sp_mat make_ball_basis(const Points & points,
   return basis;
 }
 
-sp_mat make_rbf_basis(const Points & points,
+mat make_rbf_basis(const Points & points,
                    const Points & centers,
                    double bandwidth){
   uint N = points.n_rows;
@@ -171,7 +171,7 @@ sp_mat make_rbf_basis(const Points & points,
     basis(idx,uvec{k}) = exp(-bandwidth * dist(idx));
   }
   basis = orth(basis); // Not ortho at all; need to do explicitly
-  return sp_mat(basis);
+  return basis;
 }
 
 sp_mat make_radial_fourier_basis(const Points & points,
