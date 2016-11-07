@@ -71,25 +71,21 @@ int main(int argc, char** argv)
   cout << "Smoothing vector: " << g.t() << endl;
   sp_mat smoother = build_convolution_matrix(N,g);
 
-  vector<sp_mat> sblocks = block_mult(smoother,blocks);
-
   // Build and pertrub the q
   mat Q = build_hallway_q(N);
   mat tildeQ = perturb_q(Q,0.25);
-  mat smoothQ = smoother * tildeQ;
 
   // TODO: perturb the operator
-  
   bvec free_vars = zeros<bvec>((A+1)*N);
   free_vars.head(N).fill(1);
 
   LCP rlcp = LCP(build_M(blocks),vectorise(Q),free_vars);
   LCP lcp = LCP(build_M(blocks),vectorise(tildeQ),free_vars);
-  LCP slcp = LCP(build_M(sblocks),vectorise(smoothQ),free_vars);
+  LCP slcp = smooth_lcp(smoother,blocks,tildeQ,free_vars);
 
   sp_mat value_basis = make_value_basis(points);
-  PLCP plcp = approx_lcp(points,value_basis,blocks,tildeQ,free_vars);
-  PLCP splcp = approx_lcp(points,value_basis,sblocks,smoothQ,free_vars);
+  PLCP plcp = approx_lcp(value_basis,speye(N,N),blocks,tildeQ,free_vars);
+  PLCP splcp = approx_lcp(value_basis,smoother,blocks,tildeQ,free_vars);
 
   // Solve the problem
   KojimaSolver solver = KojimaSolver();

@@ -305,3 +305,92 @@ sp_mat make_basis(const string & mode,
   }
   return basis;
 }
+
+LCP smooth_lcp(const sp_mat & smoother,
+               const vector<sp_mat> & blocks,
+               const mat & Q,
+               const bvec & free_vars){
+  uint n = smoother.n_rows;
+  assert(n == smoother.n_cols);
+  uint A = blocks.size();
+  uint N = n*(A+1);
+  assert(A >= 1);
+  assert(size(n,n) == size(blocks.at(0)));
+  assert(size(n,A+1) == size(Q));
+  assert(N == free_vars.n_elem);
+  
+  // Smooth blocks
+  vector<sp_mat> sblocks = block_mult(smoother,blocks);
+
+  // Smooth Q
+  mat sQ = mat(size(Q));
+  sQ.col(0) = Q.col(0); // State weights unchanged
+  sQ.tail_cols(A) = smoother * Q.tail_cols(A);
+
+  sp_mat M = build_M(sblocks);
+  vec q = vectorise(sQ);
+  return LCP(M,q,free_vars);
+}
+
+vector<sp_mat> make_freebie_flow_bases(const sp_mat & value_basis,
+                                       const vector<sp_mat> blocks){
+  // TODO: think more carefully about q;
+  // Ignore? Project onto value basis? Add to value basis for flow calc?
+  vector<sp_mat> flow_bases;
+  uint A = blocks.size();
+  for(uint a = 0; a < A; a++){
+    sp_mat raw_basis = blocks.at(a) * value_basis;
+    flow_bases.push_back(sp_mat(orth(mat(raw_basis))));
+    // Orthonorm (TODO: do directly in sparse?)
+  }
+  return flow_bases;
+}
+
+
+PLCP approx_lcp(const sp_mat & value_basis,
+                const sp_mat & smoother,
+                const vector<sp_mat> & blocks,
+                const mat & Q,
+                const bvec & free_vars){
+  uint n = smoother.n_rows;
+  assert(n == smoother.n_cols);
+  uint A = blocks.size();
+  assert(A >= 1);
+  assert(size(n,n) == size(blocks.at(0)));
+  assert(size(n,A+1) == size(Q));
+  uint N = n*(A+1);
+  assert(N == free_vars.n_elem);
+  assert(n == value_basis.n_rows);
+
+  // Smooth blocks
+  vector<sp_mat> sblocks = block_mult(smoother,blocks);
+  
+  // Smooth Q
+  mat sQ = mat(size(Q));
+  sQ.col(0) = Q.col(0); // State weights unchanged
+  sQ.tail_cols(A) = smoother * Q.tail_cols(A);
+  vec q = vectorise(sQ);
+
+
+  // Build freebie flow bases for the smoothed problem
+  vector<sp_mat> flow_bases = make_freebie_flow_bases(value_basis,
+                                                      sblocks);
+
+  // Build the basis blocks and the basis matrix
+  block_sp_vec p_blocks;
+  p_blocks.reserve(A + 1);
+  p_blocks.push_back(value_basis);
+  p_blocks.insert(p_blocks.end(),
+                  flow_bases.begin(),
+                  flow_bases.end());
+  assert((A+1) == p_blocks.size());
+  sp_mat P = block_diag(p_blocks);
+
+  // Build LCP matrix M and the U coefficient matrix
+  sp_mat M = build_M(blocks) + 1e-10 * speye(N,N); // Regularize
+  sp_mat U = P.t() * M * P * P.t();
+
+  return PLCP(P,U,q,free_vars);
+
+}
+

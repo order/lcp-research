@@ -7,6 +7,7 @@
 #include <set>
 #include <vector>
 #include "misc.h"
+#include "lcp.h"
 
 using namespace std;
 using namespace arma;
@@ -81,5 +82,19 @@ sp_mat make_basis(const string&,
                   const vector<double>&,
                   const Points &,
                   uint K);
+
+LCP smooth_lcp(const sp_mat & smoother,
+               const vector<sp_mat> & blocks,
+               const mat & Q,
+               const bvec & free_vars);
+
+vector<sp_mat> make_freebie_flow_bases(const sp_mat & value_basis,
+                                       const vector<sp_mat> blocks);
+
+PLCP approx_lcp(const sp_mat & value_basis,
+                const sp_mat & smoother,
+                const vector<sp_mat> & blocks,
+                const mat & Q,
+                const bvec & free_vars);
 
 #endif
