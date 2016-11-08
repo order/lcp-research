@@ -161,14 +161,11 @@ mat make_rbf_basis(const Points & points,
                    double bandwidth){
   uint N = points.n_rows;
   uint K = centers.n_rows;
-  mat basis = zeros<mat>(N,K);
-  basis.col(0) = ones<vec>(N);
-  double value_thresh = 1e-8;
-  double dist_thresh = std::sqrt(-std::log(value_thresh) / bandwidth);
-  for(uint k = 1; k < K; k++){
-    vec dist = lp_norm(points.each_row() - centers.row(k),2,1);
-    uvec idx = find(dist <= dist_thresh);
-    basis(idx,uvec{k}) = exp(-bandwidth * dist(idx));
+  
+  mat basis = zeros<mat>(N,K+1);
+  basis.col(K) = ones<vec>(N);
+  for(uint k = 0; k < K; k++){
+    basis.col(k) = gaussian(points,centers.row(k).t(),bandwidth);
   }
   basis = orth(basis); // Not ortho at all; need to do explicitly
   return basis;
@@ -211,6 +208,12 @@ sp_mat make_fourier_basis(const Points & points,
 
   basis = orth(basis); // Explicitly orthonormalize
   return sp_mat(basis);
+}
+
+sp_mat make_voronoi_basis(const Points & points,
+                       const Points & centers){
+  VoronoiBasis v_basis(points,centers);
+  return v_basis.get_basis();
 }
 
 
@@ -339,7 +342,7 @@ vector<sp_mat> make_freebie_flow_bases(const sp_mat & value_basis,
   vector<sp_mat> flow_bases;
   uint A = blocks.size();
   for(uint a = 0; a < A; a++){
-    sp_mat raw_basis = blocks.at(a) * value_basis;
+    sp_mat raw_basis = blocks.at(a).t() * value_basis;
     flow_bases.push_back(sp_mat(orth(mat(raw_basis))));
     // Orthonorm (TODO: do directly in sparse?)
   }
@@ -367,14 +370,18 @@ PLCP approx_lcp(const sp_mat & value_basis,
   
   // Smooth Q
   mat sQ = mat(size(Q));
-  sQ.col(0) = Q.col(0); // State weights unchanged
-  sQ.tail_cols(A) = smoother * Q.tail_cols(A);
+  
+  sQ.col(0) = value_basis * value_basis.t() * Q.col(0);
+  sQ.tail_cols(A) = smoother * value_basis * value_basis.t() *  Q.tail_cols(A);
   vec q = vectorise(sQ);
 
 
   // Build freebie flow bases for the smoothed problem
-  vector<sp_mat> flow_bases = make_freebie_flow_bases(value_basis,
-                                                      sblocks);
+  //vector<sp_mat> flow_bases = make_freebie_flow_bases(value_basis,
+  //                                                    sblocks);
+  vector<sp_mat> flow_bases;
+  flow_bases.push_back(speye(n,n));
+  flow_bases.push_back(speye(n,n));
 
   // Build the basis blocks and the basis matrix
   block_sp_vec p_blocks;
@@ -387,9 +394,8 @@ PLCP approx_lcp(const sp_mat & value_basis,
   sp_mat P = block_diag(p_blocks);
 
   // Build LCP matrix M and the U coefficient matrix
-  sp_mat M = build_M(blocks) + 1e-10 * speye(N,N); // Regularize
+  sp_mat M = build_M(blocks);// + 1e-10 * speye(N,N); // Regularize
   sp_mat U = P.t() * M * P * P.t();
-
   return PLCP(P,U,q,free_vars);
 
 }

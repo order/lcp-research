@@ -19,6 +19,16 @@ if __name__ == "__main__":
     P = np.reshape(sol.p,(N,A),order='F')
     D = np.reshape(sol.d,(N,A),order='F')
 
+    Q = sol.Q
+    assert((N,A) == Q.shape)
+
+    if True:
+        plt.figure()
+        plt.suptitle('Projected Q')
+        for a in range(A):
+            plt.subplot(2,2,a+1)
+            tmv.plot_vertices(nodes,faces,Q[:,a])
+            print np.min(Q[:,a]), np.max(Q[:,a])
     
     for (X,name) in [(P,"Primal"),(D,"Dual")]:
         plt.figure()

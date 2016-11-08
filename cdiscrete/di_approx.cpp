@@ -12,24 +12,24 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 #define B 5.0
-#define LENGTH 0.5
+#define LENGTH 0.6
+#define GAMMA 0.999
 
 sp_mat make_value_basis(const Points & points){
 
   uint N = points.n_rows;
   
-  uint k = 9;
+  uint k = 15;
   vec grid = linspace<vec>(-B,B,k);
   vector<vec> grids;
   grids.push_back(grid);
   grids.push_back(grid);
 
   mat centers = make_points(grids);
-  double bandwidth = 50;
+  double bandwidth = 3;
   mat basis = make_rbf_basis(points,centers,bandwidth);
-
-  basis = orth(join_horiz(ones<vec>(N),basis));
-  
+  //sp_mat basis = make_voronoi_basis(points,centers);
+  //sp_mat basis = speye(N,N);
   return sp_mat(basis);
 }
 
@@ -69,18 +69,16 @@ int main(int argc, char** argv)
   uint A = di.num_actions();
   assert(A >= 2);
   
-  double gamma = 0.99;
-
   // Reference blocks
   cout << "Building LCP blocks..." << endl;
-  vector<sp_mat> blocks = di.lcp_blocks(&mesh,gamma);
+  vector<sp_mat> blocks = di.lcp_blocks(&mesh,GAMMA);
   assert(A == blocks.size());
   assert(size(N,N) == size(blocks.at(0)));
 
   // Build smoother
   cout << "Building smoother matrix..." << endl;
-  double bandwidth = 75;
-  double thresh = 1e-3;  
+  double bandwidth = 100;
+  double thresh = 1e-4;  
   sp_mat smoother = gaussian_smoother(points,bandwidth,thresh);
   assert(size(N,N) == size(smoother));
 
@@ -101,15 +99,17 @@ int main(int argc, char** argv)
 
   cout << "Assembling blocks into smoothed projective LCP..." << endl;
   sp_mat value_basis = make_value_basis(points);
+  smoother = speye(N,N);
   PLCP plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);  
 
   // Solve the problem
-  cout << "Initializing Kojima solver..." << endl;
-  //ProjectiveSolver solver = ProjectiveSolver();
-  KojimaSolver solver = KojimaSolver();
+  cout << "Initializing solver..." << endl;
+  ProjectiveSolver solver = ProjectiveSolver();
+  //KojimaSolver solver = KojimaSolver();
   solver.comp_thresh = 1e-12;
+  solver.initial_sigma = 0.25;
   cout << "Starting augmented LCP solve..."  << endl;
-  SolverResult rsol = solver.aug_solve(slcp);
+  SolverResult rsol = solver.aug_solve(plcp);
 
   // Build the PLCP problem
 
@@ -118,5 +118,6 @@ int main(int argc, char** argv)
   Archiver arch = Archiver();
   arch.add_vec("p",rsol.p);
   arch.add_vec("d",rsol.d);
+  arch.add_mat("Q", reshape(plcp.q,N,A+1));
   arch.write("test.sol");
 }
