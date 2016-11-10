@@ -13,10 +13,10 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 #define B 5.0
-#define LENGTH 0.5
+#define LENGTH 0.4
 #define GAMMA 0.995
-#define SMOOTH_BW 100
-#define RBF_GRID_SIZE 9
+#define SMOOTH_BW 50
+#define RBF_GRID_SIZE 11
 
 sp_mat make_value_basis(const Points & points){
 
@@ -141,7 +141,7 @@ int main(int argc, char** argv)
   cout << "Assembling blocks into smoothed projective LCP..." << endl;
   sp_mat value_basis = make_value_basis(points);
 
-  for(uint i = 0; i < 15; i++){
+  for(uint i = 0; i < 1; i++){
     cout << "Starting new iteration..." << endl;
     PLCP plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);  
 
