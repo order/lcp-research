@@ -183,10 +183,11 @@ uvec q_policy(const Discretizer * disc,
 // Simplest policy; return action with max flow
 uvec flow_policy(const Discretizer * disc,
                  const mat & flows){
+  uint A = flows.n_cols;
   uint C = disc->number_of_cells();
   Points centers = disc->get_cell_centers();
   // Pad with 0 flow at oob node
-  mat padded_flows = join_vert(flows,zeros<rowvec>(2));
+  mat padded_flows = join_vert(flows,zeros<rowvec>(A));
  
   mat interp = disc->interpolate(centers,padded_flows);
   uvec policy = col_argmax(interp);
@@ -212,4 +213,38 @@ uvec flow_policy_diff(const Discretizer * disc,
     diff(find(policy0 != policyi)) += 1;
   }
   return diff;
+}
+
+uvec policy_disagree(const Discretizer * disc,
+                     const Simulator * sim,
+                     const vec & values,
+                     const mat & flows,
+                     const double gamma,
+                     const uint samples){
+  uint N = values.n_elem;
+  
+  uvec gp = grad_policy(disc,sim,values,samples);
+  uvec qp = q_policy(disc,sim,values,gamma,samples);
+  uvec fp = flow_policy(disc,flows);
+
+  uvec agg = (gp == qp);
+  agg %= (gp == fp);
+  return agg;
+}
+
+vec agg_flow_at_centers(const Discretizer * disc,
+                         const mat & flows){
+  uint n = disc->number_of_spatial_nodes();
+  uint N = disc->number_of_all_nodes();
+  assert(n == flows.n_rows or N == flows.n_rows);
+  
+  uint C = disc->number_of_cells();
+  Points centers = disc->get_cell_centers();
+  
+  // Pad with 0 flow at oob node
+  vec agg_flows = zeros<vec>(N);
+  agg_flows.head(flows.n_rows) = sum(flows,1);
+   
+  vec interp = disc->interpolate(centers,agg_flows);
+  return interp;
 }

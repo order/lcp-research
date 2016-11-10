@@ -50,3 +50,13 @@ uvec flow_policy(const Discretizer * disc,
 
 uvec flow_policy_diff(const Discretizer * disc,
                       const mat & flow);
+
+uvec policy_disagree(const Discretizer * disc,
+                     const Simulator * sim,
+                     const vec & values,
+                     const mat & flows,
+                     const double gamma,
+                     const uint samples=25);
+
+vec agg_flow_at_centers(const Discretizer * disc,
+                        const mat & flows);

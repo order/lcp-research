@@ -7,7 +7,7 @@ def gauss(X,a,C):
     g = np.empty(N)
     for i in xrange(N):
         x = X[i,:]
-        g[i] = a * np.exp(-0.5 * x.dot(C.dot(x.T)))
+        g[i] = a * np.exp(-x.dot(C.dot(x.T)))
     return g
 
 def gradient(Y,X,a,C):
@@ -19,31 +19,70 @@ def gradient(Y,X,a,C):
     dC = np.zeros((D,D))
     for i in xrange(N):
         x = X[i,:]
-        dC -= (Y[i] - F[i]) * F[i] * x.T * x
-    
+        dC += (Y[i] - F[i]) * F[i] * np.outer(x,x)
+    assert np.linalg.norm(dC - dC.T) < 1e-15
+        
     return (da,dC)
 
 def gradient_descent(X,Y):
-    C = np.eye(2);
-    a = 0.1
-    for i in xrange(25):
+
+    N = Y.size
+    
+    f = lambda a,C: np.linalg.norm(Y - gauss(X,a,C))**2
+    
+    C = np.random.rand(2,2)
+    C = C.T.dot(C)
+    assert np.all(np.linalg.eigvals(C) > 0)
+    a = 2 + (2*np.random.rand()-1)
+    for i in xrange(250):
         print 'a:',a
-        print "\tResidual:", np.linalg.norm(Y - gauss(X,a,C))**2
+        F = f(a,C)
+        print "\tAverage Residual:", F / float(N)
+
+        if F / float(N) < 1e-4:
+            break
+        
         (da,dC) = gradient(Y,X,a,C)
         print "\tda:", da
-        print "\tdC:", da
+        print "\tdC:", dC
+        
+        t = 1.0 / np.linalg.norm(dC)
+        t0 = 1e-9
+        s = 0.1
+        b = 0.5
+        grad_norm = da**2 + np.sum(dC**2)
+        
+        while True:
+            try:
+                np.linalg.cholesky(C - t * dC)
+            except Exception:
+                print "\tNon-PD, t=",t
+                t *= b
+                continue
+            break
+        while np.any(np.linalg.eigvals(C - t * dC) < 0):
+            t *= b
 
-        a -= 1e-4 * da
-        C -= 1e-4 * dC
+        assert np.all(np.linalg.eigvals(C - t * dC) > 0)
+        
+        while f(a - t *da, C - t * dC) - F > - s * t * grad_norm and t > t0:
+            print "\tBacktracking",t,f(a + t *da, C + t * dC) - F
+            t *= b
+        assert np.all(np.linalg.eigvals(C - t * dC) > 0)
+
+        a -= t * da
+        C -= t * dC
     return (a,C)
     
 
-G = 127
-(P,[X,Y]) = make_points([np.linspace(-1,1,G)]*2,True)
+G = 128
+(P,[X,Y]) = make_points([np.linspace(-5,5,G)]*2,True)
 
-Z = gauss(P,2,np.eye(2))
+Z = gauss(P,2,np.array([[3,-1],[-1,2]]))
 Z[np.where(np.isnan(Z))[0]] = 1
 (a,C) = gradient_descent(P,Z)
+print "Final a:",a
+print "Final C:",C
 
 plt.subplot(2,2,1)
 plt.pcolormesh(X,Y,np.reshape(Z,X.shape))
