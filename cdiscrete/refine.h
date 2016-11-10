@@ -12,6 +12,7 @@ vec bellman_residual(const Discretizer * disc,
                      double gamma,
                      int steps = 0,
                      uint samples = 25);
+
 vec bellman_residual_with_flows(const Discretizer * disc,
                                 const Simulator * sim,
                                 const vec & values,

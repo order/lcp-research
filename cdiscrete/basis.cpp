@@ -335,15 +335,28 @@ LCP smooth_lcp(const sp_mat & smoother,
   return LCP(M,q,free_vars);
 }
 
-vector<sp_mat> make_freebie_flow_bases(const sp_mat & value_basis,
-                                       const vector<sp_mat> blocks){
-  // TODO: think more carefully about q;
-  // Ignore? Project onto value basis? Add to value basis for flow calc?
+vector<sp_mat> make_freebie_flow_bases_ignore_q(const sp_mat & value_basis,
+                                                const vector<sp_mat> blocks){
   vector<sp_mat> flow_bases;
   uint A = blocks.size();
   for(uint a = 0; a < A; a++){
     sp_mat raw_basis = blocks.at(a).t() * value_basis;
     flow_bases.push_back(sp_mat(orth(mat(raw_basis))));
+    // Orthonorm (TODO: do directly in sparse?)
+  }
+  return flow_bases;
+}
+
+vector<sp_mat> make_freebie_flow_bases(const sp_mat & value_basis,
+                                       const vector<sp_mat> blocks,
+                                       const mat & Q){
+  vector<sp_mat> flow_bases;
+  uint A = blocks.size();
+  assert((A+1) == Q.n_cols);
+  for(uint a = 0; a < A; a++){
+    mat raw_basis = join_horiz(mat(blocks.at(a).t() * value_basis),
+                               Q.col(a+1));
+    flow_bases.push_back(sp_mat(orth(raw_basis)));
     // Orthonorm (TODO: do directly in sparse?)
   }
   return flow_bases;
@@ -367,22 +380,35 @@ PLCP approx_lcp(const sp_mat & value_basis,
 
   // Smooth blocks
   vector<sp_mat> sblocks = block_mult(smoother,blocks);
-  
-  // Smooth Q
-  mat sQ = mat(size(Q));
-  
-  sQ.col(0) = value_basis * value_basis.t() * Q.col(0);
-  sQ.tail_cols(A) = smoother * value_basis * value_basis.t() *  Q.tail_cols(A);
-  vec q = vectorise(sQ);
-
 
   // Build freebie flow bases for the smoothed problem
-  //vector<sp_mat> flow_bases = make_freebie_flow_bases(value_basis,
-  //                                                    sblocks);
+  bool ignore_q = false;
   vector<sp_mat> flow_bases;
-  flow_bases.push_back(speye(n,n));
-  flow_bases.push_back(speye(n,n));
+  vec q;
+  if(ignore_q){
+    flow_bases = make_freebie_flow_bases_ignore_q(value_basis,
+                                                  sblocks);
+    // Project smoothed costs onto `freebie' basis
+    mat sQ = mat(size(Q));  
+    sQ.col(0) = Q.col(0);
+    for(uint a = 0; a < A; a++){
+      sp_mat F = flow_bases.at(a);
+      sQ.col(a+1) = F * F.t() * smoother * Q.col(a+1);
+    }
+    q = vectorise(sQ);
+  }
+  else{
+    mat sQ = mat(size(Q));  
+    sQ.col(0) = Q.col(0);
+    for(uint a = 0; a < A; a++){
+      sQ.col(a+1) = smoother * Q.col(a+1);
+    }
+    q = vectorise(sQ);
 
+    flow_bases = make_freebie_flow_bases(value_basis,
+                                         sblocks,
+                                         sQ);
+  }
   // Build the basis blocks and the basis matrix
   block_sp_vec p_blocks;
   p_blocks.reserve(A + 1);

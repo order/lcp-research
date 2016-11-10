@@ -72,7 +72,7 @@ list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
 #  "refine.cpp" "solver.cpp"
 #  ${COMMON_FILES})
 create_single_source_cgal_program("di_approx.cpp" "tri_mesh.cpp" "di.cpp"
-  "refine.cpp" "solver.cpp" "smooth.cpp"
+  "refine.cpp" "solver.cpp" "smooth.cpp" "refine.cpp"
   ${COMMON_FILES})
 #create_single_source_cgal_program("hillcar_gen.cpp" "tri_mesh.cpp"
 #  "hillcar.cpp" ${COMMON_FILES})

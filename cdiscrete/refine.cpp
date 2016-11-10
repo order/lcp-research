@@ -7,6 +7,8 @@ vec bellman_residual(const Discretizer * disc,
                      double gamma,
                      int steps,
                      uint samples){
+  // Calculate the bellman residual at the cell centers
+
   uint N = disc->number_of_all_nodes();
   uint C = disc->number_of_cells();
   
@@ -27,8 +29,6 @@ vec bellman_residual(const Discretizer * disc,
                      gamma,
                      steps,
                      samples);                       
-  // TODO: think about weighting by flows at center
-  // Combines flow and values
   vec v_q_est = min(Q,1);
   assert(C == v_q_est.n_elem);
   // Absolute error
@@ -41,7 +41,8 @@ vec bellman_residual_with_flows(const Discretizer * disc,
                                 double gamma,
                                 int steps,
                                 uint samples){
-
+  // Calculate the bellman residual at the cell centers
+  // Use the flow probabilities rather than max
   uint N = disc->number_of_all_nodes();
   uint C = disc->number_of_cells();
   uint A = sim->num_actions();

@@ -89,8 +89,11 @@ LCP smooth_lcp(const sp_mat & smoother,
                const mat & Q,
                const bvec & free_vars);
 
+vector<sp_mat> make_freebie_flow_bases_ignore_q(const sp_mat & value_basis,
+                                                const vector<sp_mat> blocks);
 vector<sp_mat> make_freebie_flow_bases(const sp_mat & value_basis,
-                                       const vector<sp_mat> blocks);
+                                       const vector<sp_mat> blocks,
+                                       const mat & Q);
 
 PLCP approx_lcp(const sp_mat & value_basis,
                 const sp_mat & smoother,

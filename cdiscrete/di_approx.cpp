@@ -5,6 +5,7 @@
 #include "solver.h"
 #include "basis.h"
 #include "smooth.h"
+#include "refine.h"
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
@@ -12,14 +13,15 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 #define B 5.0
-#define LENGTH 0.6
-#define GAMMA 0.999
+#define LENGTH 0.4
+#define GAMMA 0.995
+#define SMOOTH_BW 100
 
 sp_mat make_value_basis(const Points & points){
 
   uint N = points.n_rows;
   
-  uint k = 15;
+  uint k = 9;
   vec grid = linspace<vec>(-B,B,k);
   vector<vec> grids;
   grids.push_back(grid);
@@ -77,7 +79,7 @@ int main(int argc, char** argv)
 
   // Build smoother
   cout << "Building smoother matrix..." << endl;
-  double bandwidth = 100;
+  double bandwidth = SMOOTH_BW;
   double thresh = 1e-4;  
   sp_mat smoother = gaussian_smoother(points,bandwidth,thresh);
   assert(size(N,N) == size(smoother));
@@ -99,7 +101,6 @@ int main(int argc, char** argv)
 
   cout << "Assembling blocks into smoothed projective LCP..." << endl;
   sp_mat value_basis = make_value_basis(points);
-  smoother = speye(N,N);
   PLCP plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);  
 
   // Solve the problem
@@ -111,13 +112,18 @@ int main(int argc, char** argv)
   cout << "Starting augmented LCP solve..."  << endl;
   SolverResult rsol = solver.aug_solve(plcp);
 
-  // Build the PLCP problem
-
+  // Bellman residual
+  vec res =  bellman_residual(&mesh,
+                              &di,
+                              rsol.p.head(N),
+                              GAMMA);
+  
   // Record the solution and problem data
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
   arch.add_vec("p",rsol.p);
   arch.add_vec("d",rsol.d);
+  arch.add_vec("res",res);
   arch.add_mat("Q", reshape(plcp.q,N,A+1));
   arch.write("test.sol");
 }

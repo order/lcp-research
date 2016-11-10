@@ -29,26 +29,32 @@ if __name__ == "__main__":
             plt.subplot(2,2,a+1)
             tmv.plot_vertices(nodes,faces,Q[:,a])
             print np.min(Q[:,a]), np.max(Q[:,a])
-    
-    for (X,name) in [(P,"Primal"),(D,"Dual")]:
-        plt.figure()
-        plt.suptitle(name)
-        assert A == 3
-        for a in xrange(A):
-            plt.subplot(2,2,a+1)
-            tmv.plot_vertices(nodes,faces,X[:,a])
-            plt.title(str(a))
-        if name == "Primal" and "ans" in sol.data:
-            plt.subplot(2,2,4)
-            tmv.plot_vertices(nodes,faces,sol.ans - X[:,0])
-            plt.title("Residual")
+            
+    if True:
+        for (X,name) in [(P,"Primal"),(D,"Dual")]:
+            plt.figure()
+            plt.suptitle(name)
+            assert A == 3
+            for a in xrange(A):
+                plt.subplot(2,2,a+1)
+                tmv.plot_vertices(nodes,faces,X[:,a])
+                plt.title(str(a))
+            if name == "Primal" and "ans" in sol.data:
+                plt.subplot(2,2,4)
+                tmv.plot_vertices(nodes,faces,sol.ans - X[:,0])
+                plt.title("Residual")
 
+    if True:
         plt.figure()
-        plt.title(name)
-        for a in xrange(A):
-            (x,f) = cdf_points(X[:,a])
-            plt.semilogy(x,f)
-        plt.legend(range(A),loc='best')
+        plt.title("Bellmen Residual")
+        tmv.plot_faces(nodes,faces,sol.res)
         
+    if False:
+            plt.figure()
+            plt.title(name)
+            for a in xrange(A):
+                (x,f) = cdf_points(X[:,a])
+                plt.semilogy(x,f)
+            plt.legend(range(A),loc='best')
     
     plt.show()
