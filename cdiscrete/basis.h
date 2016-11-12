@@ -45,7 +45,8 @@ sp_mat make_ball_basis(const Points & points,
                        uint R);
 mat make_rbf_basis(const Points & points,
                    const Points & centers,
-                   double bandwidth);
+                   double bandwidth,
+		   double cutoff_thresh=1e-6);
 sp_mat make_radial_fourier_basis(const Points & points,
                               uint K, double max_freq);
 

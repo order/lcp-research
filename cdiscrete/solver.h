@@ -36,6 +36,7 @@ class KojimaSolver{
   double comp_thresh;
   uint max_iter;
   bool verbose;
+  bool iter_verbose; // Just print iteration
   double regularizer;
   double aug_rel_scale;
   double initial_sigma;
@@ -52,6 +53,7 @@ class ProjectiveSolver{
   double comp_thresh;
   uint max_iter;
   bool verbose;
+  bool iter_verbose; // Just print iteration
   double regularizer;
   double aug_rel_scale;
   double initial_sigma;

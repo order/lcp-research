@@ -158,7 +158,8 @@ sp_mat make_ball_basis(const Points & points,
 
 mat make_rbf_basis(const Points & points,
                    const Points & centers,
-                   double bandwidth){
+                   double bandwidth,
+		   double cutoff_thresh){
   uint N = points.n_rows;
   uint K = centers.n_rows;
   
@@ -167,6 +168,7 @@ mat make_rbf_basis(const Points & points,
   for(uint k = 0; k < K; k++){
     basis.col(k) = gaussian(points,centers.row(k).t(),bandwidth);
   }
+  basis(find(basis < cutoff_thresh)).fill(0);
   basis = orth(basis); // Not ortho at all; need to do explicitly
   return basis;
 }

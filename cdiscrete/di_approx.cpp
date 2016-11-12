@@ -15,8 +15,8 @@ using namespace tri_mesh;
 #define B 5.0
 #define LENGTH 0.4
 #define GAMMA 0.995
-#define SMOOTH_BW 50
-#define RBF_GRID_SIZE 11
+#define SMOOTH_BW 100
+#define RBF_GRID_SIZE 13
 
 sp_mat make_value_basis(const Points & points){
 
@@ -30,7 +30,7 @@ sp_mat make_value_basis(const Points & points){
 
   mat centers = make_points(grids);
   double bandwidth = 2.5;
-  mat basis = make_rbf_basis(points,centers,bandwidth);
+  mat basis = make_rbf_basis(points,centers,bandwidth,0);
   //sp_mat basis = make_voronoi_basis(points,centers);
   //sp_mat basis = speye(N,N);
   return sp_mat(basis);
@@ -119,7 +119,7 @@ int main(int argc, char** argv)
   // Build smoother
   cout << "Building smoother matrix..." << endl;
   double bandwidth = SMOOTH_BW;
-  double thresh = 1e-4;  
+  double thresh = 1e-6;  
   sp_mat smoother = gaussian_smoother(points,bandwidth,thresh);
   assert(size(N,N) == size(smoother));
 
@@ -130,65 +130,40 @@ int main(int argc, char** argv)
   bvec free_vars = zeros<bvec>((A+1)*N);
   free_vars.head(N).fill(1);
 
-  cout << "Assembling blocks into reference LCP..." << endl;
-  sp_mat M = build_M(blocks);
-  vec q = vectorise(Q);
-  LCP lcp = LCP(M,q,free_vars); // Reference blocks
-
-  cout << "Assembling blocks into smoothed LCP..." << endl;
-  LCP slcp = smooth_lcp(smoother,blocks,Q,free_vars);
-
   cout << "Assembling blocks into smoothed projective LCP..." << endl;
   sp_mat value_basis = make_value_basis(points);
 
-  for(uint i = 0; i < 1; i++){
-    cout << "Starting new iteration..." << endl;
-    PLCP plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);  
+  vec rand_gaussian = gaussian(points, 4*randu<vec>(2) - 2, 3);
+  sp_mat extended_value_basis = sp_mat(orth(join_horiz(mat(value_basis),
+						       rand_gaussian)));
+  PLCP plcp1 = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
+  PLCP plcp2 = approx_lcp(extended_value_basis,smoother,blocks,Q,free_vars);
 
-    // Solve the problem
-    cout << "Initializing solver..." << endl;
-    ProjectiveSolver solver = ProjectiveSolver();
-    //KojimaSolver solver = KojimaSolver();
-    solver.comp_thresh = 1e-12;
-    solver.initial_sigma = 0.25;
-    solver.verbose = false;
+  cout << "Initializing solver..." << endl;
+  ProjectiveSolver solver = ProjectiveSolver();
+  solver.comp_thresh = 1e-12;
+  solver.initial_sigma = 0.25;
+  solver.verbose = true;
     
-    cout << "Starting augmented LCP solve..."  << endl;
-    SolverResult rsol = solver.aug_solve(plcp);
+  cout << "Starting augmented LCP solve..."  << endl;
+  SolverResult sol1 = solver.aug_solve(plcp1);
+  SolverResult sol2 = solver.aug_solve(plcp2);
 
-    // Bellman residual
-    mat P = reshape(rsol.p,N,A+1);
-    vec value = P.col(0);
-    mat flows = P.tail_cols(A);
-    vec res =  bellman_residual(&mesh,
-                                &di,
-                                value,
-                                GAMMA);  
-    uvec disagree = policy_disagree(&mesh,&di,value,flows,GAMMA);
-    vec agg_flow = agg_flow_at_centers(&mesh,flows);
-
-    vec heuristic = res;// % sqrt(agg_flow);// * agg_flow;
-    //heuristic(find(disagree == 1)) *= 2;
-
-    cout << "Generating new basis vectors..." << endl;
-    mat new_vects = refine(points,
-                           mesh.get_cell_centers(),
-                           heuristic);
-    cout << "\tOrthonormalizing..." << endl;
-    mat dense_basis = orth(join_horiz(mat(value_basis),new_vects));
-    value_basis = sp_mat(dense_basis);
+  mat P1 = reshape(sol1.p,N,A+1);
+  mat P2 = reshape(sol2.p,N,A+1);
   
-    // Record the solution and problem data
-    mesh.write_cgal("test.mesh");
-    Archiver arch = Archiver();
-    arch.add_vec("p",rsol.p);
-    arch.add_vec("d",rsol.d);
-    arch.add_vec("res",res);
-    arch.add_uvec("disagree",disagree);
-    arch.add_vec("agg_flow",agg_flow);
-    arch.add_vec("heuristic",heuristic);
-    arch.add_mat("new_vects",new_vects);
-    arch.add_mat("Q", reshape(plcp.q,N,A+1));
-    arch.write("test.sol");
-  }
+  vec value1 = P1.col(0);
+  vec value2 = P2.col(0);
+
+  vec res1 =  bellman_residual_at_nodes(&mesh,&di,value1,GAMMA);  
+  vec res2 =  bellman_residual_at_nodes(&mesh,&di,value2,GAMMA);  
+
+  mesh.write_cgal("test.mesh");
+  Archiver arch = Archiver();
+  arch.add_vec("p",sol2.p);
+  arch.add_vec("d",sol2.d);
+  arch.add_vec("res1",res1);
+  arch.add_vec("res2",res2);
+  arch.add_vec("res_diff",res1 - res2);
+  arch.write("test.sol");
 }

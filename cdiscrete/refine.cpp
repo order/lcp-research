@@ -1,12 +1,41 @@
 #include "refine.h"
 #include <assert.h>
 
-vec bellman_residual(const Discretizer * disc,
-                     const Simulator * sim,
-                     const vec & values,
-                     double gamma,
-                     int steps,
-                     uint samples){
+vec bellman_residual_at_nodes(const Discretizer * disc,
+				const Simulator * sim,
+				const vec & values,
+				double gamma,
+				int steps,
+				uint samples){
+  
+  uint n = disc->number_of_spatial_nodes();
+  uint N = disc->number_of_all_nodes();
+  assert(N == (n+1));
+  double max_val = 1.0 / (1.0 - gamma);
+
+  vec V;
+  if(n == values.n_elem){
+    V = join_vert(values, vec{max_val}); // Pad
+  }
+  else{
+    V = values;
+  }
+
+  Points nodes = disc->get_spatial_nodes();
+  mat Q = estimate_Q(nodes,disc,sim,V,
+                     gamma,steps,samples);
+  assert(n == Q.n_rows);
+  
+  vec v_q_est = min(Q,1);
+  return v_q_est - values;
+}
+
+vec bellman_residual_at_centers(const Discretizer * disc,
+				const Simulator * sim,
+				const vec & values,
+				double gamma,
+				int steps,
+				uint samples){
   // Calculate the bellman residual at the cell centers
 
   uint N = disc->number_of_all_nodes();
@@ -32,15 +61,15 @@ vec bellman_residual(const Discretizer * disc,
   vec v_q_est = min(Q,1);
   assert(C == v_q_est.n_elem);
   // Absolute error
-  return abs(v_interp - v_q_est);
+  return v_q_est - v_interp;
 }
-vec bellman_residual_with_flows(const Discretizer * disc,
-                                const Simulator * sim,
-                                const vec & values,
-                                const mat & flows,
-                                double gamma,
-                                int steps,
-                                uint samples){
+vec bellman_residual_at_centers_with_flows(const Discretizer * disc,
+					   const Simulator * sim,
+					   const vec & values,
+					   const mat & flows,
+					   double gamma,
+					   int steps,
+					   uint samples){
   // Calculate the bellman residual at the cell centers
   // Use the flow probabilities rather than max
   uint N = disc->number_of_all_nodes();
@@ -81,7 +110,7 @@ vec bellman_residual_with_flows(const Discretizer * disc,
   vec v_q_est = sum(Q % weights,1);
   assert(C == v_q_est.n_elem);
   // Absolute error
-  return abs(v_interp - v_q_est);
+  return v_q_est - v_interp;
 }
 
 vec advantage_function(const Discretizer * disc,
@@ -215,7 +244,7 @@ uvec flow_policy_diff(const Discretizer * disc,
   return diff;
 }
 
-uvec policy_disagree(const Discretizer * disc,
+uvec policy_agg(const Discretizer * disc,
                      const Simulator * sim,
                      const vec & values,
                      const mat & flows,
@@ -227,9 +256,7 @@ uvec policy_disagree(const Discretizer * disc,
   uvec qp = q_policy(disc,sim,values,gamma,samples);
   uvec fp = flow_policy(disc,flows);
 
-  uvec agg = (gp == qp);
-  agg %= (gp == fp);
-  return agg;
+  return gp + qp + fp;
 }
 
 vec agg_flow_at_centers(const Discretizer * disc,

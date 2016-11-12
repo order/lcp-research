@@ -6,20 +6,27 @@
 using namespace arma;
 using namespace std;
 
-vec bellman_residual(const Discretizer * disc,
-                     const Simulator * sim,
-                     const vec & values,
-                     double gamma,
-                     int steps = 0,
-                     uint samples = 25);
+vec bellman_residual_at_nodes(const Discretizer * disc,
+			      const Simulator * sim,
+			      const vec & values,
+			      double gamma,
+			      int steps = 0,
+			      uint samples = 25);
 
-vec bellman_residual_with_flows(const Discretizer * disc,
-                                const Simulator * sim,
-                                const vec & values,
-                                const mat & flows,
-                                double gamma,
-                                int steps = 0,
-                                uint samples = 25);
+vec bellman_residual_at_centers(const Discretizer * disc,
+				const Simulator * sim,
+				const vec & values,
+				double gamma,
+				int steps = 0,
+				uint samples = 25);
+
+vec bellman_residual_at_centers_with_flows(const Discretizer * disc,
+					   const Simulator * sim,
+					   const vec & values,
+					   const mat & flows,
+					   double gamma,
+					   int steps = 0,
+					   uint samples = 25);
 
 vec advantage_residual(const Discretizer * disc,
                        const Simulator * sim,
@@ -51,7 +58,7 @@ uvec flow_policy(const Discretizer * disc,
 uvec flow_policy_diff(const Discretizer * disc,
                       const mat & flow);
 
-uvec policy_disagree(const Discretizer * disc,
+uvec policy_agg(const Discretizer * disc,
                      const Simulator * sim,
                      const vec & values,
                      const mat & flows,

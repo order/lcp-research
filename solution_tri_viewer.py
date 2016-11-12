@@ -19,10 +19,10 @@ if __name__ == "__main__":
     P = np.reshape(sol.p,(N,A),order='F')
     D = np.reshape(sol.d,(N,A),order='F')
 
-    Q = sol.Q
-    assert((N,A) == Q.shape)
-
     if False:
+        Q = sol.Q
+        assert((N,A) == Q.shape)
+    
         plt.figure()
         plt.suptitle('Projected Q')
         for a in range(A):
@@ -43,7 +43,7 @@ if __name__ == "__main__":
                 tmv.plot_vertices(nodes,faces,sol.ans - X[:,0])
                 plt.title("Residual")
 
-    if True:
+    if False:
         plt.figure()
         plt.title("New vectors")
         V = sol.new_vects
@@ -53,21 +53,17 @@ if __name__ == "__main__":
         plt.figure()
         plt.suptitle('Residual and heuristic')
         plt.subplot(2,2,1);
-        plt.title("Bellmen residual")
-        tmv.plot_faces(nodes,faces,sol.res)
+        plt.title("Bellmen residual 1")
+        tmv.plot_vertices(nodes,faces,sol.res1)
         
         plt.subplot(2,2,2);
-        plt.title("Policy disagreement")
-        tmv.plot_faces(nodes,faces,sol.disagree)
-        
+        plt.title("Bellmen residual 2")
+        tmv.plot_vertices(nodes,faces,sol.res2)
+
         plt.subplot(2,2,3);
-        plt.title("Aggregate flow")
-        tmv.plot_faces(nodes,faces,sol.agg_flow)
-        
-        plt.subplot(2,2,4);
-        plt.title("Heuristic")
-        tmv.plot_faces(nodes,faces,sol.heuristic)
-        
+        plt.title("Bellmen residual difference")
+        tmv.plot_vertices(nodes,faces,sol.res_diff)       
+
     if False:
             plt.figure()
             plt.title(name)

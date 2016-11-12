@@ -63,7 +63,8 @@ void SolverResult::write(const string & filename) const{
 KojimaSolver::KojimaSolver(){
   comp_thresh = 1e-8;
   max_iter = 500;
-  verbose = true;
+  verbose = false;
+  iter_verbose = true;
   regularizer = 1e-8;
   aug_rel_scale = 0.75;
   initial_sigma = 0.95;
@@ -141,7 +142,7 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
   double sigma = initial_sigma;
   uint iter;  
   for(iter = 0; iter < max_iter; iter++){
-    if(verbose)
+    if(verbose or iter_verbose)
       cout << "---Iteration " << iter << "---" << endl;
     assert(all(0 == y(free_idx)));
 
@@ -214,7 +215,8 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
 ProjectiveSolver::ProjectiveSolver(){
   comp_thresh = 1e-8;
   max_iter = 500;
-  verbose = true;
+  verbose = false;
+  iter_verbose = true;
   regularizer = 1e-8;
   aug_rel_scale = 0.75;
   initial_sigma = 0.95;
@@ -298,7 +300,7 @@ SolverResult ProjectiveSolver::solve(const PLCP & plcp,
   uint iter;
   double mean_comp;
   for(iter = 0; iter < max_iter; iter++){    
-    if(verbose)
+    if(verbose or iter_verbose)
       cout << "---Iteration " << iter << "---" << endl;
     // Mean complementarity
     vec s = y(bound_idx);
