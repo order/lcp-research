@@ -9,6 +9,7 @@ sp_mat gaussian_smoother(const Points & points,
   vector<tuple<uint,uint,double> > triples;
   for(uint col = 0; col < N; col++){
     vec g = gaussian(points,points.row(col).t(),bandwidth);
+    g /= accu(g);
     uvec idx = find(g > zero_thresh); // Threshold
     
     for(uint i = 0; i < idx.n_elem; i++){

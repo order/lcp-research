@@ -13,10 +13,12 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 #define B 5.0
-#define LENGTH 0.4
+#define LENGTH 0.35
 #define GAMMA 0.995
-#define SMOOTH_BW 100
-#define RBF_GRID_SIZE 13
+#define SMOOTH_BW 50
+#define SMOOTH_THRESH 1e-4
+
+#define RBF_GRID_SIZE 11
 
 sp_mat make_value_basis(const Points & points){
 
@@ -29,8 +31,8 @@ sp_mat make_value_basis(const Points & points){
   grids.push_back(grid);
 
   mat centers = make_points(grids);
-  double bandwidth = 2.5;
-  mat basis = make_rbf_basis(points,centers,bandwidth,0);
+  double bandwidth = 2;
+  mat basis = make_rbf_basis(points,centers,bandwidth,1e-3);
   //sp_mat basis = make_voronoi_basis(points,centers);
   //sp_mat basis = speye(N,N);
   return sp_mat(basis);
@@ -119,7 +121,7 @@ int main(int argc, char** argv)
   // Build smoother
   cout << "Building smoother matrix..." << endl;
   double bandwidth = SMOOTH_BW;
-  double thresh = 1e-6;  
+  double thresh = SMOOTH_THRESH;
   sp_mat smoother = gaussian_smoother(points,bandwidth,thresh);
   assert(size(N,N) == size(smoother));
 
@@ -133,7 +135,7 @@ int main(int argc, char** argv)
   cout << "Assembling blocks into smoothed projective LCP..." << endl;
   sp_mat value_basis = make_value_basis(points);
 
-  vec rand_gaussian = gaussian(points, 4*randu<vec>(2) - 2, 3);
+  vec rand_gaussian = gaussian(points, randn<vec>(2), 4);
   sp_mat extended_value_basis = sp_mat(orth(join_horiz(mat(value_basis),
 						       rand_gaussian)));
   PLCP plcp1 = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
@@ -156,8 +158,20 @@ int main(int argc, char** argv)
   vec value2 = P2.col(0);
 
   vec res1 =  bellman_residual_at_nodes(&mesh,&di,value1,GAMMA);  
-  vec res2 =  bellman_residual_at_nodes(&mesh,&di,value2,GAMMA);  
+  vec res2 =  bellman_residual_at_nodes(&mesh,&di,value2,GAMMA);
 
+  cout << "Basis sparsity: " << sparsity(value_basis) << endl;
+  cout << "Smoother sparsity: " << sparsity(smoother) << endl;
+
+  cout << "Residual 1 1-norm: " << norm(res1,1) << endl;
+  cout << "Residual 2 1-norm: " << norm(res2,1) << endl;
+  
+  cout << "Residual 1 2-norm: " << norm(res1,2) << endl;
+  cout << "Residual 2 2-norm: " << norm(res2,2) << endl;
+  
+  cout << "Residual 1 sup-norm: " << norm(res1,"inf") << endl;
+  cout << "Residual 2 sup-norm: " << norm(res2,"inf") << endl;
+  
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
   arch.add_vec("p",sol2.p);

@@ -36,7 +36,12 @@ if __name__ == "__main__":
             assert A == 3
             for a in xrange(A):
                 plt.subplot(2,2,a+1)
-                tmv.plot_vertices(nodes,faces,X[:,a])
+                if a > 0:
+                    print np.min(X[:,a])
+                    assert np.all(X[:,a] > 0)
+                    tmv.plot_vertices(nodes,faces,np.log(X[:,a]))
+                else:
+                    tmv.plot_vertices(nodes,faces,X[:,a])
                 plt.title(str(a))
             if name == "Primal" and "ans" in sol.data:
                 plt.subplot(2,2,4)
