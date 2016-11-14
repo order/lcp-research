@@ -13,12 +13,14 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 #define B 5.0
-#define LENGTH 0.35
+#define LENGTH 0.3
 #define GAMMA 0.995
 #define SMOOTH_BW 50
-#define SMOOTH_THRESH 1e-4
+#define SMOOTH_THRESH 1e-3
 
-#define RBF_GRID_SIZE 11
+#define RBF_GRID_SIZE 6
+
+#define REFERENCE false
 
 sp_mat make_value_basis(const Points & points){
 
@@ -31,8 +33,8 @@ sp_mat make_value_basis(const Points & points){
   grids.push_back(grid);
 
   mat centers = make_points(grids);
-  double bandwidth = 2;
-  mat basis = make_rbf_basis(points,centers,bandwidth,1e-3);
+  double bandwidth = 0.5;
+  mat basis = make_rbf_basis(points,centers,bandwidth,1e-6);
   //sp_mat basis = make_voronoi_basis(points,centers);
   //sp_mat basis = speye(N,N);
   return sp_mat(basis);
@@ -93,7 +95,9 @@ TriMesh generate_initial_mesh(){
 DoubleIntegratorSimulator build_di_simulator(){
   mat bbox = build_bbox();
   mat actions = vec{-1,1};
-  return DoubleIntegratorSimulator(bbox,actions);
+  double noise_std = 0.0;
+  double step = 0.01;
+  return DoubleIntegratorSimulator(bbox,actions,noise_std,step);
 }
 
 int main(int argc, char** argv)
@@ -135,21 +139,35 @@ int main(int argc, char** argv)
   cout << "Assembling blocks into smoothed projective LCP..." << endl;
   sp_mat value_basis = make_value_basis(points);
 
-  vec rand_gaussian = gaussian(points, randn<vec>(2), 4);
+  vec rand_gaussian = gaussian(points, zeros<vec>(2), 1);
   sp_mat extended_value_basis = sp_mat(orth(join_horiz(mat(value_basis),
 						       rand_gaussian)));
+
+  LCP slcp = smooth_lcp(smoother,blocks,Q,free_vars);
   PLCP plcp1 = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
   PLCP plcp2 = approx_lcp(extended_value_basis,smoother,blocks,Q,free_vars);
 
-  cout << "Initializing solver..." << endl;
-  ProjectiveSolver solver = ProjectiveSolver();
-  solver.comp_thresh = 1e-12;
-  solver.initial_sigma = 0.25;
-  solver.verbose = true;
-    
-  cout << "Starting augmented LCP solve..."  << endl;
-  SolverResult sol1 = solver.aug_solve(plcp1);
-  SolverResult sol2 = solver.aug_solve(plcp2);
+  cout << "Initializing solvers..." << endl;
+  KojimaSolver ksolver = KojimaSolver();
+  ksolver.comp_thresh = 1e-12;
+  ksolver.initial_sigma = 0.25;
+  ksolver.verbose = false;
+  
+  ProjectiveSolver psolver = ProjectiveSolver();
+  psolver.comp_thresh = 1e-12;
+  psolver.initial_sigma = 0.25;
+  psolver.verbose = false;
+
+  SolverResult rsol;
+  if(REFERENCE){
+    cout << "Reference augmented LCP solve..."  << endl;
+    rsol = ksolver.aug_solve(slcp);
+  }
+  
+  cout << "Starting augmented PLCP solve 1..."  << endl;
+  SolverResult sol1 = psolver.aug_solve(plcp1);
+  cout << "Starting augmented PLCP solve 2..."  << endl;
+  SolverResult sol2 = psolver.aug_solve(plcp2);
 
   mat P1 = reshape(sol1.p,N,A+1);
   mat P2 = reshape(sol2.p,N,A+1);
@@ -174,10 +192,17 @@ int main(int argc, char** argv)
   
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
-  arch.add_vec("p",sol2.p);
-  arch.add_vec("d",sol2.d);
+  if(REFERENCE){
+    arch.add_vec("rp",rsol.p);
+    arch.add_vec("rd",rsol.d);
+  }
+  arch.add_vec("p1",sol1.p);
+  arch.add_vec("d1",sol1.d);
+  arch.add_vec("p2",sol2.p);
+  arch.add_vec("d2",sol2.d);
+  
   arch.add_vec("res1",res1);
   arch.add_vec("res2",res2);
-  arch.add_vec("res_diff",res1 - res2);
+  arch.add_vec("res_diff",res2 - res1);
   arch.write("test.sol");
 }

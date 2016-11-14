@@ -370,6 +370,8 @@ PLCP approx_lcp(const sp_mat & value_basis,
                 const vector<sp_mat> & blocks,
                 const mat & Q,
                 const bvec & free_vars){
+
+  //Sizing and checking
   uint n = smoother.n_rows;
   assert(n == smoother.n_cols);
   uint A = blocks.size();
@@ -384,7 +386,7 @@ PLCP approx_lcp(const sp_mat & value_basis,
   vector<sp_mat> sblocks = block_mult(smoother,blocks);
 
   // Build freebie flow bases for the smoothed problem
-  bool ignore_q = false;
+  bool ignore_q = true;
   vector<sp_mat> flow_bases;
   vec q;
   if(ignore_q){
@@ -422,7 +424,7 @@ PLCP approx_lcp(const sp_mat & value_basis,
   sp_mat P = block_diag(p_blocks);
 
   // Build LCP matrix M and the U coefficient matrix
-  sp_mat M = build_M(blocks);// + 1e-10 * speye(N,N); // Regularize
+  sp_mat M = build_M(sblocks);// + 1e-10 * speye(N,N); // Regularize
   sp_mat U = P.t() * M * P * P.t();
   return PLCP(P,U,q,free_vars);
 

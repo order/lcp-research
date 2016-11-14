@@ -13,12 +13,10 @@ if __name__ == "__main__":
     sol = Unarchiver(file_base + ".sol")
 
     N = nodes.shape[0]
-    assert 0 == sol.p.size % N
-    A = sol.p.size / N
+    assert 0 == sol.p1.size % N
+    A = sol.p1.size / N
 
-    P = np.reshape(sol.p,(N,A),order='F')
-    D = np.reshape(sol.d,(N,A),order='F')
-
+    # RHS information
     if False:
         Q = sol.Q
         assert((N,A) == Q.shape)
@@ -28,32 +26,45 @@ if __name__ == "__main__":
         for a in range(A):
             plt.subplot(2,2,a+1)
             tmv.plot_vertices(nodes,faces,Q[:,a])
-            
-    if True:
-        for (X,name) in [(P,"Primal"),(D,"Dual")]:
+
+    # Before and after primal/dual info
+    if True:        
+        P1 = np.reshape(sol.p1,(N,A),order='F')
+        D1 = np.reshape(sol.d1,(N,A),order='F')
+        P2 = np.reshape(sol.p2,(N,A),order='F')
+        D2 = np.reshape(sol.d2,(N,A),order='F')
+        for (X,name) in [(P1,"Primal 1"),(D1,"Dual 1"),
+                         (P2,"Primal 2"),(D2,"Dual 2")]:
             plt.figure()
             plt.suptitle(name)
             assert A == 3
             for a in xrange(A):
                 plt.subplot(2,2,a+1)
                 if a > 0:
-                    print np.min(X[:,a])
                     assert np.all(X[:,a] > 0)
                     tmv.plot_vertices(nodes,faces,np.log(X[:,a]))
                 else:
                     tmv.plot_vertices(nodes,faces,X[:,a])
                 plt.title(str(a))
-            if name == "Primal" and "ans" in sol.data:
-                plt.subplot(2,2,4)
-                tmv.plot_vertices(nodes,faces,sol.ans - X[:,0])
-                plt.title("Residual")
 
+    # Reference plot (smoothed LCP)
     if False:
+        R = np.reshape(sol.rp,(N,A),order='F')
+        
         plt.figure()
-        plt.title("New vectors")
-        V = sol.new_vects
-        tmv.plot_vertices(nodes,faces,V[:,0])            
+        plt.suptitle('Reference primal')
+        assert A == 3
+        for a in xrange(A):
+            plt.subplot(2,2,a+1)
+            if a > 0:
+                assert np.all(R[:,a] > 0)
+                tmv.plot_vertices(nodes,faces,np.log(R[:,a]))
+            else:
+                tmv.plot_vertices(nodes,faces,R[:,a])
+            plt.title(str(a))
+                      
 
+    # Residual information
     if True:
         plt.figure()
         plt.suptitle('Residual and heuristic')
