@@ -111,6 +111,20 @@ def unpack_sp_mat(A):
     cols = cols.astype(np.integer)    
     return sps.coo_matrix((data,(rows,cols)),shape=(R,C))
 
+def unpack_cube(vec):
+    N = vec[0]
+    D = vec[1]
+    S = vec[2]
+    assert N % 1 < 1e-15
+    assert D % 1 < 1e-15
+    assert S % 1 < 1e-15
+
+    N = int(N)
+    D = int(D)
+    S = int(S)
+    assert (N*D*S + 3) == vec.size
+
+    return np.reshape(vec[3:],(N,D,S),order='F')
 
 def prep_lines(lines):
     lines = [line.split('#',1)[0].strip() for line in lines]

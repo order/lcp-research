@@ -17,9 +17,11 @@ class Simulator{
                                    bool include_oob) const = 0;
 
   virtual mat q_mat(const Discretizer *) const = 0;
-  virtual vector<sp_mat> transition_blocks(const Discretizer *) const = 0;
+  virtual vector<sp_mat> transition_blocks(const Discretizer *,
+                                           uint num_samples=1) const = 0;
   virtual vector<sp_mat> lcp_blocks(const Discretizer *,
-                                    const double gamma) const = 0;
+                                    const double gamma,
+                                    uint num_samples) const = 0;
 
   virtual uint num_actions() const = 0;
   virtual uint dim_actions() const = 0;

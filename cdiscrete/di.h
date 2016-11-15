@@ -22,9 +22,11 @@ class DoubleIntegratorSimulator : public Simulator{
                            const vec & action,
                            bool include_oob) const;
 
-  vector<sp_mat> transition_blocks(const Discretizer * disc) const;
+  vector<sp_mat> transition_blocks(const Discretizer * disc,
+                                   uint num_samples=1) const;
   vector<sp_mat> lcp_blocks(const Discretizer * disc,
-			    const double gamma) const;
+                            const double gamma,
+                            uint num_samples=1) const;
   mat q_mat(const Discretizer * disc) const;
 
   void add_bang_bang_curve(tri_mesh::TriMesh & mesh,

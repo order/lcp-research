@@ -22,6 +22,8 @@ struct Archiver{
                const vec & v);
   bool add_uvec(const string & field_name,
                 const uvec & v);
+  bool add_cube(const string & field_name,
+                const cube & v);
 
   template <typename D>
   bool generic_add(const string & name,
@@ -50,6 +52,7 @@ ostream& operator<< (ostream& os, const Unarchiver& unarch);
 // Marshalling and unmarshalling matrices into vectors w/ headers
 template<typename D> Col<D> pack_vec(const Col<D> &);
 template<typename D> Col<D> pack_mat(const Mat<D> &);
+template<typename D> Col<D> pack_cube(const Cube<D> &);
 template<typename D> Col<D> pack_sp_mat(const SpMat<D> &);
 
 template<typename D> Col<D> unpack_vec(const Col<D> &);

@@ -13,14 +13,14 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 #define B 5.0
-#define LENGTH 0.3
+#define LENGTH 0.35
 #define GAMMA 0.995
-#define SMOOTH_BW 50
-#define SMOOTH_THRESH 1e-3
+#define SMOOTH_BW 1e9
+#define SMOOTH_THRESH 1e-4
 
 #define RBF_GRID_SIZE 6
 
-#define REFERENCE false
+#define SAMPLES 1024
 
 sp_mat make_value_basis(const Points & points){
 
@@ -96,9 +96,13 @@ DoubleIntegratorSimulator build_di_simulator(){
   mat bbox = build_bbox();
   mat actions = vec{-1,1};
   double noise_std = 0.0;
-  double step = 0.01;
+  double step = 0.025;
   return DoubleIntegratorSimulator(bbox,actions,noise_std,step);
 }
+
+////////////////////
+// MAIN FUNCTION //
+///////////////////
 
 int main(int argc, char** argv)
 {
@@ -136,73 +140,53 @@ int main(int argc, char** argv)
   bvec free_vars = zeros<bvec>((A+1)*N);
   free_vars.head(N).fill(1);
 
-  cout << "Assembling blocks into smoothed projective LCP..." << endl;
+  cout << "Making value basis..." << endl;
   sp_mat value_basis = make_value_basis(points);
 
-  vec rand_gaussian = gaussian(points, zeros<vec>(2), 1);
-  sp_mat extended_value_basis = sp_mat(orth(join_horiz(mat(value_basis),
-						       rand_gaussian)));
 
-  LCP slcp = smooth_lcp(smoother,blocks,Q,free_vars);
-  PLCP plcp1 = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
-  PLCP plcp2 = approx_lcp(extended_value_basis,smoother,blocks,Q,free_vars);
-
-  cout << "Initializing solvers..." << endl;
-  KojimaSolver ksolver = KojimaSolver();
-  ksolver.comp_thresh = 1e-12;
-  ksolver.initial_sigma = 0.25;
-  ksolver.verbose = false;
   
+  cout << "Building reference approximate PLCP..." << endl;
+  PLCP ref_plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
+
   ProjectiveSolver psolver = ProjectiveSolver();
-  psolver.comp_thresh = 1e-12;
+  psolver.comp_thresh = 1e-8;
   psolver.initial_sigma = 0.25;
   psolver.verbose = false;
+  psolver.iter_verbose = false;
 
-  SolverResult rsol;
-  if(REFERENCE){
-    cout << "Reference augmented LCP solve..."  << endl;
-    rsol = ksolver.aug_solve(slcp);
+  cout << "Starting reference augmented PLCP solve..."  << endl;
+  SolverResult ref_sol = psolver.aug_solve(ref_plcp);
+  mat ref_P = reshape(ref_sol.p,N,A+1);
+  vec ref_V = ref_P.col(0);
+  vec ref_res = bellman_residual_at_nodes(&mesh,&di,ref_V,GAMMA);  
+  vec ref_res_norm = vec{norm(ref_res,1),norm(ref_res,2),norm(ref_res,"inf")};
+
+  uvec ridx = randi<uvec>(SAMPLES, distr_param(0,N-1)); 
+  mat centers = points.rows(ridx);
+  
+  mat data = mat(SAMPLES,3);
+  for(uint i = 0; i < SAMPLES; i++){
+    cout << "Trial " << i << "..." << endl;
+    vec rand_gaussian = gaussian(points, centers.row(i).t(), 1e4);
+    sp_mat extended_value_basis = sp_mat(orth(join_horiz(mat(value_basis),
+                                                         rand_gaussian)));
+    PLCP plcp = approx_lcp(extended_value_basis,smoother,
+                           blocks,Q,free_vars);
+    SolverResult sol = psolver.aug_solve(plcp);
+    mat P = reshape(sol.p,N,A+1);
+    vec V = P.col(0);
+    vec res = bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
+    vec res_norm = vec{norm(res,1),norm(res,2),norm(res,"inf")};
+
+    data.row(i) = (res_norm - ref_res_norm).t();
+    cout << data.row(i);
   }
-  
-  cout << "Starting augmented PLCP solve 1..."  << endl;
-  SolverResult sol1 = psolver.aug_solve(plcp1);
-  cout << "Starting augmented PLCP solve 2..."  << endl;
-  SolverResult sol2 = psolver.aug_solve(plcp2);
-
-  mat P1 = reshape(sol1.p,N,A+1);
-  mat P2 = reshape(sol2.p,N,A+1);
-  
-  vec value1 = P1.col(0);
-  vec value2 = P2.col(0);
-
-  vec res1 =  bellman_residual_at_nodes(&mesh,&di,value1,GAMMA);  
-  vec res2 =  bellman_residual_at_nodes(&mesh,&di,value2,GAMMA);
-
-  cout << "Basis sparsity: " << sparsity(value_basis) << endl;
-  cout << "Smoother sparsity: " << sparsity(smoother) << endl;
-
-  cout << "Residual 1 1-norm: " << norm(res1,1) << endl;
-  cout << "Residual 2 1-norm: " << norm(res2,1) << endl;
-  
-  cout << "Residual 1 2-norm: " << norm(res1,2) << endl;
-  cout << "Residual 2 2-norm: " << norm(res2,2) << endl;
-  
-  cout << "Residual 1 sup-norm: " << norm(res1,"inf") << endl;
-  cout << "Residual 2 sup-norm: " << norm(res2,"inf") << endl;
   
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
-  if(REFERENCE){
-    arch.add_vec("rp",rsol.p);
-    arch.add_vec("rd",rsol.d);
-  }
-  arch.add_vec("p1",sol1.p);
-  arch.add_vec("d1",sol1.d);
-  arch.add_vec("p2",sol2.p);
-  arch.add_vec("d2",sol2.d);
-  
-  arch.add_vec("res1",res1);
-  arch.add_vec("res2",res2);
-  arch.add_vec("res_diff",res2 - res1);
-  arch.write("test.sol");
+  arch.add_vec("ref_res",ref_res);
+  arch.add_mat("centers",centers);
+  arch.add_mat("data",data);
+
+  arch.write("test.data");
 }

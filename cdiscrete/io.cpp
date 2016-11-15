@@ -41,6 +41,13 @@ bool Archiver::add_uvec(const string & field_name,
   generic_add(name,packed);
 }
 
+bool Archiver::add_cube(const string & field_name,
+                        const cube & v){
+  string name = field_name + ".cube";
+  vec packed = pack_cube(v);
+  generic_add(name,packed);
+}
+
 template <typename D>
 bool Archiver::generic_add(const string & name,
 			   const Col<D> & data){
@@ -219,6 +226,16 @@ template<typename D> Mat<D> unpack_mat(const Col<D> & A){
 }
 template umat unpack_mat(const uvec &);
 template mat unpack_mat(const vec &);
+
+template<typename D> Col<D> pack_cube(const Cube<D> & A){
+  Col<D> ret = Col<D>(3 + A.n_elem);
+  ret(0) = A.n_rows;
+  ret(1) = A.n_cols;
+  ret(2) = A.n_slices;
+  ret.tail(A.n_elem) = vectorise(A);
+  return ret;
+}
+template vec pack_cube(const cube &);
 
 template<typename D> Col<D> pack_sp_mat(const SpMat<D> & A){
 

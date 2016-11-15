@@ -48,8 +48,7 @@ vec gaussian(const Points & points,
   assert(D == center.n_elem);
   
   // Gabor wavelet (real valued frequencies only)
-  vec sqdist = sum(pow(points.each_row() - center.t(),2),1);
-  vec gauss = exp(-bandwidth*sqdist);
+  vec gauss = exp(-bandwidth * sum(pow(points.each_row() - center.t(),2),1));
   return gauss;
 }
 
@@ -159,7 +158,7 @@ sp_mat make_ball_basis(const Points & points,
 mat make_rbf_basis(const Points & points,
                    const Points & centers,
                    double bandwidth,
-		   double cutoff_thresh){
+                   double cutoff_thresh){
   uint N = points.n_rows;
   uint K = centers.n_rows;
   
@@ -168,8 +167,9 @@ mat make_rbf_basis(const Points & points,
   for(uint k = 0; k < K; k++){
     basis.col(k) = gaussian(points,centers.row(k).t(),bandwidth);
   }
-  basis(find(basis < cutoff_thresh)).fill(0);
+  //basis(find(basis < cutoff_thresh)).fill(0);
   basis = orth(basis); // Not ortho at all; need to do explicitly
+  assert((K+1) == basis.n_cols);
   return basis;
 }
 
@@ -325,7 +325,7 @@ LCP smooth_lcp(const sp_mat & smoother,
   assert(N == free_vars.n_elem);
   
   // Smooth blocks
-  vector<sp_mat> sblocks = block_mult(smoother,blocks);
+  vector<sp_mat> sblocks = block_rmult(smoother,blocks);
 
   // Smooth Q
   mat sQ = mat(size(Q));
@@ -383,7 +383,7 @@ PLCP approx_lcp(const sp_mat & value_basis,
   assert(n == value_basis.n_rows);
 
   // Smooth blocks
-  vector<sp_mat> sblocks = block_mult(smoother,blocks);
+  vector<sp_mat> sblocks = block_rmult(smoother,blocks);
 
   // Build freebie flow bases for the smoothed problem
   bool ignore_q = true;

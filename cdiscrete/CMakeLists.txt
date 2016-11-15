@@ -74,6 +74,9 @@ list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
 create_single_source_cgal_program("di_approx.cpp" "tri_mesh.cpp" "di.cpp"
   "refine.cpp" "solver.cpp" "smooth.cpp" "refine.cpp"
   ${COMMON_FILES})
+create_single_source_cgal_program("di_grid_approx.cpp" "tri_mesh.cpp" "di.cpp"
+  "refine.cpp" "solver.cpp" "smooth.cpp" "refine.cpp"
+  ${COMMON_FILES})
 #create_single_source_cgal_program("hillcar_gen.cpp" "tri_mesh.cpp"
 #  "hillcar.cpp" ${COMMON_FILES})
 #create_single_source_cgal_program("hillcar_refine.cpp" "tri_mesh.cpp"
@@ -112,6 +115,7 @@ message(STATUS "Libraries: ${CDISCRETE_LIBRARIES}")
 
 #target_link_libraries(di_refine ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_approx ${CDISCRETE_LIBRARIES})
+target_link_libraries(di_grid_approx ${CDISCRETE_LIBRARIES})
 
 #target_link_libraries(hillcar_gen ${CDISCRETE_LIBRARIES})
 #target_link_libraries(hillcar_refine ${CDISCRETE_LIBRARIES})

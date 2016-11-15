@@ -97,23 +97,31 @@ sp_mat DoubleIntegratorSimulator::transition_matrix(const Discretizer * disc,
   return P;
 }
 
-vector<sp_mat> DoubleIntegratorSimulator::transition_blocks(const Discretizer * disc) const{
+vector<sp_mat> DoubleIntegratorSimulator::transition_blocks(const Discretizer * disc,
+                                                            uint num_samples) const{
   vector<sp_mat> blocks;
   uint A = num_actions();
-  
+
+  // Swap out if there are oob
   bool include_oob = false;
+  uint n = disc->number_of_spatial_nodes();
   for(uint a = 0; a < A; a++){
-    sp_mat T = transition_matrix(disc,m_actions.row(a).t(),include_oob);
+    sp_mat T = sp_mat(n,n);
+    for(uint s = 0; s < num_samples;s++){
+      T += transition_matrix(disc,m_actions.row(a).t(),include_oob);
+    }
+    T /= (double)num_samples;
     blocks.push_back(T);
   }
   return blocks;
 }
 
 vector<sp_mat> DoubleIntegratorSimulator::lcp_blocks(const Discretizer * disc,
-						     const double gamma) const{
+                                                     const double gamma,
+                                                     uint num_samples) const{
   uint A = num_actions();
   uint N = disc->number_of_spatial_nodes(); // Not using oob
-  vector<sp_mat> blocks = transition_blocks(disc);
+  vector<sp_mat> blocks = transition_blocks(disc,num_samples);
   assert(A == blocks.size());
 
   for(uint a = 0; a < A; a++){
