@@ -25,7 +25,7 @@ if __name__ == "__main__":
         interp = Interpolator(sol.centers,sol.data[:,i])
         Z = interp(nodes)
         plt.title(name)
-        tmv.plot_vertices(nodes,faces,Z)
+        tmv.plot_vertices(nodes,faces,Z,cmap=plt.get_cmap('plasma_r'))
         
     plt.subplot(2,2,4)
     plt.title("Residual")

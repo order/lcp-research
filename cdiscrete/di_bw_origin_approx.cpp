@@ -7,6 +7,12 @@
 #include "smooth.h"
 #include "refine.h"
 
+/*
+  Program for exploring the effects of adding different isometric gaussians
+  to the origin for approximating a double integrator problem.
+  Record l1,l2,linf Bellmen residual changes
+*/
+
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
@@ -18,9 +24,7 @@ using namespace tri_mesh;
 #define SMOOTH_BW 1e9
 #define SMOOTH_THRESH 1e-4
 
-#define RBF_GRID_SIZE 6
-
-#define SAMPLES 1024
+#define RBF_GRID_SIZE 8 // Make sure even so origin isn't already covered
 
 sp_mat make_value_basis(const Points & points){
 
@@ -33,7 +37,7 @@ sp_mat make_value_basis(const Points & points){
   grids.push_back(grid);
 
   mat centers = make_points(grids);
-  double bandwidth = 1.0;
+  double bandwidth = 0.75;
   mat basis = make_rbf_basis(points,centers,bandwidth,1e-6);
   //sp_mat basis = make_voronoi_basis(points,centers);
   //sp_mat basis = speye(N,N);
@@ -128,9 +132,7 @@ int main(int argc, char** argv)
 
   // Build smoother
   cout << "Building smoother matrix..." << endl;
-  double bandwidth = SMOOTH_BW;
-  double thresh = SMOOTH_THRESH;
-  sp_mat smoother = gaussian_smoother(points,bandwidth,thresh);
+  sp_mat smoother = gaussian_smoother(points,SMOOTH_BW,SMOOTH_THRESH);
   assert(size(N,N) == size(smoother));
 
   // Build and pertrub the q
@@ -161,13 +163,12 @@ int main(int argc, char** argv)
   vec ref_res = bellman_residual_at_nodes(&mesh,&di,ref_V,GAMMA);  
   vec ref_res_norm = vec{norm(ref_res,1),norm(ref_res,2),norm(ref_res,"inf")};
 
-  uvec ridx = randi<uvec>(SAMPLES, distr_param(0,N-1)); 
-  mat centers = points.rows(ridx);
-  
-  mat data = mat(SAMPLES,3);
-  for(uint i = 0; i < SAMPLES; i++){
+  uint BW = 128;
+  vec bandwidths = linspace<vec>(0.1,10,BW);
+  mat data = mat(BW,3);
+  for(uint i = 0; i < BW; i++){
     cout << "Trial " << i << "..." << endl;
-    vec rand_gaussian = gaussian(points, centers.row(i).t(), 0.5);
+    vec rand_gaussian = gaussian(points, zeros<vec>(2), bandwidths(i));
     sp_mat extended_value_basis = sp_mat(orth(join_horiz(mat(value_basis),
                                                          rand_gaussian)));
     PLCP plcp = approx_lcp(extended_value_basis,smoother,
@@ -185,8 +186,8 @@ int main(int argc, char** argv)
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
   arch.add_vec("ref_res",ref_res);
-  arch.add_mat("centers",centers);
   arch.add_mat("data",data);
+  arch.add_mat("bandwidths",bandwidths);
 
   arch.write("test.data");
 }
