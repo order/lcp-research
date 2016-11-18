@@ -177,20 +177,19 @@ LCP augment_lcp(const LCP & original,
                 vec & x,
                 vec & y,
                 double scale){
-  
+  cout << "Scale: " << scale << endl;
   uint N = original.q.n_elem;
   x = ones<vec>(N);
   y = ones<vec>(N);
   y(find(1 == original.free_vars)).fill(0);
   
   vec r = y - (original.M * x + original.q); // Initial residual
-  double s = scale; // Absolute scale
   //[M r]
   //[0 s]
   sp_mat M = sp_mat(N+1,N+1);
   M(span(0,N-1),span(0,N-1)) = original.M;
   M(span(0,N-1),N) = r;
-  M(N,N) = s;
+  M(N,N) = scale;
 
   vec q = vec(N+1);
   q.head(N) = original.q;

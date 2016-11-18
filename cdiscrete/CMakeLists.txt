@@ -74,6 +74,9 @@ list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
 create_single_source_cgal_program("di_approx.cpp" "tri_mesh.cpp" "di.cpp"
   "refine.cpp" "solver.cpp" "smooth.cpp" "refine.cpp"
   ${COMMON_FILES})
+create_single_source_cgal_program("di_foo.cpp" "tri_mesh.cpp" "di.cpp"
+  "refine.cpp" "solver.cpp" "smooth.cpp" "refine.cpp"
+  ${COMMON_FILES})
 create_single_source_cgal_program("di_grid_approx.cpp" "tri_mesh.cpp" "di.cpp"
   "refine.cpp" "solver.cpp" "smooth.cpp" "refine.cpp"
   ${COMMON_FILES})
@@ -85,14 +88,14 @@ create_single_source_cgal_program("di_bw_origin_approx.cpp" "tri_mesh.cpp" "di.c
 #create_single_source_cgal_program("hillcar_refine.cpp" "tri_mesh.cpp"
 #  "hillcar.cpp" "refine.cpp" ${COMMON_FILES})
 
-create_single_source_cgal_program("minop_approx.cpp" "tri_mesh.cpp"
-  "minop.cpp" ${COMMON_FILES})
+#create_single_source_cgal_program("minop_approx.cpp" "tri_mesh.cpp"
+#  "minop.cpp" ${COMMON_FILES})
 #create_single_source_cgal_program("minop_sensitivity.cpp" "tri_mesh.cpp"
 #  ${COMMON_FILES})
 #create_single_source_cgal_program("minop_free_vs_bound.cpp" "tri_mesh.cpp"
 #  ${COMMON_FILES})
-create_single_source_cgal_program("minop_flow_refine.cpp" "tri_mesh.cpp"
-  "minop.cpp" ${COMMON_FILES})
+#create_single_source_cgal_program("minop_flow_refine.cpp" "tri_mesh.cpp"
+#  "minop.cpp" ${COMMON_FILES})
 
 #create_single_source_cgal_program("basis_gen.cpp" "tri_mesh.cpp"
 #  ${COMMON_FILES})
@@ -103,7 +106,7 @@ create_single_source_cgal_program("minop_flow_refine.cpp" "tri_mesh.cpp"
 #  "refine.cpp" ${COMMON_FILES})
 #create_single_source_cgal_program("tet_interp.cpp" "tet_mesh.cpp" ${COMMON_FILES})
 
-add_executable (hallway_approx hallway_approx.cpp hallway.cpp ${COMMON_FILES})
+#add_executable (hallway_approx hallway_approx.cpp hallway.cpp ${COMMON_FILES})
 
 
 list(APPEND CDISCRETE_LIBRARIES
@@ -117,6 +120,7 @@ list(APPEND CDISCRETE_LIBRARIES
 message(STATUS "Libraries: ${CDISCRETE_LIBRARIES}")
 
 #target_link_libraries(di_refine ${CDISCRETE_LIBRARIES})
+target_link_libraries(di_foo ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_approx ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_grid_approx ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_bw_origin_approx ${CDISCRETE_LIBRARIES})
@@ -126,10 +130,10 @@ target_link_libraries(di_bw_origin_approx ${CDISCRETE_LIBRARIES})
 
 #target_link_libraries(min_gen ${CDISCRETE_LIBRARIES})
 #target_link_libraries(min_refine ${CDISCRETE_LIBRARIES})
-target_link_libraries(minop_approx ${CDISCRETE_LIBRARIES})
+#target_link_libraries(minop_approx ${CDISCRETE_LIBRARIES})
 #target_link_libraries(minop_sensitivity ${CDISCRETE_LIBRARIES})
 #target_link_libraries(minop_free_vs_bound ${CDISCRETE_LIBRARIES})
-target_link_libraries(minop_flow_refine ${CDISCRETE_LIBRARIES})
+#target_link_libraries(minop_flow_refine ${CDISCRETE_LIBRARIES})
 
 
 #target_link_libraries(basis_gen ${CDISCRETE_LIBRARIES})
@@ -138,4 +142,4 @@ target_link_libraries(minop_flow_refine ${CDISCRETE_LIBRARIES})
 #target_link_libraries(dubins_refine ${CDISCRETE_LIBRARIES})
 
 #target_link_libraries(tet_interp ${CDISCRETE_LIBRARIES})
-target_link_libraries(hallway_approx ${CDISCRETE_LIBRARIES})
+#target_link_libraries(hallway_approx ${CDISCRETE_LIBRARIES})

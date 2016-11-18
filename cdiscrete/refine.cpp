@@ -1,6 +1,31 @@
 #include "refine.h"
 #include <assert.h>
 
+mat model_q(const vec values,
+	    const vector<sp_mat> p_blocks,
+	    const mat costs,
+	    const double gamma){
+  // Blocks must be the transition matrices
+  // Column stochastic
+  
+  uint N = values.n_elem;
+  uint A = p_blocks.size();
+
+  mat Q = mat(N,A);
+  for(uint a = 0 ; a < A; a++){
+    Q.col(a) = costs.col(a) + gamma * p_blocks.at(a).t() * values;
+  }
+  return Q;
+}
+
+vec bellman_residual_from_model(const vec values,
+				const vector<sp_mat> p_blocks,
+				const mat costs,
+				const double gamma){
+  mat Q = model_q(values,p_blocks,costs,gamma);
+  return min(Q,1) - values;
+}
+
 vec bellman_residual_at_nodes(const Discretizer * disc,
 				const Simulator * sim,
 				const vec & values,

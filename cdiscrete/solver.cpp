@@ -187,7 +187,7 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
     s += steplen * ds;
 
     if(verbose){
-      double res = norm(res_f) + norm(res_b);
+      double res = norm(join_vert(res_f,res_b));
       cout <<"\t Mean complementarity: " << mean_comp
            <<"\n\t Residual norm: " << res
            <<"\n\t |df|: " << norm(df)

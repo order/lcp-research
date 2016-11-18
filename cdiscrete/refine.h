@@ -6,6 +6,16 @@
 using namespace arma;
 using namespace std;
 
+mat model_q(const vec values,
+	    const vector<sp_mat> p_blocks,
+	    const mat costs,
+	    const double gamma);
+
+vec bellman_residual_from_model(const vec values,
+				const vector<sp_mat> p_blocks,
+				const mat costs,
+				const double gamma);
+
 vec bellman_residual_at_nodes(const Discretizer * disc,
 			      const Simulator * sim,
 			      const vec & values,

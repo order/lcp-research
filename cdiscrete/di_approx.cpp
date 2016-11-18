@@ -128,9 +128,7 @@ int main(int argc, char** argv)
 
   // Build smoother
   cout << "Building smoother matrix..." << endl;
-  double bandwidth = SMOOTH_BW;
-  double thresh = SMOOTH_THRESH;
-  sp_mat smoother = gaussian_smoother(points,bandwidth,thresh);
+  sp_mat smoother = gaussian_smoother(points,SMOOTH_BW,SMOOTH_THRESH);
   assert(size(N,N) == size(smoother));
 
   // Build and pertrub the q
@@ -142,8 +140,6 @@ int main(int argc, char** argv)
 
   cout << "Making value basis..." << endl;
   sp_mat value_basis = make_value_basis(points);
-
-
   
   cout << "Building reference approximate PLCP..." << endl;
   PLCP ref_plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
