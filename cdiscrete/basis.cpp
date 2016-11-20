@@ -386,7 +386,7 @@ PLCP approx_lcp(const sp_mat & value_basis,
   vector<sp_mat> sblocks = block_rmult(smoother,blocks);
 
   // Build freebie flow bases for the smoothed problem
-  bool ignore_q = true;
+  bool ignore_q = false;
   vector<sp_mat> flow_bases;
   vec q;
   if(ignore_q){

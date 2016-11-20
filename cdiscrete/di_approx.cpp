@@ -13,30 +13,29 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 #define B 5.0
-#define LENGTH 0.35
+#define LENGTH 0.5
 #define GAMMA 0.995
 #define SMOOTH_BW 1e9
 #define SMOOTH_THRESH 1e-4
 
-#define RBF_GRID_SIZE 6
+#define RBF_GRID_SIZE 4
+#define RBF_BW 0.25
 
-#define SAMPLES 1024
+#define ADDED_BW 0.25
 
 sp_mat make_value_basis(const Points & points){
 
   uint N = points.n_rows;
   
-  uint k = RBF_GRID_SIZE;
-  vec grid = linspace<vec>(-B,B,k);
+  vec grid = linspace<vec>(-B,B,RBF_GRID_SIZE);
   vector<vec> grids;
   grids.push_back(grid);
   grids.push_back(grid);
 
   mat centers = make_points(grids);
-  double bandwidth = 1.0;
-  mat basis = make_rbf_basis(points,centers,bandwidth,1e-6);
-  //sp_mat basis = make_voronoi_basis(points,centers);
-  //sp_mat basis = speye(N,N);
+  mat basis = make_rbf_basis(points,centers,RBF_BW,1e-6);
+
+  basis = orth(basis);
   return sp_mat(basis);
 }
 
@@ -145,7 +144,7 @@ int main(int argc, char** argv)
   PLCP ref_plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
 
   ProjectiveSolver psolver = ProjectiveSolver();
-  psolver.comp_thresh = 1e-8;
+  psolver.comp_thresh = 1e-22;
   psolver.initial_sigma = 0.25;
   psolver.verbose = false;
   psolver.iter_verbose = false;
@@ -154,16 +153,18 @@ int main(int argc, char** argv)
   SolverResult ref_sol = psolver.aug_solve(ref_plcp);
   mat ref_P = reshape(ref_sol.p,N,A+1);
   vec ref_V = ref_P.col(0);
-  vec ref_res = bellman_residual_at_nodes(&mesh,&di,ref_V,GAMMA);  
-  vec ref_res_norm = vec{norm(ref_res,1),norm(ref_res,2),norm(ref_res,"inf")};
-
-  uvec ridx = randi<uvec>(SAMPLES, distr_param(0,N-1)); 
-  mat centers = points.rows(ridx);
+  mat ref_F = ref_P.tail_cols(A);
+  vec ref_res = bellman_residual_at_nodes(&mesh,&di,ref_V,GAMMA);
   
-  mat data = mat(SAMPLES,3);
-  for(uint i = 0; i < SAMPLES; i++){
+  vec ref_res_norm = vec{norm(ref_res,1),norm(ref_res,2),norm(ref_res,"inf")};
+  vec adv =  advantage_function(&mesh,&di,ref_V,GAMMA);
+  uvec p_agg =  policy_agg(&mesh,&di,ref_V,ref_F,GAMMA);
+  
+  mat centers = points;
+  mat data = mat(N,3);
+  for(uint i = 0; i < N; i++){
     cout << "Trial " << i << "..." << endl;
-    vec rand_gaussian = gaussian(points, centers.row(i).t(), 0.5);
+    vec rand_gaussian = gaussian(points, centers.row(i).t(), ADDED_BW);
     sp_mat extended_value_basis = sp_mat(orth(join_horiz(mat(value_basis),
                                                          rand_gaussian)));
     PLCP plcp = approx_lcp(extended_value_basis,smoother,
@@ -180,7 +181,11 @@ int main(int argc, char** argv)
   
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
+  arch.add_mat("P",ref_P);
   arch.add_vec("ref_res",ref_res);
+  arch.add_vec("adv",adv);
+  arch.add_uvec("p_agg",p_agg);
+
   arch.add_mat("centers",centers);
   arch.add_mat("data",data);
 
