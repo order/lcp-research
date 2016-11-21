@@ -169,7 +169,9 @@ mat make_rbf_basis(const Points & points,
   }
   //basis(find(basis < cutoff_thresh)).fill(0);
   basis = orth(basis); // Not ortho at all; need to do explicitly
-  assert((K+1) == basis.n_cols);
+  if(basis.n_cols < (K+1)){
+    cerr << "WARNING: Basis degenerate..." << endl;
+  }
   return basis;
 }
 

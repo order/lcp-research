@@ -281,7 +281,7 @@ uvec policy_agg(const Discretizer * disc,
   uvec qp = q_policy(disc,sim,values,gamma,samples);
   uvec fp = flow_policy(disc,flows);
 
-  return gp + qp + fp;
+  return gp + 2*qp + 4*fp;
 }
 
 vec agg_flow_at_centers(const Discretizer * disc,

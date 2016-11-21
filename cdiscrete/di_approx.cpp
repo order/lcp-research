@@ -15,7 +15,7 @@ using namespace tri_mesh;
 #define B 5.0
 #define LENGTH 0.5
 #define GAMMA 0.995
-#define SMOOTH_BW 1e9
+#define SMOOTH_BW 10
 #define SMOOTH_THRESH 1e-4
 
 #define RBF_GRID_SIZE 4
@@ -24,7 +24,6 @@ using namespace tri_mesh;
 #define ADDED_BW 0.25
 
 sp_mat make_value_basis(const Points & points){
-
   uint N = points.n_rows;
   
   vec grid = linspace<vec>(-B,B,RBF_GRID_SIZE);

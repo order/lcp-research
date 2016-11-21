@@ -13,15 +13,16 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 #define B 5.0
-#define LENGTH 0.35
+#define LENGTH 0.5
 #define GAMMA 0.995
-#define SMOOTH_BW 1e9
+#define SMOOTH_BW 1
 #define SMOOTH_THRESH 1e-4
 
-#define RBF_GRID_SIZE 6
-#define RBF_BW 0.5
+#define RBF_GRID_SIZE 4
+#define RBF_BW 0.25
 
-#define SAMPLES 1024
+#define ADDED_BW 0.5
+
 
 sp_mat make_value_basis(const Points & points){
 
@@ -159,11 +160,15 @@ int main(int argc, char** argv)
   mat P = reshape(sol.p,N,A+1);
   mat D = reshape(sol.d,N,A+1);
   vec V = P.col(0);
+  mat F = P.tail_cols(A);
   
   vec res = bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
+  vec res_faces = bellman_residual_at_centers(&mesh,&di,V,GAMMA);
   vec res_norm = vec{norm(res,1),
 		     norm(res,2),
 		     norm(res,"inf")};
+  vec adv =  advantage_function(&mesh,&di,V,GAMMA);
+  uvec p_agg =  policy_agg(&mesh,&di,V,F,GAMMA);
 
   cout << "res_norm: " << res_norm.t();
   
@@ -173,6 +178,10 @@ int main(int argc, char** argv)
   arch.add_mat("D",D);
 
   arch.add_vec("res",res);
+  arch.add_vec("res_faces",res_faces);
 
+  arch.add_vec("adv",adv);
+  arch.add_uvec("p_agg",p_agg);
+  
   arch.write("test.data");
 }

@@ -13,11 +13,10 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 #define B 5.0
-#define LENGTH 0.3
+#define LENGTH 0.5
 #define GAMMA 0.995
 #define SMOOTH_BW 1e9
 #define SMOOTH_THRESH 1e-4
-
 
 sp_mat make_value_basis(const Points & points,
                         uint rbf_grid_size,
@@ -102,8 +101,8 @@ int main(int argc, char** argv)
   psolver.verbose = false;
   psolver.iter_verbose = false;
 
-  vec bandwidth = vec{0.4,0.5,0.6,0.75,1.0,1.25};
-  uvec grid_size = regspace<uvec>(5,17);
+  vec bandwidth = linspace(0.25,1,5);
+  uvec grid_size = regspace<uvec>(3,20);
 
   cube data = cube(bandwidth.n_elem,
                    grid_size.n_elem,
@@ -137,5 +136,5 @@ int main(int argc, char** argv)
   arch.add_vec("bandwidth",bandwidth);
   arch.add_uvec("grid_size",grid_size);
 
-  arch.write("grids.dat");
+  arch.write("test.data");
 }

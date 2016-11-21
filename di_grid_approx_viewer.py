@@ -27,6 +27,6 @@ if __name__ == "__main__":
         plt.title(name)
         for b in xrange(B):
             plt.semilogy(grid_size,data[b,:,i])
-        plt.legend(bw)
+        plt.legend(bw,loc='best')
     plt.show()
             

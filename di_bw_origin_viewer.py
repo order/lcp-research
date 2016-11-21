@@ -18,12 +18,17 @@ if __name__ == "__main__":
     l2 = sol.data[:,1]
     linf = sol.data[:,2]
 
+    max_i = np.argmax(l1)
+    min_i = np.argmin(l1)
+    print "Min:", min_i,bw[min_i], l1[min_i]
+    print "Max:", max_i,bw[max_i], l1[max_i]
+
     plt.figure()
     plt.suptitle('Additional basis at origin')
     for (i,name) in enumerate(['l1','l2','linf']):
         plt.subplot(2,2,i+1)
         plt.title(name)
-        plt.plot(bw,sol.data[:,i])
+        plt.semilogx(bw,sol.data[:,i],'.')
         plt.ylabel('Residual change')
         plt.xlabel('Bandwidth')    
     plt.show()

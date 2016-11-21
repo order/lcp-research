@@ -21,30 +21,37 @@ if __name__ == "__main__":
     
     (N,A) = P.shape
     plt.figure()
-    plt.title("Primal")
+    plt.suptitle("Primal")
     for a in xrange(A):
         plt.subplot(2,2,a+1)
         tmv.plot_vertices(nodes,faces,P[:,a])
 
     plt.figure()
-    plt.title("Policy")
-    policy = np.argmin(P[:,1:],axis=1)
-    tmv.plot_vertices(nodes,faces,policy)
-
-    plt.figure()
-    plt.title("Dual")
+    plt.suptitle("Dual")
     for a in xrange(A):
         plt.subplot(2,2,a+1)
-        tmv.plot_vertices(nodes,faces,D[:,a])   
-    
+        tmv.plot_vertices(nodes,faces,D[:,a])  
+        
     plt.figure()
-    plt.title("Residual")
-    tmv.plot_vertices(nodes,faces,sol.res)
-
-    
-    plt.figure()
+    plt.subplot(2,2,1)
     plt.title("Min dual residual")
     R = np.minimum(D[:,1],D[:,2])
     tmv.plot_vertices(nodes,faces,R)
 
+    plt.subplot(2,2,2)
+    plt.title("Bellman residual")
+    tmv.plot_vertices(nodes,faces,sol.res)
+
+    plt.subplot(2,2,3)
+    plt.title("Policy")
+    tmv.plot_faces(nodes,faces,sol.p_agg)
+
+    plt.subplot(2,2,4)
+    plt.title("Advantage function")
+    tmv.plot_faces(nodes,faces,sol.adv)
+
+    plt.figure()
+    plt.title("Heuristic")
+    tmv.plot_faces(nodes,faces,sol.adv * sol.res_faces)
+    
     plt.show()
