@@ -16,42 +16,8 @@ if __name__ == "__main__":
     print "Number of faces:",len(faces)
     sol = Unarchiver(file_base + ".data")
 
-    P = sol.P
-    D = sol.D
-    
-    (N,A) = P.shape
     plt.figure()
-    plt.suptitle("Primal")
-    for a in xrange(A):
-        plt.subplot(2,2,a+1)
-        tmv.plot_vertices(nodes,faces,P[:,a])
-
+    tmv.plot_vertices(nodes,faces,sol.pball)
     plt.figure()
-    plt.suptitle("Dual")
-    for a in xrange(A):
-        plt.subplot(2,2,a+1)
-        tmv.plot_vertices(nodes,faces,D[:,a])  
-        
-    plt.figure()
-    plt.subplot(2,2,1)
-    plt.title("Min dual residual")
-    R = np.minimum(D[:,1],D[:,2])
-    tmv.plot_vertices(nodes,faces,R)
-
-    plt.subplot(2,2,2)
-    plt.title("Bellman residual")
-    tmv.plot_vertices(nodes,faces,sol.res)
-
-    plt.subplot(2,2,3)
-    plt.title("Policy")
-    tmv.plot_faces(nodes,faces,sol.p_agg)
-
-    plt.subplot(2,2,4)
-    plt.title("Advantage function")
-    tmv.plot_faces(nodes,faces,sol.adv)
-
-    plt.figure()
-    plt.title("Heuristic")
-    tmv.plot_faces(nodes,faces,sol.adv * sol.res_faces)
-    
+    tmv.plot_vertices(nodes,faces,sol.lball)
     plt.show()

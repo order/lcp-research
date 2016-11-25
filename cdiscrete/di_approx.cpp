@@ -15,13 +15,22 @@ using namespace tri_mesh;
 #define B 5.0
 #define LENGTH 0.5
 #define GAMMA 0.995
-#define SMOOTH_BW 10
+#define SMOOTH_BW 5
 #define SMOOTH_THRESH 1e-4
 
 #define RBF_GRID_SIZE 4
 #define RBF_BW 0.25
 
-#define ADDED_BW 0.25
+#define NUM_BW 25
+
+vec new_vector(const Points & points){
+  double angle = 2.67;
+  double b = 0.006;
+  double c = 0.16;
+  mat rot = mat{{cos(angle), -sin(angle)},{sin(angle),cos(angle)}};
+  mat cov = rot * diagmat(vec{b,c}) * rot.t();
+  return gaussian(points,zeros<vec>(2),cov);
+}
 
 sp_mat make_value_basis(const Points & points){
   uint N = points.n_rows;
@@ -33,6 +42,8 @@ sp_mat make_value_basis(const Points & points){
 
   mat centers = make_points(grids);
   mat basis = make_rbf_basis(points,centers,RBF_BW,1e-6);
+  vec new_vec = new_vector(points);
+  basis = join_horiz(basis,new_vec);
 
   basis = orth(basis);
   return sp_mat(basis);
@@ -151,42 +162,54 @@ int main(int argc, char** argv)
   cout << "Starting reference augmented PLCP solve..."  << endl;
   SolverResult ref_sol = psolver.aug_solve(ref_plcp);
   mat ref_P = reshape(ref_sol.p,N,A+1);
+  mat ref_D = reshape(ref_sol.d,N,A+1);
   vec ref_V = ref_P.col(0);
   mat ref_F = ref_P.tail_cols(A);
   vec ref_res = bellman_residual_at_nodes(&mesh,&di,ref_V,GAMMA);
   
-  vec ref_res_norm = vec{norm(ref_res,1),norm(ref_res,2),norm(ref_res,"inf")};
+  vec ref_res_norm = vec{norm(ref_res,1),
+			 norm(ref_res,2),
+			 norm(ref_res,"inf"),
+			 abs(accu(ref_res))};
   vec adv =  advantage_function(&mesh,&di,ref_V,GAMMA);
   uvec p_agg =  policy_agg(&mesh,&di,ref_V,ref_F,GAMMA);
-  
-  mat centers = points;
-  mat data = mat(N,3);
-  for(uint i = 0; i < N; i++){
-    cout << "Trial " << i << "..." << endl;
-    vec rand_gaussian = gaussian(points, centers.row(i).t(), ADDED_BW);
-    sp_mat extended_value_basis = sp_mat(orth(join_horiz(mat(value_basis),
-                                                         rand_gaussian)));
-    PLCP plcp = approx_lcp(extended_value_basis,smoother,
-                           blocks,Q,free_vars);
-    SolverResult sol = psolver.aug_solve(plcp);
-    mat P = reshape(sol.p,N,A+1);
-    vec V = P.col(0);
-    vec res = bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
-    vec res_norm = vec{norm(res,1),norm(res,2),norm(res,"inf")};
 
-    data.row(i) = (res_norm - ref_res_norm).t();
-    cout << data.row(i);
+  
+  vec bandwidths = logspace<vec>(-2,0.75,NUM_BW); // 0.1 to ~6
+  cube data = cube(N,NUM_BW,4); // l1,l2,linf,accu
+  for(uint i = 0; i < N; i++){
+    cout << "Center " << i << " of " << N << "..." << endl;
+    for(uint j = 0; j < NUM_BW;j++){
+      cout << "\tBandwidth " << bandwidths(j) << "..." << endl;
+      vec rand_gaussian = gaussian(points,
+				   points.row(i).t(), // location
+				   bandwidths(j)); // Width
+      sp_mat extended_value_basis = sp_mat(orth(join_horiz(mat(value_basis),
+							   rand_gaussian)));
+      PLCP plcp = approx_lcp(extended_value_basis,smoother,
+			     blocks,Q,free_vars);
+      SolverResult sol = psolver.aug_solve(plcp);
+      mat P = reshape(sol.p,N,A+1);
+      vec V = P.col(0);
+      vec res = bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
+      vec res_norm = vec{norm(res,1),norm(res,2),
+			 norm(res,"inf"),abs(accu(res))};
+
+      data.tube(i,j) = (res_norm - ref_res_norm).t();
+    }
   }
   
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
   arch.add_mat("P",ref_P);
+  arch.add_mat("D",ref_D);
   arch.add_vec("ref_res",ref_res);
   arch.add_vec("adv",adv);
   arch.add_uvec("p_agg",p_agg);
 
-  arch.add_mat("centers",centers);
-  arch.add_mat("data",data);
+  arch.add_mat("points",points);
+  arch.add_vec("bandwidths",bandwidths);
+  arch.add_cube("data",data);
 
   arch.write("test.data");
 }

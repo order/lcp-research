@@ -14,15 +14,21 @@ using namespace tri_mesh;
 
 #define B 5.0
 #define LENGTH 0.5
-#define GAMMA 0.995
-#define SMOOTH_BW 1
+#define GAMMA 0.99
+#define SMOOTH_BW 5
 #define SMOOTH_THRESH 1e-4
 
 #define RBF_GRID_SIZE 4
 #define RBF_BW 0.25
 
-#define ADDED_BW 0.5
-
+vec new_vector(const Points & points){
+  double angle = 1.2567;
+  double b = 0.001;
+  double c = 0.0785;
+  mat rot = mat{{cos(angle), -sin(angle)},{sin(angle),cos(angle)}};
+  mat cov = rot * diagmat(vec{b,c}) * rot.t();
+  return gaussian(points,zeros<vec>(2),cov);
+}
 
 sp_mat make_value_basis(const Points & points){
 
@@ -37,47 +43,14 @@ sp_mat make_value_basis(const Points & points){
   mat centers = make_points(grids);
   double bandwidth = RBF_BW;
   mat basis = make_rbf_basis(points,centers,bandwidth,1e-6);
+  vec new_vec = new_vector(points);
+  
+
+  basis = join_horiz(basis,new_vec);
+  basis = orth(basis);
   //sp_mat basis = make_voronoi_basis(points,centers);
   //sp_mat basis = speye(N,N);
   return sp_mat(basis);
-}
-
-mat refine(const Points & vertices,
-           const Points & face_centers,
-           const vec & heuristic){
-  cout << "Starting refine..." << endl;
-  uint F = face_centers.n_rows;
-  uint N = vertices.n_rows;
-  uint D = vertices.n_cols;
-  assert(F == heuristic.n_elem);
-  
-  uint cand = 256;
-  uvec center_idx = randi<uvec>(cand,distr_param(0,F-1));
-  double bw = 5;
-
-  mat basis = mat(F,cand);
-  for(uint i = 0; i < cand; i++){
-    uint idx = center_idx(i);
-    assert(idx < F);
-    vec center = face_centers.row(idx).t();
-    basis.col(i) = gaussian(face_centers,center,bw);
-  }
-  //basis = orth(basis);
-  vec corr = basis.t() * heuristic;
-  uvec corr_idx = sort_index(corr);
-
-  uint K = 1;
-  mat actual_basis = mat(N,K);
-  uvec actual_idx = corr_idx.tail(K);
-
-  for(uint k = 0; k < K; k++){
-    uint I = actual_idx(k);
-
-    uint idx = center_idx(I);
-    vec center = face_centers.row(idx).t();
-    actual_basis.col(k) = gaussian(vertices,center,bw);
-  }
-  return actual_basis;
 }
 
 mat build_bbox(){
@@ -129,6 +102,20 @@ int main(int argc, char** argv)
   assert(A == blocks.size());
   assert(size(N,N) == size(blocks.at(0)));
 
+  // Shapes
+  vec ball = zeros<vec>(N);
+  vec dist = sqrt(sum(pow(points,2),1));
+  ball(find(dist < 1)).fill(1);
+
+  vec lball = spsolve(blocks.at(1).t(), ball);
+  vec pball = spsolve(p_blocks.at(1).t(), ball);
+  mesh.write_cgal("balls.mesh");
+  Archiver barch = Archiver();
+  barch.add_vec("lball",lball);
+  barch.add_vec("pball",pball);
+  barch.write("balls.data");
+  exit(1);
+  
   // Build smoother
   cout << "Building smoother matrix..." << endl;
   double bandwidth = SMOOTH_BW;
@@ -144,17 +131,24 @@ int main(int argc, char** argv)
   bvec free_vars = zeros<bvec>((A+1)*N);
   free_vars.head(N).fill(1);
 
+  sp_mat M = build_M(blocks);
+  vec q = vectorise(Q);
+
+  LCP lcp = LCP(M,q,free_vars);
+
   // Build the approximate PLCP
   sp_mat value_basis = make_value_basis(points);
   PLCP plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
 
+  //KojimaSolver solver = KojimaSolver();
   ProjectiveSolver solver = ProjectiveSolver();
   solver.comp_thresh = 1e-22;
   solver.initial_sigma = 0.25;
   solver.aug_rel_scale = 0.75;
-  solver.regularizer = 1e-12;
+  solver.regularizer = 0;
   solver.verbose = true;
-  
+
+  //SolverResult sol = solver.aug_solve(lcp);
   SolverResult sol = solver.aug_solve(plcp);
   
   mat P = reshape(sol.p,N,A+1);
@@ -182,6 +176,8 @@ int main(int argc, char** argv)
 
   arch.add_vec("adv",adv);
   arch.add_uvec("p_agg",p_agg);
+
+  arch.add_vec("new_vec",new_vector(points));
   
   arch.write("test.data");
 }

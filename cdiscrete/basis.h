@@ -29,7 +29,9 @@ vec gaussian(const vec & points,
 vec gaussian(const Points & points,
              const vec & center,
              const double bandwidth);
-
+vec gaussian(const Points & points,
+             const vec & center,
+             const mat & cov);
 
 double find_radius(const vec & dist,
                    uint target);

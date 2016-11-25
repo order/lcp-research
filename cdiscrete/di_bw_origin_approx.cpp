@@ -8,7 +8,7 @@
 #include "refine.h"
 
 /*
-  Program for exploring the effects of adding different isometric gaussians
+  Program for exploring the effects of adding different gaussians
   to the origin for approximating a double integrator problem.
   Record l1,l2,linf Bellmen residual changes
 */
@@ -21,13 +21,14 @@ using namespace tri_mesh;
 #define B 5.0
 #define LENGTH 0.5
 #define GAMMA 0.995
-#define SMOOTH_BW 1
+#define SMOOTH_BW 1e9
 #define SMOOTH_THRESH 1e-4
 
 #define RBF_GRID_SIZE 4 // Make sure even so origin isn't already covered
 #define RBF_BW 0.25
 
-#define NUM_BW 128
+#define NUM_ANGLE 20
+#define NUM_AMPL  20
 
 sp_mat make_value_basis(const Points & points){
   uint N = points.n_rows;
@@ -123,30 +124,56 @@ int main(int argc, char** argv)
   vec ref_res = bellman_residual_at_nodes(&mesh,&di,ref_V,GAMMA);  
   vec ref_res_norm = vec{norm(ref_res,1),norm(ref_res,2),norm(ref_res,"inf")};
 
-  vec bandwidths = logspace<vec>(-2,2,NUM_BW);
-  mat data = mat(NUM_BW,3);
-  for(uint i = 0; i < NUM_BW; i++){
-    cout << "Trial " << i << "..." << endl;
-    vec rand_gaussian = gaussian(points, zeros<vec>(2), bandwidths(i));
-    sp_mat extended_value_basis = sp_mat(orth(join_horiz(mat(value_basis),
-                                                         rand_gaussian)));
-    PLCP plcp = approx_lcp(extended_value_basis,smoother,
-                           blocks,Q,free_vars);
-    SolverResult sol = psolver.aug_solve(plcp);
-    mat P = reshape(sol.p,N,A+1);
-    vec V = P.col(0);
-    vec res = bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
-    vec res_norm = vec{norm(res,1),norm(res,2),norm(res,"inf")};
+  //////////////////////////
+  // SETUP FOR EXPERIMENT //
+  //////////////////////////
+  vec angles = linspace(0,datum::pi,NUM_ANGLE+1).head(NUM_ANGLE);
+  vec amplitudes = logspace<vec>(-3,0,NUM_AMPL); // 0.01 to 1
 
-    data.row(i) = (res_norm - ref_res_norm).t();
-    cout << data.row(i);
+  uint num_points = (NUM_ANGLE * (NUM_AMPL + 1) * NUM_AMPL) / 2;
+  mat coords = mat(num_points,3);
+  mat res_diff = mat(num_points,3);
+  uint I = 0;
+  
+  for(uint a = 0; a < NUM_ANGLE; a++){
+    double angle = angles(a);
+    mat rot = mat{{cos(angle), -sin(angle)},{sin(angle),cos(angle)}};
+    for(uint i = 0; i < NUM_AMPL; i++){
+      double long_vec = amplitudes(i);
+      for(uint j = i; j < NUM_AMPL; j++){
+	double short_vec = amplitudes(j);
+	vec coord = vec{angle,long_vec,short_vec};
+	assert(I < num_points);
+	coords.row(I) = coord.t();
+	cout << "Running " << I << "/" << num_points  << endl;
+	cout << "\tCoord: " << coord.t();
+
+	mat cov = rot * diagmat(vec{long_vec,short_vec}) * rot.t();
+	vec new_vec = gaussian(points,zeros<vec>(2),cov);
+	sp_mat new_basis = sp_mat(orth(join_horiz(mat(value_basis),
+						  new_vec)));
+
+	PLCP plcp = approx_lcp(new_basis,smoother,
+			       blocks,Q,free_vars);
+
+	SolverResult sol = psolver.aug_solve(plcp);
+
+	// Interpret results
+	mat P = reshape(sol.p,N,A+1);
+	vec V = P.col(0);
+	vec res = bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
+	vec res_norm = vec{norm(res,1),norm(res,2),norm(res,"inf")};
+	res_diff.row(I++) = (res_norm - ref_res_norm).t();
+      }
+    }
   }
+  assert(I == num_points);
   
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
   arch.add_vec("ref_res",ref_res);
-  arch.add_mat("data",data);
-  arch.add_mat("bandwidths",bandwidths);
+  arch.add_mat("res_diff",res_diff);
+  arch.add_mat("coords",coords);
 
   arch.write("test.data");
 }

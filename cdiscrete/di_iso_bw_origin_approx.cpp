@@ -7,6 +7,12 @@
 #include "smooth.h"
 #include "refine.h"
 
+/*
+  Program for exploring the effects of adding different gaussians
+  to the origin for approximating a double integrator problem.
+  Record l1,l2,linf Bellmen residual changes
+*/
+
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
@@ -15,23 +21,26 @@ using namespace tri_mesh;
 #define B 5.0
 #define LENGTH 0.5
 #define GAMMA 0.995
-#define SMOOTH_BW 10
+#define SMOOTH_BW 1e9
 #define SMOOTH_THRESH 1e-3
 
-sp_mat make_value_basis(const Points & points,
-                        uint rbf_grid_size,
-                        double rbf_bandwidth){
+#define RBF_GRID_SIZE 4 // Make sure even so origin isn't already covered
+#define RBF_BW 0.25
 
+#define NUM_BW 128
+
+sp_mat make_value_basis(const Points & points){
   uint N = points.n_rows;
-  vec grid = linspace<vec>(-B,B,rbf_grid_size);
+  
+  vec grid = linspace<vec>(-B,B,RBF_GRID_SIZE);
   vector<vec> grids;
   grids.push_back(grid);
   grids.push_back(grid);
 
   mat centers = make_points(grids);
-  mat basis = make_rbf_basis(points,centers,rbf_bandwidth,0);
-  //sp_mat basis = make_voronoi_basis(points,centers);
-  //sp_mat basis = speye(N,N);
+  mat basis = make_rbf_basis(points,centers,RBF_BW,1e-6);
+
+  basis = orth(basis);
   return sp_mat(basis);
 }
 
@@ -94,47 +103,58 @@ int main(int argc, char** argv)
   
   bvec free_vars = zeros<bvec>((A+1)*N);
   free_vars.head(N).fill(1);
+
+  cout << "Making value basis..." << endl;
+  sp_mat value_basis = make_value_basis(points);
   
+  cout << "Building reference approximate PLCP..." << endl;
+  PLCP ref_plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
+
   ProjectiveSolver psolver = ProjectiveSolver();
-  psolver.comp_thresh = 1e-12;
+  psolver.comp_thresh = 1e-8;
   psolver.initial_sigma = 0.25;
   psolver.verbose = false;
   psolver.iter_verbose = false;
 
-  vec bandwidth = logspace<vec>(-1,0.75,5);
-  uvec grid_size = regspace<uvec>(3,16);
+  cout << "Starting reference augmented PLCP solve..."  << endl;
+  SolverResult ref_sol = psolver.aug_solve(ref_plcp);
+  mat ref_P = reshape(ref_sol.p,N,A+1);
+  vec ref_V = ref_P.col(0);
+  vec ref_res = bellman_residual_at_nodes(&mesh,&di,ref_V,GAMMA);  
+  vec ref_res_norm = vec{norm(ref_res,1),norm(ref_res,2),norm(ref_res,"inf")};
 
-  cube data = cube(bandwidth.n_elem,
-                   grid_size.n_elem,
-                   3);
+  //////////////////////////
+  // SETUP FOR EXPERIMENT //
+  //////////////////////////
+  vec bandwidths = logspace<vec>(-3,1,NUM_BW); // 0.01 to 1
+  uint num_points = bandwidths.n_elem;
+  mat res_diff = mat(num_points,3);
+  
+  for(uint i = 0; i < num_points; i++){
+    cout << "Running " << i << "/" << num_points  << endl;
+	
+    vec new_vec = gaussian(points,zeros<vec>(2),bandwidths(i));
+    sp_mat new_basis = sp_mat(orth(join_horiz(mat(value_basis),
+					      new_vec)));
 
-  for(uint i = 0; i < bandwidth.n_elem; i++){
-    double bw = bandwidth(i);
-    cout << "Bandwidth " << bw << endl;
-    for(uint j = 0; j < grid_size.n_elem; j++){
-      uint G = grid_size(j);
-      cout << "\tGrid size " << G << endl;
-      sp_mat value_basis = make_value_basis(points,G,bw);
-      PLCP plcp = approx_lcp(value_basis,smoother,
-                             blocks,Q,free_vars);
-      SolverResult sol = psolver.aug_solve(plcp);
-      mat P = reshape(sol.p,N,A+1);
-      vec V = P.col(0);
-      
-      vec res = bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
-      data(i,j,0) = norm(res,1);
-      data(i,j,1) = norm(res,2);
-      data(i,j,2) = norm(res,"inf");
-      rowvec tube = data.tube(i,j);
-      cout<< "\t\tResidual: " << tube;
-    }
+    PLCP plcp = approx_lcp(new_basis,smoother,
+			   blocks,Q,free_vars);
+
+    SolverResult sol = psolver.aug_solve(plcp);
+
+    // Interpret results
+    mat P = reshape(sol.p,N,A+1);
+    vec V = P.col(0);
+    vec res = bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
+    vec res_norm = vec{norm(res,1),norm(res,2),norm(res,"inf")};
+    res_diff.row(i) = (res_norm - ref_res_norm).t();
   }
   
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
-  arch.add_cube("data",data);
-  arch.add_vec("bandwidth",bandwidth);
-  arch.add_uvec("grid_size",grid_size);
+  arch.add_vec("ref_res",ref_res);
+  arch.add_mat("res_diff",res_diff);
+  arch.add_mat("bandwidths",bandwidths);
 
   arch.write("test.data");
 }

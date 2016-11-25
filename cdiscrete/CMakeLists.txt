@@ -83,6 +83,9 @@ create_single_source_cgal_program("di_grid_approx.cpp" "tri_mesh.cpp" "di.cpp"
 create_single_source_cgal_program("di_bw_origin_approx.cpp" "tri_mesh.cpp" "di.cpp"
   "refine.cpp" "solver.cpp" "smooth.cpp" "refine.cpp"
   ${COMMON_FILES})
+create_single_source_cgal_program("di_iso_bw_origin_approx.cpp" "tri_mesh.cpp" "di.cpp"
+  "refine.cpp" "solver.cpp" "smooth.cpp" "refine.cpp"
+  ${COMMON_FILES})
 #create_single_source_cgal_program("hillcar_gen.cpp" "tri_mesh.cpp"
 #  "hillcar.cpp" ${COMMON_FILES})
 #create_single_source_cgal_program("hillcar_refine.cpp" "tri_mesh.cpp"
@@ -124,6 +127,7 @@ target_link_libraries(di_foo ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_approx ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_grid_approx ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_bw_origin_approx ${CDISCRETE_LIBRARIES})
+target_link_libraries(di_iso_bw_origin_approx ${CDISCRETE_LIBRARIES})
 
 #target_link_libraries(hillcar_gen ${CDISCRETE_LIBRARIES})
 #target_link_libraries(hillcar_refine ${CDISCRETE_LIBRARIES})

@@ -47,10 +47,26 @@ vec gaussian(const Points & points,
   uint D = points.n_cols;
   assert(D == center.n_elem);
   
-  // Gabor wavelet (real valued frequencies only)
   vec gauss = exp(-bandwidth * sum(pow(points.each_row() - center.t(),2),1));
   return gauss;
 }
+
+vec gaussian(const Points & points,
+             const vec & center,
+             const mat & cov){
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  assert(D == center.n_elem);
+  assert(size(D,D) == size(cov));
+  
+  vec gauss = vec(N);
+  for(uint i = 0; i < N; i++){
+    vec x = points.row(i).t() - center;
+    gauss(i) = exp(- dot(x, cov * x));
+  }
+  return gauss;
+}
+
 
 double find_radius(const vec & dist,
                    uint target){

@@ -27,6 +27,8 @@ if __name__ == "__main__":
         plt.title(name)
         for b in xrange(B):
             plt.semilogy(grid_size,data[b,:,i])
+        plt.xlabel('Grid density')
+        plt.ylabel('Residual')
         plt.legend(bw,loc='best')
     plt.show()
             
