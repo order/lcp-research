@@ -31,25 +31,17 @@ vec new_vector(const Points & points){
 }
 
 sp_mat make_value_basis(const Points & points){
-
   uint N = points.n_rows;
-  
-  uint k = RBF_GRID_SIZE;
-  vec grid = linspace<vec>(-B,B,k);
-  vector<vec> grids;
-  grids.push_back(grid);
-  grids.push_back(grid);
 
-  mat centers = make_points(grids);
-  double bandwidth = RBF_BW;
-  mat basis = make_rbf_basis(points,centers,bandwidth,1e-6);
-  vec new_vec = new_vector(points);
-  
+  mat basis = mat(N,4);
+  basis.col(0).fill(1);
+  basis.col(1) = gaussian(points,zeros<vec>(2),0.5);
+  basis.col(2) = gaussian(points,vec{1.3,0.743217},2.7);
+  basis.col(3) = gaussian(points,vec{-1.3,-0.743217},2.7);
 
-  basis = join_horiz(basis,new_vec);
+  //basis.col(3) = gaussian(points,vec{-1.679,-0.458},0.25);
   basis = orth(basis);
-  //sp_mat basis = make_voronoi_basis(points,centers);
-  //sp_mat basis = speye(N,N);
+
   return sp_mat(basis);
 }
 
@@ -101,20 +93,6 @@ int main(int argc, char** argv)
   vector<sp_mat> p_blocks = di.transition_blocks(&mesh);
   assert(A == blocks.size());
   assert(size(N,N) == size(blocks.at(0)));
-
-  // Shapes
-  vec ball = zeros<vec>(N);
-  vec dist = sqrt(sum(pow(points,2),1));
-  ball(find(dist < 1)).fill(1);
-
-  vec lball = spsolve(blocks.at(1).t(), ball);
-  vec pball = spsolve(p_blocks.at(1).t(), ball);
-  mesh.write_cgal("balls.mesh");
-  Archiver barch = Archiver();
-  barch.add_vec("lball",lball);
-  barch.add_vec("pball",pball);
-  barch.write("balls.data");
-  exit(1);
   
   // Build smoother
   cout << "Building smoother matrix..." << endl;

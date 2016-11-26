@@ -52,10 +52,13 @@ if __name__ == "__main__":
 
     plt.figure()
     plt.title("Heuristic")
-    tmv.plot_vertices(nodes,faces,R - sol.res)
+    agg = np.sum(P[:,1:])
+    H = np.maximum(np.abs(R),np.abs(sol.res)) * agg
+    tmv.plot_vertices(nodes,faces,H)
 
-    plt.figure()
-    plt.title("Heuristic")
-    tmv.plot_vertices(nodes,faces,sol.new_vec)
+    I = np.argmax(H)
+    print "Heuristic max:"
+    print "\tIndex:", I
+    print "\tCoord:", nodes[I]
     
     plt.show()

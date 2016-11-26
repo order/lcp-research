@@ -21,13 +21,15 @@ using namespace tri_mesh;
 #define B 5.0
 #define LENGTH 0.5
 #define GAMMA 0.995
-#define SMOOTH_BW 1e9
+#define SMOOTH_BW 5
 #define SMOOTH_THRESH 1e-3
 
 #define RBF_GRID_SIZE 4 // Make sure even so origin isn't already covered
 #define RBF_BW 0.25
 
 #define NUM_BW 128
+
+#define NEW_CENTER vec{1.3,0.743217}
 
 sp_mat make_value_basis(const Points & points){
   uint N = points.n_rows;
@@ -38,7 +40,10 @@ sp_mat make_value_basis(const Points & points){
   grids.push_back(grid);
 
   mat centers = make_points(grids);
-  mat basis = make_rbf_basis(points,centers,RBF_BW,1e-6);
+  //mat basis = make_rbf_basis(points,centers,RBF_BW,1e-6);
+  mat basis = mat(N,2);
+  basis.col(0).fill(1);
+  basis.col(1) = gaussian(points,zeros<vec>(2),0.14);
 
   basis = orth(basis);
   return sp_mat(basis);
@@ -132,10 +137,13 @@ int main(int argc, char** argv)
   
   for(uint i = 0; i < num_points; i++){
     cout << "Running " << i << "/" << num_points  << endl;
-	
-    vec new_vec = gaussian(points,zeros<vec>(2),bandwidths(i));
+
+    mat new_vects = mat(N,2);
+    new_vects.col(0) = gaussian(points,NEW_CENTER,bandwidths(i));
+    new_vects.col(1) = gaussian(points,-NEW_CENTER,bandwidths(i));
+    
     sp_mat new_basis = sp_mat(orth(join_horiz(mat(value_basis),
-					      new_vec)));
+					      new_vects)));
 
     PLCP plcp = approx_lcp(new_basis,smoother,
 			   blocks,Q,free_vars);

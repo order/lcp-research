@@ -3,248 +3,225 @@
 #include "io.h"
 #include "lcp.h"
 #include "solver.h"
+#include "basis.h"
+#include "smooth.h"
 #include "refine.h"
+
+/*
+  Program for exploring the effects of adding different gaussians
+  to the origin for approximating a double integrator problem.
+  Record l1,l2,linf Bellmen residual changes
+*/
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
 using namespace tri_mesh;
 
-po::variables_map read_command_line(uint argc, char** argv){
-  po::options_description desc("Meshing options");
-  desc.add_options()
-    ("help", "produce help message")
-    ("outfile_base,o", po::value<string>()->required(),
-     "Base for all files generated (lcp, mesh)")
-    ("mesh_file,m", po::value<string>(), "Input (CGAL) mesh file")
-    ("mesh_angle", po::value<double>()->default_value(0.125),
-     "Mesh angle refinement criterion")
-    ("mesh_length", po::value<double>()->default_value(1),
-     "Mesh edge length refinement criterion")    
-    ("gamma,g", po::value<double>()->default_value(0.997),
-     "Discount factor")
-    ("boundary,B", po::value<double>()->default_value(5.0),
-     "Square boundary box [-B,B]^2")
-    ("bang_points,b", po::value<uint>()->default_value(0),
-     "Number of bang-bang curve points to add to initial mesh");
-  po::variables_map var_map;
-  po::store(po::parse_command_line(argc, argv, desc), var_map);
-  po::notify(var_map);
+#define B 5.0
+#define LENGTH 0.5
+#define GAMMA 0.995
+#define SMOOTH_BW 1e9
+#define SMOOTH_THRESH 1e-3
 
-  if (var_map.count("help")) {
-    cout << desc << "\n";
-    exit(1);
-  }
-  return var_map;
-}
+#define NUM_ADD_ROUNDS 16
 
-DoubleIntegratorSimulator build_di_simulator(const po::variables_map & var_map){
-  double B = var_map["boundary"].as<double>();
+#define NUM_ANGLE 15
+#define NUM_AMPL  15
+
+mat build_bbox(){
   mat bbox = mat(2,2);
   bbox.col(0).fill(-B);
   bbox.col(1).fill(B);
-  mat actions = vec{-1,1};
-  return DoubleIntegratorSimulator(bbox,actions);
+  return bbox;
 }
 
-TriMesh generate_initial_mesh(const po::variables_map & var_map,
-                           TriMesh & mesh){
-  double angle = var_map["mesh_angle"].as<double>();
-  double length = var_map["mesh_length"].as<double>();
-
-  double B = var_map["boundary"].as<double>();    
-  vec lb = -B*ones<vec>(2);
-  vec ub = B*ones<vec>(2);
-  mat bbox = join_horiz(lb,ub);
-
+TriMesh generate_initial_mesh(){
+  double angle = 0.125;
+  double length = LENGTH;
+  mat bbox = build_bbox();
   return generate_initial_mesh(angle,length,bbox);
 }
 
-umat generate_policy_mat(const TriMesh & mesh,
-                         const DoubleIntegratorSimulator & di,
-                         const vec & value,
-                         const mat & flows,
-                         double gamma){
-  uint F = mesh.number_of_faces();
-  
-  uvec f_pi = flow_policy(&mesh,flows);  
-  uvec g_pi = grad_policy(&mesh,&di,value);
-  uvec q_pi = q_policy(&mesh,&di,value,gamma);
-
-  umat policies = umat(F,3);
-  policies.col(0) = f_pi;
-  policies.col(1) = g_pi;
-  policies.col(2) = q_pi;
-  return policies;
+DoubleIntegratorSimulator build_di_simulator(){
+  mat bbox = build_bbox();
+  mat actions = vec{-1,1};
+  double noise_std = 0.0;
+  double step = 0.025;
+  return DoubleIntegratorSimulator(bbox,actions,noise_std,step);
 }
 
-bvec find_policy_disagreement(const umat & policies){
-  uint N = policies.n_rows;
-  uint C = policies.n_cols;
-  uvec agg = sum(policies,1);
-  assert(N == agg.n_elem);
-  bvec disagree = ones<bvec>(N);
-  disagree(find(0 == agg)).fill(0);
-  disagree(find(C == agg)).fill(0);
-  return disagree;
+vec new_vector(const Points & points,
+               const vec & center,
+               const vec & param){
+  assert(3 == param.n_elem);
+  double a = param(0); // Angle
+  double b = param(1); // Along angle length
+  double c = param(2); // Orthogonal length
+  
+  mat rot = mat{{cos(a), -sin(a)},{sin(a),cos(a)}};
+  mat cov = rot * diagmat(vec{b,c}) * rot.t();
+  return gaussian(points,center,cov);
 }
 
-vec residual_heuristic(const TriMesh & mesh,
-                                const DoubleIntegratorSimulator & di,
-                                const vec & value,
-                                const vec & flow_vol,
-                                double gamma){
-  uint N = mesh.number_of_spatial_nodes();
-  assert(N == value.n_elem);
-  
-  uint F = mesh.number_of_faces();
-  assert(F == flow_vol.n_elem);
-  
-  vec bell_res = bellman_residual(&mesh,&di,value,gamma,0,25);
-  assert(F == bell_res.n_elem);
+mat find_primal(const mat & basis,
+                const sp_mat & smoother,
+                const vector<sp_mat> & blocks,
+                const mat & Q,
+                const bvec & free_vars){
+  uint N = basis.n_rows;
+  assert(size(N,N) == size(smoother));
+  uint A = blocks.size();
+  assert(size(N,A+1) == size(Q));
 
-  vec H = bell_res % pow(flow_vol,0.5);
-  assert(F == H.n_elem);
-  return H;
+  ProjectiveSolver psolver = ProjectiveSolver();
+  psolver.comp_thresh = 1e-8;
+  psolver.initial_sigma = 0.25;
+  psolver.verbose = false;
+  psolver.iter_verbose = false;
+  
+  PLCP plcp = approx_lcp(sp_mat(basis),smoother,
+                         blocks,Q,free_vars);
+  SolverResult prev_sol = psolver.aug_solve(plcp);
+  mat P = reshape(prev_sol.p,N,A+1);
+  return P;
 }
 
-vec policy_disagreement_heuristic(const TriMesh & mesh,
-                                           const DoubleIntegratorSimulator & di,
-                                           const vec & value,
-                                           const vec & flow_vol,
-                                           const bvec & disagree,
-                                           double gamma){
-  uint F = mesh.number_of_faces();
-  vec adv_fun = advantage_function(&mesh,&di,value,gamma,0,25);
-  assert(F == adv_fun.n_elem);
-  vec H = adv_fun % flow_vol;
-  H(find(0 == disagree)).fill(0);
-  assert(F == H.n_elem);
-  return H;
+vec find_residual(const TriMesh & mesh,
+                  const DoubleIntegratorSimulator & di,
+                  const mat & basis,
+                  const sp_mat & smoother,
+                  const vector<sp_mat> & blocks,
+                  const mat & Q,
+                  const bvec & free_vars){
+  uint N = basis.n_rows;
+  assert(size(N,N) == size(smoother));
+  uint A = blocks.size();
+  assert(size(N,A+1) == size(Q));
+
+  ProjectiveSolver psolver = ProjectiveSolver();
+  psolver.comp_thresh = 1e-8;
+  psolver.initial_sigma = 0.25;
+  psolver.verbose = false;
+  psolver.iter_verbose = false;
+  
+  PLCP plcp = approx_lcp(sp_mat(basis),smoother,
+                         blocks,Q,free_vars);
+  SolverResult prev_sol = psolver.aug_solve(plcp);
+  mat P = find_primal(basis,smoother,blocks,Q,free_vars);
+  vec V = P.col(0);
+  return bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
 }
 
-uint refine_mesh(const po::variables_map & var_map,
-                 TriMesh & mesh,
-                 const vec & res_heur,
-                 const vec & pol_heur){
-  double angle = var_map["mesh_angle"].as<double>();
-  double length = var_map["mesh_length"].as<double>();
-
-  uint N = mesh.number_of_spatial_nodes();
-  uint F = mesh.number_of_faces();
-  assert(F == res_heur.n_rows);
-  assert(F == pol_heur.n_rows);
-  
-  double res_cutoff = quantile(res_heur,0.95);
-  double pol_cutoff = quantile(pol_heur,0.9);
-  vec area = mesh.cell_area();
-
-  // Identify the centers we want to expand
-  vector<vec> new_points;
-  for(uint f = 0; f < F; f++){
-    if(area(f) < 0.01)
-      continue; // Too small    
-    if(res_heur(f) > res_cutoff
-       or pol_heur(f) > pol_cutoff){
-      new_points.push_back(mesh.center_of_face(f));
-    }
-  }
-  mesh.unfreeze();
-  
-  // Add these centers (two steps to avoid indexing issues)
-
-  for(uint f = 0; f < new_points.size(); f++){
-    mesh.insert(convert(new_points[f]));
-  }
-
-  cout << "\tOptimizing node position..." << endl;
-  cout << "\tRefining split cells..." << endl;
-  mesh.refine(0.125,1);
-  mesh.lloyd(25);
-
-  string tmp_file = "/tmp/tmp.tri";
-  mesh.freeze();
-  mesh.write_cgal(tmp_file);
-  mesh.unfreeze();
-  mesh.read_cgal(tmp_file);
-  mesh.freeze();
- 
-  return mesh.number_of_spatial_nodes() - N;
-}
-
-//===========================================================
-// Main function
+////////////////////
+// MAIN FUNCTION //
+///////////////////
 
 int main(int argc, char** argv)
 {
-  // Parse command line
-  po::variables_map var_map = read_command_line(argc,argv);
+  arma_rng::set_seed_random();
+  // Set up 2D space
 
   cout << "Generating initial mesh..." << endl;
-  TriMesh mesh;
-  DoubleIntegratorSimulator di = build_di_simulator(var_map);
-  generate_initial_mesh(var_map,di,mesh);
-  mesh.freeze();
+  TriMesh mesh = generate_initial_mesh();
+  Points points = mesh.get_spatial_nodes();
+  uint N = points.n_rows;
+  assert(N == mesh.number_of_spatial_nodes());
+  assert(N > 0);
+  
+  DoubleIntegratorSimulator di = build_di_simulator();
+  uint A = di.num_actions();
+  assert(A >= 2);
+  
+  // Reference blocks
+  cout << "Building LCP blocks..." << endl;
+  vector<sp_mat> blocks = di.lcp_blocks(&mesh,GAMMA);
+  assert(A == blocks.size());
+  assert(size(N,N) == size(blocks.at(0)));
 
-  double gamma = var_map["gamma"].as<double>();
+  // Build smoother
+  cout << "Building smoother matrix..." << endl;
+  sp_mat smoother = gaussian_smoother(points,SMOOTH_BW,SMOOTH_THRESH);
+  assert(size(N,N) == size(smoother));
 
-  cout << "Initializing solver..." << endl;
-  KojimaSolver solver;
-  solver.comp_thresh = 1e-12;
-  solver.max_iter = 150;
-  solver.regularizer = 1e-8;
-  solver.verbose = false;
-  solver.aug_rel_scale = 10;
+  // Build and pertrub the q
+  cout << "Building RHS Q..." << endl;
+  mat Q = di.q_mat(&mesh);
+  
+  bvec free_vars = zeros<bvec>((A+1)*N);
+  free_vars.head(N).fill(1);
 
-  string filebase = var_map["outfile_base"].as<string>();
-  uint A = 2;
-  for(uint i = 0; i <= 20; i++){
-    string iter_filename = filebase + "." + to_string(i);
+  cout << "Making value basis..." << endl;
+  mat basis = ones<mat>(N,1) / sqrt(N);
+  mat residuals = mat(N,NUM_ADD_ROUNDS+1);
+  cube primals = cube(N,A+1,NUM_ADD_ROUNDS+1);
+  mat centers = mat(NUM_ADD_ROUNDS,2);
+  mat params = mat(NUM_ADD_ROUNDS,3);
+
+  for(uint I = 0; I < NUM_ADD_ROUNDS; I++){
+    cout << "Running " << I << "/" << NUM_ADD_ROUNDS  << endl;
+
+    // Pick the location
+
+    mat P = find_primal(basis,smoother,blocks,Q,free_vars);
+    vec res = find_residual(mesh,di,basis,smoother,blocks,Q,free_vars);
+    residuals.col(I) = res;
+    primals.slice(I) = P;
+
+    uint idx = argmax(abs(res)); // Location place with most res
+    vec center = points.row(idx).t();
+
+    vec angles = linspace(0,datum::pi,NUM_ANGLE+1).head(NUM_ANGLE);
+    vec amplitudes = logspace<vec>(-2,0.75,NUM_AMPL); // 0.01 to 1
+
+    double best_norm = datum::inf;
+    vec best_param;
+    mat best_basis;
     
-    uint N = mesh.number_of_spatial_nodes();
-    uint F = mesh.number_of_faces();
+    for(uint a = 0; a < NUM_ANGLE; a++){
+      cout << "\tAngle: " << angles(a) << endl;
+      for(uint i = 0; i < NUM_AMPL; i++){
+        for(uint j = i; j < NUM_AMPL; j++){
+          vec test_param = vec{angles(a),
+                           amplitudes(i),
+                           amplitudes(j)};
+          vec new_v = new_vector(points,center,test_param);
+          mat test_basis = join_horiz(basis,new_v);
+          test_basis = orth(test_basis);
 
-    // These are the mesh files for this iteration
-    cout << "Writing:"
-         << "\n\t" << (iter_filename + ".node") << " (Shewchuk node file)"
-         << "\n\t" << (iter_filename + ".ele") << " (Shewchuk element file)"
-         << "\n\t" << (iter_filename + ".tri") << " (CGAL mesh file)" << endl;
-    mesh.write_shewchuk(iter_filename);
-    mesh.write_cgal(iter_filename + ".tri");
-
-    cout << "Building LCP..." << endl;
-    bool include_oob = false;
-    bool value_nonneg = false;
-    LCP lcp = build_lcp(&di,&mesh,gamma,include_oob,value_nonneg);
-    //lcp.write("test.lcp");
-    cout << "Solving iteration " << i << " LCP..." << endl;
-    SolverResult sol = solver.aug_solve(lcp);
-    assert((A+1)*N == sol.p.n_elem);
-    sol.write(iter_filename + ".sol");
-    cout << "Writing solution to " << iter_filename << ".sol" << endl;
-    
-    mat P = reshape(sol.p,size(N,(A+1)));
-    vec value = P.col(0);
-    mat flows = P.tail_cols(2);
-
-    cout << "Calculating heuristics..." << endl;
-    umat policies =  generate_policy_mat(mesh, di, value, flows, gamma);
-    bvec disagree = find_policy_disagreement(policies);
-    vec flow_vol = mesh.prism_volume(sum(flows,1));
-    vec res_heur = residual_heuristic(mesh,di,value,flow_vol,gamma);
-    vec pol_heur = policy_disagreement_heuristic(mesh,di,value,
-                                                 flow_vol,
-                                                 disagree,gamma);
-
-
-    cout << "Refining mesh..." << endl;
-    uint num_new_nodes = refine_mesh(var_map,
-                                     mesh,
-                                     res_heur,
-                                     pol_heur);
-    cout << "Added " << num_new_nodes << " new nodes." << endl;
-    if (0 == num_new_nodes){
-      break;
+          vec test_res = find_residual(mesh,di,test_basis,smoother,
+                                       blocks,Q,free_vars);
+          double test_norm = norm(test_res);
+          if(test_norm < best_norm){
+            cout << "\t\tNew best: " << test_param.t();
+            cout << "\t\tRes. 2-norm: " << test_norm << endl;;
+            
+            best_norm = test_norm;
+            best_param = test_param;
+            best_basis = test_basis;
+          }
+        }
+      }
     }
+        
+    // Record best params
+    centers.row(I) = center.t();
+    params.row(I) = best_param.t();
+
+    //Extend vector
+    basis = best_basis;
   }
+  mat P = find_primal(basis,smoother,blocks,Q,free_vars);
+  vec res = find_residual(mesh,di,basis,smoother,blocks,Q,free_vars);
+  primals.slice(NUM_ADD_ROUNDS) = P;
+  residuals.col(NUM_ADD_ROUNDS) = res;
+
+  mesh.write_cgal("test.mesh");
+  Archiver arch = Archiver();
+  arch.add_mat("residuals",residuals);
+  arch.add_cube("primals",primals);
+  arch.add_mat("centers",centers);
+  arch.add_mat("params",params);
+
+  arch.write("test.data");
 }

@@ -21,8 +21,9 @@ if __name__ == "__main__":
 
     max_i = np.argmax(l1)
     min_i = np.argmin(l1)
-    print "Min:", min_i,bw[min_i], l1[min_i]
-    print "Max:", max_i,bw[max_i], l1[max_i]
+    print "Min:"
+    print "\tIndex:",min_i
+    print "\tBW",bw[min_i]
 
     plt.figure()
     for (i,name) in enumerate(["l1","l2","linf"]):
