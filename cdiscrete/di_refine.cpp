@@ -21,19 +21,37 @@ using namespace tri_mesh;
 #define B 5.0
 #define LENGTH 0.5
 #define GAMMA 0.995
-#define SMOOTH_BW 1e9
+#define SMOOTH_BW 5
 #define SMOOTH_THRESH 1e-3
 
-#define NUM_ADD_ROUNDS 16
+#define RBF_GRID_SIZE 1 // Make sure even so origin isn't already covered
+#define RBF_BW 0.25
 
-#define NUM_ANGLE 15
-#define NUM_AMPL  15
+#define NUM_ADD_ROUNDS 8
+
+#define NUM_ANGLE 8
+#define NUM_AMPL  7
 
 mat build_bbox(){
   mat bbox = mat(2,2);
   bbox.col(0).fill(-B);
   bbox.col(1).fill(B);
   return bbox;
+}
+
+mat make_basis(const Points & points){
+  uint N = points.n_rows;
+  
+  vec grid = linspace<vec>(-B,B,RBF_GRID_SIZE);
+  vector<vec> grids;
+  grids.push_back(grid);
+  grids.push_back(grid);
+
+  mat centers = make_points(grids);
+  mat basis = make_rbf_basis(points,centers,RBF_BW,1e-6);
+
+  basis = orth(basis);
+  return basis;
 }
 
 TriMesh generate_initial_mesh(){
@@ -75,42 +93,55 @@ mat find_primal(const mat & basis,
   assert(size(N,A+1) == size(Q));
 
   ProjectiveSolver psolver = ProjectiveSolver();
-  psolver.comp_thresh = 1e-8;
+  psolver.comp_thresh = 1e-12;
   psolver.initial_sigma = 0.25;
   psolver.verbose = false;
   psolver.iter_verbose = false;
   
   PLCP plcp = approx_lcp(sp_mat(basis),smoother,
                          blocks,Q,free_vars);
-  SolverResult prev_sol = psolver.aug_solve(plcp);
-  mat P = reshape(prev_sol.p,N,A+1);
+  SolverResult sol = psolver.aug_solve(plcp);
+  mat P = reshape(sol.p,N,A+1);
   return P;
 }
 
 vec find_residual(const TriMesh & mesh,
                   const DoubleIntegratorSimulator & di,
-                  const mat & basis,
-                  const sp_mat & smoother,
-                  const vector<sp_mat> & blocks,
-                  const mat & Q,
-                  const bvec & free_vars){
-  uint N = basis.n_rows;
-  assert(size(N,N) == size(smoother));
-  uint A = blocks.size();
-  assert(size(N,A+1) == size(Q));
-
-  ProjectiveSolver psolver = ProjectiveSolver();
-  psolver.comp_thresh = 1e-8;
-  psolver.initial_sigma = 0.25;
-  psolver.verbose = false;
-  psolver.iter_verbose = false;
-  
-  PLCP plcp = approx_lcp(sp_mat(basis),smoother,
-                         blocks,Q,free_vars);
-  SolverResult prev_sol = psolver.aug_solve(plcp);
-  mat P = find_primal(basis,smoother,blocks,Q,free_vars);
+                  const mat & P){
   vec V = P.col(0);
   return bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
+}
+
+vec softmax(const vec & v, double temp){
+  return normalise(exp(temp * abs(v)),1);
+}
+vec quantile_cut(const vec & v, double q){
+  vec w = abs(v);
+  w(find(w < quantile(w,q))).fill(0);
+  w /= accu(w);
+  return w;
+}
+
+uint sample_vec(const vec & v){
+  vec w = quantile_cut(v,0.9);
+  
+  uint N = w.n_elem;
+  double agg = 0;
+  vec roll_v = randu<vec>(1);
+  double roll = roll_v(0);
+  for(uint i = 0; i < N; i++){
+    agg += w(i);
+    if(agg >= roll){
+      return i;
+    }
+  }
+  assert(false);
+}
+
+vec heuristic(const mat & P, const vec & res){
+  uint A = P.n_cols - 1;
+  vec agg = sum(P.tail_cols(A),1);
+  return abs(res) % softmax(agg,0.25);
 }
 
 ////////////////////
@@ -152,8 +183,10 @@ int main(int argc, char** argv)
   free_vars.head(N).fill(1);
 
   cout << "Making value basis..." << endl;
-  mat basis = ones<mat>(N,1) / sqrt(N);
+  //mat basis = ones<mat>(N,1) / (double) N;
+  mat basis = make_basis(points);
   mat residuals = mat(N,NUM_ADD_ROUNDS+1);
+  mat heuristics = mat(N,NUM_ADD_ROUNDS+1);
   cube primals = cube(N,A+1,NUM_ADD_ROUNDS+1);
   mat centers = mat(NUM_ADD_ROUNDS,2);
   mat params = mat(NUM_ADD_ROUNDS,3);
@@ -164,15 +197,18 @@ int main(int argc, char** argv)
     // Pick the location
 
     mat P = find_primal(basis,smoother,blocks,Q,free_vars);
-    vec res = find_residual(mesh,di,basis,smoother,blocks,Q,free_vars);
+    vec res = find_residual(mesh,di,P);
+    vec heur = heuristic(P,res);
     residuals.col(I) = res;
     primals.slice(I) = P;
+    heuristics.col(I) = heur;
 
-    uint idx = argmax(abs(res)); // Location place with most res
+    uint idx = sample_vec(heur);
     vec center = points.row(idx).t();
-
+    cout << "Center:" << center.t();
+    cout.flush();
     vec angles = linspace(0,datum::pi,NUM_ANGLE+1).head(NUM_ANGLE);
-    vec amplitudes = logspace<vec>(-2,0.75,NUM_AMPL); // 0.01 to 1
+    vec amplitudes = logspace<vec>(-1.5,0.5,NUM_AMPL); // 0.01 to 1
 
     double best_norm = datum::inf;
     vec best_param;
@@ -185,16 +221,20 @@ int main(int argc, char** argv)
           vec test_param = vec{angles(a),
                            amplitudes(i),
                            amplitudes(j)};
-          vec new_v = new_vector(points,center,test_param);
-          mat test_basis = join_horiz(basis,new_v);
+          mat test_basis = mat(N,2 + basis.n_cols);
+          test_basis.col(0) = new_vector(points,center,test_param);
+          test_basis.col(1) = new_vector(points,-center,test_param);
+          test_basis.tail_cols(basis.n_cols) = basis;
           test_basis = orth(test_basis);
 
-          vec test_res = find_residual(mesh,di,test_basis,smoother,
-                                       blocks,Q,free_vars);
-          double test_norm = norm(test_res);
+          mat test_P = find_primal(test_basis,smoother,blocks,Q,free_vars);
+          vec test_res = find_residual(mesh,di,test_P);
+          vec test_heur = heuristic(test_P,test_res);
+
+          double test_norm = norm(test_heur,1);
           if(test_norm < best_norm){
             cout << "\t\tNew best: " << test_param.t();
-            cout << "\t\tRes. 2-norm: " << test_norm << endl;;
+            cout << "\t\tHeuristic 1-norm: " << test_norm << endl;;
             
             best_norm = test_norm;
             best_param = test_param;
@@ -212,16 +252,22 @@ int main(int argc, char** argv)
     basis = best_basis;
   }
   mat P = find_primal(basis,smoother,blocks,Q,free_vars);
-  vec res = find_residual(mesh,di,basis,smoother,blocks,Q,free_vars);
+  vec res = find_residual(mesh,di,P);
+  vec heur = heuristic(P,res);
   primals.slice(NUM_ADD_ROUNDS) = P;
   residuals.col(NUM_ADD_ROUNDS) = res;
+  heuristics.col(NUM_ADD_ROUNDS) = heur;
 
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
   arch.add_mat("residuals",residuals);
   arch.add_cube("primals",primals);
   arch.add_mat("centers",centers);
+  arch.add_mat("heuristics",heuristics);
   arch.add_mat("params",params);
+  arch.add_vec("new_vec",new_vector(points,
+                                    centers.tail_rows(1).t(),
+                                    params.tail_rows(1).t()));
 
   arch.write("test.data");
 }
