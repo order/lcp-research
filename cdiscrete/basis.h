@@ -32,6 +32,9 @@ vec gaussian(const Points & points,
 vec gaussian(const Points & points,
              const vec & center,
              const mat & cov);
+vec laplacian(const Points & points,
+	      const vec & center,
+	      const double bandwidth);
 
 double find_radius(const vec & dist,
                    uint target);
@@ -40,6 +43,10 @@ double find_radius(const vec & dist,
                    uint target);
 mat dist_mat(const Points & A,
              const Points & B);
+
+vec make_ball(const Points & points,
+	      const vec & center,
+	      const double radius);
 
 sp_mat make_sample_basis(uint N,uint K);
 sp_mat make_ball_basis(const Points & points,

@@ -66,7 +66,17 @@ vec gaussian(const Points & points,
   }
   return gauss;
 }
-
+vec laplacian(const Points & points,
+	      const vec & center,
+	      const double bandwidth){
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  assert(D == center.n_elem);
+  
+  vec laplace = exp(-bandwidth *
+		    sqrt(sum(pow(points.each_row() - center.t(),2),1)));
+  return laplace;
+}
 
 double find_radius(const vec & dist,
                    uint target){
@@ -112,6 +122,16 @@ mat dist_mat(const Points & A, const Points & B){
     dist.col(i) = lp_norm(A.each_row() - B.row(i),2,1);
   }
   return dist;
+}
+
+vec make_ball(const Points & points,
+	      const vec & center,
+	      const double radius){
+  uint N = points.n_rows;
+  vec ball = zeros<vec>(N);
+  vec dist = lp_norm(points.each_row() - center.t(),2,1);
+  ball(find(dist <= radius)).fill(1);
+  return ball;
 }
 
 
