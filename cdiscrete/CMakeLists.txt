@@ -80,6 +80,9 @@ create_single_source_cgal_program("di_approx.cpp" "tri_mesh.cpp" "di.cpp"
 create_single_source_cgal_program("di_foo.cpp" "tri_mesh.cpp" "di.cpp"
   "refine.cpp" "solver.cpp" "smooth.cpp"
   ${COMMON_FILES})
+create_single_source_cgal_program("di_single.cpp" "tri_mesh.cpp" "di.cpp"
+  "refine.cpp" "solver.cpp" "smooth.cpp"
+  ${COMMON_FILES})
 create_single_source_cgal_program("di_grid_approx.cpp" "tri_mesh.cpp" "di.cpp"
   "refine.cpp" "solver.cpp" "smooth.cpp" 
   ${COMMON_FILES})
@@ -128,6 +131,7 @@ message(STATUS "Libraries: ${CDISCRETE_LIBRARIES}")
 #target_link_libraries(di_refine ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_foo ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_basis ${CDISCRETE_LIBRARIES})
+target_link_libraries(di_single ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_refine ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_approx ${CDISCRETE_LIBRARIES})
 target_link_libraries(di_grid_approx ${CDISCRETE_LIBRARIES})

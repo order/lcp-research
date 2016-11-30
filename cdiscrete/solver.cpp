@@ -30,9 +30,9 @@ double steplen_heuristic(const vec & x,
 double sigma_heuristic(double sigma,
                        double steplen){
   double max_sigma = 0.999;
-  double min_sigma = 0.1;
+  double min_sigma = 0.05;
   if(steplen >= 0.8)
-    sigma *= 0.975;
+    sigma *= 0.96;
   else if(steplen < 0.2)
       sigma = 0.75 + 0.25*sigma;
   else if(steplen < 1e-3)

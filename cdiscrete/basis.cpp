@@ -401,7 +401,20 @@ vector<sp_mat> make_freebie_flow_bases(const sp_mat & value_basis,
   }
   return flow_bases;
 }
-
+vector<mat> make_raw_freebie_flow_bases(const mat & value_basis,
+                                        const vector<sp_mat> blocks,
+                                        const mat & Q){
+  // Same as above, but don't orthonormalize
+  vector<mat> flow_bases;
+  uint A = blocks.size();
+  assert((A+1) == Q.n_cols);
+  for(uint a = 0; a < A; a++){
+    mat raw_basis = join_horiz(mat(blocks.at(a).t() * value_basis),
+                               Q.col(a+1));
+    flow_bases.push_back(raw_basis);
+  }
+  return flow_bases;
+}
 
 PLCP approx_lcp(const sp_mat & value_basis,
                 const sp_mat & smoother,
@@ -442,9 +455,7 @@ PLCP approx_lcp(const sp_mat & value_basis,
   else{
     mat sQ = mat(size(Q));  
     sQ.col(0) = Q.col(0);
-    for(uint a = 0; a < A; a++){
-      sQ.col(a+1) = smoother * Q.col(a+1);
-    }
+    sQ.tail_cols(A) = smoother * Q.tail_cols(A);
     q = vectorise(sQ);
 
     flow_bases = make_freebie_flow_bases(value_basis,

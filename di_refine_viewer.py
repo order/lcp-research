@@ -31,7 +31,7 @@ if __name__ == "__main__":
     (N,I) = R.shape
     print sol.heuristics.shape
     if True:
-        for i in xrange(0,I,4):
+        for i in xrange(0,I,2):
             plt.figure()
             plt.suptitle("Iter " + str(i))
 

@@ -48,13 +48,24 @@ if __name__ == "__main__":
 
     plt.subplot(2,2,4)
     plt.title("Advantage function")
-    tmv.plot_faces(nodes,faces,sol.adv)
+    tmv.plot_faces(nodes,faces,sol.adv)    
 
     plt.figure()
     plt.title("Heuristic")
     agg = np.sum(P[:,1:])
     H = np.maximum(np.abs(R),np.abs(sol.res)) * agg
     tmv.plot_vertices(nodes,faces,H)
+
+    if False:
+        assert N == sol.bases.shape[0]
+        assert (A) == sol.bases.shape[2]
+        K = sol.bases.shape[1]
+        for i in xrange(K):
+            plt.figure()
+            plt.suptitle("Basis " + str(i))
+            for a in xrange(A):
+                plt.subplot(2,2,a+1)
+                tmv.plot_vertices(nodes,faces,sol.bases[:,i,a])
 
     I = np.argmax(H)
     print "Heuristic max:"
