@@ -33,12 +33,13 @@ vec new_vector(const Points & points){
 sp_mat make_value_basis(const Points & points){
   uint N = points.n_rows;
 
-  mat basis = mat(N,4);
+  mat basis = mat(N,5);
   basis.col(0).fill(1);
   basis.col(1) = gaussian(points,zeros<vec>(2),0.5);
   basis.col(2) = gaussian(points,vec{1.3,0.743217},2.7);
   basis.col(3) = gaussian(points,vec{-1.3,-0.743217},2.7);
-
+  basis.col(2) = gaussian(points,vec{1.3,0.743217},2.7);
+  basis.col(3) = gaussian(points,vec{-1.3,-0.743217},2.7);
   //basis.col(3) = gaussian(points,vec{-1.679,-0.458},0.25);
   basis = orth(basis);
 
