@@ -13,7 +13,7 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 #define B 5.0
-#define LENGTH 0.4
+#define LENGTH 0.35
 #define GAMMA 0.995
 #define SMOOTH_BW 1e9
 #define SMOOTH_THRESH 1e-3
@@ -30,50 +30,54 @@ vec new_vector(const Points & points){
   return gaussian(points,zeros<vec>(2),cov);
 }
 
-mat make_value_basis(const Points & points,
+mat value_freebie(const vec & v,
+		  const vector<sp_mat> & blocks,
+		  const sp_mat & smoother){
+  // If we want a particular function to be well represented in
+  // the flow basis, then this function figures out what vectors need to be
+  // in the value basis for that function to be contained within all freebie
+  // flow bases.
+  uint N = v.n_elem;
+  assert(size(N,N) == size(smoother));
+  uint A = blocks.size();
+  assert(A > 0);
+  assert(size(N,N) == size(blocks.at(0)));
+  
+  mat basis = mat(N,A);
+  for(uint i = 0; i < A; i++){
+    sp_mat E = blocks.at(i) * smoother.t();
+    sp_mat G = E.t() + 1e-9*speye(N,N); // Regularized
+    basis.col(i) = spsolve(G,v);
+  }
+  return basis;
+}
+
+mat make_raw_value_basis(const Points & points,
                      const vector<sp_mat> & blocks,
                      const sp_mat & smoother){
   uint N = points.n_rows;
   uint A = blocks.size();
 
-  mat basis = mat(N,8);
-  basis.col(0).fill(1);
+  // General basis
+  vector<vec> grids;
+  grids.push_back(linspace<vec>(-B,B,4));
+  grids.push_back(linspace<vec>(-B,B,4));
+  Points grid_points = make_points(grids);
+  mat grid_basis = make_rbf_basis(points,grid_points,0.27,1e-5);
+
+  // Flow targeted basis
+  mat added_basis = mat(N,5);
+  added_basis.col(0) = gaussian(points,zeros<vec>(2),0.27);
+  added_basis.cols(uvec{1,2})
+    = value_freebie(laplacian(points,zeros<vec>(2),5),blocks,smoother);
+  added_basis.cols(uvec{3,4})
+    = value_freebie(laplacian(points,points.row(1041).t(),5),blocks,smoother);
   
-  vec V = laplacian(points,points.row(8).t(),0.75);
-  for(uint i = 0; i < A; i++){
-    cout << "Solving for " << i << " block value..." << endl;
-    sp_mat E = blocks.at(i) * smoother.t();
-    sp_mat A = E.t() + 1e-9*speye(N,N);
-    vec b = V;
-    basis.col(i+1) = spsolve(A,b);
-    //basis.col(i+1) = b;
-  }
-
-  V = gaussian(points,points.row(779).t(),1.0);
-  for(uint i = 0; i < A; i++){
-    cout << "Solving for " << i << " block value..." << endl;
-    sp_mat E = blocks.at(i) * smoother.t();
-    sp_mat A = E.t() + 1e-9*speye(N,N);
-    vec b = V;
-    basis.col(i+3) = spsolve(A,b);
-    //basis.col(i+1) = b;
-  }
-
-  V = gaussian(points,points.row(734).t(),1.0);
-  for(uint i = 0; i < A; i++){
-    cout << "Solving for " << i << " block value..." << endl;
-    sp_mat E = blocks.at(i) * smoother.t();
-    sp_mat A = E.t() + 1e-9*speye(N,N);
-    vec b = V;
-    basis.col(i+5) = spsolve(A,b);
-    //basis.col(i+1) = b;
-  }
+  mat basis = join_horiz(grid_basis,added_basis);
   
-  basis.col(7) = gaussian(points,zeros<vec>(2),2.0);
-
-  //basis.col(3) = gaussian(points,vec{-1.679,-0.458},0.25);
-
-  return basis;
+  //mat basis = grid_basis;
+  
+  return basis; // Don't normalize here
 }
 
 mat build_bbox(){
@@ -127,9 +131,13 @@ int main(int argc, char** argv)
   
   // Build smoother
   cout << "Building smoother matrix..." << endl;
-  double bandwidth = SMOOTH_BW;
-  double thresh = SMOOTH_THRESH;
-  sp_mat smoother = gaussian_smoother(points,bandwidth,thresh);
+  sp_mat smoother;
+  if(SMOOTH_BW < 1e8){
+    smoother = gaussian_smoother(points,SMOOTH_BW,SMOOTH_THRESH);
+  }
+  else{
+    smoother = speye(N,N);
+  }      
   assert(size(N,N) == size(smoother));
 
   // Build and pertrub the q
@@ -146,7 +154,7 @@ int main(int argc, char** argv)
   LCP lcp = LCP(M,q,free_vars);
 
   // Build the approximate PLCP
-  mat raw_value_basis = make_value_basis(points,blocks,smoother);
+  mat raw_value_basis = make_raw_value_basis(points,blocks,smoother);
   sp_mat value_basis = sp_mat(orth(raw_value_basis));
   uint K = value_basis.n_cols;
 
