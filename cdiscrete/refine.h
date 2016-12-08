@@ -77,3 +77,6 @@ uvec policy_agg(const Discretizer * disc,
 
 vec agg_flow_at_centers(const Discretizer * disc,
                         const mat & flows);
+
+sp_mat build_markov_chain_from_blocks(const vector<sp_mat> & blocks,
+				      const uvec policy);

@@ -5,7 +5,7 @@
 using namespace arma;
 
 //=================================================
-// POLICIES
+// POLICIES				      
 
 // Abstract policy class
 class Policy{

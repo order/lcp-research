@@ -13,37 +13,57 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 #define B 5.0
-#define LENGTH 0.5
-#define GAMMA 0.99
-#define SMOOTH_BW 5
-#define SMOOTH_THRESH 1e-4
+#define LENGTH 0.4
+#define GAMMA 0.995
+#define SMOOTH_BW 1e9
+#define SMOOTH_THRESH 1e-3
 
 #define RBF_GRID_SIZE 4
 #define RBF_BW 0.25
 
-vec new_vector(const Points & points){
-  double angle = 1.2567;
-  double b = 0.001;
-  double c = 0.0785;
-  mat rot = mat{{cos(angle), -sin(angle)},{sin(angle),cos(angle)}};
-  mat cov = rot * diagmat(vec{b,c}) * rot.t();
-  return gaussian(points,zeros<vec>(2),cov);
+#define NUM_REFINE_ITER 2
+
+mat value_freebie(const vec & v,
+		  const vector<sp_mat> & blocks,
+		  const sp_mat & smoother){
+  // If we want a particular function to be well represented in
+  // the flow basis, then this function figures out what vectors need to be
+  // in the value basis for that function to be contained within all freebie
+  // flow bases.
+  uint N = v.n_elem;
+  assert(size(N,N) == size(smoother));
+  uint A = blocks.size();
+  assert(A > 0);
+  assert(size(N,N) == size(blocks.at(0)));
+  
+  mat basis = mat(N,A);
+  for(uint i = 0; i < A; i++){
+    sp_mat E = blocks.at(i) * smoother.t();
+    sp_mat G = E.t() + 1e-9*speye(N,N); // Regularized
+    basis.col(i) = spsolve(G,v);
+  }
+  return basis;
 }
 
-sp_mat make_value_basis(const Points & points){
+mat make_raw_value_basis(const Points & points,
+                     const vector<sp_mat> & blocks,
+                     const sp_mat & smoother){
   uint N = points.n_rows;
+  uint A = blocks.size();
 
-  mat basis = mat(N,5);
-  basis.col(0).fill(1);
-  basis.col(1) = gaussian(points,zeros<vec>(2),0.5);
-  basis.col(2) = gaussian(points,vec{1.3,0.743217},2.7);
-  basis.col(3) = gaussian(points,vec{-1.3,-0.743217},2.7);
-  basis.col(2) = gaussian(points,vec{1.3,0.743217},2.7);
-  basis.col(3) = gaussian(points,vec{-1.3,-0.743217},2.7);
-  //basis.col(3) = gaussian(points,vec{-1.679,-0.458},0.25);
-  basis = orth(basis);
+  // General basis
+  vector<vec> grids;
+  grids.push_back(linspace<vec>(-B,B,4));
+  grids.push_back(linspace<vec>(-B,B,4));
+  Points grid_points = make_points(grids);
+  mat grid_basis = make_rbf_basis(points,grid_points,0.27,1e-5);
 
-  return sp_mat(basis);
+  // Flow targeted basis
+  //mat added_basis = mat(N,5);  
+  //mat basis = join_horiz(grid_basis,added_basis);
+  mat basis = grid_basis;
+    
+  return basis; // Don't normalize here
 }
 
 mat build_bbox(){
@@ -97,9 +117,13 @@ int main(int argc, char** argv)
   
   // Build smoother
   cout << "Building smoother matrix..." << endl;
-  double bandwidth = SMOOTH_BW;
-  double thresh = SMOOTH_THRESH;
-  sp_mat smoother = gaussian_smoother(points,bandwidth,thresh);
+  sp_mat smoother;
+  if(SMOOTH_BW < 1e8){
+    smoother = gaussian_smoother(points,SMOOTH_BW,SMOOTH_THRESH);
+  }
+  else{
+    smoother = speye(N,N);
+  }      
   assert(size(N,N) == size(smoother));
 
   // Build and pertrub the q
@@ -116,18 +140,46 @@ int main(int argc, char** argv)
   LCP lcp = LCP(M,q,free_vars);
 
   // Build the approximate PLCP
-  sp_mat value_basis = make_value_basis(points);
-  PLCP plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
+  mat raw_value_basis = make_raw_value_basis(points,blocks,smoother);
+  sp_mat value_basis = sp_mat(orth(raw_value_basis));
+  uint K = value_basis.n_cols;
 
-  //KojimaSolver solver = KojimaSolver();
+  // Record raw (un-orthonormalized) bases
+  vector<mat> raw_flow_bases = make_raw_freebie_flow_bases(raw_value_basis,
+                                                           blocks,Q);
+  assert(A == raw_flow_bases.size());
+  cube basis_cube = cube(N,K+1,A+1);
+  basis_cube.slice(0) = join_horiz(raw_value_basis,zeros<mat>(N,1));
+  for(uint i = 0; i < A; i++){
+    // Extra column in flow bases for cost column
+    assert(size(N,K+1) == size(raw_flow_bases.at(i)));
+    basis_cube.slice(i+1) = raw_flow_bases.at(i);
+  }
+
+  
+  KojimaSolver ref_solver = KojimaSolver();
+  ref_solver.comp_thresh = 1e-22;
+  ref_solver.initial_sigma = 0.2;
+  ref_solver.aug_rel_scale = 0.75;
+  ref_solver.regularizer = 1e-12;
+  ref_solver.verbose = false;
+
+  cout << "Reference solve..." << endl;
+  SolverResult ref_sol = ref_solver.aug_solve(lcp);
+  mat ref_P = reshape(ref_sol.p,N,A+1);
+  mat ref_D = reshape(ref_sol.d,N,A+1);
+
   ProjectiveSolver solver = ProjectiveSolver();
   solver.comp_thresh = 1e-22;
-  solver.initial_sigma = 0.25;
+  solver.initial_sigma = 0.2;
   solver.aug_rel_scale = 0.75;
-  solver.regularizer = 0;
-  solver.verbose = true;
+  solver.regularizer = 1e-12;
+  solver.verbose = false;
 
-  //SolverResult sol = solver.aug_solve(lcp);
+  
+  PLCP plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
+  
+  cout << "Projective solve..." << endl;
   SolverResult sol = solver.aug_solve(plcp);
   
   mat P = reshape(sol.p,N,A+1);
@@ -136,27 +188,42 @@ int main(int argc, char** argv)
   mat F = P.tail_cols(A);
   
   vec res = bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
-  vec res_faces = bellman_residual_at_centers(&mesh,&di,V,GAMMA);
-  vec res_norm = vec{norm(res,1),
-		     norm(res,2),
-		     norm(res,"inf")};
   vec adv =  advantage_function(&mesh,&di,V,GAMMA);
   uvec p_agg =  policy_agg(&mesh,&di,V,F,GAMMA);
 
-  cout << "res_norm: " << res_norm.t();
+  uvec f_policy = index_min(F,1);
+  assert(N == f_policy.n_elem);
+  sp_mat Pmc = build_markov_chain_from_blocks(blocks,f_policy);
+  vec new_vec = spsolve(Pmc.t(),res);
+  
+  raw_value_basis = join_horiz(raw_value_basis,new_vec);
+  value_basis = sp_mat(orth(raw_value_basis));
+  plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
+  sol = solver.aug_solve(plcp);
+
+  P = reshape(sol.p,N,A+1);
+  D = reshape(sol.d,N,A+1);
+  V = P.col(0);
+  F = P.tail_cols(A);
+  
+  res = bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
+  adv =  advantage_function(&mesh,&di,V,GAMMA);
+  p_agg =  policy_agg(&mesh,&di,V,F,GAMMA);
   
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
+  arch.add_mat("ref_P",ref_P);
+  arch.add_mat("ref_D",ref_D);
+  
   arch.add_mat("P",P);
   arch.add_mat("D",D);
 
   arch.add_vec("res",res);
-  arch.add_vec("res_faces",res_faces);
 
   arch.add_vec("adv",adv);
   arch.add_uvec("p_agg",p_agg);
 
-  arch.add_vec("new_vec",new_vector(points));
+  arch.add_vec("new_vec",new_vec);
   
   arch.write("test.data");
 }

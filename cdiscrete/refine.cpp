@@ -300,3 +300,18 @@ vec agg_flow_at_centers(const Discretizer * disc,
   vec interp = disc->interpolate(centers,agg_flows);
   return interp;
 }
+
+
+sp_mat build_markov_chain_from_blocks(const vector<sp_mat> & blocks,
+				      const uvec policy){
+  uint N = policy.n_elem;
+  uint A = blocks.size();
+  assert(max(policy) < A);
+  
+  sp_mat P = sp_mat(N,N);
+  for(uint i = 0; i < N; i++){
+    uint a = policy(i);
+    P.col(i) = blocks.at(a).col(i);
+  }
+  return P;
+}
