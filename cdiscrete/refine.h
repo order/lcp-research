@@ -61,6 +61,11 @@ uvec q_policy(const Discretizer * disc,
              const vec & values,
              double gamma,
              uint samples = 25);
+uvec q_policy_at_nodes(const Discretizer * disc,
+		       const Simulator * sim,
+		       const vec & values,
+		       double gamma,
+		       uint samples = 25);
 
 uvec flow_policy(const Discretizer * disc,
                  const mat & flow);

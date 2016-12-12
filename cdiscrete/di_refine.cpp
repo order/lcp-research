@@ -21,7 +21,7 @@ using namespace tri_mesh;
 #define B 5.0
 #define LENGTH 0.35
 #define GAMMA 0.995
-#define SMOOTH_BW 15
+#define SMOOTH_BW 1e9
 #define SMOOTH_THRESH 1e-3
 
 #define NUM_ADD_ROUNDS 16
@@ -38,13 +38,17 @@ mat make_basis(const Points & points){
 
   // General basis
   vector<vec> grids;
-  grids.push_back(linspace<vec>(-B,B,3));
-  grids.push_back(linspace<vec>(-B,B,3));
+  grids.push_back(linspace<vec>(-B,B,4));
+  grids.push_back(linspace<vec>(-B,B,4));
   Points grid_points = make_points(grids);
-  mat grid_basis = make_rbf_basis(points,grid_points,0.25,1e-5);
+  
+  mat basis = make_rbf_basis(points,grid_points,0.25,1e-5);
+  basis = join_horiz(basis,gaussian(points,zeros<vec>(2),1));
 
-  mat basis = grid_basis;
-    
+  //mat basis = mat(N,3);
+  //basis.col(0) = ones<mat>(N,1);
+  //basis.col(1) = gaussian(points,zeros<vec>(2),0.25);
+  //basis.col(2) = gaussian(points,zeros<vec>(2),1);
   return basis; // Don't normalize here
 }
 
@@ -92,6 +96,7 @@ SolverResult find_solution(const mat & basis,
   psolver.initial_sigma = 0.25;
   psolver.verbose = false;
   psolver.iter_verbose = false;
+  psolver.regularizer = 1e-12;
   
   PLCP plcp = approx_lcp(sp_mat(basis),smoother,
                          blocks,Q,free_vars);
@@ -182,6 +187,7 @@ int main(int argc, char** argv)
   mat residuals = mat(N,NUM_ADD_ROUNDS+1);
   cube primals = cube(N,A+1,NUM_ADD_ROUNDS+1);
   cube duals = cube(N,A+1,NUM_ADD_ROUNDS+1);
+  mat vresiduals = mat(N,NUM_ADD_ROUNDS+1);
   for(uint I = 0; I < NUM_ADD_ROUNDS; I++){
     cout << "Running " << I << "/" << NUM_ADD_ROUNDS  << endl;
     // Pick the location
@@ -189,21 +195,23 @@ int main(int argc, char** argv)
     mat P = reshape(sol.p,N,A+1);
     mat D = reshape(sol.d,N,A+1);
     
-    //vec res = find_residual(mesh,di,P);
-    vec res = min(D.tail_cols(A),1);
-    vec agg = sum(P.tail_cols(A),1);
-    
+    vec res = find_residual(mesh,di,P);
+    vec md_res = min(D.tail_cols(A),1);
+   
     assert(N == res.n_elem);
-    uvec f_policy = index_min(P.tail_cols(A),1);
-    assert(N == f_policy.n_elem);
-    sp_mat Pmc = build_markov_chain_from_blocks(blocks,f_policy);
-
-    //uint idx = index_max(abs(res % sqrt(agg)));
-    //vec target = laplacian(points,points.row(idx).t(),2.5);
-    vec heur = res;// % sqrt(agg);
+    uvec pi = index_max(P.tail_cols(A),1);
+    //uvec pi = q_policy_at_nodes(&mesh,&di,P.col(0),GAMMA,25);
+    assert(N == pi.n_elem);
+    
     mat new_vects = mat(N,2);
-    new_vects.col(0) = spsolve(blocks.at(0).t(),heur);
-    new_vects.col(1) = spsolve(blocks.at(1).t(),heur);
+    for(uint i = 0; i < A; i++){
+      vec heur = vec(md_res); // Use the dual residual estimate, not the real deal
+      uvec mask = find((1-i) == pi);
+      heur(mask).fill(0); // mask out
+     
+      new_vects.col(i) = spsolve(blocks.at(i).t(),heur);
+    }
+
 
     basis = join_horiz(basis,new_vects);
     basis = orth(basis);
@@ -211,9 +219,15 @@ int main(int argc, char** argv)
     residuals.col(I) = res;
     primals.slice(I) = P;
     duals.slice(I) = D;
+    vresiduals.col(I) = blocks.at(0) * P.col(0) + blocks.at(1) * P.col(1) - Q.col(0);
 
-    vec res_norm = vec{norm(res,1),norm(res,2),norm(res,"inf")};
-    cout << "\tResidual norm:" << res_norm.t() << endl;
+
+    vec bellman_res_norm = vec{norm(res,1),norm(res,2),norm(res,"inf")};
+    vec md_res_norm = vec{norm(md_res,1),norm(md_res,2),norm(md_res,"inf")};
+
+    cout << "\tBellman residual norm:" << bellman_res_norm.t() << endl;
+    cout << "\tMin. dual residual norm:" << md_res_norm.t() << endl;
+
     cout << "\tBasis size: " << basis.n_cols << endl;
   }
   SolverResult sol = find_solution(basis,smoother,blocks,Q,free_vars);
@@ -230,6 +244,7 @@ int main(int argc, char** argv)
   arch.add_mat("residuals",residuals);
   arch.add_cube("primals",primals);
   arch.add_cube("duals",duals);
+  arch.add_mat("vresiduals",vresiduals);
 
   arch.write("test.data");
 }

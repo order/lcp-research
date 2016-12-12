@@ -13,7 +13,7 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 #define B 5.0
-#define LENGTH 0.4
+#define LENGTH 0.35
 #define GAMMA 0.995
 #define SMOOTH_BW 1e9
 #define SMOOTH_THRESH 1e-3
@@ -22,28 +22,6 @@ using namespace tri_mesh;
 #define RBF_BW 0.25
 
 #define NUM_REFINE_ITER 2
-
-mat value_freebie(const vec & v,
-		  const vector<sp_mat> & blocks,
-		  const sp_mat & smoother){
-  // If we want a particular function to be well represented in
-  // the flow basis, then this function figures out what vectors need to be
-  // in the value basis for that function to be contained within all freebie
-  // flow bases.
-  uint N = v.n_elem;
-  assert(size(N,N) == size(smoother));
-  uint A = blocks.size();
-  assert(A > 0);
-  assert(size(N,N) == size(blocks.at(0)));
-  
-  mat basis = mat(N,A);
-  for(uint i = 0; i < A; i++){
-    sp_mat E = blocks.at(i) * smoother.t();
-    sp_mat G = E.t() + 1e-9*speye(N,N); // Regularized
-    basis.col(i) = spsolve(G,v);
-  }
-  return basis;
-}
 
 mat make_raw_value_basis(const Points & points,
                      const vector<sp_mat> & blocks,
@@ -163,6 +141,8 @@ int main(int argc, char** argv)
   ref_solver.aug_rel_scale = 0.75;
   ref_solver.regularizer = 1e-12;
   ref_solver.verbose = false;
+  ref_solver.iter_verbose = false;
+  
 
   cout << "Reference solve..." << endl;
   SolverResult ref_sol = ref_solver.aug_solve(lcp);
@@ -175,13 +155,38 @@ int main(int argc, char** argv)
   solver.aug_rel_scale = 0.75;
   solver.regularizer = 1e-12;
   solver.verbose = false;
+  solver.iter_verbose = false;
 
-  
+  ////////////////////////////////////////
+  // Get residual from initial approximation
   PLCP plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
-  
   cout << "Projective solve..." << endl;
   SolverResult sol = solver.aug_solve(plcp);
+
+  // Add new basis
+  mat old_P = reshape(sol.p,N,A+1);
+  vec old_res = bellman_residual_at_nodes(&mesh,&di,old_P.col(0),GAMMA);
+  vec value_res = blocks.at(0) * old_P.col(1) + blocks.at(1) * old_P.col(2) - Q.col(0);
   
+  mat dual_res = reshape(sol.d,N,A+1).eval().tail_cols(A);
+  
+  mat new_vects = mat(N,2);
+  for(uint i = 0; i < A; i++){
+    vec target = min(dual_res,1);
+    uvec mask = find((1-i) == index_min(dual_res,1));
+    target(mask).fill(0); // mask out
+
+    new_vects.col(i) = spsolve(blocks.at(i).t(),target);
+    }
+  
+  raw_value_basis = join_horiz(raw_value_basis,new_vects);
+  value_basis = sp_mat(orth(raw_value_basis));
+
+  // Re-solve
+  plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
+  sol = solver.aug_solve(plcp);
+
+  // Report outcome.
   mat P = reshape(sol.p,N,A+1);
   mat D = reshape(sol.d,N,A+1);
   vec V = P.col(0);
@@ -191,39 +196,25 @@ int main(int argc, char** argv)
   vec adv =  advantage_function(&mesh,&di,V,GAMMA);
   uvec p_agg =  policy_agg(&mesh,&di,V,F,GAMMA);
 
-  uvec f_policy = index_min(F,1);
-  assert(N == f_policy.n_elem);
-  sp_mat Pmc = build_markov_chain_from_blocks(blocks,f_policy);
-  vec new_vec = spsolve(Pmc.t(),res);
-  
-  raw_value_basis = join_horiz(raw_value_basis,new_vec);
-  value_basis = sp_mat(orth(raw_value_basis));
-  plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
-  sol = solver.aug_solve(plcp);
-
-  P = reshape(sol.p,N,A+1);
-  D = reshape(sol.d,N,A+1);
-  V = P.col(0);
-  F = P.tail_cols(A);
-  
-  res = bellman_residual_at_nodes(&mesh,&di,V,GAMMA);
-  adv =  advantage_function(&mesh,&di,V,GAMMA);
-  p_agg =  policy_agg(&mesh,&di,V,F,GAMMA);
+  vec res_norm = vec{norm(res,1),norm(res,2),norm(res,"inf")};
+  cout << "Residual norm:" << res_norm.t() << endl;
   
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
   arch.add_mat("ref_P",ref_P);
   arch.add_mat("ref_D",ref_D);
-  
+
   arch.add_mat("P",P);
   arch.add_mat("D",D);
 
+  arch.add_vec("old_res",old_res);
   arch.add_vec("res",res);
+  arch.add_vec("value_res",value_res);
 
   arch.add_vec("adv",adv);
   arch.add_uvec("p_agg",p_agg);
 
-  arch.add_vec("new_vec",new_vec);
+  arch.add_mat("new_vects",new_vects);
   
   arch.write("test.data");
 }

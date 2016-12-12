@@ -27,11 +27,11 @@ if __name__ == "__main__":
     plt.figure()
     plt.suptitle("Value information")
     plt.subplot(2,2,1)
-    plt.title("Reference value")
+    plt.title("Ref. value")
     tmv.plot_vertices(nodes,faces,ref_P[:,0])
     
     plt.subplot(2,2,2)
-    plt.title("Approximate value")
+    plt.title("Approx. value")
     tmv.plot_vertices(nodes,faces,P[:,0])
 
     plt.subplot(2,2,3)
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     tmv.plot_vertices(nodes,faces,P[:,0] - ref_P[:,0])
 
     plt.subplot(2,2,4)
-    plt.title("Bellman residual")
+    plt.title("Bellman res")
     tmv.plot_vertices(nodes,faces,sol.res)
 
     #######################################
@@ -47,20 +47,16 @@ if __name__ == "__main__":
     plt.figure()
     plt.suptitle("Flow information")
     plt.subplot(2,2,1)
-    plt.title("Ref. Agg. flow")
+    plt.title("Ref. agg. flow")
     ref_agg = np.sum(ref_P[:,1:],axis=1)
     tmv.plot_vertices(nodes,faces,ref_agg)
     
     plt.subplot(2,2,2)
-    plt.title("Approximate value")
+    plt.title("Approx. agg. flow")
     agg = np.sum(P[:,1:],axis=1)
     tmv.plot_vertices(nodes,faces,agg)
 
     plt.subplot(2,2,3)
-    plt.title("Difference")
-    tmv.plot_vertices(nodes,faces,agg - ref_agg)
-
-    plt.subplot(2,2,4)
     plt.title("Advantage")
     tmv.plot_faces(nodes,faces,sol.adv)
 
@@ -72,14 +68,50 @@ if __name__ == "__main__":
     plt.title("Min Dual")
     min_dual = np.min(D[:,1:],axis=1)
     tmv.plot_vertices(nodes,faces,min_dual)
-    
+
+    plt.suptitle("Dual policy")
     plt.subplot(2,2,2)
+    plt.title("Min Dual")
+    dual_policy = np.argmin(D[:,1:],axis=1)
+    tmv.plot_vertices(nodes,faces,dual_policy)
+    
+    plt.subplot(2,2,3)
     plt.title("Policy")
     tmv.plot_faces(nodes,faces,sol.p_agg)
+
+    plt.subplot(2,2,4)
+    plt.title("Value residual")
+    tmv.plot_vertices(nodes,faces,sol.D[:,0])
 
     ########################################
     # New vector
     plt.figure()
-    plt.title("New vector")
-    tmv.plot_vertices(nodes,faces,sol.new_vec) 
+    plt.suptitle("New vectors")
+    plt.subplot(1,2,1)
+    tmv.plot_vertices(nodes,faces,sol.new_vects[:,0])
+    plt.subplot(1,2,2)
+    tmv.plot_vertices(nodes,faces,sol.new_vects[:,1]) 
+
+    #######################################
+    # Misc stuff
+    plt.figure()
+    plt.suptitle("Misc stuff")
+    plt.subplot(2,2,1)
+    plt.title("Old Bellman Res")
+    tmv.plot_vertices(nodes,faces,sol.old_res)
+
+    plt.subplot(2,2,2)
+    plt.title("Bellman Res")
+    tmv.plot_vertices(nodes,faces,sol.res)
+    
+
+    plt.suptitle("Res difference")
+    plt.subplot(2,2,3)
+    plt.title("Diff")
+    tmv.plot_vertices(nodes,faces,sol.res - sol.old_res)
+    
+    plt.subplot(2,2,4)
+    plt.title("Value res")
+    tmv.plot_vertices(nodes,faces,sol.value_res)
+    
     plt.show()

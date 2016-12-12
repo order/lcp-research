@@ -234,6 +234,33 @@ uvec q_policy(const Discretizer * disc,
   return policy;
 }
 
+uvec q_policy_at_nodes(const Discretizer * disc,
+              const Simulator * sim,
+              const vec & values,
+              double gamma,
+              uint samples){
+  uint N = disc->number_of_spatial_nodes();
+  
+  // Pad for the oob node
+  double max_val = 1.0 / (1.0 - gamma);
+  vec padded_values = join_vert(values, vec{max_val});
+   
+  Points nodes = disc->get_spatial_nodes();
+  
+  // Calculate the 1-step value estimate using dynamics  
+  mat Q = estimate_Q(nodes,
+                     disc,
+                     sim,
+                     padded_values,
+                     gamma,
+                     0,
+                     samples);
+
+  uvec policy = col_argmin(Q);
+  assert(N == policy.n_elem);
+  return policy;
+}
+
 // Simplest policy; return action with max flow
 uvec flow_policy(const Discretizer * disc,
                  const mat & flows){

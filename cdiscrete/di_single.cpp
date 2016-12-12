@@ -30,28 +30,6 @@ vec new_vector(const Points & points){
   return gaussian(points,zeros<vec>(2),cov);
 }
 
-mat value_freebie(const vec & v,
-		  const vector<sp_mat> & blocks,
-		  const sp_mat & smoother){
-  // If we want a particular function to be well represented in
-  // the flow basis, then this function figures out what vectors need to be
-  // in the value basis for that function to be contained within all freebie
-  // flow bases.
-  uint N = v.n_elem;
-  assert(size(N,N) == size(smoother));
-  uint A = blocks.size();
-  assert(A > 0);
-  assert(size(N,N) == size(blocks.at(0)));
-  
-  mat basis = mat(N,A);
-  for(uint i = 0; i < A; i++){
-    sp_mat E = blocks.at(i) * smoother.t();
-    sp_mat G = E.t() + 1e-9*speye(N,N); // Regularized
-    basis.col(i) = spsolve(G,v);
-  }
-  return basis;
-}
-
 mat make_raw_value_basis(const Points & points,
                      const vector<sp_mat> & blocks,
                      const sp_mat & smoother){
@@ -66,13 +44,8 @@ mat make_raw_value_basis(const Points & points,
   mat grid_basis = make_rbf_basis(points,grid_points,0.27,1e-5);
 
   // Flow targeted basis
-  mat added_basis = mat(N,5);
+  mat added_basis = mat(N,1);
   added_basis.col(0) = gaussian(points,zeros<vec>(2),0.27);
-  added_basis.cols(uvec{1,2})
-    = value_freebie(laplacian(points,zeros<vec>(2),5),blocks,smoother);
-  added_basis.cols(uvec{3,4})
-    = value_freebie(laplacian(points,points.row(1041).t(),5),blocks,smoother);
-  
   mat basis = join_horiz(grid_basis,added_basis);
   
   //mat basis = grid_basis;

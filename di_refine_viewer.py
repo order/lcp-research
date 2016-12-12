@@ -16,27 +16,26 @@ if __name__ == "__main__":
 
     R = sol.residuals
     (N,I) = R.shape
-    for i in xrange(0,I,8):
+    for i in xrange(0,I,4):
         plt.figure()
         plt.suptitle("Iter " + str(i))
         
         plt.subplot(2,2,1)
-        plt.title("value")
+        plt.title("Value")
         tmv.plot_vertices(nodes,faces, sol.primals[:,0,i])
 
         plt.subplot(2,2,2)
-        plt.title("agg flow")
-        agg = np.sum(sol.primals[:,1:,i],1)
-        tmv.plot_vertices(nodes,faces, np.log(agg))
+        plt.title("Min Dual Res")
+        dual_res = np.min(sol.duals[:,1:,i],1)
+        tmv.plot_vertices(nodes,faces, dual_res)
 
         plt.subplot(2,2,3)
-        plt.title("policy")
+        plt.title("Policy")
         tmv.plot_vertices(nodes,faces,
                           np.argmax(sol.primals[:,1:,i],axis=1))
         
         plt.subplot(2,2,4)
-        plt.title('residual')
-        tmv.plot_vertices(nodes,faces,R[:,i])
-
+        plt.title('vres')
+        tmv.plot_vertices(nodes,faces,sol.residuals[:,i])
 
     plt.show()
