@@ -65,7 +65,7 @@ if __name__ == "__main__":
     plt.figure()
     plt.suptitle("Dual information")
     plt.subplot(2,2,1)
-    plt.title("Min Dual")
+    plt.title("Min Dual")v
     min_dual = np.min(D[:,1:],axis=1)
     tmv.plot_vertices(nodes,faces,min_dual)
 
