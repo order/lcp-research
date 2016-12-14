@@ -221,6 +221,13 @@ PLCP augment_plcp(const PLCP & original,
 
   
   sp_mat P = sp_mat(original.P);
+  double I_norm = norm(speye(K,K) - P.t() * P);
+  if(norm(I_norm) >= PRETTY_SMALL){
+    cerr << "Error: P does not look orthogonal ("
+	 << I_norm << ")..." << endl;
+  }
+  assert(I_norm < PRETTY_SMALL);
+  
   sp_mat U = sp_mat(original.U);
   vec q = vec(original.q);
   assert(all(q(find(1 == original.free_vars)) <= 0));
@@ -242,6 +249,11 @@ PLCP augment_plcp(const PLCP & original,
   w = spsolve(P.t()*P + 1e-15*speye(K,K),P.t()*(x - y + q));
 
   vec w_res = P * w - res;
+  if(norm(w_res) >= PRETTY_SMALL){
+    cerr << "Error: Reduced vector w residual large ("
+	 << w_res << ")..." << endl;
+  }
+
   assert(norm(w_res) < PRETTY_SMALL);
   
   vec b = P.t()*x - U*x - w;

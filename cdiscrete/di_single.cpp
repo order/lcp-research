@@ -18,9 +18,6 @@ using namespace tri_mesh;
 #define SMOOTH_BW 1e9
 #define SMOOTH_THRESH 1e-3
 
-#define RBF_GRID_SIZE 4
-#define RBF_BW 0.25
-
 vec new_vector(const Points & points){
   double angle = 1.2567;
   double b = 0.001;
@@ -38,17 +35,10 @@ mat make_raw_value_basis(const Points & points,
 
   // General basis
   vector<vec> grids;
-  grids.push_back(linspace<vec>(-B,B,4));
-  grids.push_back(linspace<vec>(-B,B,4));
+  grids.push_back(linspace<vec>(-B,B,3));
+  grids.push_back(linspace<vec>(-B,B,3));
   Points grid_points = make_points(grids);
-  mat grid_basis = make_rbf_basis(points,grid_points,0.27,1e-5);
-
-  // Flow targeted basis
-  mat added_basis = mat(N,1);
-  added_basis.col(0) = gaussian(points,zeros<vec>(2),0.27);
-  mat basis = join_horiz(grid_basis,added_basis);
-  
-  //mat basis = grid_basis;
+  mat basis = make_rbf_basis(points,grid_points,0.25,1e-5);
   
   return basis; // Don't normalize here
 }
@@ -144,17 +134,17 @@ int main(int argc, char** argv)
   }
   
   PLCP plcp = approx_lcp(value_basis,smoother,blocks,Q,free_vars);
-
-  //KojimaSolver solver = KojimaSolver();
-  ProjectiveSolver solver = ProjectiveSolver();
+  
+  KojimaSolver solver = KojimaSolver();
+  //ProjectiveSolver solver = ProjectiveSolver();
   solver.comp_thresh = 1e-22;
   solver.initial_sigma = 0.2;
   solver.aug_rel_scale = 0.75;
   solver.regularizer = 0;
   solver.verbose = true;
 
-  //SolverResult sol = solver.aug_solve(lcp);
-  SolverResult sol = solver.aug_solve(plcp);
+  SolverResult sol = solver.aug_solve(lcp);
+  //SolverResult sol = solver.aug_solve(plcp);
   
   mat P = reshape(sol.p,N,A+1);
   mat D = reshape(sol.d,N,A+1);
@@ -167,24 +157,13 @@ int main(int argc, char** argv)
 		     norm(res,2),
 		     norm(res,"inf")};
   vec adv =  advantage_function(&mesh,&di,V,GAMMA);
-  uvec p_agg =  policy_agg(&mesh,&di,V,F,GAMMA);
-
-  cout << "res_norm: " << res_norm.t();
   
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
-  arch.add_mat("P",P);
-  arch.add_mat("D",D);
+  arch.add_mat("primal",P);
+  arch.add_mat("dual",D);
+  arch.add_vec("residual",res);
 
-  arch.add_vec("res",res);
-  arch.add_vec("res_faces",res_faces);
-
-  arch.add_vec("adv",adv);
-  arch.add_uvec("p_agg",p_agg);
-
-  arch.add_cube("bases",basis_cube);
-
-  arch.add_vec("new_vec",new_vector(points));
   
   arch.write("test.data");
 }

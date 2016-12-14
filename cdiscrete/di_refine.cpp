@@ -38,17 +38,15 @@ mat make_basis(const Points & points){
 
   // General basis
   vector<vec> grids;
-  grids.push_back(linspace<vec>(-B,B,4));
-  grids.push_back(linspace<vec>(-B,B,4));
+  grids.push_back(linspace<vec>(-B,B,3));
+  grids.push_back(linspace<vec>(-B,B,3));
   Points grid_points = make_points(grids);
   
-  mat basis = make_rbf_basis(points,grid_points,0.25,1e-5);
-  basis = join_horiz(basis,gaussian(points,zeros<vec>(2),1));
+  mat basis = make_rbf_basis(points,grid_points,0.25);
 
-  //mat basis = mat(N,3);
+  //mat basis = mat(N,2);
   //basis.col(0) = ones<mat>(N,1);
-  //basis.col(1) = gaussian(points,zeros<vec>(2),0.25);
-  //basis.col(2) = gaussian(points,zeros<vec>(2),1);
+  //basis.col(1) = gaussian(points,zeros<vec>(2),2.5);
   return basis; // Don't normalize here
 }
 
@@ -161,6 +159,8 @@ int main(int argc, char** argv)
   DoubleIntegratorSimulator di = build_di_simulator();
   uint A = di.num_actions();
   assert(A >= 2);
+
+  uint C = mesh.number_of_cells();
   
   // Reference blocks
   cout << "Building LCP blocks..." << endl;
@@ -181,46 +181,63 @@ int main(int argc, char** argv)
   free_vars.head(N).fill(1);
 
   cout << "Making value basis..." << endl;
-  //mat basis = ones<mat>(N,1) / (double) N;
   mat basis = make_basis(points);
-  
-  mat residuals = mat(N,NUM_ADD_ROUNDS+1);
+  basis = orth(basis);
+
   cube primals = cube(N,A+1,NUM_ADD_ROUNDS+1);
   cube duals = cube(N,A+1,NUM_ADD_ROUNDS+1);
-  mat vresiduals = mat(N,NUM_ADD_ROUNDS+1);
+  
+  mat residuals = mat(N,NUM_ADD_ROUNDS+1);
+  mat min_duals = mat(N,NUM_ADD_ROUNDS+1);
+  mat advantages = mat(N,NUM_ADD_ROUNDS+1);
+  umat policies = umat(N,NUM_ADD_ROUNDS+1);
+
+  mat misc = zeros(N,NUM_ADD_ROUNDS+1);
+  
   for(uint I = 0; I < NUM_ADD_ROUNDS; I++){
     cout << "Running " << I << "/" << NUM_ADD_ROUNDS  << endl;
     // Pick the location
     SolverResult sol = find_solution(basis,smoother,blocks,Q,free_vars);
     mat P = reshape(sol.p,N,A+1);
     mat D = reshape(sol.d,N,A+1);
+    vec V = P.col(0);
+    mat F = P.tail_cols(A);
     
     vec res = find_residual(mesh,di,P);
-    vec md_res = min(D.tail_cols(A),1);
-   
-    assert(N == res.n_elem);
-    uvec pi = index_max(P.tail_cols(A),1);
-    //uvec pi = q_policy_at_nodes(&mesh,&di,P.col(0),GAMMA,25);
-    assert(N == pi.n_elem);
+    vec md_res = min(D.tail_cols(A),1);   
+    uvec pi = index_max(F,1);
+    vec adv = max(D.tail_cols(A),1) - md_res;
     
     mat new_vects = mat(N,2);
+    uint idx = sample_vec(md_res);
+    cout << "Index: " << idx << endl;
+
     for(uint i = 0; i < A; i++){
-      vec heur = vec(md_res); // Use the dual residual estimate, not the real deal
+      //vec heur = md_res % gaussian(points,points.row(idx).t(),0.5);
+      vec heur;
+      if (norm(md_res,"inf") < 2){
+	heur = res;
+      }
+      else{
+	heur = md_res;
+      }
       uvec mask = find((1-i) == pi);
       heur(mask).fill(0); // mask out
      
-      new_vects.col(i) = spsolve(blocks.at(i).t(),heur);
+      new_vects.col(i) = spsolve(smoother * blocks.at(i).t(),heur);
+      misc.col(I) += blocks.at(i) * heur;
     }
 
 
     basis = join_horiz(basis,new_vects);
     basis = orth(basis);
-
-    residuals.col(I) = res;
-    primals.slice(I) = P;
+    
+    primals.slice(I) = P;    
     duals.slice(I) = D;
-    vresiduals.col(I) = blocks.at(0) * P.col(0) + blocks.at(1) * P.col(1) - Q.col(0);
-
+    residuals.col(I) = res;
+    min_duals.col(I) = md_res;
+    advantages.col(I) = adv;
+    policies.col(I) = pi;
 
     vec bellman_res_norm = vec{norm(res,1),norm(res,2),norm(res,"inf")};
     vec md_res_norm = vec{norm(md_res,1),norm(md_res,2),norm(md_res,"inf")};
@@ -233,18 +250,31 @@ int main(int argc, char** argv)
   SolverResult sol = find_solution(basis,smoother,blocks,Q,free_vars);
   mat P = reshape(sol.p,N,A+1);
   mat D = reshape(sol.d,N,A+1);
+
   vec res = find_residual(mesh,di,P);
-  
+  vec md_res = min(D.tail_cols(A),1);   
+  uvec pi = index_max(P.tail_cols(A),1);
+  vec adv = max(D.tail_cols(A),1) - md_res;
+
+  primals.slice(NUM_ADD_ROUNDS) = P;    
+  duals.slice(NUM_ADD_ROUNDS) = D;
   residuals.col(NUM_ADD_ROUNDS) = res;
-  primals.slice(NUM_ADD_ROUNDS) = P;
-  duals.slice(NUM_ADD_ROUNDS) = D;  
+  min_duals.col(NUM_ADD_ROUNDS) = md_res;
+  advantages.col(NUM_ADD_ROUNDS) = adv;
+  policies.col(NUM_ADD_ROUNDS) = pi;
+		 misc.col(NUM_ADD_ROUNDS) = blocks.at(0) * res;
+
 
   mesh.write_cgal("test.mesh");
   Archiver arch = Archiver();
-  arch.add_mat("residuals",residuals);
   arch.add_cube("primals",primals);
   arch.add_cube("duals",duals);
-  arch.add_mat("vresiduals",vresiduals);
+  arch.add_mat("residuals",residuals);
+  arch.add_mat("min_duals",min_duals);
+  arch.add_mat("advantages",advantages);
+  arch.add_mat("misc",misc);
+
+  arch.add_umat("policies",policies);
 
   arch.write("test.data");
 }
