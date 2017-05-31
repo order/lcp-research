@@ -7,9 +7,15 @@
 using namespace arma;
 using namespace std;
 
+#define STAY_ACTION 0.0
+#define SELL_ACTION 1.0
+
 class StockSimulator : public Simulator{
  public:
-  StockSimulator(const mat & bbox, double step);
+  StockSimulator(const mat & bbox,
+		 double step,
+		 double theta,
+		 double noise_std);
   mat get_actions() const;
   mat get_costs(const Points & points) const;
   vec get_state_weights(const Points & points) const;
@@ -36,7 +42,7 @@ class StockSimulator : public Simulator{
   mat m_bbox;
   double m_step;
   double m_noise_std;
-  double m_damp;
+  double m_theta;
 };
 
 tri_mesh::TriMesh generate_initial_mesh(double angle,

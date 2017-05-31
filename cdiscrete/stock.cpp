@@ -1,16 +1,21 @@
-#include "di.h"
+#include "econ.h"
 #include "misc.h"
 
 using namespace tri_mesh;
 
 StockSimulator::StockSimulator(const mat & bbox,
-			       double step) :
-  m_bbox(bbox),m_step(step){
+			       double step,
+			       double theta,
+			       double noise_std) :
+  m_bbox(bbox),m_step(step), m_theta(theta), m_noise_std(noise_std){
 }
 
 
 mat StockSimulator::get_actions() const{
-  return {{0.0},{1.0}};  // List initialization
+  /*
+    We will use "0" to signal staying, and "1" to signal selling.
+   */
+  return {{STAY_ACTION},{SELL_ACTION}};  // List initialization okay?
 }
 
 mat StockSimulator::get_costs(const Points & points) const{
@@ -30,13 +35,22 @@ mat StockSimulator::get_costs(const Points & points) const{
 
 
 vec StockSimulator::get_state_weights(const Points & points) const{
-  // State weights: uniform seems like a bad assumption. Put all weight on
-  // state closest to (0,0)?
+  /*
+    State weights: uniform seems like a bad assumption. 
+    Currently, put all weight on state closest to (0,0).
+  */
+  
   uint N = points.n_rows;
   uint D = points.n_cols;
   assert(TRI_NUM_DIM == D);
+
+  vec norm = lp_norm(points, 2, 1);
+  assert(norm.n_elem == point.n_rows);
+
+  uint idx = norm.index_min();
   
-  vec weight = ones<vec>(N) / (double) N;
+  vec weight = zeros(N);
+  weight(idx) = 1.0; // All weight on the smallest state
   return weight;
 }
 
@@ -52,11 +66,12 @@ Points StockSimulator::next(const Points & points,
   double t = m_step;
   vec noise = m_noise_std*randn<vec>(1);  // TODO: replace with empirical
   double u = actions(0) + noise(0);
-  
-  new_points.col(0) = points.col(0) + t*points.col(1) + 0.5*t*t*u;
-  new_points.col(1) = (1.0 - m_damp)*points.col(1) + t*u;
 
-  saturate(new_points,
+  // Replace this with the stock model
+  new_points.col(0) = points.col(0) + t*points.col(1) + noise;
+  new_points.col(1) = noise;
+
+  saturate(new_points, // TODO: What does this do again?
            uvec{0,1},
            m_bbox);
   

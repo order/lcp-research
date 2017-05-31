@@ -154,6 +154,9 @@ template <typename M, typename V> M row_divide(const M & A,
 template mat row_divide(const mat & A, const rowvec & b);
 
 vec lp_norm(const mat & A,double p,uint dir){
+  /*
+    Does either the column-wise (dir=0) or row-wise (dir=1) p-norm
+  */
   return pow(sum(pow(A,p),dir),1.0 / p);
 }
 
