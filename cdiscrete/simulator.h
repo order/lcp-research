@@ -7,6 +7,10 @@
 
 class Simulator{
  public:
+
+  /*
+    Costs are (num_states, num_actions)
+   */
   virtual mat get_costs(const Points & points) const = 0;
   virtual vec get_state_weights(const Points & points) const = 0;
   virtual mat get_actions() const = 0;

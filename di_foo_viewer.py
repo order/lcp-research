@@ -7,7 +7,15 @@ from utils.archiver import *
 from utils.plotting import cdf_points
 import tri_mesh_viewer as tmv
 
+"""
+This file is for displaying the output of cdiscrete/di_foo.
+These are experimental double integrator scripts that move "too fast"
+for documentation to be reasonable.
+"""
+
 if __name__ == "__main__":
+
+    assert 2 == len(sys.argv), "Please supply a file prefix"
     
     (_,file_base) = sys.argv
 
@@ -65,7 +73,7 @@ if __name__ == "__main__":
     plt.figure()
     plt.suptitle("Dual information")
     plt.subplot(2,2,1)
-    plt.title("Min Dual")v
+    plt.title("Min Dual")
     min_dual = np.min(D[:,1:],axis=1)
     tmv.plot_vertices(nodes,faces,min_dual)
 

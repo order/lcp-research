@@ -1,4 +1,4 @@
-#include "di.h"
+#include "econ.h"
 #include "misc.h"
 #include "io.h"
 #include "lcp.h"
@@ -13,11 +13,11 @@ namespace po = boost::program_options;
 using namespace tri_mesh;
 
 """
-This is a fast-moving file for double integrator experiments.
+This is a fast-moving file for economics experiments.
 It generates:
 1) Mesh file
 2) Data file
-These are read and visualized in ../di_foo_viewer.py
+These are read and visualized in ../econ_foo_viewer.py
 """
 
 
