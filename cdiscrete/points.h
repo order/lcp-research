@@ -10,10 +10,11 @@ typedef std::map<Index,NodeType> NodeTypeRegistry;
 typedef std::vector<const NodeTypeRules &> NodeTypeRuleList;
 typedef std::vector<const NodeRemapper &> NodeRemapperList;
 
-class Points{
+class TypedPoints{
   /*
-    Class for organizing points. Points are either bounded Euclidean points,
-    or are "special" (e.g. out of bound and other sink states).
+    Class adding typing information to organize points. Points are either 
+    bounded Euclidean points, or are "special" (e.g. out of bound and other 
+    sink states).
     Euclidean points have type EUCLIDEAN_TYPE. Other point types are specially
     registered.
     Rules for detecting and applying rules can be applied as vectors.
@@ -21,13 +22,13 @@ class Points{
     NB: The assumption is that most nodes are Euclidean and "normal".
   */
  public:
-  Points(const mat & points, const NodeTypeRegistry & reg);
-  Points(const mat & points);
-  Points();
+  TypedPoints(const Points & points, const NodeTypeRegistry & reg);
+  TypedPoints(const Points & points);
+  TypedPoints();
 
   // Registry functions
   uint get_next_type(); // Max registry keys + 1
-  void register(Index, NodeType); // Add new element to registry
+  void register(Index idx, NodeType ntype); // Add new element to registry
   uint num_special_nodes() const;
   uint num_normal_nodes() const;
   uint num_all_nodes() const;
@@ -41,7 +42,7 @@ class Points{
   void apply_remapper(const NodeRemapper & remapper);
   void apply_remappers(const NodeRemapperList & remappers);
   
-  mat m_points;
+  Points m_points;
   NodeTypeRegistry m_reg;
 
   bool check_validity() const;
@@ -93,6 +94,8 @@ class WrapRemapper : public NodeRemapper{
  protected:
   mat m_bbox;
 }
+
+bool check_bounding_box(const mat & bbox);
 
 
 #endif
