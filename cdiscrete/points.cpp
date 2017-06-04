@@ -234,4 +234,3 @@ NodeRemapRegistry WrapRemapper::remapper(const Points & points){
     assert(not any(points.col(d) < lb));
   }   
 }
-
