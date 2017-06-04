@@ -7,7 +7,6 @@
 typedef uint NodeType;  // Node types
 typedef uint Index;
 typedef std::map<Index,NodeType> NodeTypeRegistry;
-typedef std::map<Index,vec> NodeRemapRegistry;
 typedef std::vector<const NodeTypeRules &> NodeTypeRuleList;
 typedef std::vector<const NodeRemapper &> NodeRemapperList;
 
@@ -29,9 +28,12 @@ class Points{
   // Registry functions
   uint get_next_type(); // Max registry keys + 1
   void register(Index, NodeType); // Add new element to registry
-  uint num_special_nodes();
-  uint num_normal_nodes();
-  uint num_all_nodes();
+  uint num_special_nodes() const;
+  uint num_normal_nodes() const;
+  uint num_all_nodes() const;
+
+  uvec get_normal_mask() const;
+  uvec get_special_mask() const;
 
   // Run rules for typing and remapping.
   void apply_typing_rule(const NodeTypeRule & rule);
@@ -41,6 +43,8 @@ class Points{
   
   mat m_points;
   NodeTypeRegistry m_reg;
+
+  bool check_validity() const;
 
  protected:
   void _ensure_blanked();
@@ -63,19 +67,20 @@ class NodeRemapper{
     Any remapped points found are returned in a map from indices to new 
     vectors.
   */  
-  virtual NodeRemapRegistry remap(const Points & points) const = 0;
+  virtual void remap(Points & points) const = 0;
 }
 
 class OutOfBoundsRule : public NodeTypeRule(){
-  OutOfBoundsRule(const mat & bounding_box, uint oob_type);
+  OutOfBoundsRule(const mat & bounding_box, NodeType oob_type);
   NodeTypeRegistry type_elements(const Points & points);
  protected:
   mat m_bbox;
+  NodeType m_type;
 }
 
 class SaturateRemapper : public NodeRemapper{
   SaturateRemapper(const mat & bounding_box);
-  NodeRemapRegistry remapper(const Points & points);
+  void remapper(Points & points);
   
  protected:
   mat m_bbox;
@@ -83,7 +88,7 @@ class SaturateRemapper : public NodeRemapper{
 
 class WrapRemapper : public NodeRemapper{
   SaturateRemapper(const mat & bounding_box);
-  NodeRemapRegistry remapper(const Points & points);
+  void remapper(Points & points);
   
  protected:
   mat m_bbox;

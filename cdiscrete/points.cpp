@@ -3,6 +3,10 @@
 using arma;
 using std;
 
+/*
+ * POINTS STRUCTURE
+ */
+
 Points::Points(const mat & points, const NodeTypeRegistry & reg) :
   m_points(points), m_reg(reg), m_max_type(EUCLIDEAN_TYPE) {
   assert(m_points.n_rows >= m_reg.size());
@@ -26,17 +30,37 @@ void Points::register(Index idx, NodeType node_type){
   m_points.row(idx).fill(SPECIAL_FILL);  // Blank out row
 }
 
-uint Points::num_special_nodes(){
+uint Points::num_special_nodes() const{
   return m_reg.size();
 }
 
-uint Points::num_normal_nodes(){
+uint Points::num_normal_nodes() const{
   assert(m_points.n_rows >= m_reg.size());  
   return m_points.n_rows - m_reg.size();
 }
 
-uint Points::num_all_nodes(){
+uint Points::num_all_nodes() const{
   return m_points.n_rows();
+}
+
+uvec Points::get_normal_mask() const{
+  uvec mask = ones(this->num_all_nodes());
+  for(NodeTypeRegistry::const_iterator it = m_reg.begin();
+      it != m_reg.end(); ++it){
+    mask[it->first] = 0;
+  }
+  assert(this->num_normal_nodes() == sum(mask));
+  return mask;
+}
+
+uvec Points::get_special_mask() const{
+  uvec mask = zeros(this->num_all_nodes());
+  for(NodeTypeRegistry::const_iterator it = m_reg.begin();
+      it != m_reg.end(); ++it){
+    mask[it->first] = 1;
+  }
+  assert(this->num_special_nodes() == sum(mask));
+  return mask;
 }
 
 void Points::apply_typing_rule(const NodeTypeRule & rule){
@@ -67,15 +91,7 @@ void Points::apply_typing_rules(const NodeTypeRuleList & rules){
 }
 
 void Points::apply_remapper(const NodeRemapper & remapper){
-  NodeRemapRegistry new_points = remapper->remap(m_points);
-  for(NodeRemapRegistry point_it = new_points.begin();
-      point_it != new_points.end(); ++point_it){
-    Index row_idx = point_it->first;
-    vec new_point = point_it->second;
-    assert(!m_points.row(row_idx).has_nan());  // Check not NaN
-
-    m_points.row(row_idx) = new_point;  // Update row
-  }
+  remapper->remap(m_points);
 }
 
 void Points::apply_remappers(const NodeRemapperList & remappers){
@@ -87,3 +103,135 @@ void Points::apply_remappers(const NodeRemapperList & remappers){
 		       std::placeholders::_1);
   for_each(rules.begin(), rules.end(), bound_fn);
 }
+
+bool Points::check_validity() const{
+  uint N = m_points.n_rows;
+  for(uint i = 0; i < N; ++i){
+    bool has_nan = m_points.row(i).has_nan();
+    bool is_special = (m_reg.find(i) != m_reg.end());
+    assert(has_nan == is_special);
+
+    if(is_special){
+      assert(m_reg[i] > EUCLIDEAN_TYPE); // Special types not Euclidean
+      assert(m_reg[i] <= m_max_type);
+    }
+  }
+}
+
+void Points::_ensure_blanked(){
+  /*
+    Make sure that everthing in the registry corresponds to NaN'd rows
+  */
+  for(NodeTypeRegistry::const_iterator it = m_reg.begin();
+      it != m_reg.end(); ++it){
+    bool is_blank = m_points.row(it->first).has_nan();
+    if(!is_blank){
+      m_points.row(it->first).fill(datum::nan);
+    }
+  }
+}
+
+
+/*
+ * OUT OF BOUNDS NODE TYPE RULE
+ */
+
+OutOfBoundsRule::OutOfBoundsRule(const mat & bounding_box,
+				 NodeType oob_type) :
+  m_bbox(bounding_box), m_type(oob_type) {
+  assert(2 == m_bbox.n_cols);
+}
+
+NodeTypeRegistry OutOfBoundsRule::type_elements(const Points & points){
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  assert(D == m_bbox.n_rows);
+  assert(2 == m_bbox.n_cols);
+
+  vec lb = m_bbox.col(0);
+  vec ub = m_bbox.col(1);
+
+  set violations;
+
+  // Iterate through the dimensions
+  for(uint d = 0; d < D; ++d){
+    uvec low = find(points.col(d) < lb(d));
+    violations.insert(low.begin(), low.end());
+    
+    uvec high = find(points.col(d) > ub(d));
+    violations.insert(high.begin(), high.end());
+  }
+
+  NodeTypeRegistry ret;
+  for(set::const_iterator it = violations.begin();
+      it != violations.end(); ++it){
+    ret[*it] = m_type;
+  }
+  return ret;
+}
+
+
+/*
+ * SATURATION REMAPPER
+ */
+
+SaturateRemapper::SaturateRemapper(const mat & bounding_box,
+				   double fudge=PRETTY_SMALL) :
+  m_bbox(bounding_box), m_fudge(fudge){}
+
+
+void SaturateRemapper::remapper(Points & points){
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  assert(D == m_bbox.n_rows);
+  assert(2 == m_bbox.n_cols);
+
+  uvec normal_rows = points.get_normal_mask();
+  NodeRemapRegistry reg;
+  for(uint d = 0; d < D; ++d){
+    uvec dim_col = uvec{d};
+    double lb = m_bbox(d,0);
+    double ub = m_bbox(d,1);
+    
+    uvec low_mask = find(points.col(d) < lb + m_fudge);
+    points.m_points(normal_rows,dim_col).fill(lb + m_fudge);
+
+    uvec high_mask = find(points.col(d) > ub - m_fudge);
+    points.m_points(normal_rows,dim_col).fill(ub - m_fudge);
+  }  
+}
+
+
+/*
+ * WRAP REMAPPER
+ */
+
+WrapRemapper::WrapRemapper(const mat & bounding_box) :
+  m_bbox(bounding_box){}
+
+
+NodeRemapRegistry WrapRemapper::remapper(const Points & points){
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  assert(D == m_bbox.n_rows);
+  assert(2 == m_bbox.n_cols);
+
+  uvec normal_rows = points.get_normal_mask();
+  NodeRemapRegistry reg;
+  for(uint d = 0; d < D; ++d){
+    if(!is_finite(bbox.row(d)))
+      continue;
+    
+    uvec dim_col = uvec{d};
+    double lb = m_bbox(d,0);
+    double ub = m_bbox(d,1);
+
+    vec tmp = points.col(d) - lb;
+    tmp = vec_mod(tmp, ub - lb);
+    points.col(d) = tmp + lb;
+    
+    assert(not any(points.col(d) > ub));
+    assert(not any(points.col(d) < lb));
+  }   
+}
+

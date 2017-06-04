@@ -46,7 +46,7 @@ void wrap(Points & points,
           const mat &bbox){
   /*
     Wrap points back onto bounding box.
-    Think "toru"s
+    Think "torus"
   */
   
   uint D = points.n_cols;
