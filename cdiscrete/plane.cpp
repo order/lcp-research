@@ -18,7 +18,7 @@ vec RelativePlanesSimulator::get_state_weights(const Points & points) const{
   uint D = points.n_cols;
   assert(TET_NUM_DIM == D);
   
-  vec weight = ones<vec>(N) / (double) N; 
+  vec weight = ones<vec>(N) / (double) N; // Uniform
   return weight;
 }
 
@@ -75,6 +75,8 @@ Points RelativePlanesSimulator::next(const Points & points,
     {-datum::pi,datum::pi}
   };
   wrap(r_points, angle_col, angle_bbox);
+
+  // 
   
   return r_points;
 }
@@ -91,7 +93,7 @@ mat RelativePlanesSimulator::q_mat(const Discretizer * disc) const{
   Q.col(0).head_rows(N) = -get_state_weights(points);
   Q(N-1,0) = 0;  // No weight for the OOB node
 
-  // Fill in costs. OOB has 0 cost regardless.
+  // Fill in costs. OOB has 0 cost (success!).
   Q.tail_cols(A) = join_cols(get_costs(points), zeros<mat>(1,A));
   return Q;
 }
@@ -102,7 +104,7 @@ sp_mat RelativePlanesSimulator::transition_matrix(const Discretizer * disc,
   Points points = disc->get_spatial_nodes();
   uint n = disc->number_of_spatial_nodes();
   uint N = disc->number_of_all_nodes();
-  assert(N == n+1); // single oob node
+  assert(N == points.n_rows + 1); // single oob node
   
   Points p_next = next(points,action);
   ElementDist P = disc->points_to_element_dist(p_next);

@@ -10,6 +10,8 @@ typedef std::map<Index,NodeType> NodeTypeRegistry;
 typedef std::vector<const NodeTypeRules &> NodeTypeRuleList;
 typedef std::vector<const NodeRemapper &> NodeRemapperList;
 
+typedef mat Points; // Basic untyped points
+
 class TypedPoints{
   /*
     Class adding typing information to organize points. Points are either 

@@ -6,7 +6,6 @@
 using namespace std;
 using namespace arma;
 
-typedef mat Points;
 typedef uvec   Indices;
 typedef umat   VertexIndices;
 typedef sp_mat ElementDist;

@@ -3,33 +3,23 @@
 #include "grid.h"
 #include "misc.h"
 
-ostream& operator<< (ostream& os, const OutOfBounds& oob){
-  os << "Indices: " << oob.indices.t();
-  os << "Type: " << oob.type.t();
-  return os;
-}
-
-ostream& operator<< (ostream& os, const Coords& coords){
-  os << "Indices: " << coords.indices.t();
-  os << "Coords:\n" << coords.coords;
-  return os;
-}
-
 uvec c_order_stride(const uvec & points_per_dim){
-  /* Coeffs to converts from grid coords to indicies
-   These are also called "strides"
-   E.g. if the mesh is 3x2 (nodes), then the (node) indices are:
+  /* 
+     Coeffs to converts from grid coords to indicies
+     This logic is used in laying out matrices in memory and also called 
+     a "stride"
+     E.g. if the mesh is 3x2 (nodes), then the (node) indices are:
 
-   4 - 5
-   |   |
-   2 - 3
-   |   |
-   0 - 1
+     4 - 5
+     |   |
+     2 - 3
+     |   |
+     0 - 1
 
-   So, to figure out the index of grid coord (x,y), we just multiply
-   it by the coefficients [2,1].
+     So, to figure out the index of grid coord (x,y), we just multiply
+     it by the coefficients [2,1].
    
-   For 2 and 3 dim, we should exactly match the output of sub2ind
+     For 2 and 3 dim, we should exactly match the output of sub2ind
   */
   
   uint D = points_per_dim.n_elem;
@@ -44,8 +34,34 @@ uvec c_order_stride(const uvec & points_per_dim){
 }
 
 uvec c_order_cell_shift(const uvec & points_per_dim){
-  /* For D-dimensional cells, returns the constant index offsets
-     for the 2**D nodes in a cell.
+  /* 
+     Consider a D-dimenional cell of the grid. There is a least indexed 
+     vertex according to C order. The pattern of indices relative to this 
+     least vertex is fixed: different cells are just offset by a different
+     minimum vertex.
+
+     We index these vertices by their coordinate in binary. E.g. in 2D:
+
+     01 - 11     1 - 3
+      |   |   => |   |
+     00 - 10     0 - 2
+
+     This function returns those constant index offsets.
+
+     E.g. if the grid is:
+
+     6 - 7 - 8
+     |   |   |
+     3 - 4 - 5
+     |   |   |
+     0 - 1 - 2
+
+     Notices that the cell <0,3,1,4> =  <4,7,5,8> - 4; it's the same pattern.
+
+     points_per_dim: the number of points in the grid along each
+     dimension.
+
+     TODO: better comment explaining this
   */
   
   uint D = points_per_dim.n_elem;
@@ -63,6 +79,9 @@ uvec c_order_cell_shift(const uvec & points_per_dim){
 
 Indices coords_to_indices(const Coords & coords,
 			  const uvec & num_entity){
+  /*
+   * Takes in a coordinate block
+   */
   uint N = coords.num_total;
   Indices idx = Indices(N);
 
@@ -104,9 +123,71 @@ UniformGrid::UniformGrid(vec & low,
   m_low(low),
   m_high(high),
   m_num_cells(num_cells),
-  m_num_nodes(num_cells+1),
+  m_num_nodes(num_cells + 1),
   m_width((high - low) / num_cells),
-  m_dim(low.n_elem){}
+  m_dim(low.n_elem){
+  uint D = low.n_elem;
+  assert(D == high.n_elem);
+  assert(D == num_cells);
+}
+
+
+TypedPoints UniformGrid::get_spatial_nodes(){
+  /*
+   * Might want to make this a more general function.
+   * Generates grid points in order.
+   * Later dimensions cycle faster, e.g.:
+   * [0 0]
+   * [0 1]
+   * [0 2]
+   * [1 0]
+   *  ...
+   */
+  uint D = m_low.n_elem;
+  uint N = number_of_spatial_nodes();
+  Points points = Points(N,d);
+
+  // Which cycle iteration we are on
+  uint cycle = 1;
+  // How many times to repeat a value before moving to the next
+  uint repeat = prod(m_num_nodes.tail(D-1));
+  
+  for(uint d = 0; d < D; d++){
+    uint idx = 0;
+    uint nn = m_num_nodes(d);
+    vec values = linspace<vec>(m_low(d), m_high(d), nn);
+
+    // Sanity checks (also explains the update)
+    assert(cycle == prod(m_num_nodes.head(d)));
+    assert(repeat == prod(m_num_nodes.tail(D - d - 1)));
+    assert(N == cycle * repeat * nn);
+      
+    for(uint c = 0; c < cycle; c++){
+      for(uint value_idx = 0; value_idx < nn; value_idx++){
+	for(uint r = 0; r < repeat; r++){
+	  points(idx,d) = values(value_idx);
+      }
+      }
+    }
+
+    // Shift over the cycle and repeat
+    cycle *= m_num_nodes(d);
+    if(d < D - 1){
+      assert(repeat > 1);
+      assert(0 == mod(repeat, m_num_nodes(d+1)));
+      repeat /= m_num_nodes(d+1);
+    }    
+  }
+}
+
+
+  virtual TypedPoints get_cell_centers() const = 0;
+  virtual umat get_cell_node_indices() const = 0;
+
+
+/*
+ * OLD CODE REGION
+ */
 
 OutOfBounds UniformGrid::points_to_out_of_bounds(const Points & points){
   // Two passes: identify the OOB points, then classify
