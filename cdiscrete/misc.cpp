@@ -59,6 +59,15 @@ mat make_points(const vector<vec> & grids)
   return P;
 }
 
+SizeMat uvec2sizemat(const uvec & pair){
+  assert(2 == pair.n_elem);
+  return size(pair(0), pair(1));
+}
+SizeCube uvec2sizecube(const uvec & cube){
+  assert(3 == cube.n_elem);
+  return size(cube(0), cube(1), cube(2)); 
+}
+
 //=================================================
 
 uvec vec_mod(const uvec & a, uint n){

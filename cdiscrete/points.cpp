@@ -22,7 +22,7 @@ uint TypedPoints::get_next_type(){
   return ++m_max_type;
 }
 
-void TypedPoints::register(Index idx, NodeType node_type){
+void TypedPoints::register_type(Index idx, NodeType node_type){
   assert(node_type <= m_max_type);
   assert(idx <= m_points.n_rows);
   

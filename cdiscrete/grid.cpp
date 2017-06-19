@@ -1,7 +1,9 @@
 #include <iostream>
 #include <assert.h>
 #include "grid.h"
-#include "misc.h"
+
+using namespace std;
+using namespace arma;
 
 
 /**************************************************************************
@@ -9,7 +11,9 @@
  ***************************/
 
 
-uvec c_order_stride(const uvec & points_per_dim){
+
+
+uvec c_order_stride(const uvec & grid_size){
   /* 
      Coeffs to converts from grid coords to indicies
      This is a C-style layout, which is row-major for 2d.
@@ -32,27 +36,28 @@ uvec c_order_stride(const uvec & points_per_dim){
      NB: For 2 and 3 dim, we should exactly match the output of arma::sub2ind.
   */
   
-  uint D = points_per_dim.n_elem;
+  uint D = grid_size.n_elem;
   uvec stride = uvec(D);
 
   uint agg = 1;
   for(uint d = D; d > 0; --d){
     stride(d-1) = agg;
-    agg *= points_per_dim(d - 1);
+    agg *= grid_size(d - 1);
   }
 
   // Check for 2 and 3 dimensions
-  if(2 == D || 3 == D){
-    uvec stride_check = uvec(D);
-    uvec sub = zeros<uvec>(D);
-    for(uint d = D; d < 0; d++){
-      sub(d) = 1;
-      stride_check(d) = sub2ind(sub);
-      sub(d) = 0;
-    }
+  if(2 == D){
+    SizeMat sz = uvec2sizemat(grid_size);
+    umat I = eye<umat>(2,2);
+    uvec stride_check = sub2ind(sz, I);
     assert(all(stride_check == stride));
   }
-    
+  else if(3 == D){
+    SizeCube sz = uvec2sizecube(grid_size);
+    umat I = eye<umat>(3,3);
+    uvec stride_check = sub2ind(sz, I);     
+    assert(all(stride_check == stride));
+  }    
   return stride;
 }
 
@@ -107,7 +112,7 @@ uvec c_order_cell_shift(const uvec & points_per_dim){
  ********************/
 
 
-Coords::Coords(const umat & coords){
+Coords::Coords(const imat & coords){
   m_coords = coords;
   n_rows = coords.n_rows;
   n_dim = coords.n_cols;
@@ -117,35 +122,26 @@ Coords::Coords(const umat & coords){
 }
 
 
-static bool Coords::_coord_check(){
+bool Coords::_coord_check(){
   /*
    * Check to make sure that the coordinates make sense with the supplied
    * grid sizes, and that non-spatial coords are NaN'd out correctly
    */
-  for(uint idx = 0; idx < m_coords.n_rows; ++idx;)
+  for(uint idx = 0; idx < m_coords.n_rows; ++idx){
     ivec const& row_ref = m_coords.row(idx);
-    if(has_nan(row_ref)){ // Has at least one NaN
-      if(find_finite(row_ref).n_elem > 0){
-	// Not all NaN
-	assert(0 == find_finite(row_ref).n_elem);
-	return false;
-      }
-      if(m_type_map::end() == m_type_map.find(idx)){
-	// Not added to m_type_mape
-	assert(m_type_map::end() != m_type_map.find(idx));
-	return false;
-      }
-      continue;
-    }
-    assert(0 == find_nonfinite(row_ref)); // No infs
+    uvec find_res = find_non_finite(row_ref);
+    assert(0 == find_res.n_elem || row_ref.n_elem == find_res.n_elem);
 
+    if(find_res.n_elem > 0){
+      assert(m_type_map::end() != m_type_map.find(idx));
+    }
   }
   return true;
 }
 
 
-static Coords Coords::_indices_to_coords(const uvec & grid_size,
-				       const uvec & indices){
+static Coords Coords::_indicies_to_coords(const uvec & grid_size,
+					  const uvec & indices){
   /*
    * Convert indices into coordinates by repeated modulus.
    * NB: makes sense because c-order stride is in decreasing order

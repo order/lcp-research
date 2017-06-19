@@ -18,6 +18,9 @@ void print_shape(const mat & A);
 // Make points from a grdi
 mat make_points(const std::vector<vec> & grids);
 
+SizeMat uvec2sizemat(const uvec & pair);
+SizeCube uvec2sizecube(const uvec & cube);
+
 //=====================================
 // BOOLEAN
 typedef Col<unsigned char> bvec; // boolean vector; bool doesn't work in arma
@@ -120,4 +123,5 @@ block_sp_mat sp_partition(const sp_mat & A,
 sp_mat sp_normalise(const sp_mat & A,uint p,uint d);
 
 double sparsity(const sp_mat & A);
+
 #endif

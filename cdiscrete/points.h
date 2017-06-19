@@ -1,14 +1,68 @@
 #ifndef __Z_POINTS_INCLUDED__
 #define __Z_POINTS_INCLUDED__
 
+#include <armadillo>
+
 #define EUCLIDEAN_TYPE 0
 #define SPECIAL_FILL arma::datum::nan
 
 typedef std::map<uint,uint> TypeRegistry;
-typedef std::vector<const TypeRules &> TypeRuleList;
+typedef arma::mat Points; // Basic untyped points
+
+/*****************************************************
+ * TYPING RULES *
+ ****************/
+class TypeRule{
+ public:
+  /*
+    Apply rule to point set. Any special points found are returned in a
+    map from indices to types.
+  */
+  virtual TypeRegistry type_elements(const Points & points) const = 0;
+};
+typedef std::vector<const TypeRule &> TypeRuleList;
+
+class OutOfBoundsRule : public TypeRule{
+  OutOfBoundsRule(const arma::mat & bounding_box, uint oob_type);
+  TypeRegistry type_elements(const Points & points);
+ protected:
+  arma::mat m_bbox;
+  uint m_type;
+};
+
+
+
+class NodeRemapper{
+ public:
+  /*
+    Apply remapping rule to point set. 
+    Any remapped points found are returned in a map from indices to new 
+    vectors.
+  */  
+  virtual void remap(Points & points) const = 0;
+};
 typedef std::vector<const NodeRemapper &> NodeRemapperList;
 
-typedef mat Points; // Basic untyped points
+
+class SaturateRemapper : public NodeRemapper{
+  SaturateRemapper(const arma::mat & bounding_box);
+  void remapper(Points & points);
+  
+ protected:
+  arma::mat m_bbox;
+};
+
+class WrapRemapper : public NodeRemapper{
+  WrapRemapper(const arma::mat & bounding_box);
+  void remapper(Points & points);
+  
+ protected:
+  arma::mat m_bbox;
+};
+
+/************************************************************
+ * POINT TYPE OBJECT *
+ *********************/
 
 class TypedPoints{
   /*
@@ -28,13 +82,13 @@ class TypedPoints{
 
   // Registry functions
   uint get_next_type(); // Max registry keys + 1
-  void register(uint idx, uint ntype); // Add new element to registry
+  void register_type(uint idx, uint ntype); // Add new element to registry
   uint num_special_nodes() const;
   uint num_normal_nodes() const;
   uint num_all_nodes() const;
 
-  uvec get_normal_mask() const;
-  uvec get_special_mask() const;
+  arma::uvec get_normal_mask() const;
+  arma::uvec get_special_mask() const;
 
   // Run rules for typing and remapping.
   void apply_typing_rule(const TypeRule & rule);
@@ -43,7 +97,7 @@ class TypedPoints{
   void apply_remappers(const NodeRemapperList & remappers);
   
   Points m_points;
-  NodeTypeRegistry m_reg;
+  TypeRegistry m_reg;
 
   bool check_validity() const;
 
@@ -52,52 +106,10 @@ class TypedPoints{
   uint m_max_type;
 };
 
-class TypeRule{
- public:
-  /*
-    Apply rule to point set. Any special points found are returned in a
-    map from indices to types.
-  */
-  virtual TypeRegistry type_elements(const mat & points) const = 0;
-}
 
-class NodeRemapper{
- public:
-  /*
-    Apply remapping rule to point set. 
-    Any remapped points found are returned in a map from indices to new 
-    vectors.
-  */  
-  virtual void remap(Points & points) const = 0;
-}
+// MISC FUNCTIONS
 
-class OutOfBoundsRule : public TypeRule(){
-  OutOfBoundsRule(const mat & bounding_box, uint oob_type);
-  TypeRegistry type_elements(const mat & points);
- protected:
-  mat m_bbox;
-  uint m_type;
-}
-
-class SaturateRemapper : public NodeRemapper{
-  SaturateRemapper(const mat & bounding_box);
-  void remapper(Points & points);
-  
- protected:
-  mat m_bbox;
-}
-
-class WrapRemapper : public NodeRemapper{
-  SaturateRemapper(const mat & bounding_box);
-  void remapper(Points & points);
-  
- protected:
-  mat m_bbox;
-}
-
-bool check_bounding_box(const mat & bbox);
-
-
+bool check_bounding_box(const arma::mat & bbox);
 
 
 #endif
