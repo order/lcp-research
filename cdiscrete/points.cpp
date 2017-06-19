@@ -142,7 +142,7 @@ OutOfBoundsRule::OutOfBoundsRule(const mat & bounding_box,
   assert(check_bounding_box(m_bbox));
 }
 
-NodeTypeRegistry OutOfBoundsRule::type_elements(const TypedPoints & points){
+TypeRegistry OutOfBoundsRule::type_elements(const mat & points){
   uint N = points.n_rows;
   uint D = points.n_cols;
   assert(D == m_bbox.n_rows);

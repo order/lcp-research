@@ -4,10 +4,8 @@
 #define EUCLIDEAN_TYPE 0
 #define SPECIAL_FILL arma::datum::nan
 
-typedef uint NodeType;  // Node types
-typedef uint Index;
-typedef std::map<Index,NodeType> NodeTypeRegistry;
-typedef std::vector<const NodeTypeRules &> NodeTypeRuleList;
+typedef std::map<uint,uint> TypeRegistry;
+typedef std::vector<const TypeRules &> TypeRuleList;
 typedef std::vector<const NodeRemapper &> NodeRemapperList;
 
 typedef mat Points; // Basic untyped points
@@ -24,13 +22,13 @@ class TypedPoints{
     NB: The assumption is that most nodes are Euclidean and "normal".
   */
  public:
-  TypedPoints(const Points & points, const NodeTypeRegistry & reg);
+  TypedPoints(const Points & points, const TypeRegistry & reg);
   TypedPoints(const Points & points);
   TypedPoints();
 
   // Registry functions
   uint get_next_type(); // Max registry keys + 1
-  void register(Index idx, NodeType ntype); // Add new element to registry
+  void register(uint idx, uint ntype); // Add new element to registry
   uint num_special_nodes() const;
   uint num_normal_nodes() const;
   uint num_all_nodes() const;
@@ -39,8 +37,8 @@ class TypedPoints{
   uvec get_special_mask() const;
 
   // Run rules for typing and remapping.
-  void apply_typing_rule(const NodeTypeRule & rule);
-  void apply_typing_rules(const NodeTypeRuleList & rules);
+  void apply_typing_rule(const TypeRule & rule);
+  void apply_typing_rules(const TypeRuleList & rules);
   void apply_remapper(const NodeRemapper & remapper);
   void apply_remappers(const NodeRemapperList & remappers);
   
@@ -54,13 +52,13 @@ class TypedPoints{
   uint m_max_type;
 };
 
-class NodeTypeRule{
+class TypeRule{
  public:
   /*
     Apply rule to point set. Any special points found are returned in a
     map from indices to types.
   */
-  virtual NodeTypeRegistry type_elements(const Points & points) const = 0;
+  virtual TypeRegistry type_elements(const mat & points) const = 0;
 }
 
 class NodeRemapper{
@@ -73,12 +71,12 @@ class NodeRemapper{
   virtual void remap(Points & points) const = 0;
 }
 
-class OutOfBoundsRule : public NodeTypeRule(){
-  OutOfBoundsRule(const mat & bounding_box, NodeType oob_type);
-  NodeTypeRegistry type_elements(const Points & points);
+class OutOfBoundsRule : public TypeRule(){
+  OutOfBoundsRule(const mat & bounding_box, uint oob_type);
+  TypeRegistry type_elements(const mat & points);
  protected:
   mat m_bbox;
-  NodeType m_type;
+  uint m_type;
 }
 
 class SaturateRemapper : public NodeRemapper{
