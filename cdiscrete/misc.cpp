@@ -65,6 +65,18 @@ uvec vec_mod(const uvec & a, uint n){
   return a - (a / n) * n;
 }
 
+umat divmod(const uvec & a, uint n){
+  /*
+   * Returns two columns:
+   * 1) Multiplier floor(a / n)
+   * 2) Mod (a % n)
+   */
+  mat ret = mat(a.n_elem, 2);
+  ret.col(0) = floor(a/n);
+  ret.col(1) = a - ret.col(0) * n;
+  return ret;
+}
+
 vec vec_mod(const vec & a, double n){
   return a - floor(a / n) * n;
 }

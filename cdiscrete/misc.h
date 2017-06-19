@@ -28,6 +28,7 @@ typedef Col<unsigned char> bvec; // boolean vector; bool doesn't work in arma
 // Element-wise modulus
 
 uvec vec_mod(const uvec & a, uint n);
+umat divmod(const uvec & a, uint n);
 vec vec_mod(const vec & a, double n);
 
 // Interval

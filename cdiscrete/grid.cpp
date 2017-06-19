@@ -3,11 +3,18 @@
 #include "grid.h"
 #include "misc.h"
 
+
+/**************************************************************************
+ * STRIDE HELPER FUNCTIONS *
+ ***************************/
+
+
 uvec c_order_stride(const uvec & points_per_dim){
   /* 
      Coeffs to converts from grid coords to indicies
-     This logic is used in laying out matrices in memory and also called 
-     a "stride"
+     This is a C-style layout, which is row-major for 2d.
+     Elements of a row will be adjacent in memory, elements of a column
+     may be disjoint.
      E.g. if the mesh is 3x2 (nodes), then the (node) indices are:
 
      4 - 5
@@ -16,22 +23,39 @@ uvec c_order_stride(const uvec & points_per_dim){
      |   |
      0 - 1
 
-     So, to figure out the index of grid coord (x,y), we just multiply
-     it by the coefficients [2,1].
+     To figure out the index of grid coord (x,y), we just multiply
+     it by the coefficients [2,1]; this vector is what the function returns.
+
+     For higher order tensors, the indexing will be contiguous for the last 
+     dimension.
    
-     For 2 and 3 dim, we should exactly match the output of sub2ind
+     NB: For 2 and 3 dim, we should exactly match the output of arma::sub2ind.
   */
   
   uint D = points_per_dim.n_elem;
   uvec stride = uvec(D);
 
   uint agg = 1;
-  for(uint i = D; i > 0; --i){
-    stride(i-1) = agg;
-    agg *= points_per_dim(i-1);
+  for(uint d = D; d > 0; --d){
+    stride(d-1) = agg;
+    agg *= points_per_dim(d - 1);
   }
+
+  // Check for 2 and 3 dimensions
+  if(2 == D || 3 == D){
+    uvec stride_check = uvec(D);
+    uvec sub = zeros<uvec>(D);
+    for(uint d = D; d < 0; d++){
+      sub(d) = 1;
+      stride_check(d) = sub2ind(sub);
+      sub(d) = 0;
+    }
+    assert(all(stride_check == stride));
+  }
+    
   return stride;
 }
+
 
 uvec c_order_cell_shift(const uvec & points_per_dim){
   /* 
@@ -47,7 +71,6 @@ uvec c_order_cell_shift(const uvec & points_per_dim){
      00 - 10     0 - 2
 
      This function returns those constant index offsets.
-
      E.g. if the grid is:
 
      6 - 7 - 8
@@ -57,6 +80,7 @@ uvec c_order_cell_shift(const uvec & points_per_dim){
      0 - 1 - 2
 
      Notices that the cell <0,3,1,4> =  <4,7,5,8> - 4; it's the same pattern.
+     This patter, <0,3,1,4> is the "C-order cell shift".
 
      points_per_dim: the number of points in the grid along each
      dimension.
@@ -77,10 +101,89 @@ uvec c_order_cell_shift(const uvec & points_per_dim){
   return shifts;
 }
 
-Indices coords_to_indices(const Coords & coords,
-			  const uvec & num_entity){
+
+/************************************************************************
+ * COORDINATE CLASS *
+ ********************/
+
+
+Coords::Coords(const uvec & grid_size, const mat & coords) : 
+  m_grid_size(grid_size), m_dim(grid_size.size()){
+  assert(_coord_check(grid_size, coords));
+  m_coords = coords;
+  m_num_coords = prod(m_grid_size);
+}
+
+
+Coords::Coords(const uvec & grid_size, const uvec & indices) :
+  m_grid_size(grid_size), m_dim(grid_size.size()){
+  m_num_coords = prod(m_grid_size);
+
+  assert(all(indices < m_num_coords)); // No oob nodes
+  m_coords = _indices_to_coords(m_grid_size, indices);
+}
+
+
+static bool _coord_check(const uvec & grid_size, const mat & coords){
+  for(uint i = 0; i < coords.n_rows; i++){
+    if(has_nan(coords.row[i])){
+      // All nan, or all finite.
+      if(find_finite(coords.row[i]).n_elem > 0){
+	assert(0 == find_finite(coords.row[i]).n_elem);
+	return false;
+      }
+      continue;
+    }
+
+    // Everything is finite and spatial
+    assert(0 == find_nonfinite(coords.row[i])); // No infs
+    if(any(coords.row[i] < 0)){
+      assert(all(0 <= coords.row[i]));
+      return false;
+    }
+    if(any(coords.row[i] >= grid_size)){
+      assert(any(coords.row[i] >= grid_size));
+      return false;
+            
+    }
+  }
+  return true;
+}
+
+
+static umat Coords::_indices_to_coords(const uvec & grid_size,
+				       const uvec & indices){
   /*
-   * Takes in a coordinate block
+   * Convert indices into coordinates by repeated modulus.
+   * NB: makes sense because c-order stride is in decreasing order
+   */
+  uvec stride = c_order_stride(grid_size);
+  coords = mat(indices.n_elem, m_dim);
+
+  umat mod_res = mat(indices.n_elem,2);
+  mod_res.col(1) = indices;
+  for(uint d = 0; d < m_dim; d++){
+    mod_res = div_mod(mod_res.col(1), stride(d));
+    coords.col(d) = mod_res.col(0);
+  }
+
+  // NaN out any non-spatial nodes
+  // NB: assumption is that there are relatively few of these usually.
+  uint first_non_spatial = prod(grid_size);
+  uvec non_spatial = find(indices >= first_non_spatial);
+  coords.rows(non_spatial).fill(datum::nan);
+
+  assert(_coord_check(grid_size, coords));
+  
+  return coords;
+}
+
+
+static uvec Coords::_coords_to_indices(const uvec & grid_size,
+				       const Coords & coords){
+  /*
+   * Takes in a coordinate block and grid size; return 
+   * node index that the 
    */
   uint N = coords.num_total;
   Indices idx = Indices(N);
@@ -117,6 +220,12 @@ Indices coords_to_indices(const Coords & coords,
   return idx;
 }
 
+
+/***************************************************************************
+ * UNIFORM GRID CLASS *
+ **********************/
+
+
 UniformGrid::UniformGrid(vec & low,
 			  vec & high,
 			 uvec & num_cells) :
@@ -134,58 +243,70 @@ UniformGrid::UniformGrid(vec & low,
 
 TypedPoints UniformGrid::get_spatial_nodes(){
   /*
-   * Might want to make this a more general function.
-   * Generates grid points in order.
    * Later dimensions cycle faster, e.g.:
    * [0 0]
-   * [0 1]
-   * [0 2]
-   * [1 0]
+   * [0 0.1]
+   * [0 0.2]
+   * [1.5 0]
+   * [1.5 0.1]
    *  ...
    */
-  uint D = m_low.n_elem;
-  uint N = number_of_spatial_nodes();
-  Points points = Points(N,d);
-
-  // Which cycle iteration we are on
-  uint cycle = 1;
-  // How many times to repeat a value before moving to the next
-  uint repeat = prod(m_num_nodes.tail(D-1));
-  
-  for(uint d = 0; d < D; d++){
-    uint idx = 0;
-    uint nn = m_num_nodes(d);
-    vec values = linspace<vec>(m_low(d), m_high(d), nn);
-
-    // Sanity checks (also explains the update)
-    assert(cycle == prod(m_num_nodes.head(d)));
-    assert(repeat == prod(m_num_nodes.tail(D - d - 1)));
-    assert(N == cycle * repeat * nn);
-      
-    for(uint c = 0; c < cycle; c++){
-      for(uint value_idx = 0; value_idx < nn; value_idx++){
-	for(uint r = 0; r < repeat; r++){
-	  points(idx,d) = values(value_idx);
-      }
-      }
+  vector<vec> marginal_grids;
+  for(uint d = 0; d < m_dim; d++){
+    vec mg = linspace<vec>(m_low(d),
+			   m_high(d),
+			   num_num_nodes(d));
+    if(mg.size() > 1){
+      // Make sure the grid width is expected.
+      assert(abs(mg(1) - mg(0) - m_width(d)) < PRETTY_SMALL);
     }
-
-    // Shift over the cycle and repeat
-    cycle *= m_num_nodes(d);
-    if(d < D - 1){
-      assert(repeat > 1);
-      assert(0 == mod(repeat, m_num_nodes(d+1)));
-      repeat /= m_num_nodes(d+1);
-    }    
+    marginal_grids.push_back(mg);
   }
+  Points points = make_points(marginal_grids);
+  assert(number_of_spatial_nodes() == points.n_rows);
+  return TypedPoints(points);
 }
 
 
-  virtual TypedPoints get_cell_centers() const = 0;
-  virtual umat get_cell_node_indices() const = 0;
+TypedPoints UniformGrid::get_cell_centers(){\
+  /*
+   * Like above, but one less point per dimension, and shifted to the middle
+   * of the range
+   */
+  vector<vec> marginal_grids;
+  for(uint d = 0; d < m_dim; d++){
+    vec mg = linspace<vec>(m_low(d) + 0.5 * m_width(d),
+			   m_high(d) - 0.5 * m_width(d),
+			   num_num_cells(d));
+    marginal_grids.push_back(mg);
+  }
+  Points points = make_points(marginal_grids);
+  assert(number_of_cells() == points.n_rows);
+  return TypedPoints(points);
+}
+
+umat UniformGrid::get_cell_node_indices(){
+  /*
+   * Go through the cells in C order, and print the 
+   * node ids associated with the cells.
+   */
+  vector<vec> marginal_coords;
+  for(uint d = 0; d < m_dim; d++){
+    vec mc = linspace<vec>(,
+			   m_high(d) - 0.5 * m_width(d),
+			   num_num_cells(d));
+    marginal_coords.push_back(mc);
+  }
+  Points coords = make_points(marginal_coords);
+  assert(number_of_cells() == coords.n_rows);
+
+  coords
+}
 
 
-/*
+
+
+/***********************************************************************
  * OLD CODE REGION
  */
 
