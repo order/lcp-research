@@ -122,26 +122,39 @@ Coords::Coords(const imat & coords){
 }
 
 
-bool Coords::_coord_check(){
+bool Coords::_check(const uvec & grid_size) const{
+  assert(_coord_check(grid_size, m_coords));
+  assert(_type_reg_check(m_type_map, m_coords));
+}
+
+
+bool Coords::_coord_check(const uvec & grid_size, const umat & coords) const{
   /*
    * Check to make sure that the coordinates make sense with the supplied
    * grid sizes, and that non-spatial coords are NaN'd out correctly
    */
-  for(uint idx = 0; idx < m_coords.n_rows; ++idx){
-    ivec const& row_ref = m_coords.row(idx);
-    uvec find_res = find_non_finite(row_ref);
+  for(uint idx = 0; idx < coords.n_rows; ++idx){
+    ivec const& row_ref = coords.row(idx);
+    uvec find_res = find_nonfinite(row_ref);
     assert(0 == find_res.n_elem || row_ref.n_elem == find_res.n_elem);
+    if(0 == find_res.n_elem)
+      assert(all(row_ref < grid_size));
+  }
+  return true;
+}
 
-    if(find_res.n_elem > 0){
-      assert(m_type_map::end() != m_type_map.find(idx));
-    }
+bool Coords::_type_reg_check(const TypeRegistry & registry, const umat & coords){
+  uvec find_res = find_nonfinite(coords.col(0));
+  for(auto const& it = find_res){
+    assert(registry.end() != registry.find(*it));
   }
   return true;
 }
 
 
-static Coords Coords::_indicies_to_coords(const uvec & grid_size,
-					  const uvec & indices){
+
+Coords Coords::_indicies_to_coords(const uvec & grid_size,
+				   const uvec & indices) const {
   /*
    * Convert indices into coordinates by repeated modulus.
    * NB: makes sense because c-order stride is in decreasing order
@@ -151,20 +164,19 @@ static Coords Coords::_indicies_to_coords(const uvec & grid_size,
   assert(all(indices <= max_idx)); // Only one OOB
   
   uvec stride = c_order_stride(grid_size);
-  umat coords = mat(indices.n_elem, m_dim);
+  umat coords = umat(indices.n_elem, n_dim);
 
-  umat mod_res = mat(indices.n_elem,2);
+  umat mod_res = umat(indices.n_elem, 2);
   mod_res.col(1) = indices;
-  for(uint d = 0; d < m_dim; d++){
-    mod_res = div_mod(mod_res.col(1), stride(d));
+  for(uint d = 0; d < n_dim; d++){
+    mod_res = divmod(mod_res.col(1), stride(d));
     coords.col(d) = mod_res.col(0);
   }
 
   // NaN out any non-spatial nodes
   // NB: assumption is that there are relatively few of these usually.
-  uvec non_spatial = find(indices >= m_spatial_max);
+  uvec non_spatial = find(indices >= max_idx);
   coords.rows(non_spatial).fill(datum::nan);
-  _mark(non_spatial, Coords::OOB_COORD);
 
   assert(_coord_check(grid_size, coords));
   
@@ -173,7 +185,7 @@ static Coords Coords::_indicies_to_coords(const uvec & grid_size,
 
 
 static uvec Coords::_coords_to_indices(const uvec & grid_size,
-				       const Coords & coords){
+				       const Coords & coords) const{
   coords.restrict(grid_size);  // Make sure oob points marked as such
   
   uint N = coords.n_rows;
@@ -200,6 +212,7 @@ void Coords::_mark(const uvec & indices, uint coord_type){
   }
 }
 
+
 void Coords::_mark(const TypeRegistry & reg){
   /*
    * Go through and add the indices to the type map with the supplied
@@ -207,7 +220,6 @@ void Coords::_mark(const TypeRegistry & reg){
    */
   for(auto const & it : indices){
     assert(it->second != SPATIAL_COORD);
-
     m_type_map[it->first] = it->second;
     m_coords.row(it->first).fill(datum::nan);
   }
@@ -256,7 +268,7 @@ UniformGrid::UniformGrid(vec & low,
   m_num_cells(num_cells),
   m_num_nodes(num_cells + 1),
   m_width((high - low) / num_cells),
-  m_dim(low.n_elem){
+  n_dim(low.n_elem){
   uint D = low.n_elem;
   assert(D == high.n_elem);
   assert(D == num_cells);
@@ -274,7 +286,7 @@ TypedPoints UniformGrid::get_spatial_nodes(){
    *  ...
    */
   vector<vec> marginal_grids;
-  for(uint d = 0; d < m_dim; d++){
+  for(uint d = 0; d < n_dim; d++){
     vec mg = linspace<vec>(m_low(d),
 			   m_high(d),
 			   num_num_nodes(d));
@@ -296,7 +308,7 @@ TypedPoints UniformGrid::get_cell_centers(){\
    * of the range
    */
   vector<vec> marginal_grids;
-  for(uint d = 0; d < m_dim; d++){
+  for(uint d = 0; d < n_dim; d++){
     vec mg = linspace<vec>(m_low(d) + 0.5 * m_width(d),
 			   m_high(d) - 0.5 * m_width(d),
 			   num_num_cells(d));
@@ -313,7 +325,7 @@ umat UniformGrid::get_cell_node_indices(){
    * node ids associated with the cells.
    */
   vector<vec> marginal_coords;
-  for(uint d = 0; d < m_dim; d++){
+  for(uint d = 0; d < n_dim; d++){
     uvec mc = regspace<uvec>(0,m_num_cells(d));
     marginal_coords.push_back(mc);
   }
@@ -332,9 +344,9 @@ uvec UniformGrid::cell_coords_to_low_node_indices(const Coords & coords){
 
 uvec UniformGrid::cell_coords_to_vertices(const Coords & coords){
   uint N = coords.number_of_all_coords();
-  uint D = coords.m_dim;
+  uint D = coords.n_dim;
   uint V = pow(2.0,D);
-  assert(m_dim == D);
+  assert(n_dim == D);
   
   uvec shift = c_order_cell_shift(m_num_nodes);
   assert(shift.n_elem == V);
@@ -362,7 +374,7 @@ OutOfBounds UniformGrid::points_to_out_of_bounds(const Points & points){
   // Two passes: identify the OOB points, then classify
   uint N = points.n_rows;
   uint D = points.n_cols;
-  assert(D == m_dim);
+  assert(D == n_dim);
 
   // Generate the mask
   OutOfBounds oob;
@@ -392,7 +404,7 @@ OutOfBounds UniformGrid::points_to_out_of_bounds(const Points & points){
 Coords UniformGrid::points_to_cell_coords(const Points & points){
   uint N = points.n_rows;
   uint D = points.n_cols;
-  assert(D == m_dim);
+  assert(D == n_dim);
 
   Coords coords;
   coords.oob = this->points_to_out_of_bounds(points);

@@ -12,8 +12,6 @@
 using namespace std;
 using namespace arma;
 
-typedef std::map<uint,uint> CoordTypeRegistry;
-
 uvec c_order_stride(const uvec & points_per_dim);
 uvec c_order_cell_shift(const uvec & points_per_dim);
 
@@ -24,11 +22,13 @@ class Coords{
   
   Coords(const imat & coords);
 
-  bool _coord_check();
-  static Coords _indicies_to_coords(const uvec & grid_size,
-				    const uvec & indices);
-  static uvec _coords_to_indices(const uvec & grid_size,
-				 const Coords & coords);
+  bool _check(const uvec & grid_size) const;
+  bool _coord_check(const uvec & grid_size, const umat & coords) const;
+  bool _type_reg_check(const TypeRegistry & registry, const umat & coords);
+  umat _indicies_to_coords(const uvec & grid_size,
+			     const uvec & indices) const;
+  uvec _coords_to_indices(const uvec & grid_size,
+			  const Coords & coords) const;
   void _mark(const uvec & indices, uint coord_type);
   void _mark(const TypeRegistry & reg);
  
@@ -43,7 +43,7 @@ class Coords{
   imat m_coords;
   uint n_rows;
   uint n_dim;
-  CoordTypeRegistry m_type_map;
+  TypeRegistry m_type_map;
 };
 
 class UniformGrid : public TypedDiscretizer{
@@ -77,7 +77,7 @@ class UniformGrid : public TypedDiscretizer{
   uvec m_num_nodes;
   vec m_width;
 
-  uint m_dim;
+  uint n_dim;
 };
 
 ElementDist pack_vertices_and_weights(uint num_total_nodes,
