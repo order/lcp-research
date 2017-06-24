@@ -118,7 +118,7 @@ Coords::Coords(const imat & coords){
   n_dim = coords.n_cols;
 
   uvec special = find_nonfinite(coords.col(0));
-  _mark(special, Coords::OOB_COORD);
+  _mark(special, Coords::OOB_TYPE);
 }
 
 
@@ -133,19 +133,21 @@ bool Coords::_coord_check(const uvec & grid_size, const umat & coords) const{
    * Check to make sure that the coordinates make sense with the supplied
    * grid sizes, and that non-spatial coords are NaN'd out correctly
    */
-  for(uint idx = 0; idx < coords.n_rows; ++idx){
-    ivec const& row_ref = coords.row(idx);
-    uvec find_res = find_nonfinite(row_ref);
-    assert(0 == find_res.n_elem || row_ref.n_elem == find_res.n_elem);
-    if(0 == find_res.n_elem)
-      assert(all(row_ref < grid_size));
-  }
+
+  uvec ref_nan = find_nonfinite(coords.col(0));
+  uvec ref_fin = find_finite(coords.col(0));
+  assert(0 == find_finite(coords.rows(ref_nan)));
+  assert(0 == find_non_finite(coords.rows(ref_fin)));
+  
+  imat signed_coords = conv_to<imat>::from(coords);
+  signed_coords.each_row() -= conv_to<ivec>::from(grid_size);
+  assert(all(signed_coords < 0));
   return true;
 }
 
 bool Coords::_type_reg_check(const TypeRegistry & registry, const umat & coords){
   uvec find_res = find_nonfinite(coords.col(0));
-  for(auto const& it = find_res){
+  for(auto const& it : find_res){
     assert(registry.end() != registry.find(*it));
   }
   return true;
@@ -153,8 +155,8 @@ bool Coords::_type_reg_check(const TypeRegistry & registry, const umat & coords)
 
 
 
-Coords Coords::_indicies_to_coords(const uvec & grid_size,
-				   const uvec & indices) const {
+umat Coords::_indicies_to_coords(const uvec & grid_size,
+				 const uvec & indices) const {
   /*
    * Convert indices into coordinates by repeated modulus.
    * NB: makes sense because c-order stride is in decreasing order
@@ -184,19 +186,25 @@ Coords Coords::_indicies_to_coords(const uvec & grid_size,
 }
 
 
-static uvec Coords::_coords_to_indices(const uvec & grid_size,
-				       const Coords & coords) const{
-  coords.restrict(grid_size);  // Make sure oob points marked as such
-  
-  uint N = coords.n_rows;
-  uvec idx = Indices(N);
+uvec Coords::_coords_to_indices(const uvec & grid_size,
+				const Coords & coords) const{
+  // Calculate indices for normal coords
 
-  uvec stride = c_order_stride(num_entity);
-  uvec indices = coords.m_coords * stride;
-  for(auto const & it : m_type_map){
-    indices(it->first) = it->second;
+  // TODO: convert coords to uvec somehow
+  uvec stride = c_order_stride(grid_size);
+  umat indices = coords.m_coords * stride; 
+
+  // OOB special indices
+  TypeRegistry oob_reg = coords._find_oob(grid_size);
+  uint special_idx = max_spatial_index(grid_size);
+  for(auto const & it : oob_reg){
+    assert(SPATIAL_TYPE != it->second);
+    indices(it.first) = it.second + special_idx;
   }
+
+  // Check that everything has been updated.
   assert(0 == find_nonfinite(indices));
+  
   return indices;
 }
 
@@ -219,40 +227,55 @@ void Coords::_mark(const TypeRegistry & reg){
    * coord_type
    */
   for(auto const & it : indices){
-    assert(it->second != SPATIAL_COORD);
+    assert(it->second != SPATIAL_TYPE);
     m_type_map[it->first] = it->second;
     m_coords.row(it->first).fill(datum::nan);
   }
 }
 
-void Coords::restrict(const uvec & grid_size){
- 
+
+TypeRegistry Coords::_find_oob(const uvec & grid_size) const{
+  // Make the bounding box, and OOB rule
   mat bbox = zeros(n_dim,2);
   bbox.col(1) = grid_size - 1;
-  OutOfBoundsRule rule = OutOfBoundsRule(bbox, 1);
+  OutOfBoundsRule oob_rule = OutOfBoundsRule(bbox, OOB_TYPE);
 
-  
-  TypeRegistry reg = rule.type_element(m_coords);
-  m_type_map.insert(reg.begin(), reg.end());  
-  for(auto const& it: reg){
-    m_coord.row(it->first).fill(datum::nan);
-  }
+  // Apply the rule to get OOB rows
+  return rule.type_element(m_coords);
 }
 
 
-uint Coords::number_of_spatial_coords(){
+void Coords::restrict_coords(const uvec & grid_size){
+  /*
+   * Check which coordinate rows violate the grid, and 
+   * NaN them out.
+   */
+
+  // Apply the rule to get OOB rows
+  TypeRegistry reg = _find_oob(grid_size);
+  m_type_map.insert(reg.begin(), reg.end());  
+  _mark(m_type_map);
+}
+
+
+uint Coords::number_of_spatial_coords() const{
   return number_of_all_coords() - number_of_special_coords();
 }
 
 
-uint Coords::number_of_all_coords(){
+uint Coords::number_of_all_coords() const{
   return m_coords.n_rows;
 }
 
 
-uint Coords::number_of_all_coords(){
+uint Coords::number_of_all_coords() const{
   return m_type_map.size();
 }
+
+uint Coords::max_spatial_index(const uvec & grid_size) const{
+  return prod(grid_size) - 1;
+}
+
 
 
 /***************************************************************************

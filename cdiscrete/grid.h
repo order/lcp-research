@@ -17,8 +17,8 @@ uvec c_order_cell_shift(const uvec & points_per_dim);
 
 class Coords{
  public:
-  static const uint SPATIAL_COORD = 0;
-  static const uint OOB_COORD = 1;
+  static const uint SPATIAL_TYPE = 0;
+  static const uint OOB_TYPE = 1;
   
   Coords(const imat & coords);
 
@@ -31,12 +31,13 @@ class Coords{
 			  const Coords & coords) const;
   void _mark(const uvec & indices, uint coord_type);
   void _mark(const TypeRegistry & reg);
- 
+  TypeRegistry _find_oob(const uvec & grid_size) const;
   void restrict_coords(const uvec & grid_size);
 
   uint number_of_spatial_coords() const;
   uint number_of_all_coords() const;
   uint number_of_special_coords() const;
+  uint max_spatial_index(const uvec & grid_size) const;
 
   uvec get_indices() const;
   
