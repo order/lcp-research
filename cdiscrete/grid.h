@@ -17,7 +17,6 @@ uvec c_order_cell_shift(const uvec & points_per_dim);
 
 class Coords{
  public:
-  static const uint SPATIAL_TYPE = 0;
   static const uint OOB_TYPE = 1;
 
   Coords(const umat & coords);
@@ -51,16 +50,15 @@ class UniformGrid : public TypedDiscretizer{
  public:
   UniformGrid(vec & low,  // Least vertex of rectangular region
 	      vec & high, // Greatest vertex of rectangular region
-	      uvec & num_cells); // Fineness (in cells) of discretization
+	      uvec & num_cells, // Resolution (in cells) of discretization
+	      uint special_nodes); // Number of special (i.e. oob) nodes 
 
   TypedPoints get_spatial_nodes() const;
   TypedPoints get_cell_centers() const;
   umat get_cell_node_indices() const;
 
-  uint number_of_all_nodes() const;
-  uint number_of_spatial_nodes() const;
-  uint number_of_cells() const;
-  uint max_spatial_cell_index() const;
+  uint max_spatial_node_index() const;
+  uint max_node_index() const;
 
   uvec cell_coords_to_low_node_indices(const Coords & coords) const;
   umat cell_coords_to_vertex_indices(const Coords & coords) const;
@@ -87,15 +85,10 @@ class UniformGrid : public TypedDiscretizer{
   uvec m_num_cells;
   uvec m_num_nodes;
   vec m_width;
-
+  
+  uint n_special_nodes;
   uint n_dim;
 };
-
-ElementDist pack_vertices_and_weights(uint num_total_nodes,
-				      Indices inbound_indices,
-				      VertexIndices inbound_vertices,
-				      mat inbound_weights,
-				      Indices oob_indices,
-				      Indices oob_vertices);
+ElementDist build_sparse_dist(uint n_nodes, mat weights, umat vert_indices);
 
 #endif

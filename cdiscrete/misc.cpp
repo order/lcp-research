@@ -30,8 +30,11 @@ template<typename M, typename V> M make_points(const vector<V> & grids)
   
   // Figure out the dimensions of things
   uint D = grids.size();
-  uint N = prod(grids);
-  M P = mat(N,D); // Create the matrix
+  uint N = 1;
+  for(auto const & it : grids){
+    N *= it.size();
+  }
+  M P = M(N,D); // Create the matrix
   
   uint rep_elem = N; // Element repetition
   uint rep_cycle = 1; // Pattern rep
@@ -80,7 +83,7 @@ umat divmod(const uvec & a, uint n){
    * 1) Multiplier floor(a / n)
    * 2) Mod (a % n)
    */
-  mat ret = mat(a.n_elem, 2);
+  umat ret = umat(a.n_elem, 2);
   ret.col(0) = floor(a/n);
   ret.col(1) = a - ret.col(0) * n;
   return ret;

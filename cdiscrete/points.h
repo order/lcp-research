@@ -2,8 +2,9 @@
 #define __Z_POINTS_INCLUDED__
 
 #include <armadillo>
+#include <map>
 
-#define EUCLIDEAN_TYPE 0
+#define SPATIAL_TYPE 0
 #define SPECIAL_FILL arma::datum::nan
 
 typedef std::map<uint,uint> TypeRegistry;
@@ -20,7 +21,7 @@ class TypeRule{
   */
   virtual TypeRegistry type_elements(const Points & points) const = 0;
 };
-typedef std::vector<const TypeRule &> TypeRuleList;
+typedef std::vector<TypeRule> TypeRuleList;
 
 class OutOfBoundsRule : public TypeRule{
  public:
@@ -32,7 +33,6 @@ class OutOfBoundsRule : public TypeRule{
 };
 
 
-
 class NodeRemapper{
  public:
   /*
@@ -42,7 +42,7 @@ class NodeRemapper{
   */  
   virtual void remap(Points & points) const = 0;
 };
-typedef std::vector<const NodeRemapper &> NodeRemapperList;
+typedef std::vector<NodeRemapper> NodeRemapperList;
 
 
 class SaturateRemapper : public NodeRemapper{
@@ -85,7 +85,7 @@ class TypedPoints{
   uint get_next_type(); // Max registry keys + 1
   void register_type(uint idx, uint ntype); // Add new element to registry
   uint num_special_nodes() const;
-  uint num_normal_nodes() const;
+  uint num_spatial_nodes() const;
   uint num_all_nodes() const;
 
   arma::uvec get_normal_mask() const;
@@ -105,7 +105,6 @@ class TypedPoints{
 
  protected:
   void _ensure_blanked();
-  uint m_max_type;
 };
 
 

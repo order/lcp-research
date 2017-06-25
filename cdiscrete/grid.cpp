@@ -11,8 +11,6 @@ using namespace arma;
  ***************************/
 
 
-
-
 uvec c_order_stride(const uvec & grid_size){
   /* 
      Coeffs to converts from grid coords to indicies
@@ -188,7 +186,7 @@ umat Coords::_indicies_to_coords(const uvec & grid_size,
   // NaN out any non-spatial nodes
   // NB: assumption is that there are relatively few of these usually.
   uvec non_spatial = find(indices >= max_idx);
-  coords.rows(non_spatial).fill(datum::nan);
+  coords.rows(non_spatial).fill(SPECIAL_FILL);
 
   assert(_coord_check(grid_size, coords));
   
@@ -227,7 +225,7 @@ void Coords::_mark(const uvec & indices, uint coord_type){
   assert(coord_type != SPATIAL_COORD);
   for(auto const & it : indices){
     m_reg[it] = coord_type;
-    m_coords.row(it).fill(datum::nan);
+    m_coords.row(it).fill(SPECIAL_FILL);
   }
   assert(_type_reg_check(m_reg, m_coords));
 }
@@ -241,7 +239,7 @@ void Coords::_mark(const TypeRegistry & reg){
   for(auto const & it : reg){
     assert(it.second != SPATIAL_TYPE);
     m_reg[it.first] = it.second;
-    m_coords.row(it.first).fill(datum::nan);
+    m_coords.row(it.first).fill(SPECIAL_FILL);
   }
   assert(_type_reg_check(m_reg, m_coords));
 }
@@ -288,14 +286,16 @@ uvec Coords::get_indices(const uvec & grid_size) const{
 
 
 UniformGrid::UniformGrid(vec & low,
-			  vec & high,
-			 uvec & num_cells) :
+			 vec & high,
+			 uvec & num_cells,
+			 uint special_nodes) :
   m_low(low),
   m_high(high),
   m_num_cells(num_cells),
   m_num_nodes(num_cells + 1),
   m_width((high - low) / num_cells),
-  n_dim(low.n_elem){
+  n_dim(low.n_elem),
+  n_special_nodes(special_nodes){
   uint D = low.n_elem;
   assert(D == high.n_elem);
   assert(D == num_cells);
@@ -364,6 +364,14 @@ umat UniformGrid::get_cell_node_indices() const{
   return coords.get_indices(m_num_cells);
 }
 
+uint UniformGrid::max_spatial_node_index() const{
+  return prod(m_num_nodes) - 1;
+}
+
+uint UniformGrid::max_node_index() const{
+  return max_spatial_node_index() + n_special_nodes;
+}
+
 
 uvec UniformGrid::cell_coords_to_low_node_indices(const Coords & coords) const
 {
@@ -408,8 +416,8 @@ umat UniformGrid::cell_coords_to_vertex_indices(const Coords & coords) const{
   }
 
   // Encode the oob row as all oob index
-  uint oob_idx = max_spatial_cell_index();
-  for(auto const & it : m_reg){
+  uint oob_idx = max_spatial_node_index();
+  for(auto const & it : coords.m_reg){
     assert(it.second > 0);
     vertices.row(it.first).fill(oob_idx + it.second);
   }
@@ -417,11 +425,6 @@ umat UniformGrid::cell_coords_to_vertex_indices(const Coords & coords) const{
   
   return vertices;
 }
-
-uint UniformGrid::max_spatial_cell_index() const{
-  return prod( m_num_cells);
-}
-
 
 Coords UniformGrid::points_to_cell_coords(const TypedPoints & points) const{
   // Takes in points, spits out cell coords
@@ -445,7 +448,7 @@ TypedPoints UniformGrid::cell_coords_to_low_points(const Coords & coords) const{
 
 
 
-mat UniformGrid::points_to_cell_nodes_rel_dist(const TypedPoints & points,
+mat UniformGrid::points_to_cell_nodes_dist(const TypedPoints & points,
 					       const Coords & coords) const{
   /*
    * Takes in points, and returns a matrix with the distances to the 
@@ -477,7 +480,20 @@ mat UniformGrid::points_to_cell_nodes_rel_dist(const TypedPoints & points,
 // **************************************************************************
 
 
-ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points){
+ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points)
+  const{
+  /*
+   * Does multi-linear interpolation. Points internal to the cell are mapped
+   * to a probability distribution over vertices of that cell, with weights
+   * depending on distance from the vertex.
+   * So the weight of the (x) point will be largest for the bottom-left 
+   * corner, and least for the top-right corner.
+   o----o
+   |    |
+   | x  |
+   o----o
+   */
+  
   // Assume points are properly bounded.
   assert(points.check_bounding_box(m_low, m_high));
 
@@ -485,7 +501,7 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points){
   mat dist = points_to_cell_nodes_dist(points, coords);
   mat rel_dist = row_divide(dist,m_width);
 
-  uint N = points.n_rows;
+  uint N = points.m_points.n_rows;
   uint D = n_dim;
   uint V = pow(2.0,D);
   uint halfV = pow(2.0,D-1);
@@ -507,8 +523,8 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points){
   // Check the weights of the low and high nodes.
   // position 0 -> 00...0 is the low node, so weight should be prod(rel_dist)
   // position V-1 -> 11...1, so weight should be prod(1-rel_dist)
-  vec low_node_weights = prod(1 - rel_dist.rows(inb_idx),1);
-  vec hi_node_weights = prod(rel_dist.rows(inb_idx),1);
+  vec low_node_weights = prod(1 - rel_dist,1);
+  vec hi_node_weights = prod(rel_dist,1);
   assert(approx_equal(weights.col(0),low_node_weights,"absdiff",1e-12));
   assert(approx_equal(weights.col(V-1),hi_node_weights,"absdiff",1e-12));
 
@@ -520,48 +536,56 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points){
 
   // Convert into a sparse matrix.
   umat vert_indices = cell_coords_to_vertex_indices(coords);
-  ElementDist distrib = pack_weights(weights, vert_indices);
+  uint n_nodes = max_node_index() + 1;
+  ElementDist distrib = build_sparse_dist(n_nodes, weights, vert_indices);
 
   return distrib; 
 }
 
-ElementDist pack_vertices_and_weights(mat weights, umat vert_indices){
-  // TODO:
-  assert(inbound_vertices.n_rows == inbound_indices.n_elem);
-  assert(oob_indices.n_elem == oob_vertices.n_elem);
-  assert(size(inbound_vertices) == size(inbound_weights));
+ElementDist build_sparse_dist(uint n_nodes, umat vert_indices, mat weights){
+  // Take in the number of nodes, the vertex indices, and the weights
+  // and build the probabilistic transition matrix.
+  vector<uword> v_row;
+  vector<uword> v_col;
+  vector<double> v_data;
+
+  uint N = vert_indices.n_rows;
+  uint V = vert_indices.n_cols;
+
+  // Basic sanity checking.
+  assert(all(weights <= 1.0));
+  assert(all(weights >= 0.0));
+  assert(all(vert_indices < n_nodes));
   
-  uint N = num_total_nodes;
-  uint M = inbound_vertices.n_rows + oob_vertices.n_elem;
-  uint INB_N = inbound_vertices.n_elem;
-  uint OOB_N = oob_vertices.n_elem;
-  uint NNZ = INB_N + OOB_N;
- 
+  // Build out the row, column, and data vectors.
+  for(uint i = 0; i < N; i++){
+    uvec uni = unique(vert_indices.row(i));
+    assert(uni.n_elem == 1 || uni.n_elem == V);
+    if(1 == uni.n_elem){
+      // Transition to non-spatial node.
+      // Currently assume that there is a unique special node with all the
+      // weight.
+      assert(abs(weights(i,0) - 1.0) < PRETTY_SMALL); // All weight
+      v_row.push_back(i);
+      v_col.push_back(uni(0));
+      v_data.push_back(1.0);
+    }
+    else{
+      assert(V == uni.n_elem); // Proper spatial dist
+      assert(abs(sum(v_data.row(i)) - 1) < PRETTY_SMALL); // Transition
+      for(uint j = 0; j < V; j++){
+	v_row.push_back(i);
+	v_col.push_back(vert_indices(i,j));
+	v_data.push_back(weights(i,j));
+      }
+    }
+  }
 
-  // Set the location
-  umat loc = umat(2,NNZ);
-  // Flatten vertices and indices into rows
-  uvec flat_inb_vertices = vectorise(inbound_vertices);
-  umat rep_inb_idx = repmat(inbound_indices,
-			    1, inbound_vertices.n_cols);
-  uvec flat_inb_idx = vectorise(rep_inb_idx);
-  // Check sizes
-  assert(flat_inb_vertices.n_elem == INB_N);
-  assert(flat_inb_idx.n_elem == INB_N);
-  loc(0,span(0,INB_N-1)) = flat_inb_vertices.t();
-  loc(1,span(0,INB_N-1)) = flat_inb_idx.t();
-
-  cout << "LOC:\n" << loc;
-
-  // Out of bound location
-  loc(0,span(INB_N,NNZ-1)) = oob_vertices.t();
-  loc(1,span(INB_N,NNZ-1)) = oob_indices.t();
-
-  // Set the data
-  vec data = vec(INB_N + OOB_N);
-  data(span(0,INB_N-1)) = vectorise(inbound_weights); // Inbound
-  data(span(INB_N,NNZ-1)).fill(1); // Out of bounds
-
-  return sp_mat(loc,data,N,M);  
+  uint nnz = v_row.size();
+  umat loc = umat(2,nnz);
+  loc.row(0) = urowvec(v_row);
+  loc.row(1) = urowvec(v_col);
+  vec data = vec(v_data);
+  return sp_mat(loc,data,N,n_nodes);
 }
 				      

@@ -1,29 +1,29 @@
+#include "misc.h"
 #include "points.h"
 
-using arma;
-using std;
+#include <assert.h>
+#include <set>
+
+using namespace arma;
+using namespace std;
 
 /*
  * TYPED POINTS STRUCTURE
  */
 
-TypedPoints::TypedPoints(const mat & points, const NodeTypeRegistry & reg) :
-  m_points(points), m_reg(reg), m_max_type(EUCLIDEAN_TYPE) {
+TypedPoints::TypedPoints(const mat & points, const TypeRegistry & reg) :
+  m_points(points), m_reg(reg){
   assert(m_points.n_rows >= m_reg.size());
   _ensure_blanked();
 }
 
 TypedPoints::TypedPoints(const mat & points) :
-  m_points(points), m_max_type(EUCLIDEAN_TYPE) {}
+  m_points(points){}
 
-TypedPoints::TypedPoints() : m_max_type(EUCLIDEAN_TYPE){}
+TypedPoints::TypedPoints(){}
 
-uint TypedPoints::get_next_type(){
-  return ++m_max_type;
-}
 
-void TypedPoints::register_type(Index idx, NodeType node_type){
-  assert(node_type <= m_max_type);
+void TypedPoints::register_type(uint idx, uint node_type){
   assert(idx <= m_points.n_rows);
   
   m_reg[idx] = node_type;
@@ -34,74 +34,50 @@ uint TypedPoints::num_special_nodes() const{
   return m_reg.size();
 }
 
-uint TypedPoints::num_normal_nodes() const{
-  assert(m_points.n_rows >= m_reg.size());  
-  return m_points.n_rows - m_reg.size();
-}
-
 uint TypedPoints::num_all_nodes() const{
-  return m_points.n_rows();
+  return m_points.n_rows;
 }
 
-uvec TypedPoints::get_normal_mask() const{
-  uvec mask = ones(this->num_all_nodes());
-  for(NodeTypeRegistry::const_iterator it = m_reg.begin();
-      it != m_reg.end(); ++it){
-    mask[it->first] = 0;
-  }
-  assert(this->num_normal_nodes() == sum(mask));
-  return mask;
+
+uint TypedPoints::num_spatial_nodes() const{
+  return num_all_nodes() - num_special_nodes();
 }
 
-uvec TypedPoints::get_special_mask() const{
-  uvec mask = zeros(this->num_all_nodes());
-  for(NodeTypeRegistry::const_iterator it = m_reg.begin();
-      it != m_reg.end(); ++it){
-    mask[it->first] = 1;
-  }
-  assert(this->num_special_nodes() == sum(mask));
-  return mask;
-}
 
-void TypedPoints::apply_typing_rule(const NodeTypeRule & rule){
+void TypedPoints::apply_typing_rule(const TypeRule & rule){
   /*
     Apply a single rule
    */
-  NodeTypeRegistry new_types = rule.type_elements(m_points);
-  for(NodeTypeRegistry reg_it = new_types.begin();
-      reg_it != new_types.end(); ++reg_it){
-    Index row_idx = reg_it->first;
-    NodeType row_type = reg_it->second;
-    assert(!m_points.row(row_idx).has_nan());  // Check NaN <=> typed
-
-    // Add to the registry and NaN fill the row
-    m_reg[row_idx] = row_type;
-    m_points.row(row_idx).fill(datum::nan);
+  TypeRegistry new_types = rule.type_elements(m_points);
+  for(auto const & it : new_types){
+    assert(m_reg.end() == m_reg.find(it.first)); // Not already in.
+    assert(!m_points.row(it.first).has_nan()); // Not NaN filled.
+    
+    m_reg[it.first] = it.second;
+    m_points.row(it.first).fill(datum::nan);
   }
 }
 
-void TypedPoints::apply_typing_rules(const NodeTypeRuleList & rules){
+void TypedPoints::apply_typing_rules(const TypeRuleList & rules){
   /*
     Iterate through list and apply node type rules
   */
-  auto bound_fn = bind(&TypedPoints::apply_typing_rule,
-		       this,
-		       std::placeholders::_1);
-  for_each(rules.begin(), rules.end(), bound_fn);
+  for(auto const & it : rules){
+    apply_typing_rule(it);
+  }
 }
 
 void TypedPoints::apply_remapper(const NodeRemapper & remapper){
-  remapper->remap(m_points);
+  remapper.remap(m_points);
 }
 
 void TypedPoints::apply_remappers(const NodeRemapperList & remappers){
   /*
     Iterate through list and apply node remappers
   */
-  auto bound_fn = bind(&TypedPoints::apply_remapper,
-		       this,
-		       std::placeholders::_1);
-  for_each(rules.begin(), rules.end(), bound_fn);
+  for(auto const & it : remappers){
+    apply_remapper(it);
+  }
 }
 
 bool TypedPoints::check_validity() const{
@@ -112,7 +88,7 @@ bool TypedPoints::check_validity() const{
     assert(has_nan == is_special);
 
     if(is_special){
-      assert(m_reg[i] > EUCLIDEAN_TYPE); // Special types not Euclidean
+      assert(m_reg[i] > SPATIAL_TYPE); // Special types not Euclidean
       assert(m_reg[i] <= m_max_type);
     }
   }
@@ -122,11 +98,11 @@ void TypedPoints::_ensure_blanked(){
   /*
     Make sure that everthing in the registry corresponds to NaN'd rows
   */
-  for(NodeTypeRegistry::const_iterator it = m_reg.begin();
-      it != m_reg.end(); ++it){
-    bool is_blank = m_points.row(it->first).has_nan();
+  for(auto const & it : m_reg){
+    bool is_blank = m_points.row(it.first).has_nan();
+    assert(m_points.n_cols == find_nonfinite(m_points.row(it.first)));
     if(!is_blank){
-      m_points.row(it->first).fill(datum::nan);
+      m_points.row(it.first).fill(SPECIAL_FILL);
     }
   }
 }
@@ -137,7 +113,7 @@ void TypedPoints::_ensure_blanked(){
  */
 
 OutOfBoundsRule::OutOfBoundsRule(const mat & bounding_box,
-				 NodeType oob_type) :
+				 uint oob_type) :
   m_bbox(bounding_box), m_type(oob_type) {
   assert(check_bounding_box(m_bbox));
 }
@@ -151,7 +127,7 @@ TypeRegistry OutOfBoundsRule::type_elements(const mat & points) const{
   vec lb = m_bbox.col(0);
   vec ub = m_bbox.col(1);
 
-  set violations;
+  set<uint> violations;
 
   // Iterate through the dimensions
   for(uint d = 0; d < D; ++d){
@@ -162,10 +138,9 @@ TypeRegistry OutOfBoundsRule::type_elements(const mat & points) const{
     violations.insert(high.begin(), high.end());
   }
 
-  NodeTypeRegistry ret;
-  for(set::const_iterator it = violations.begin();
-      it != violations.end(); ++it){
-    ret[*it] = m_type;
+  TypeRegistry ret;
+  for(auto const & it : violations){
+    ret[it] = m_type;
   }
   return ret;
 }
