@@ -63,13 +63,13 @@ class UniformGrid : public TypedDiscretizer{
   uint max_spatial_cell_index() const;
 
   uvec cell_coords_to_low_node_indices(const Coords & coords) const;
-  umat cell_coords_to_vertices(const Coords & coords) const;
+  umat cell_coords_to_vertex_indices(const Coords & coords) const;
 
   Coords points_to_cell_coords(const TypedPoints & points) const;
   TypedPoints cell_coords_to_low_points(const Coords & coords) const;
   
-  mat points_to_low_node_rel_dist(const TypedPoints & points,
-				  const Coords & coords) const;
+  mat points_to_cell_nodes_dist(const TypedPoints & points,
+				    const Coords & coords) const;
   
   ElementDist points_to_element_dist(const TypedPoints &) const;
   vec interpolate(const Points & points,

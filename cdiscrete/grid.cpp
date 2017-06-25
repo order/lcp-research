@@ -371,7 +371,7 @@ uvec UniformGrid::cell_coords_to_low_node_indices(const Coords & coords) const
 }
 
 
-umat UniformGrid::cell_coords_to_vertices(const Coords & coords) const{
+umat UniformGrid::cell_coords_to_vertex_indices(const Coords & coords) const{
   /*
    * Build a matrix where each row corresponds to the indices for the 
    * vertices of the coordinates.
@@ -409,8 +409,11 @@ umat UniformGrid::cell_coords_to_vertices(const Coords & coords) const{
 
   // Encode the oob row as all oob index
   uint oob_idx = max_spatial_cell_index();
-  uvec oob_rows = find(low_idx >= oob_idx);
-  vertices.rows(oob_rows).fill(oob_idx);
+  for(auto const & it : m_reg){
+    assert(it.second > 0);
+    vertices.row(it.first).fill(oob_idx + it.second);
+  }
+  assert(!vertices.has_nan()); // All should be dealt with.
   
   return vertices;
 }
@@ -437,28 +440,29 @@ TypedPoints UniformGrid::cell_coords_to_low_points(const Coords & coords) const{
   // Reverse of above
   mat scaled = row_mult(conv_to<mat>::from(coords.m_coords), m_width);
   mat raw_points = row_add(scaled, m_low);
-  return Points(raw_points, coords.m_reg);
+  return TypedPoints(raw_points, coords.m_reg);
 }
 
 
 
-mat UniformGrid::points_to_cell_nodes_rel_dist(const TypedPoints & points) const{
+mat UniformGrid::points_to_cell_nodes_rel_dist(const TypedPoints & points,
+					       const Coords & coords) const{
   /*
    * Takes in points, and returns a matrix with the distances to the 
    */
   assert(n_dim == points.n_cols);
   assert(points.check_bounding_box(m_low,m_high));
   uint N = points.m_points.n_rows;
-  
-  Coords coords = points_to_cell_coords(points);
-  Points low_points = cell_coords_to_low_points(coords);
-  mat low_diff = points.m_points - low_points; // Do the main subtraction here
+
+  // Calculate
+  TypedPoints low_points = cell_coords_to_low_points(coords);
+  mat low_diff = points.m_points - low_points.m_points;
 
   uint V = pow(2.0,n_dim);
   mat dist = mat(N, V);
   for(uint v = 0; v < V; v++){
     // Build the delta vector; the difference from the low point
-    uvec idx = find(num2binvec(v, D));
+    uvec idx = find(num2binvec(v, n_dim));
     assert(idx.n_elem <= V);    
     vec delta = zeros(N);
     delta(idx) = m_width(idx);
@@ -475,39 +479,31 @@ mat UniformGrid::points_to_cell_nodes_rel_dist(const TypedPoints & points) const
 
 ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points){
   // Assume points are properly bounded.
-  assert(points.check_bounding_box);
-  
-  mat dist = points_to_cell_nodes_rel_dist(points);
+  assert(points.check_bounding_box(m_low, m_high));
+
+  Coords coords = points_to_cell_coords(points);
+  mat dist = points_to_cell_nodes_dist(points, coords);
   mat rel_dist = row_divide(dist,m_width);
-  
 
   uint N = points.n_rows;
-  uint D = points.n_cols;
-  uint IN = coords.num_inbound;
-  uint NN = prod(m_num_nodes) + 2*D;
-  uint V = pow(2,D);
-  uint halfV = pow(2,D-1);
+  uint D = n_dim;
+  uint V = pow(2.0,D);
+  uint halfV = pow(2.0,D-1);
 
   // Calculate the interpolation weights for each point
-  mat weights = ones<mat>(IN,V);
+  mat weights = ones<mat>(N,V);
   bvec mask;
-  uvec inb_idx = coords.indices;
-  uvec oob_idx = coords.oob.indices;
-  uvec col_idx;
   mat rep_dist;
   for(uint d = 0; d < D; d++){
-    // Mask for whether the dth bit is on in the
-    // binary rep of the bth position
-    mask = binmask(d,D);
-    col_idx = uvec({d});
-
-    rep_dist = repmat(rel_dist(inb_idx,col_idx),
-		      1, halfV);
-    
-    weights.cols(find(mask > 1e-12)) %= rep_dist;		       
-    weights.cols(find(mask <= 1e-12)) %= 1- rep_dist;
+    rep_dist = repmat(rel_dist.col(d),1, halfV);
+    mask = binmask(d,D);   
+    weights.cols(find(mask == 1)) %= rep_dist;		       
+    weights.cols(find(mask == 0)) %= 1 - rep_dist;
   }
-
+  assert(all(weights >= 0));
+  assert(all(weights <= 1));
+  assert(!weights.has_nan());
+  
   // Check the weights of the low and high nodes.
   // position 0 -> 00...0 is the low node, so weight should be prod(rel_dist)
   // position V-1 -> 11...1, so weight should be prod(1-rel_dist)
@@ -516,29 +512,21 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points){
   assert(approx_equal(weights.col(0),low_node_weights,"absdiff",1e-12));
   assert(approx_equal(weights.col(V-1),hi_node_weights,"absdiff",1e-12));
 
+  // Sparsify
   for(uint d = 0; d < D; d++){
     weights(find(weights.col(d) <= ALMOST_ZERO),
 	    uvec({d})).fill(0);
   }
 
-  VertexIndices inbound_vertices = vertices.rows(coords.indices);
-  Indices oob_vertices = vertices(coords.oob.indices,uvec({0}));
-  ElementDist distrib = pack_vertices_and_weights(NN,
-						  coords.indices,
-						  inbound_vertices,
-						  weights,
-						  coords.oob.indices,
-						  oob_vertices);     
+  // Convert into a sparse matrix.
+  umat vert_indices = cell_coords_to_vertex_indices(coords);
+  ElementDist distrib = pack_weights(weights, vert_indices);
 
   return distrib; 
 }
 
-ElementDist pack_vertices_and_weights(uint num_total_nodes,
-				      Indices inbound_indices,
-				      VertexIndices inbound_vertices,
-				      mat inbound_weights,
-				      Indices oob_indices,
-				      Indices oob_vertices){
+ElementDist pack_vertices_and_weights(mat weights, umat vert_indices){
+  // TODO:
   assert(inbound_vertices.n_rows == inbound_indices.n_elem);
   assert(oob_indices.n_elem == oob_vertices.n_elem);
   assert(size(inbound_vertices) == size(inbound_weights));
