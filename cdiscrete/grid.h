@@ -21,7 +21,7 @@ class Coords{
   static const uint OOB_TYPE = 1;
 
   Coords(const umat & coords);
-  Coords(const imat & coords);
+  Coords(const umat & coords, const TypeRegistry & reg);
 
   bool check(const uvec & grid_size) const;
   bool _coord_check(const uvec & grid_size, const umat & coords) const;
@@ -33,7 +33,6 @@ class Coords{
   void _mark(const uvec & indices, uint coord_type);
   void _mark(const TypeRegistry & reg);
   TypeRegistry _find_oob(const uvec & grid_size) const;
-  void restrict_coords(const uvec & grid_size);
 
   uint number_of_spatial_coords() const;
   uint number_of_all_coords() const;
@@ -42,10 +41,10 @@ class Coords{
 
   uvec get_indices(const uvec & grid_size) const;
   
-  imat m_coords;
+  umat m_coords;
   uint n_rows;
   uint n_dim;
-  TypeRegistry m_type_map;
+  TypeRegistry m_reg;
 };
 
 class UniformGrid : public TypedDiscretizer{
@@ -66,9 +65,10 @@ class UniformGrid : public TypedDiscretizer{
   uvec cell_coords_to_low_node_indices(const Coords & coords) const;
   umat cell_coords_to_vertices(const Coords & coords) const;
 
-  Coords points_to_cell_coords(const Points & points) const;
-  mat cell_coords_to_points(const Coords & coords) const;
-  mat points_to_low_node_rel_dist(const Points & points,
+  Coords points_to_cell_coords(const TypedPoints & points) const;
+  TypedPoints cell_coords_to_low_points(const Coords & coords) const;
+  
+  mat points_to_low_node_rel_dist(const TypedPoints & points,
 				  const Coords & coords) const;
   
   ElementDist points_to_element_dist(const TypedPoints &) const;

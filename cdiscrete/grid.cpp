@@ -113,7 +113,7 @@ uvec c_order_cell_shift(const uvec & points_per_dim){
  ********************/
 
 
-Coords::Coords(const imat & coords){
+Coords::Coords(const umat & coords){
   m_coords = coords;
   n_rows = coords.n_rows;
   n_dim = coords.n_cols;
@@ -122,10 +122,19 @@ Coords::Coords(const imat & coords){
   _mark(special, Coords::OOB_TYPE);
 }
 
+Coords::Coords(const umat & coords, const TypeRegistry & reg){
+  m_coords = coords;
+  n_rows = coords.n_rows;
+  n_dim = coords.n_cols;
+
+  _mark(reg);
+}
+
+
 
 bool Coords::check(const uvec & grid_size) const{
   assert(_coord_check(grid_size, m_coords));
-  assert(_type_reg_check(m_type_map, m_coords));
+  assert(_type_reg_check(m_reg, m_coords));
 }
 
 
@@ -217,9 +226,10 @@ void Coords::_mark(const uvec & indices, uint coord_type){
    */
   assert(coord_type != SPATIAL_COORD);
   for(auto const & it : indices){
-    m_type_map[it] = coord_type;
+    m_reg[it] = coord_type;
     m_coords.row(it).fill(datum::nan);
   }
+  assert(_type_reg_check(m_reg, m_coords));
 }
 
 
@@ -230,9 +240,10 @@ void Coords::_mark(const TypeRegistry & reg){
    */
   for(auto const & it : reg){
     assert(it.second != SPATIAL_TYPE);
-    m_type_map[it.first] = it.second;
+    m_reg[it.first] = it.second;
     m_coords.row(it.first).fill(datum::nan);
   }
+  assert(_type_reg_check(m_reg, m_coords));
 }
 
 
@@ -247,19 +258,6 @@ TypeRegistry Coords::_find_oob(const uvec & grid_size) const{
 }
 
 
-void Coords::restrict_coords(const uvec & grid_size){
-  /*
-   * Check which coordinate rows violate the grid, and 
-   * NaN them out.
-   */
-
-  // Apply the rule to get OOB rows
-  TypeRegistry reg = _find_oob(grid_size);
-  m_type_map.insert(reg.begin(), reg.end());  
-  _mark(m_type_map);
-}
-
-
 uint Coords::number_of_spatial_coords() const{
   return number_of_all_coords() - number_of_special_coords();
 }
@@ -271,7 +269,7 @@ uint Coords::number_of_all_coords() const{
 
 
 uint Coords::number_of_special_coords() const{
-  return m_type_map.size();
+  return m_reg.size();
 }
 
 uint Coords::max_spatial_index(const uvec & grid_size) const{
@@ -422,29 +420,39 @@ uint UniformGrid::max_spatial_cell_index() const{
 }
 
 
-Coords UniformGrid::points_to_cell_coords(const Points & points) const{
+Coords UniformGrid::points_to_cell_coords(const TypedPoints & points) const{
   // Takes in points, spits out cell coords
-  mat diff = row_diff(points, conv_to<rowvec>::from(m_low));
+  assert(points.check_bounding_box(m_low,m_high));
+
+  // C = floor((P - low) / width)
+  mat diff = row_diff(points.m_points, conv_to<rowvec>::from(m_low));
   mat scaled = row_divide(diff, conv_to<rowvec>::from(m_width));
   umat raw_coords = conv_to<umat>::from(floor(scaled));
-  return Coords(raw_coords);
+
+  // Use all existing typing information.
+  return Coords(raw_coords, points.m_reg); // Use points information.
 }
 
-mat UniformGrid::cell_coords_to_low_points(const Coords & coords) const{
+TypedPoints UniformGrid::cell_coords_to_low_points(const Coords & coords) const{
   // Reverse of above
-  return row_add(row_mult(coords.m_coords, m_width), m_low);
+  mat scaled = row_mult(conv_to<mat>::from(coords.m_coords), m_width);
+  mat raw_points = row_add(scaled, m_low);
+  return Points(raw_points, coords.m_reg);
 }
 
 
 
-mat UniformGrid::points_to_cell_nodes_rel_dist(const Points & points) const{
+mat UniformGrid::points_to_cell_nodes_rel_dist(const TypedPoints & points) const{
+  /*
+   * Takes in points, and returns a matrix with the distances to the 
+   */
   assert(n_dim == points.n_cols);
-  uint N = points.n_rows;
+  assert(points.check_bounding_box(m_low,m_high));
+  uint N = points.m_points.n_rows;
   
   Coords coords = points_to_cell_coords(points);
-  coords.restrict_coords(m_num_cells);
   Points low_points = cell_coords_to_low_points(coords);
-  mat low_diff = points - low_points; // Do the main subtraction here
+  mat low_diff = points.m_points - low_points; // Do the main subtraction here
 
   uint V = pow(2.0,n_dim);
   mat dist = mat(N, V);
@@ -458,18 +466,20 @@ mat UniformGrid::points_to_cell_nodes_rel_dist(const Points & points) const{
     mat diff = row_add(low_diff, delta); // Add delta to customize it
     dist.col(v) = lp_norm(diff, 2, 1); // 2-norm done row-wise (the 1)
   }
-  
+
   return dist;
 }
 
 // **************************************************************************
 
 
-ElementDist UniformGrid::points_to_element_dist(const Points & points){
+ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points){
+  // Assume points are properly bounded.
+  assert(points.check_bounding_box);
   
-  Coords coords = points_to_cell_coords(points);
-  VertexIndices vertices = cell_coords_to_vertices(coords);
-  RelDist rel_dist =  points_to_low_node_rel_dist(points,coords);
+  mat dist = points_to_cell_nodes_rel_dist(points);
+  mat rel_dist = row_divide(dist,m_width);
+  
 
   uint N = points.n_rows;
   uint D = points.n_cols;

@@ -101,6 +101,7 @@ class TypedPoints{
   TypeRegistry m_reg;
 
   bool check_validity() const;
+  bool check_bounding_box(arma::vec & low, arma::vec & high) const;
 
  protected:
   void _ensure_blanked();
