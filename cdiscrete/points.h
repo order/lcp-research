@@ -23,8 +23,9 @@ class TypeRule{
 typedef std::vector<const TypeRule &> TypeRuleList;
 
 class OutOfBoundsRule : public TypeRule{
+ public:
   OutOfBoundsRule(const arma::mat & bounding_box, uint oob_type);
-  TypeRegistry type_elements(const Points & points);
+  TypeRegistry type_elements(const Points & points) const;
  protected:
   arma::mat m_bbox;
   uint m_type;

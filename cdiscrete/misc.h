@@ -15,8 +15,8 @@ void print_shape(const uvec & u);
 void print_shape(const vec & v);
 void print_shape(const mat & A);
 
-// Make points from a grdi
-mat make_points(const std::vector<vec> & grids);
+// Make points from a grid
+template <typename M, typename V> M make_points(const std::vector<V> & grids);
 
 SizeMat uvec2sizemat(const uvec & pair);
 SizeCube uvec2sizecube(const uvec & cube);

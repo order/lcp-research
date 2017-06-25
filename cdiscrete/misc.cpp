@@ -23,19 +23,15 @@ void print_shape(const mat & A){
 	    << ',' << A.n_cols << ')' << endl;
 }
 
-mat make_points(const vector<vec> & grids)
+template<typename M, typename V> M make_points(const vector<V> & grids)
 {
   // Makes a mesh out of the D vectors
   // 'C' style ordering... last column changes most rapidly
   
   // Figure out the dimensions of things
   uint D = grids.size();
-  uint N = 1;
-  for(vector<vec>::const_iterator it = grids.begin();
-      it != grids.end(); ++it){
-    N *= it->n_elem;
-  }
-  mat P = mat(N,D); // Create the matrix
+  uint N = prod(grids);
+  M P = mat(N,D); // Create the matrix
   
   uint rep_elem = N; // Element repetition
   uint rep_cycle = 1; // Pattern rep
@@ -58,6 +54,10 @@ mat make_points(const vector<vec> & grids)
   }
   return P;
 }
+template mat make_points(const vector<vec> & grids);
+template umat make_points(const vector<uvec> & grids);
+template imat make_points(const vector<ivec> & grids);
+
 
 SizeMat uvec2sizemat(const uvec & pair){
   assert(2 == pair.n_elem);

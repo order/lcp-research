@@ -19,10 +19,11 @@ class Coords{
  public:
   static const uint SPATIAL_TYPE = 0;
   static const uint OOB_TYPE = 1;
-  
+
+  Coords(const umat & coords);
   Coords(const imat & coords);
 
-  bool _check(const uvec & grid_size) const;
+  bool check(const uvec & grid_size) const;
   bool _coord_check(const uvec & grid_size, const umat & coords) const;
   bool _type_reg_check(const TypeRegistry & registry, const umat & coords);
   umat _indicies_to_coords(const uvec & grid_size,
@@ -39,7 +40,7 @@ class Coords{
   uint number_of_special_coords() const;
   uint max_spatial_index(const uvec & grid_size) const;
 
-  uvec get_indices() const;
+  uvec get_indices(const uvec & grid_size) const;
   
   imat m_coords;
   uint n_rows;
@@ -60,6 +61,15 @@ class UniformGrid : public TypedDiscretizer{
   uint number_of_all_nodes() const;
   uint number_of_spatial_nodes() const;
   uint number_of_cells() const;
+  uint max_spatial_cell_index() const;
+
+  uvec cell_coords_to_low_node_indices(const Coords & coords) const;
+  umat cell_coords_to_vertices(const Coords & coords) const;
+
+  Coords points_to_cell_coords(const Points & points) const;
+  mat cell_coords_to_points(const Coords & coords) const;
+  mat points_to_low_node_rel_dist(const Points & points,
+				  const Coords & coords) const;
   
   ElementDist points_to_element_dist(const TypedPoints &) const;
   vec interpolate(const Points & points,
