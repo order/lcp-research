@@ -477,8 +477,6 @@ mat UniformGrid::points_to_cell_nodes_dist(const TypedPoints & points,
   return dist;
 }
 
-// **************************************************************************
-
 
 ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points)
   const{
@@ -537,10 +535,49 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points)
   // Convert into a sparse matrix.
   umat vert_indices = cell_coords_to_vertex_indices(coords);
   uint n_nodes = max_node_index() + 1;
-  ElementDist distrib = build_sparse_dist(n_nodes, weights, vert_indices);
+  ElementDist distrib = build_sparse_dist(n_nodes, vert_indices, weights);
 
   return distrib; 
 }
+
+
+template <typename T> T UniformGrid::base_interpolate(const Points & points,
+                                                  const T& data) const{
+  assert(m_frozen);
+  
+  uint N = points.n_rows;
+  uint d = points.n_cols;
+  uint NN = max_node_index() + 1;
+  assert(data.n_rows == NN);
+  
+  ElementDist D = points_to_element_dist(points);
+  assert(size(D) == size(NN,N));
+
+  T ret = D.t() * data;
+  assert(ret.n_rows == N);
+  assert(ret.n_cols == data.n_cols);
+  return ret;
+}
+vec UniformGrid::interpolate(const Points & points, const vec & data) const{
+  return base_interpolate<vec>(points,data);
+}
+mat UniformGrid::interpolate(const Points & points, const mat & data) const{
+  return base_interpolate<mat>(points,data);
+}
+mat UniformGrid::find_bounding_box() const{
+  mat bounds = mat(n_dim,2);
+  bounds.col(0) = m_low;
+  bounds.col(1) = m_high;
+  assert(check_bbox(bounds));
+  return bounds;
+}
+
+mat UniformGrid::cell_gradient(const vec & value) const{
+  assert(false); // TODO: fill this in.
+  return mat();
+}
+
+
 
 ElementDist build_sparse_dist(uint n_nodes, umat vert_indices, mat weights){
   // Take in the number of nodes, the vertex indices, and the weights

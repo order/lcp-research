@@ -70,6 +70,8 @@ class UniformGrid : public TypedDiscretizer{
 				    const Coords & coords) const;
   
   ElementDist points_to_element_dist(const TypedPoints &) const;
+  template <typename T> T base_interpolate(const Points & points,
+					   const T& data) const;
   vec interpolate(const Points & points,
 		  const vec & values) const;
   mat interpolate(const Points & points,
@@ -89,6 +91,6 @@ class UniformGrid : public TypedDiscretizer{
   uint n_special_nodes;
   uint n_dim;
 };
-ElementDist build_sparse_dist(uint n_nodes, mat weights, umat vert_indices);
+ElementDist build_sparse_dist(uint n_nodes, umat vert_indices, mat weights);
 
 #endif
