@@ -7,6 +7,48 @@
 using namespace arma;
 using namespace std;
 
+uvec get_spatial_rows(const Points & points){
+  assert(check_points(points));
+  return find_finite(points.col(0));
+}
+
+uvec get_special_rows(const Points & points){
+  assert(check_points(points));
+  return find_nonfinite(points.col(0));
+}
+
+bool check_points(const Points & points){
+  // No non-finite elements in the "spatial" rows
+  uvec spatial = find_finite(points.col(0));
+  assert(is_finite(points.rows(spatial)));
+
+  // No finite elements in the "special" rows
+  uvec special = find_nonfinite(points.col(0));
+  assert(0 == find_finite(points.rows(special)).n_elem);
+  return true;
+}
+
+
+bool check_bbox(const mat & bbox){
+  assert(2 == bbox.n_cols);
+  assert(all(bbox.col(0) < bbox.col(1))); // Must be full dimensional
+  return true;
+}
+
+
+bool check_points_in_bbox(const Points & points, const mat & bbox){
+  assert(check_bbox(bbox));
+  uint D = points.n_cols;
+  assert(D == bbox.rows());
+  
+  for(uint d = 0; d < D; d++){
+    assert(not any(points.col(d) < bbox(d,0)));
+    assert(not any(points.col(d) > bbox(d,1)));
+  }
+  return true;
+}
+
+
 /*
  * TYPED POINTS STRUCTURE
  */
@@ -128,14 +170,17 @@ TypeRegistry OutOfBoundsRule::type_elements(const mat & points) const{
   vec ub = m_bbox.col(1);
 
   set<uint> violations;
-
+  uvec spatial_rows = get_spatial_rows(points);
   // Iterate through the dimensions
   for(uint d = 0; d < D; ++d){
-    uvec low = find(points.col(d) < lb(d));
-    violations.insert(low.begin(), low.end());
+    uvec dim_col = uvec{d};
+    uvec low_mask = find(points(spatial_rows,dim_col) < lb);
+    low_mask = spatial_rows(low_mask);
+    violations.insert(low_mask.begin(), low_mask.end());
     
-    uvec high = find(points.col(d) > ub(d));
-    violations.insert(high.begin(), high.end());
+    uvec high_mask = find(points(spatial_rows,dim_col) > ub);
+    high_mask = spatial_rows(high_mask);
+    violations.insert(high_mask.begin(), high_mask.end());
   }
 
   TypeRegistry ret;
@@ -150,33 +195,40 @@ TypeRegistry OutOfBoundsRule::type_elements(const mat & points) const{
  * SATURATION REMAPPER
  */
 
-SaturateRemapper::SaturateRemapper(const mat & bounding_box,
-				   double fudge=PRETTY_SMALL) :
-  m_bbox(bounding_box), m_fudge(fudge){
+SaturateRemapper::SaturateRemapper(const mat & bounding_box) :
+  m_bbox(bounding_box){
   assert(check_bounding_box(m_bbox));
-  assert(m_fudge >= 0);
 }
 
 
-void SaturateRemapper::remapper(TypedPoints & points){
+void SaturateRemapper::remapper(Points & points){
   uint N = points.n_rows;
   uint D = points.n_cols;
   assert(D == m_bbox.n_rows);
   assert(2 == m_bbox.n_cols);
 
-  uvec normal_rows = points.get_normal_mask();
-  NodeRemapRegistry reg;
+  uvec spatial_rows = get_spatial_rows(points);
   for(uint d = 0; d < D; ++d){
     uvec dim_col = uvec{d};
     double lb = m_bbox(d,0);
     double ub = m_bbox(d,1);
+    if(lb == -datum::inf && ub == datum::inf){
+      continue;
+    }
     
-    uvec low_mask = find(points.col(d) < lb + m_fudge);
-    points.m_points(normal_rows,dim_col).fill(lb + m_fudge);
+    uvec low_mask = find(points(spatial_rows,dim_col) < lb);
+    low_mask = spatial_rows(low_mask);
+    points(low_mask,dim_col).fill(lb);
 
-    uvec high_mask = find(points.col(d) > ub - m_fudge);
-    points.m_points(normal_rows,dim_col).fill(ub - m_fudge);
-  }  
+    uvec high_mask = find(points(spatial_rows,dim_col) > ub);
+    high_mask = spatial_rows(high_mask);
+    points(high_mask,dim_col).fill(ub);
+  }
+  assert(check_points_in_bbox(points,m_bbox));
+}
+
+void SaturateRemapper::remapper(TypedPoints & points){
+  remapper(points.m_points);
 }
 
 
@@ -190,33 +242,33 @@ WrapRemapper::WrapRemapper(const mat & bounding_box) :
 }
 
 
-NodeRemapRegistry WrapRemapper::remapper(const TypedPoints & points){
+void WrapRemapper::remapper(Points & points){
   uint N = points.n_rows;
   uint D = points.n_cols;
   assert(D == m_bbox.n_rows);
-  
-  uvec normal_rows = points.get_normal_mask();
-  NodeRemapRegistry reg;
+
+  uvec spatial_rows = get_spatial_rows(points);
   for(uint d = 0; d < D; ++d){
-    if(!is_finite(bbox.row(d)))
-      continue;
-    
     uvec dim_col = uvec{d};
     double lb = m_bbox(d,0);
-    double ub = m_bbox(d,1);
+    double ub = m_bbox(d,1);   
 
-    vec tmp = points.col(d) - lb;
+    if(lb == -datum::inf || ub == datum::inf){
+      assert(lb == -datum::inf && ub == datum::inf);
+      continue;
+    }
+    assert(is_finite(m_bbox.col(d)));
+
+    vec tmp = points(spatial_rows,dim_col) - lb;
     tmp = vec_mod(tmp, ub - lb);
-    points.col(d) = tmp + lb;
+    points(spatial_rows,dim_col) = tmp + lb;
     
     assert(not any(points.col(d) > ub));
     assert(not any(points.col(d) < lb));
-  }   
+  }
+  assert(check_points_in_bbox(points,m_bbox));
 }
 
-
-bool check_bounding_box(const mat & bbox){
-  assert(2 == bbox.n_cols);
-  assert(all(bbox.col(0) < bbox.col(1))); // Must be full dimensional
-  return true;
+void WrapRemapper::remapper(TypedPoints & points){
+  remapper(points.m_points);
 }

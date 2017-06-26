@@ -10,6 +10,12 @@
 typedef std::map<uint,uint> TypeRegistry;
 typedef arma::mat Points; // Basic untyped points
 
+arma::uvec get_spatial_rows(const Points & points);
+arma::uvec get_special_rows(const Points & points);
+bool check_points(const Points & points);
+
+class TypedPoints; // Forward declaration.
+
 /*****************************************************
  * TYPING RULES *
  ****************/
@@ -41,6 +47,8 @@ class NodeRemapper{
     vectors.
   */  
   virtual void remap(Points & points) const = 0;
+  virtual void remap(TypedPoints & points) const = 0;
+
 };
 typedef std::vector<NodeRemapper> NodeRemapperList;
 
@@ -48,6 +56,7 @@ typedef std::vector<NodeRemapper> NodeRemapperList;
 class SaturateRemapper : public NodeRemapper{
   SaturateRemapper(const arma::mat & bounding_box);
   void remapper(Points & points);
+  void remapper(TypedPoints & points);
   
  protected:
   arma::mat m_bbox;
@@ -56,7 +65,8 @@ class SaturateRemapper : public NodeRemapper{
 class WrapRemapper : public NodeRemapper{
   WrapRemapper(const arma::mat & bounding_box);
   void remapper(Points & points);
-  
+  void remapper(TypedPoints & points);
+ 
  protected:
   arma::mat m_bbox;
 };
