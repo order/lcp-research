@@ -16,7 +16,7 @@ project( mesh )
 
 
 # Explicitly set some flags
-set(CMAKE_CXX_FLAGS "-O3 -fstack-protector -Wformat -Werror=format-security -frounding-math -FORTIFY_SOURCE=1 -fext-numeric-literals -std=c++11")
+set(CMAKE_CXX_FLAGS "-g -fstack-protector -Wformat -Werror=format-security -frounding-math -FORTIFY_SOURCE=1 -fext-numeric-literals -std=c++11")
 
 # CGAL and its components
 find_package( CGAL QUIET COMPONENTS  )
@@ -118,7 +118,7 @@ list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
 
 #add_executable (hallway_approx hallway_approx.cpp hallway.cpp ${COMMON_FILES})
 
-add_executable (grid_test grid_test.cpp grid.cpp misc.cpp discretizer.cpp points.cpp)
+add_executable (point_tests point_tests.cpp misc.cpp points.cpp)
 
 
 list(APPEND CDISCRETE_LIBRARIES
@@ -160,4 +160,4 @@ message(STATUS "Libraries: ${CDISCRETE_LIBRARIES}")
 #target_link_libraries(tet_interp ${CDISCRETE_LIBRARIES})
 #target_link_libraries(hallway_approx ${CDISCRETE_LIBRARIES})
 
-target_link_libraries(grid_test  ${CDISCRETE_LIBRARIES})
+target_link_libraries(point_tests ${CDISCRETE_LIBRARIES})

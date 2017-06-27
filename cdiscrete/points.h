@@ -13,6 +13,7 @@ typedef arma::mat Points; // Basic untyped points
 arma::uvec get_spatial_rows(const Points & points);
 arma::uvec get_special_rows(const Points & points);
 bool check_points(const Points & points);
+bool check_bbox(const arma::mat & bbox);
 
 class TypedPoints; // Forward declaration.
 
@@ -54,18 +55,20 @@ typedef std::vector<NodeRemapper> NodeRemapperList;
 
 
 class SaturateRemapper : public NodeRemapper{
+ public:
   SaturateRemapper(const arma::mat & bounding_box);
-  void remapper(Points & points);
-  void remapper(TypedPoints & points);
+  void remap(Points & points) const;
+  void remap(TypedPoints & points) const;
   
  protected:
   arma::mat m_bbox;
 };
 
 class WrapRemapper : public NodeRemapper{
+ public:
   WrapRemapper(const arma::mat & bounding_box);
-  void remapper(Points & points);
-  void remapper(TypedPoints & points);
+  void remap(Points & points) const;
+  void remap(TypedPoints & points) const;
  
  protected:
   arma::mat m_bbox;
@@ -98,7 +101,7 @@ class TypedPoints{
   uint num_spatial_nodes() const;
   uint num_all_nodes() const;
 
-  arma::uvec get_normal_mask() const;
+  arma::uvec get_spatial_mask() const;
   arma::uvec get_special_mask() const;
 
   // Run rules for typing and remapping.
@@ -120,7 +123,7 @@ class TypedPoints{
 
 // MISC FUNCTIONS
 
-bool check_bounding_box(const arma::mat & bbox);
+
 
 
 #endif

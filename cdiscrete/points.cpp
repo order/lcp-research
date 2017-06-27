@@ -18,13 +18,15 @@ uvec get_special_rows(const Points & points){
 }
 
 bool check_points(const Points & points){
+  assert(!points.has_inf());
+  
   // No non-finite elements in the "spatial" rows
   uvec spatial = find_finite(points.col(0));
   assert(is_finite(points.rows(spatial)));
 
   // No finite elements in the "special" rows
   uvec special = find_nonfinite(points.col(0));
-  assert(0 == find_finite(points.rows(special)).n_elem);
+  assert(0 == uvec(find_finite(points.rows(special))).n_elem);
   return true;
 }
 
@@ -39,7 +41,7 @@ bool check_bbox(const mat & bbox){
 bool check_points_in_bbox(const Points & points, const mat & bbox){
   assert(check_bbox(bbox));
   uint D = points.n_cols;
-  assert(D == bbox.rows());
+  assert(D == bbox.n_rows);
   
   for(uint d = 0; d < D; d++){
     assert(not any(points.col(d) < bbox(d,0)));
@@ -83,6 +85,13 @@ uint TypedPoints::num_all_nodes() const{
 
 uint TypedPoints::num_spatial_nodes() const{
   return num_all_nodes() - num_special_nodes();
+}
+
+uvec TypedPoints::get_spatial_mask() const{
+  return get_spatial_rows(m_points);
+}
+uvec TypedPoints::get_special_mask() const{
+  return get_special_rows(m_points);
 }
 
 
@@ -130,8 +139,7 @@ bool TypedPoints::check_validity() const{
     assert(has_nan == is_special);
 
     if(is_special){
-      assert(m_reg[i] > SPATIAL_TYPE); // Special types not Euclidean
-      assert(m_reg[i] <= m_max_type);
+      assert(m_reg.at(i) > SPATIAL_TYPE); // Special types not Euclidean
     }
   }
 }
@@ -141,11 +149,12 @@ void TypedPoints::_ensure_blanked(){
     Make sure that everthing in the registry corresponds to NaN'd rows
   */
   for(auto const & it : m_reg){
+    assert(!m_points.row(it.first).has_inf());
     bool is_blank = m_points.row(it.first).has_nan();
-    assert(m_points.n_cols == find_nonfinite(m_points.row(it.first)));
     if(!is_blank){
       m_points.row(it.first).fill(SPECIAL_FILL);
     }
+    assert(0 == uvec(find_finite(m_points.row(it.first))).n_elem);
   }
 }
 
@@ -157,7 +166,7 @@ void TypedPoints::_ensure_blanked(){
 OutOfBoundsRule::OutOfBoundsRule(const mat & bounding_box,
 				 uint oob_type) :
   m_bbox(bounding_box), m_type(oob_type) {
-  assert(check_bounding_box(m_bbox));
+  assert(check_bbox(m_bbox));
 }
 
 TypeRegistry OutOfBoundsRule::type_elements(const mat & points) const{
@@ -197,11 +206,11 @@ TypeRegistry OutOfBoundsRule::type_elements(const mat & points) const{
 
 SaturateRemapper::SaturateRemapper(const mat & bounding_box) :
   m_bbox(bounding_box){
-  assert(check_bounding_box(m_bbox));
+  assert(check_bbox(m_bbox));
 }
 
 
-void SaturateRemapper::remapper(Points & points){
+void SaturateRemapper::remap(Points & points) const{
   uint N = points.n_rows;
   uint D = points.n_cols;
   assert(D == m_bbox.n_rows);
@@ -227,8 +236,8 @@ void SaturateRemapper::remapper(Points & points){
   assert(check_points_in_bbox(points,m_bbox));
 }
 
-void SaturateRemapper::remapper(TypedPoints & points){
-  remapper(points.m_points);
+void SaturateRemapper::remap(TypedPoints & points) const{
+  remap(points.m_points);
 }
 
 
@@ -238,11 +247,11 @@ void SaturateRemapper::remapper(TypedPoints & points){
 
 WrapRemapper::WrapRemapper(const mat & bounding_box) :
   m_bbox(bounding_box){
-  assert(check_bounding_box(m_bbox));
+  assert(check_bbox(m_bbox));
 }
 
 
-void WrapRemapper::remapper(Points & points){
+void WrapRemapper::remap(Points & points) const{
   uint N = points.n_rows;
   uint D = points.n_cols;
   assert(D == m_bbox.n_rows);
@@ -269,6 +278,6 @@ void WrapRemapper::remapper(Points & points){
   assert(check_points_in_bbox(points,m_bbox));
 }
 
-void WrapRemapper::remapper(TypedPoints & points){
-  remapper(points.m_points);
+void WrapRemapper::remap(TypedPoints & points) const{
+  remap(points.m_points);
 }
