@@ -254,17 +254,17 @@ TypeRegistry Coords::_find_oob(const uvec & grid_size) const{
 }
 
 
-uint Coords::number_of_spatial_coords() const{
-  return number_of_all_coords() - number_of_special_coords();
+uint Coords::num_spatial() const{
+  return num_coords() - num_special();
 }
 
 
-uint Coords::number_of_all_coords() const{
+uint Coords::num_coords() const{
   return m_coords.n_rows;
 }
 
 
-uint Coords::number_of_special_coords() const{
+uint Coords::num_special() const{
   return m_reg.size();
 }
 
@@ -358,7 +358,7 @@ umat UniformGrid::get_cell_node_indices() const{
   assert(number_of_cells() == coord_points.n_rows);
   
   Coords coords = Coords(coord_points);
-  assert(0 == coords.number_of_special_coords());
+  assert(0 == coords.num_special());
   return coords.get_indices(m_num_cells);
 }
 
@@ -395,7 +395,7 @@ umat UniformGrid::cell_coords_to_vertex_indices(const Coords & coords) const{
    */
 
   // Calc dimensions and sizes
-  uint N = coords.number_of_all_coords();
+  uint N = coords.num_coords();
   uint D = coords.n_dim;
   uint V = pow(2.0,D);
   assert(n_dim == D);

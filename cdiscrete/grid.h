@@ -21,6 +21,7 @@ class Coords{
 
   Coords(const umat & coords);
   Coords(const umat & coords, const TypeRegistry & reg);
+  Coords(const TypedPoints & points);
 
   bool check(const uvec & grid_size) const;
   bool _coord_check(const uvec & grid_size, const umat & coords) const;
@@ -34,9 +35,9 @@ class Coords{
   void _mark(const TypeRegistry & reg);
   TypeRegistry _find_oob(const uvec & grid_size) const;
 
-  uint number_of_spatial_coords() const;
-  uint number_of_all_coords() const;
-  uint number_of_special_coords() const;
+  uint num_coords() const;
+  uint num_spatial() const;
+  uint num_special() const;
   uint max_spatial_index(const uvec & grid_size) const;
 
   uvec get_indices(const uvec & grid_size) const;

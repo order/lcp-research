@@ -40,6 +40,28 @@ bool test_shift_3d(){
 /*
  * Coordinate tests
  */
+bool test_coord_basic(){
+  uint N = 100;
+  Coords coords = Coords(randi<umat>(N,3,distr_param(0,10)));
+  assert(N == coords.num_coords());
+  assert(0 == coords.num_special());
+  cout << "Finished test_coords_basic" << endl;
+}
+
+bool test_coord_basic(){
+  Coords coords = Coords(umat{{0,4}, {5,4}, {1,3}});
+  TypeRegistry reg = coords._find_oob(uvec{4,4});
+  
+  
+  assert(2 == coords.num_coords());
+  assert(0 == coords.num_special());
+
+  
+  
+  cout << "Finished test_coords_basic" << endl;
+}
+
+
 
 int main(){
   cout << "Tests start..." << endl;
@@ -47,4 +69,6 @@ int main(){
   test_stride_3d();
   test_shift_2d();
   test_shift_3d();
+
+  test_coord_basic();
 }
