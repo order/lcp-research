@@ -3,6 +3,7 @@
 
 #include <armadillo>
 #include <map>
+#include <memory>
 
 #define SPATIAL_TYPE 0
 #define SPECIAL_FILL arma::datum::nan
@@ -14,6 +15,7 @@ arma::uvec get_spatial_rows(const Points & points);
 arma::uvec get_special_rows(const Points & points);
 bool check_points(const Points & points);
 bool check_bbox(const arma::mat & bbox);
+bool check_points_in_bbox(const Points & points, const arma::mat & bbox);
 
 class TypedPoints; // Forward declaration.
 
@@ -28,7 +30,7 @@ class TypeRule{
   */
   virtual TypeRegistry type_elements(const Points & points) const = 0;
 };
-typedef std::vector<TypeRule> TypeRuleList;
+typedef std::vector<std::unique_ptr<TypeRule>> TypeRuleList;
 
 class OutOfBoundsRule : public TypeRule{
  public:
@@ -51,7 +53,7 @@ class NodeRemapper{
   virtual void remap(TypedPoints & points) const = 0;
 
 };
-typedef std::vector<NodeRemapper> NodeRemapperList;
+typedef std::vector<std::unique_ptr<NodeRemapper>> NodeRemapperList;
 
 
 class SaturateRemapper : public NodeRemapper{
@@ -114,7 +116,7 @@ class TypedPoints{
   TypeRegistry m_reg;
 
   bool check_validity() const;
-  bool check_bounding_box(arma::vec & low, arma::vec & high) const;
+  bool check_in_bbox(arma::mat & bbox) const;
 
  protected:
   void _ensure_blanked();

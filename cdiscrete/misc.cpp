@@ -77,6 +77,10 @@ uvec vec_mod(const uvec & a, uint n){
   return a - (a / n) * n;
 }
 
+vec vec_mod(const vec & a, double n){
+  return a - floor(a / n) * n;
+}
+
 umat divmod(const uvec & a, uint n){
   /*
    * Returns two columns:
@@ -89,9 +93,6 @@ umat divmod(const uvec & a, uint n){
   return ret;
 }
 
-vec vec_mod(const vec & a, double n){
-  return a - floor(a / n) * n;
-}
 
 template<typename V> bvec in_interval(const V & x,
 				      double lb,

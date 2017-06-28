@@ -16,8 +16,11 @@ bool test_build_typed_points(){
   TypeRegistry reg = TypeRegistry();
   reg[1] = 1;
   TypedPoints B = TypedPoints(mat{{-2,-2},{0.5,0.5},{1,1}},reg);
-  assert(2 == A.get_spatial_mask().n_elem);
-  assert(1 == A.num_special_nodes());
+  assert(2 == B.num_spatial_nodes());
+  assert(2 == B.get_spatial_mask().n_elem);
+  assert(1 == B.num_special_nodes());
+  assert(1 == B.get_special_mask().n_elem);
+
   
   assert(B.m_points.has_nan());
   assert(is_finite(B.m_points.rows(uvec{0,2})));
@@ -36,8 +39,35 @@ bool test_oob(){
   A.apply_typing_rule(rule);
   assert(1 == A.num_special_nodes());
   assert(2 == A.num_spatial_nodes());
-  assert(all(uvec{2} == A.get_spatial_mask()));
+  assert(all(uvec{2} == A.get_special_mask()));
+  cout << "Passed test_oob." << endl;
 
+  return true;
+}
+
+bool test_oob_rand(){
+  TypedPoints points = TypedPoints( 2*randu<mat>(100,4));
+  
+  mat bbox1 = mat{
+    {-datum::inf,datum::inf},
+    {-1,1},
+    {-datum::inf,datum::inf},
+    {0,1}};
+  mat bbox2 = mat{
+    {0,1},
+    {-datum::inf,datum::inf},
+    {-1,1},
+    {-datum::inf,datum::inf}};
+  
+  TypeRuleList rules;
+  rules.emplace_back(new OutOfBoundsRule(bbox1, 1));
+  rules.emplace_back(new OutOfBoundsRule(bbox2, 2));
+  points.apply_typing_rules(rules);
+
+  mat bbox = mat{{0,1},{0,1},{0,1},{0,1}};
+  points.check_in_bbox(bbox);
+  assert(100 == points.num_special_nodes() + points.num_spatial_nodes());
+  cout << "Passed test_oob_rand." << endl;
   return true;
 }
 
@@ -59,7 +89,7 @@ bool test_wrap_1(){
   WrapRemapper remap = WrapRemapper(bbox);
   remap.remap(P);
   
-  mat expected = mat{{0.5,-2},{0.5,0.5},{0.25,1}};
+  mat expected = mat{{0.25,-2},{0.5,0.5},{0.25,1}};
   assert(norm(P - expected) < 1e-9);
   cout << "Passed test_wrap_1." << endl;
   return true;
@@ -70,18 +100,21 @@ bool test_wrap_2(){
   mat bbox = mat{{-datum::inf,datum::inf},{-1.5,0}};
   WrapRemapper remap = WrapRemapper(bbox);
   remap.remap(P);
-
-  mat expected = mat{{-2,-0.5},{0.5,-0.5},{1,-0.5}};
+  mat expected = mat{{-2,-0.5},{0.5,-1},{1,-0.5}};
   assert(norm(P - expected) < 1e-9);
   cout << "Passed test_wrap_2." << endl;
   return true;
 }
 
 
+
+
 int main(){
   test_saturate();
   test_build_typed_points();
   test_oob();
+  test_oob_rand();
   test_wrap_1();
   test_wrap_2();
+  
 }

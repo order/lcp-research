@@ -33,7 +33,7 @@ bool check_points(const Points & points){
 
 bool check_bbox(const mat & bbox){
   assert(2 == bbox.n_cols);
-  assert(all(bbox.col(0) < bbox.col(1))); // Must be full dimensional
+  assert(all(bbox.col(0) <= bbox.col(1))); // Must be full dimensional
   return true;
 }
 
@@ -42,10 +42,12 @@ bool check_points_in_bbox(const Points & points, const mat & bbox){
   assert(check_bbox(bbox));
   uint D = points.n_cols;
   assert(D == bbox.n_rows);
-  
+
+  uvec spatial = get_spatial_rows(points);
   for(uint d = 0; d < D; d++){
-    assert(not any(points.col(d) < bbox(d,0)));
-    assert(not any(points.col(d) > bbox(d,1)));
+    uvec idx = uvec{d};
+    assert(all(all(points(spatial,idx) >= bbox(d,0))));
+    assert(all(all(points(spatial,idx) <= bbox(d,1))));
   }
   return true;
 }
@@ -114,7 +116,7 @@ void TypedPoints::apply_typing_rules(const TypeRuleList & rules){
     Iterate through list and apply node type rules
   */
   for(auto const & it : rules){
-    apply_typing_rule(it);
+    apply_typing_rule(*it);
   }
 }
 
@@ -127,7 +129,7 @@ void TypedPoints::apply_remappers(const NodeRemapperList & remappers){
     Iterate through list and apply node remappers
   */
   for(auto const & it : remappers){
-    apply_remapper(it);
+    apply_remapper(*it);
   }
 }
 
@@ -142,6 +144,10 @@ bool TypedPoints::check_validity() const{
       assert(m_reg.at(i) > SPATIAL_TYPE); // Special types not Euclidean
     }
   }
+}
+
+bool TypedPoints::check_in_bbox(mat & bbox) const{
+  return check_points_in_bbox(m_points, bbox);
 }
 
 void TypedPoints::_ensure_blanked(){
@@ -183,11 +189,11 @@ TypeRegistry OutOfBoundsRule::type_elements(const mat & points) const{
   // Iterate through the dimensions
   for(uint d = 0; d < D; ++d){
     uvec dim_col = uvec{d};
-    uvec low_mask = find(points(spatial_rows,dim_col) < lb);
+    uvec low_mask = find(points(spatial_rows,dim_col) < lb(d));
     low_mask = spatial_rows(low_mask);
     violations.insert(low_mask.begin(), low_mask.end());
     
-    uvec high_mask = find(points(spatial_rows,dim_col) > ub);
+    uvec high_mask = find(points(spatial_rows,dim_col) > ub(d));
     high_mask = spatial_rows(high_mask);
     violations.insert(high_mask.begin(), high_mask.end());
   }
@@ -266,7 +272,8 @@ void WrapRemapper::remap(Points & points) const{
       assert(lb == -datum::inf && ub == datum::inf);
       continue;
     }
-    assert(is_finite(m_bbox.col(d)));
+    
+    assert(is_finite(m_bbox.row(d)));
 
     vec tmp = points(spatial_rows,dim_col) - lb;
     tmp = vec_mod(tmp, ub - lb);
