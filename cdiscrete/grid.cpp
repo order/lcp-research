@@ -31,31 +31,29 @@ uvec c_order_stride(const uvec & grid_size){
      For higher order tensors, the indexing will be contiguous for the last 
      dimension.
    
-     NB: For 2 and 3 dim, we should exactly match the output of arma::sub2ind.
+     NB: For 2 and 3 dim, we check with sub2ind. Since armadillo is
+     column-major, we need to do some flipping.
   */
   
   uint D = grid_size.n_elem;
-  uvec stride = uvec(D);
-
-  uint agg = 1;
-  for(uint d = D; d > 0; --d){
-    stride(d-1) = agg;
-    agg *= grid_size(d - 1);
-  }
-
+  uvec stride = flipud(shift(cumprod(flipud(grid_size)),1));
+  stride(stride.n_elem - 1) = 1;
+  
+#ifndef NDEBUG
   // Check for 2 and 3 dimensions
   if(2 == D){
-    SizeMat sz = uvec2sizemat(grid_size);
+    SizeMat sz = uvec2sizemat(flipud(grid_size));
     umat I = eye<umat>(2,2);
-    uvec stride_check = sub2ind(sz, I);
+    uvec stride_check = flipud(sub2ind(sz, I));
     assert(all(stride_check == stride));
   }
   else if(3 == D){
-    SizeCube sz = uvec2sizecube(grid_size);
+    SizeCube sz = uvec2sizecube(flipud(grid_size));
     umat I = eye<umat>(3,3);
-    uvec stride_check = sub2ind(sz, I);     
+    uvec stride_check = flipud(sub2ind(sz, I));
     assert(all(stride_check == stride));
-  }    
+  }
+#endif
   return stride;
 }
 
@@ -83,7 +81,7 @@ uvec c_order_cell_shift(const uvec & points_per_dim){
      0 - 1 - 2
 
      Notices that the cell <0,3,1,4> =  <4,7,5,8> - 4; it's the same pattern.
-     This patter, <0,3,1,4> is the "C-order cell shift".
+     This pattern, <0,3,1,4> is the "C-order cell shift".
 
      points_per_dim: the number of points in the grid along each
      dimension.
