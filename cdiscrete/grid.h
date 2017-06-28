@@ -24,7 +24,8 @@ class Coords{
 
   bool check(const uvec & grid_size) const;
   bool _coord_check(const uvec & grid_size, const umat & coords) const;
-  bool _type_reg_check(const TypeRegistry & registry, const umat & coords);
+  bool _type_reg_check(const TypeRegistry & registry,
+		       const umat & coords) const;
   umat _indicies_to_coords(const uvec & grid_size,
 			     const uvec & indices) const;
   uvec _coords_to_indices(const uvec & grid_size,

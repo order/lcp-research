@@ -144,19 +144,19 @@ bool Coords::_coord_check(const uvec & grid_size, const umat & coords) const{
 
   uvec ref_nan = find_nonfinite(coords.col(0));
   uvec ref_fin = find_finite(coords.col(0));
-  assert(0 == find_finite(coords.rows(ref_nan)));
-  assert(0 == find_non_finite(coords.rows(ref_fin)));
+  assert(0 == uvec(find_finite(coords.rows(ref_nan))).n_elem);
+  assert(is_finite(coords.rows(ref_fin)));
   
   imat signed_coords = conv_to<imat>::from(coords);
   signed_coords.each_row() -= conv_to<ivec>::from(grid_size);
-  assert(all(signed_coords < 0));
+  assert(all(all(signed_coords < 0)));
   return true;
 }
 
-bool Coords::_type_reg_check(const TypeRegistry & registry, const umat & coords){
+bool Coords::_type_reg_check(const TypeRegistry & registry, const umat & coords) const{
   uvec find_res = find_nonfinite(coords.col(0));
   for(auto const& it : find_res){
-    assert(registry.end() != registry.find(*it));
+    assert(registry.end() != registry.find(it));
   }
   return true;
 }
@@ -207,12 +207,12 @@ uvec Coords::_coords_to_indices(const uvec & grid_size,
   TypeRegistry oob_reg = coords._find_oob(grid_size);
   uint special_idx = max_spatial_index(grid_size);
   for(auto const & it : oob_reg){
-    assert(SPATIAL_TYPE != it->second);
+    assert(SPATIAL_TYPE != it.second);
     indices(it.first) = it.second + special_idx;
   }
 
   // Check that everything has been updated.
-  assert(0 == find_nonfinite(indices));
+  assert(is_finite(indices));
   
   return indices;
 }
@@ -222,7 +222,7 @@ void Coords::_mark(const uvec & indices, uint coord_type){
    * Go through and add the indices to the type map with the supplied
    * coord_type
    */
-  assert(coord_type != SPATIAL_COORD);
+  assert(coord_type > SPATIAL_TYPE);
   for(auto const & it : indices){
     m_reg[it] = coord_type;
     m_coords.row(it).fill(SPECIAL_FILL);
@@ -298,7 +298,7 @@ UniformGrid::UniformGrid(vec & low,
   n_special_nodes(special_nodes){
   uint D = low.n_elem;
   assert(D == high.n_elem);
-  assert(D == num_cells);
+  assert(D == num_cells.n_elem);
 }
 
 
@@ -357,7 +357,7 @@ umat UniformGrid::get_cell_node_indices() const{
     marginal_coords.push_back(mc);
   }
   umat coord_points = make_points<umat,uvec>(marginal_coords);
-  assert(number_of_cells() == coords.n_rows);
+  assert(number_of_cells() == coord_points.n_rows);
   
   Coords coords = Coords(coord_points);
   assert(0 == coords.number_of_special_coords());
@@ -428,7 +428,7 @@ umat UniformGrid::cell_coords_to_vertex_indices(const Coords & coords) const{
 
 Coords UniformGrid::points_to_cell_coords(const TypedPoints & points) const{
   // Takes in points, spits out cell coords
-  assert(points.check_bounding_box(m_low,m_high));
+  assert(points.check_in_bbox(m_low,m_high));
 
   // C = floor((P - low) / width)
   mat diff = row_diff(points.m_points, conv_to<rowvec>::from(m_low));
@@ -453,8 +453,8 @@ mat UniformGrid::points_to_cell_nodes_dist(const TypedPoints & points,
   /*
    * Takes in points, and returns a matrix with the distances to the 
    */
-  assert(n_dim == points.n_cols);
-  assert(points.check_bounding_box(m_low,m_high));
+  assert(n_dim == points.m_points.n_cols);
+  assert(points.check_in_bbox(m_low,m_high));
   uint N = points.m_points.n_rows;
 
   // Calculate
@@ -493,7 +493,7 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points)
    */
   
   // Assume points are properly bounded.
-  assert(points.check_bounding_box(m_low, m_high));
+  assert(points.check_in_bbox(m_low, m_high));
 
   Coords coords = points_to_cell_coords(points);
   mat dist = points_to_cell_nodes_dist(points, coords);
@@ -514,9 +514,9 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points)
     weights.cols(find(mask == 1)) %= rep_dist;		       
     weights.cols(find(mask == 0)) %= 1 - rep_dist;
   }
-  assert(all(weights >= 0));
-  assert(all(weights <= 1));
-  assert(!weights.has_nan());
+  assert(is_finite(weights));
+  assert(all(all(weights >= 0)));
+  assert(all(all(weights <= 1)));
   
   // Check the weights of the low and high nodes.
   // position 0 -> 00...0 is the low node, so weight should be prod(rel_dist)
@@ -542,9 +542,7 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points)
 
 
 template <typename T> T UniformGrid::base_interpolate(const Points & points,
-                                                  const T& data) const{
-  assert(m_frozen);
-  
+						      const T& data) const{  
   uint N = points.n_rows;
   uint d = points.n_cols;
   uint NN = max_node_index() + 1;
@@ -590,10 +588,11 @@ ElementDist build_sparse_dist(uint n_nodes, umat vert_indices, mat weights){
   uint V = vert_indices.n_cols;
 
   // Basic sanity checking.
-  assert(all(weights <= 1.0));
-  assert(all(weights >= 0.0));
-  assert(all(vert_indices < n_nodes));
-  
+  assert(is_finite(weights));
+  assert(all(all(weights >= 0)));
+  assert(all(all(weights <= 1)));
+  assert(all(all(vert_indices < n_nodes)));
+
   // Build out the row, column, and data vectors.
   for(uint i = 0; i < N; i++){
     uvec uni = unique(vert_indices.row(i));
@@ -602,14 +601,14 @@ ElementDist build_sparse_dist(uint n_nodes, umat vert_indices, mat weights){
       // Transition to non-spatial node.
       // Currently assume that there is a unique special node with all the
       // weight.
-      assert(abs(weights(i,0) - 1.0) < PRETTY_SMALL); // All weight
+      assert(norm(weights(i,0) - 1) < PRETTY_SMALL); // All weight
       v_row.push_back(i);
       v_col.push_back(uni(0));
       v_data.push_back(1.0);
     }
     else{
       assert(V == uni.n_elem); // Proper spatial dist
-      assert(abs(sum(v_data.row(i)) - 1) < PRETTY_SMALL); // Transition
+      assert(norm(weights.row(i) - 1) < PRETTY_SMALL); // Transition
       for(uint j = 0; j < V; j++){
 	v_row.push_back(i);
 	v_col.push_back(vert_indices(i,j));
@@ -623,6 +622,7 @@ ElementDist build_sparse_dist(uint n_nodes, umat vert_indices, mat weights){
   loc.row(0) = urowvec(v_row);
   loc.row(1) = urowvec(v_col);
   vec data = vec(v_data);
+  assert(abs(sum(data) - N) < PRETTY_SMALL);
   return sp_mat(loc,data,N,n_nodes);
 }
 				      

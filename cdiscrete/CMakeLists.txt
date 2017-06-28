@@ -118,7 +118,10 @@ list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
 
 #add_executable (hallway_approx hallway_approx.cpp hallway.cpp ${COMMON_FILES})
 
+add_executable (grid_tests grid_tests.cpp discretizer.cpp grid.cpp misc.cpp
+  points.cpp)
 add_executable (point_tests point_tests.cpp misc.cpp points.cpp)
+
 
 
 list(APPEND CDISCRETE_LIBRARIES
@@ -160,4 +163,5 @@ message(STATUS "Libraries: ${CDISCRETE_LIBRARIES}")
 #target_link_libraries(tet_interp ${CDISCRETE_LIBRARIES})
 #target_link_libraries(hallway_approx ${CDISCRETE_LIBRARIES})
 
+target_link_libraries(grid_tests ${CDISCRETE_LIBRARIES})
 target_link_libraries(point_tests ${CDISCRETE_LIBRARIES})

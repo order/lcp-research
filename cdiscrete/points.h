@@ -116,7 +116,8 @@ class TypedPoints{
   TypeRegistry m_reg;
 
   bool check_validity() const;
-  bool check_in_bbox(arma::mat & bbox) const;
+  bool check_in_bbox(const arma::mat & bbox) const;
+  bool check_in_bbox(const arma::vec & low, const arma::vec & high) const;
 
  protected:
   void _ensure_blanked();

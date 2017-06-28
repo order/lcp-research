@@ -46,17 +46,17 @@ bool test_oob(){
 }
 
 bool test_oob_rand(){
-  TypedPoints points = TypedPoints( 2*randu<mat>(100,4));
+  TypedPoints points = TypedPoints(2*(2*randu<mat>(100,4)-1));
   
   mat bbox1 = mat{
     {-datum::inf,datum::inf},
-    {-1,1},
+    {0,1},
     {-datum::inf,datum::inf},
     {0,1}};
   mat bbox2 = mat{
     {0,1},
     {-datum::inf,datum::inf},
-    {-1,1},
+    {0,1},
     {-datum::inf,datum::inf}};
   
   TypeRuleList rules;
@@ -106,15 +106,38 @@ bool test_wrap_2(){
   return true;
 }
 
+bool test_saturate_and_wrap_rand(){
+  TypedPoints points = TypedPoints(2 * (2* randu<mat>(100,4) - 1));
+  
+  mat bbox1 = mat{
+    {-datum::inf,datum::inf},
+    {0,1},
+    {-datum::inf,datum::inf},
+    {0,1}};
+  mat bbox2 = mat{
+    {0,1},
+    {-datum::inf,datum::inf},
+    {0,1},
+    {-datum::inf,datum::inf}};
+  
+  NodeRemapperList rules;
+  rules.emplace_back(new SaturateRemapper(bbox1));
+  rules.emplace_back(new WrapRemapper(bbox2));
+  points.apply_remappers(rules);
 
+  mat bbox = mat{{0,1},{0,1},{0,1},{0,1}};
+  points.check_in_bbox(bbox);
+  assert(100 == points.num_special_nodes() + points.num_spatial_nodes());
+  cout << "Passed test_oob_rand." << endl;
+}
 
 
 int main(){
-  test_saturate();
   test_build_typed_points();
   test_oob();
   test_oob_rand();
+  test_saturate();
   test_wrap_1();
   test_wrap_2();
-  
+  test_saturate_and_wrap_rand();
 }

@@ -53,6 +53,7 @@ bool check_points_in_bbox(const Points & points, const mat & bbox){
 }
 
 
+
 /*
  * TYPED POINTS STRUCTURE
  */
@@ -146,8 +147,17 @@ bool TypedPoints::check_validity() const{
   }
 }
 
-bool TypedPoints::check_in_bbox(mat & bbox) const{
+bool TypedPoints::check_in_bbox(const mat & bbox) const{
   return check_points_in_bbox(m_points, bbox);
+}
+
+bool TypedPoints::check_in_bbox(const arma::vec & low, const arma::vec & high) const{
+  uint N = low.n_elem;
+  assert(N == high.n_elem);
+  mat bbox = mat(N,2);
+  bbox.col(0) = low;
+  bbox.col(1) = high;
+  return check_in_bbox(bbox);
 }
 
 void TypedPoints::_ensure_blanked(){
