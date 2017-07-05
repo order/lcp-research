@@ -333,9 +333,13 @@ UniformGrid::UniformGrid(vec & low,
   m_width((high - low) / num_cells),
   n_dim(low.n_elem),
   n_special_nodes(special_nodes){
+  assert(approx_equal(m_high,
+		      m_low + m_width % m_num_cells,
+		      "absdiff", PRETTY_SMALL));
   uint D = low.n_elem;
   assert(D == high.n_elem);
   assert(D == num_cells.n_elem);
+  
 }
 
 
@@ -485,7 +489,7 @@ Coords UniformGrid::points_to_cell_coords(const TypedPoints & points) const{
   mat diff = row_diff(points.m_points, conv_to<rowvec>::from(m_low));
   mat scaled = row_divide(diff, conv_to<rowvec>::from(m_width));
   imat raw_coords = conv_to<imat>::from(floor(scaled));
-
+  
   // Use all existing typing information.
   return Coords(raw_coords, points.m_reg); // Use points information.
 }

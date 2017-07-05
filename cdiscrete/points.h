@@ -106,6 +106,7 @@ class TypedPoints{
 
   arma::uvec get_spatial_mask() const;
   arma::uvec get_special_mask() const;
+  bool is_special(uint idx) const;
 
   // Run rules for typing and remapping.
   void apply_typing_rule(const TypeRule & rule);
@@ -121,6 +122,8 @@ class TypedPoints{
   bool check_validity() const;
   bool check_in_bbox(const arma::mat & bbox) const;
   bool check_in_bbox(const arma::vec & low, const arma::vec & high) const;
+  
+  friend std::ostream& operator<<(std::ostream& os, const TypedPoints& p);  
 
  protected:
   void _ensure_blanked();

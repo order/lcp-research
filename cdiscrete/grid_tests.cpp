@@ -93,13 +93,13 @@ bool test_coord_map_check_2(){
 bool test_grid_basic(){
   vec low = vec{0,0};
   vec high = vec{10,10};
-  uvec num_cells = uvec{9,9};
+  uvec num_cells = uvec{10,10};
   
   UniformGrid grid = UniformGrid(low,high,num_cells,1);
   TypedPoints p = TypedPoints(mat{{1,1}});
   Coords c = grid.points_to_cell_coords(p);
   assert(1 == c.num_spatial());
-  Coords ref = Coords(ones<ivec>(1,2));
+  Coords ref = Coords(ones<imat>(1,2));
   assert(ref.equals(c));
   cout << "Finished test_grid_basic" << endl;
 

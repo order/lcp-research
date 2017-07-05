@@ -97,10 +97,14 @@ uint TypedPoints::num_spatial_nodes() const{
 uvec TypedPoints::get_spatial_mask() const{
   return get_spatial_rows(m_points);
 }
+
 uvec TypedPoints::get_special_mask() const{
   return get_special_rows(m_points);
 }
 
+bool TypedPoints::is_special(uint idx) const{
+  return m_reg.end() != m_reg.find(idx);
+}
 
 void TypedPoints::apply_typing_rule(const TypeRule & rule){
   /*
@@ -162,6 +166,19 @@ bool TypedPoints::check_in_bbox(const arma::vec & low, const arma::vec & high) c
   bbox.col(0) = low;
   bbox.col(1) = high;
   return check_in_bbox(bbox);
+}
+
+ostream& operator<<(ostream& os, const TypedPoints& p){
+  for(uint i = 0; i < p.n_rows; i++){
+    os << "Point [" << i << "]:";
+    if(p.is_special(i)){
+      os << "\tSpecial (" << p.m_reg.find(i)->second << ")" << endl;
+    }
+    else{
+      os << p.m_points.row(i);
+    }
+  }
+  return os;
 }
 
 void TypedPoints::_ensure_blanked(){
