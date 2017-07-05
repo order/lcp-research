@@ -53,7 +53,6 @@ bool check_points_in_bbox(const Points & points, const mat & bbox){
 }
 
 
-
 /*
  * TYPED POINTS STRUCTURE
  */
@@ -61,11 +60,16 @@ bool check_points_in_bbox(const Points & points, const mat & bbox){
 TypedPoints::TypedPoints(const mat & points, const TypeRegistry & reg) :
   m_points(points), m_reg(reg){
   assert(m_points.n_rows >= m_reg.size());
+  n_rows = points.n_rows;
+  n_cols = points.n_cols;
   _ensure_blanked();
 }
 
 TypedPoints::TypedPoints(const mat & points) :
-  m_points(points){}
+  m_points(points){
+  n_rows = points.n_rows;
+  n_cols = points.n_cols;
+}
 
 TypedPoints::TypedPoints(){}
 

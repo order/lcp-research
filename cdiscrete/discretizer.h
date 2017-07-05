@@ -41,10 +41,10 @@ class TypedDiscretizer{
   virtual uint number_of_spatial_nodes() const = 0;
   virtual uint number_of_cells() const = 0;
   
-  virtual ElementDist points_to_element_dist(const Points &) const = 0;
-  virtual vec interpolate(const Points & points,
+  virtual ElementDist points_to_element_dist(const TypedPoints &) const = 0;
+  virtual vec interpolate(const TypedPoints & points,
                           const vec & values) const = 0;
-  virtual mat interpolate(const Points & points,
+  virtual mat interpolate(const TypedPoints & points,
                           const mat & values) const = 0;
   virtual mat find_bounding_box() const = 0;
 

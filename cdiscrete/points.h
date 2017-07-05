@@ -5,9 +5,6 @@
 #include <map>
 #include <memory>
 
-#define SPATIAL_TYPE 0
-#define SPECIAL_FILL arma::datum::nan
-
 typedef std::map<uint,uint> TypeRegistry;
 typedef arma::mat Points; // Basic untyped points
 
@@ -92,6 +89,10 @@ class TypedPoints{
     NB: The assumption is that most nodes are Euclidean and "normal".
   */
  public:
+  static const uint DEFAULT_OOB_TYPE = 1;
+  static const uint SPATIAL_TYPE = 0;
+  const double SPECIAL_FILL = arma::datum::nan; // Can't be static, apparently
+  
   TypedPoints(const Points & points, const TypeRegistry & reg);
   TypedPoints(const Points & points);
   TypedPoints();
@@ -114,6 +115,8 @@ class TypedPoints{
   
   Points m_points;
   TypeRegistry m_reg;
+  uint n_rows;
+  uint n_cols;
 
   bool check_validity() const;
   bool check_in_bbox(const arma::mat & bbox) const;

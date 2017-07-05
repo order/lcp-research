@@ -13,7 +13,7 @@ using namespace arma;
 
 uvec c_order_stride(const uvec & grid_size){
   /* 
-     Coeffs to converts from grid coords to indicies
+     Coeffs to converts from grid coords to indices
      This is a C-style layout, which is row-major for 2d.
      Elements of a row will be adjacent in memory, elements of a column
      may be disjoint.
@@ -104,96 +104,42 @@ uvec c_order_cell_shift(const uvec & points_per_dim){
 }
 
 
-/************************************************************************
- * COORDINATE CLASS *
- ********************/
 
 
-Coords::Coords(const umat & coords){
-  m_coords = coords;
-  n_rows = coords.n_rows;
-  n_dim = coords.n_cols;
-
-  uvec special = find_nonfinite(coords.col(0));
-  _mark(special, Coords::OOB_TYPE);
-}
-
-Coords::Coords(const umat & coords, const TypeRegistry & reg){
-  m_coords = coords;
-  n_rows = coords.n_rows;
-  n_dim = coords.n_cols;
-
-  _mark(reg);
-}
-
-
-
-bool Coords::check(const uvec & grid_size) const{
-  assert(_coord_check(grid_size, m_coords));
-  assert(_type_reg_check(m_reg, m_coords));
-}
-
-
-bool Coords::_coord_check(const uvec & grid_size, const umat & coords) const{
-  /*
-   * Check to make sure that the coordinates make sense with the supplied
-   * grid sizes, and that non-spatial coords are NaN'd out correctly
-   */
-
-  uvec ref_nan = find_nonfinite(coords.col(0));
-  uvec ref_fin = find_finite(coords.col(0));
-  assert(0 == uvec(find_finite(coords.rows(ref_nan))).n_elem);
-  assert(is_finite(coords.rows(ref_fin)));
-  
-  imat signed_coords = conv_to<imat>::from(coords);
-  signed_coords.each_row() -= conv_to<ivec>::from(grid_size);
-  assert(all(all(signed_coords < 0)));
-  return true;
-}
-
-bool Coords::_type_reg_check(const TypeRegistry & registry, const umat & coords) const{
-  uvec find_res = find_nonfinite(coords.col(0));
-  for(auto const& it : find_res){
-    assert(registry.end() != registry.find(it));
-  }
-  return true;
-}
-
-
-
-umat Coords::_indicies_to_coords(const uvec & grid_size,
-				 const uvec & indices) const {
+Coords indices_to_coords(const uvec & grid_size,
+		       const uvec & indices){
   /*
    * Convert indices into coordinates by repeated modulus.
    * NB: makes sense because c-order stride is in decreasing order
    */
 
-  uint max_idx = prod(grid_size);
-  assert(all(indices <= max_idx)); // Only one OOB
-  
+  uint n_dim = grid_size.n_elem;
   uvec stride = c_order_stride(grid_size);
-  umat coords = umat(indices.n_elem, n_dim);
+  imat raw_coords = imat(indices.n_elem, n_dim);
 
   umat mod_res = umat(indices.n_elem, 2);
   mod_res.col(1) = indices;
   for(uint d = 0; d < n_dim; d++){
     mod_res = divmod(mod_res.col(1), stride(d));
-    coords.col(d) = mod_res.col(0);
+    raw_coords.col(d) = conv_to<ivec>::from(mod_res.col(0));
   }
 
-  // NaN out any non-spatial nodes
-  // NB: assumption is that there are relatively few of these usually.
-  uvec non_spatial = find(indices >= max_idx);
-  coords.rows(non_spatial).fill(SPECIAL_FILL);
+  // Build the type registry
+  TypeRegistry reg;
+  uint first_special_index = prod(grid_size);
+  uvec non_spatial = find(indices >= first_special_index);
+  for(auto const & it : non_spatial){
+    reg[it] = indices[it] - first_special_index + 1;
+  }
 
-  assert(_coord_check(grid_size, coords));
-  
+  Coords coords = Coords(raw_coords, reg);
+  assert(coords.check(grid_size));
   return coords;
 }
 
 
-uvec Coords::_coords_to_indices(const uvec & grid_size,
-				const Coords & coords) const{
+uvec coords_to_indices(const uvec & grid_size,
+		       const Coords & coords){
   // Calculate indices for normal coords
   assert(coords.check(grid_size));
   
@@ -202,30 +148,81 @@ uvec Coords::_coords_to_indices(const uvec & grid_size,
   umat indices = conv_to<umat>::from(coords.m_coords) * stride; 
 
   // OOB special indices
-  TypeRegistry oob_reg = coords._find_oob(grid_size);
-  uint special_idx = max_spatial_index(grid_size);
-  for(auto const & it : oob_reg){
-    assert(SPATIAL_TYPE != it.second);
-    indices(it.first) = it.second + special_idx;
+ 
+  uint first_special_idx = prod(grid_size);
+  for(auto const & it : coords.m_reg){
+    assert(Coords::SPATIAL_TYPE != it.second);
+    indices(it.first) = it.second + first_special_idx - 1;
   }
-
-  // Check that everything has been updated.
-  assert(is_finite(indices));
-  
+  assert(is_finite(indices));  
   return indices;
 }
+
+
+/************************************************************************
+ * COORDINATE CLASS *
+ ********************/
+
+Coords::Coords(const imat & coords){
+  m_coords = coords;
+  n_rows = coords.n_rows;
+  n_dim = coords.n_cols;
+
+  uvec special = get_special();
+  _mark(special, Coords::DEFAULT_OOB_TYPE);
+  assert(check());
+}
+
+Coords::Coords(const imat & coords, const TypeRegistry & reg){
+  m_coords = coords;
+  n_rows = coords.n_rows;
+  n_dim = coords.n_cols;
+
+  _mark(reg);
+  assert(check());
+}
+
+   
+bool Coords::check() const {
+  uvec sp_idx = get_special();
+  if(sp_idx.n_elem != m_reg.size()) return false;
+  for(auto const& it : sp_idx){
+    if(!is_special(it)) return false;
+  }
+  return true;
+}
+
+
+bool Coords::check(const uvec & grid_size) const{
+  return check() && _coord_check(grid_size);
+}
+
+
+bool Coords::_coord_check(const uvec & grid_size) const{
+  /*
+   * Check to make sure that the coordinates make sense with the supplied
+   * grid sizes.
+   */
+  for(uint d = 0; d < n_dim; d++){
+    if(any(m_coords.col(d) >= grid_size(d))) return false;
+  }
+  return true;
+}
+
+
 
 void Coords::_mark(const uvec & indices, uint coord_type){
   /*
    * Go through and add the indices to the type map with the supplied
    * coord_type
    */
-  assert(coord_type > SPATIAL_TYPE);
+  assert(coord_type > Coords::SPATIAL_TYPE);
   for(auto const & it : indices){
     m_reg[it] = coord_type;
-    m_coords.row(it).fill(SPECIAL_FILL);
+    m_coords.row(it).fill(Coords::SPECIAL_FILL);
   }
-  assert(_type_reg_check(m_reg, m_coords));
+
+  assert(check());
 }
 
 
@@ -235,19 +232,20 @@ void Coords::_mark(const TypeRegistry & reg){
    * coord_type
    */
   for(auto const & it : reg){
-    assert(it.second != SPATIAL_TYPE);
+    assert(it.second != Coords::SPATIAL_TYPE);
     m_reg[it.first] = it.second;
-    m_coords.row(it.first).fill(SPECIAL_FILL);
+    m_coords.row(it.first).fill(Coords::SPECIAL_FILL);
   }
-  assert(_type_reg_check(m_reg, m_coords));
+  assert(check());
 }
 
 
-TypeRegistry Coords::_find_oob(const uvec & grid_size) const{
+TypeRegistry Coords::_find_oob(const uvec & grid_size, uint type) const{
+  assert(type > Coords::SPATIAL_TYPE);
   // Make the bounding box, and OOB rule
   mat bbox = zeros(n_dim,2);
   bbox.col(1) = conv_to<vec>::from(grid_size) - 1;
-  OutOfBoundsRule oob_rule = OutOfBoundsRule(bbox, OOB_TYPE);
+  OutOfBoundsRule oob_rule = OutOfBoundsRule(bbox, type);
 
   // Apply the rule to get OOB rows
   return oob_rule.type_elements(conv_to<mat>::from(m_coords));
@@ -271,9 +269,50 @@ uint Coords::num_special() const{
 uint Coords::max_spatial_index(const uvec & grid_size) const{
   return prod(grid_size) - 1;
 }
+bool Coords::is_special(uint idx) const{
+  return m_reg.end() != m_reg.find(idx);
+}
 
 uvec Coords::get_indices(const uvec & grid_size) const{
-  return _coords_to_indices(grid_size, *this);
+  return coords_to_indices(grid_size, *this);
+}
+
+uvec Coords::get_spatial() const{
+  return find(m_coords.col(0) >= 0);
+}
+uvec Coords::get_special() const{
+  return find(m_coords.col(0) < 0);
+}
+
+bool Coords::equals(const Coords & other) const{
+  // Check dimensions
+  if(other.n_rows != this->n_rows) return false;
+  if(other.n_dim != this->n_dim) return false;
+  if(other.m_reg.size() != this->m_reg.size()) return false;
+
+  // Check the registry
+  for(auto const& it : other.m_reg){
+    uint idx = it.first;
+    uint val = it.second;
+    if(this->m_reg.end() == this->m_reg.find(idx)) return false;
+    if(val != this->m_reg.at(idx)) return false;
+  }
+
+  // Check the coords
+  return all(all(other.m_coords == this->m_coords));
+}
+
+ostream& operator<<(ostream& os, const Coords& c){
+  for(uint i = 0; i < c.num_coords(); i++){
+    os << "Node [" << i << "]:";
+    if(c.is_special(i)){
+      os << "\tSpecial (" << c.m_reg.find(i)->second << ")" << endl;
+    }
+    else{
+      os << c.m_coords.row(i);
+    }
+  }
+  return os;
 }
 
 
@@ -357,10 +396,24 @@ umat UniformGrid::get_cell_node_indices() const{
   umat coord_points = make_points<umat,uvec>(marginal_coords);
   assert(number_of_cells() == coord_points.n_rows);
   
-  Coords coords = Coords(coord_points);
+  Coords coords = Coords(conv_to<imat>::from(coord_points));
+  assert(coords.check());
   assert(0 == coords.num_special());
   return coords.get_indices(m_num_cells);
 }
+
+uint UniformGrid::number_of_all_nodes() const{
+  return prod(m_num_nodes);
+}
+
+uint UniformGrid::number_of_spatial_nodes() const{
+  return n_special_nodes;
+}
+
+uint UniformGrid::number_of_cells() const{
+  return prod(m_num_cells);
+}
+
 
 uint UniformGrid::max_spatial_node_index() const{
   return prod(m_num_nodes) - 1;
@@ -431,7 +484,7 @@ Coords UniformGrid::points_to_cell_coords(const TypedPoints & points) const{
   // C = floor((P - low) / width)
   mat diff = row_diff(points.m_points, conv_to<rowvec>::from(m_low));
   mat scaled = row_divide(diff, conv_to<rowvec>::from(m_width));
-  umat raw_coords = conv_to<umat>::from(floor(scaled));
+  imat raw_coords = conv_to<imat>::from(floor(scaled));
 
   // Use all existing typing information.
   return Coords(raw_coords, points.m_reg); // Use points information.
@@ -447,7 +500,7 @@ TypedPoints UniformGrid::cell_coords_to_low_points(const Coords & coords) const{
 
 
 mat UniformGrid::points_to_cell_nodes_dist(const TypedPoints & points,
-					       const Coords & coords) const{
+					   const Coords & coords) const{
   /*
    * Takes in points, and returns a matrix with the distances to the 
    */
@@ -539,7 +592,7 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points)
 }
 
 
-template <typename T> T UniformGrid::base_interpolate(const Points & points,
+template <typename T> T UniformGrid::base_interpolate(const TypedPoints & points,
 						      const T& data) const{  
   uint N = points.n_rows;
   uint d = points.n_cols;
@@ -554,12 +607,17 @@ template <typename T> T UniformGrid::base_interpolate(const Points & points,
   assert(ret.n_cols == data.n_cols);
   return ret;
 }
-vec UniformGrid::interpolate(const Points & points, const vec & data) const{
+
+vec UniformGrid::interpolate(const TypedPoints & points,
+			     const vec & data) const{
   return base_interpolate<vec>(points,data);
 }
-mat UniformGrid::interpolate(const Points & points, const mat & data) const{
+
+mat UniformGrid::interpolate(const TypedPoints & points,
+			     const mat & data) const{
   return base_interpolate<mat>(points,data);
 }
+
 mat UniformGrid::find_bounding_box() const{
   mat bounds = mat(n_dim,2);
   bounds.col(0) = m_low;

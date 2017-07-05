@@ -3,6 +3,7 @@
 
 #include <armadillo>
 #include <climits>
+#include <climits>
 #include <map>
 
 #include "discretizer.h"
@@ -15,34 +16,47 @@ using namespace arma;
 uvec c_order_stride(const uvec & points_per_dim);
 uvec c_order_cell_shift(const uvec & points_per_dim);
 
+class Coords;  // Forward declare
+Coords indices_to_coords(const uvec & grid_size,
+			 const uvec & indices);
+uvec coords_to_indices(const uvec & grid_size,
+		       const Coords & coords);
+
 class Coords{
  public:
-  static const uint OOB_TYPE = 1;
+  static const uint DEFAULT_OOB_TYPE = 1;
+  static const uint SPATIAL_TYPE = 0;
+  static const sword SPECIAL_FILL = LONG_MIN;
 
-  Coords(const umat & coords);
-  Coords(const umat & coords, const TypeRegistry & reg);
+  Coords(const imat & coords);
+  Coords(const imat & coords, const TypeRegistry & reg);
   Coords(const TypedPoints & points);
 
+  bool check() const;
   bool check(const uvec & grid_size) const;
-  bool _coord_check(const uvec & grid_size, const umat & coords) const;
-  bool _type_reg_check(const TypeRegistry & registry,
-		       const umat & coords) const;
-  umat _indicies_to_coords(const uvec & grid_size,
-			     const uvec & indices) const;
-  uvec _coords_to_indices(const uvec & grid_size,
-			  const Coords & coords) const;
+  bool _coord_check(const uvec & grid_size) const;
+
   void _mark(const uvec & indices, uint coord_type);
   void _mark(const TypeRegistry & reg);
-  TypeRegistry _find_oob(const uvec & grid_size) const;
+  TypeRegistry _find_oob(const uvec & grid_size,
+			 uint type = Coords::DEFAULT_OOB_TYPE) const;
 
   uint num_coords() const;
   uint num_spatial() const;
   uint num_special() const;
   uint max_spatial_index(const uvec & grid_size) const;
 
+  bool is_special(uint idx) const;
+  uvec get_spatial() const;
+  uvec get_special() const;
+
   uvec get_indices(const uvec & grid_size) const;
+
+  bool equals(const Coords & other) const;
+
+  friend ostream& operator<<(ostream& os, const Coords& c);  
   
-  umat m_coords;
+  imat m_coords;
   uint n_rows;
   uint n_dim;
   TypeRegistry m_reg;
@@ -59,6 +73,10 @@ class UniformGrid : public TypedDiscretizer{
   TypedPoints get_cell_centers() const;
   umat get_cell_node_indices() const;
 
+  uint number_of_all_nodes() const;
+  uint number_of_spatial_nodes() const;
+  uint number_of_cells() const;
+
   uint max_spatial_node_index() const;
   uint max_node_index() const;
 
@@ -72,11 +90,11 @@ class UniformGrid : public TypedDiscretizer{
 				    const Coords & coords) const;
   
   ElementDist points_to_element_dist(const TypedPoints &) const;
-  template <typename T> T base_interpolate(const Points & points,
+  template <typename T> T base_interpolate(const TypedPoints & points,
 					   const T& data) const;
-  vec interpolate(const Points & points,
+  vec interpolate(const TypedPoints & points,
 		  const vec & values) const;
-  mat interpolate(const Points & points,
+  mat interpolate(const TypedPoints & points,
 		  const mat & values) const;
   mat find_bounding_box() const;
 
