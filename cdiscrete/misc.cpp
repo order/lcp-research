@@ -159,7 +159,7 @@ template <typename M, typename V> M row_mult(const M & A,
   return A.each_row() % b;
 }
 template mat row_mult(const mat & A, const rowvec & b);
-template mat row_mult(const mat & A, const vec & b);
+
 
 template <typename M, typename V> M row_diff(const M & A,
 					     const V & b){
@@ -172,14 +172,12 @@ template <typename M, typename V> M row_add(const M & A,
   return A.each_row() + b;
 }
 template mat row_add(const mat & A, const rowvec & b);
-template mat row_add(const mat & A, const vec & b);
 
 template <typename M, typename V> M row_divide(const M & A,
 					       const V & b){
   return A.each_row() / b;
 }
 template mat row_divide(const mat & A, const rowvec & b);
-template mat row_divide(const mat & A, const vec & b);
 
 vec lp_norm(const mat & A,double p,uint dir){
   /*

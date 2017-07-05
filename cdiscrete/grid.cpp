@@ -496,11 +496,17 @@ Coords UniformGrid::points_to_cell_coords(const TypedPoints & points) const{
 
 TypedPoints UniformGrid::cell_coords_to_low_points(const Coords & coords) const{
   // Reverse of above
-  mat scaled = row_mult(conv_to<mat>::from(coords.m_coords), m_width);
-  mat raw_points = row_add(scaled, m_low);
+  mat scaled = row_mult(conv_to<mat>::from(coords.m_coords),
+			conv_to<rowvec>::from(m_width.t()));
+  mat raw_points = row_add(scaled, conv_to<rowvec>::from(m_low.t()));
   return TypedPoints(raw_points, coords.m_reg);
 }
 
+
+mat UniformGrid::points_to_cell_nodes_dist(const TypedPoints & points) const{
+  Coords coords = points_to_cell_coords(points);
+  return points_to_cell_nodes_dist(points, coords);
+}
 
 
 mat UniformGrid::points_to_cell_nodes_dist(const TypedPoints & points,
@@ -510,8 +516,9 @@ mat UniformGrid::points_to_cell_nodes_dist(const TypedPoints & points,
    */
   assert(n_dim == points.m_points.n_cols);
   assert(points.check_in_bbox(m_low,m_high));
-  uint N = points.m_points.n_rows;
-
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  
   // Calculate
   TypedPoints low_points = cell_coords_to_low_points(coords);
   mat low_diff = points.m_points - low_points.m_points;
@@ -522,12 +529,13 @@ mat UniformGrid::points_to_cell_nodes_dist(const TypedPoints & points,
     // Build the delta vector; the difference from the low point
     uvec idx = find(num2binvec(v, n_dim));
     assert(idx.n_elem <= V);    
-    vec delta = zeros(N);
+    rowvec delta = zeros<rowvec>(D);
     delta(idx) = m_width(idx);
     
-    mat diff = row_add(low_diff, delta); // Add delta to customize it
-    dist.col(v) = lp_norm(diff, 2, 1); // 2-norm done row-wise (the 1)
+    mat diff = row_add(low_points.m_points, delta) - points.m_points;
+    dist.col(v) = lp_norm(diff, 2, 1); // 2-norm done row-wise
   }
+  dist.rows(points.get_special_mask()).fill(0);
 
   return dist;
 }
@@ -552,7 +560,7 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points)
 
   Coords coords = points_to_cell_coords(points);
   mat dist = points_to_cell_nodes_dist(points, coords);
-  mat rel_dist = row_divide(dist,m_width);
+  mat rel_dist = row_divide(dist, conv_to<rowvec>::from(m_width.t()));
 
   uint N = points.m_points.n_rows;
   uint D = n_dim;

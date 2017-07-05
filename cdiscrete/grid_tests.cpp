@@ -3,11 +3,13 @@
 
 #include "grid.h"
 
+using namespace arma;
 using namespace std;
 
 /*
  * Helper function tests
  */
+#define ALMOST_EQUAL(A,B) approx_equal(A,B,"both",PRETTY_SMALL,PRETTY_SMALL)
 
 bool test_stride_2d(){
   uvec stride = c_order_stride(uvec{3,2});
@@ -90,19 +92,96 @@ bool test_coord_map_check_2(){
   cout << "Finished test_coord_map_check_2" << endl;
 }
 
-bool test_grid_basic(){
+bool test_grid_basic_1(){
   vec low = vec{0,0};
   vec high = vec{10,10};
-  uvec num_cells = uvec{10,10};
-  
+  uvec num_cells = uvec{10,10};  
   UniformGrid grid = UniformGrid(low,high,num_cells,1);
+  
   TypedPoints p = TypedPoints(mat{{1,1}});
   Coords c = grid.points_to_cell_coords(p);
   assert(1 == c.num_spatial());
   Coords ref = Coords(ones<imat>(1,2));
   assert(ref.equals(c));
-  cout << "Finished test_grid_basic" << endl;
+  cout << "Finished test_grid_basic_1" << endl;
+}
 
+bool test_grid_basic_2(){
+  vec low = vec{1,1};
+  vec high = vec{11,11};
+  uvec num_cells = uvec{10,10};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+  
+  TypedPoints p = TypedPoints(mat{{1,1}});
+  Coords c = grid.points_to_cell_coords(p);
+  assert(1 == c.num_spatial());
+  Coords ref = Coords(zeros<imat>(1,2));
+  assert(ref.equals(c));
+  cout << "Finished test_grid_basic_2" << endl;
+}
+
+bool test_grid_cell_coords_to_low_points_1(){
+  vec low = vec{0,0};
+  vec high = vec{10,10};
+  uvec num_cells = uvec{10,10};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+  
+  Coords c = Coords(ones<imat>(1,2));
+  TypedPoints p = grid.cell_coords_to_low_points(c);
+  assert(ALMOST_EQUAL(ones<mat>(1,2), p.m_points));
+  cout << "Finished test_grid_cell_coords_to_low_points_1" << endl;
+}
+
+bool test_grid_cell_coords_to_low_points_2(){
+  vec low = vec{0,0};
+  vec high = vec{10,10};
+  uvec num_cells = uvec{10,10};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  TypedPoints p = TypedPoints(11*ones<mat>(1,2));
+  OutOfBoundsRule rule = OutOfBoundsRule(grid.find_bounding_box(), 1);
+  p.apply_typing_rule(rule);
+  
+  Coords c = grid.points_to_cell_coords(p);
+  assert(c.is_special(0));
+  TypedPoints p2 = grid.cell_coords_to_low_points(c);
+  assert(p2.is_special(0));
+  cout << "Finished test_grid_cell_coords_to_low_points_2" << endl;
+
+}
+
+bool test_grid_cell_coords_to_low_points_3(){
+  vec low = vec{0,0};
+  vec high = vec{10,10};
+  uvec num_cells = uvec{10,10};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  TypedPoints p = TypedPoints(10*ones<mat>(1,2));
+  OutOfBoundsRule rule = OutOfBoundsRule(grid.find_bounding_box(), 1);
+  p.apply_typing_rule(rule);
+  
+  Coords c = grid.points_to_cell_coords(p);
+  assert(!c.is_special(0));
+  TypedPoints p2 = grid.cell_coords_to_low_points(c);
+  assert(!p2.is_special(0));
+  assert(ALMOST_EQUAL(p.m_points, p2.m_points));
+  cout << "Finished test_grid_cell_coords_to_low_points_3" << endl;
+
+}
+
+
+bool test_grid_points_to_dist_1(){
+  vec low = vec{0,0};
+  vec high = vec{1,1};
+  uvec num_cells = uvec{1,1};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  TypedPoints p = TypedPoints(mat{{0.5,0.5}});
+  mat d = grid.points_to_cell_nodes_dist(p);
+  mat ref = (1 / sqrt(2.0)) * ones<mat>(1,4);
+  assert(ALMOST_EQUAL(d, ref));
+
+  cout << "Finished test_points_to_dist_1" << endl; 
 }
 
 
@@ -121,5 +200,10 @@ int main(){
   test_coord_map_check_2();
 
   // Grid testing.
-  test_grid_basic();
+  test_grid_basic_1();
+  test_grid_basic_2();
+  test_grid_cell_coords_to_low_points_1();
+  test_grid_cell_coords_to_low_points_2();
+  test_grid_cell_coords_to_low_points_3();
+  test_grid_points_to_dist_1();
 }
