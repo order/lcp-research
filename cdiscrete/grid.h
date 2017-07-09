@@ -83,6 +83,8 @@ class UniformGrid : public TypedDiscretizer{
   Coords points_to_cell_coords(const TypedPoints & points) const;
   TypedPoints cell_coords_to_low_points(const Coords & coords) const;
 
+  TypedPoints apply_rules_and_remaps(const TypedPoints & points) const;
+  
   arma::mat points_to_cell_nodes_dist(const TypedPoints & points) const;
   arma::mat points_to_cell_nodes_dist(const TypedPoints & points,
 				      const Coords & coords) const;
@@ -105,6 +107,9 @@ class UniformGrid : public TypedDiscretizer{
   arma::uvec m_num_cells;
   arma::uvec m_num_nodes;
   arma::vec m_width;
+
+  TypeRuleList m_rule_list;
+  NodeRemapperList m_remap_list;
   
   uint n_special_nodes;
   uint n_dim;

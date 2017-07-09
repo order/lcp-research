@@ -43,6 +43,8 @@ bool check_points_in_bbox(const Points & points, const mat & bbox){
   uint D = points.n_cols;
   assert(D == bbox.n_rows);
 
+  assert(is_finite(points));
+
   uvec spatial = get_spatial_rows(points);
   for(uint d = 0; d < D; d++){
     uvec idx = uvec{d};
@@ -53,9 +55,23 @@ bool check_points_in_bbox(const Points & points, const mat & bbox){
 }
 
 
+bool check_points_in_bbox(const TypedPoints & points, const mat & bbox){
+  uvec mask = points.get_spatial_mask();
+  Points spatial_points = points.m_points.rows(mask);
+  check_points_in_bbox(spatial_points, bbox);
+}
+
+
 /*
  * TYPED POINTS STRUCTURE
  */
+
+TypedPoints::TypedPoints(const TypedPoints & points):
+  m_points(points.m_points), m_reg(points.m_reg){
+  n_rows = points.n_rows;
+  n_cols = points.n_rows;
+  _ensure_blanked();
+}
 
 TypedPoints::TypedPoints(const mat & points, const TypeRegistry & reg) :
   m_points(points), m_reg(reg){
@@ -156,7 +172,7 @@ bool TypedPoints::check_validity() const{
 }
 
 bool TypedPoints::check_in_bbox(const mat & bbox) const{
-  return check_points_in_bbox(m_points, bbox);
+  return check_points_in_bbox(*this, bbox);
 }
 
 bool TypedPoints::check_in_bbox(const arma::vec & low, const arma::vec & high) const{

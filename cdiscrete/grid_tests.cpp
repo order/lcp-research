@@ -171,6 +171,7 @@ bool test_grid_cell_coords_to_low_points_3(){
 
 
 bool test_grid_points_to_dist_1(){
+  // Dead center of the unit cube
   vec low = vec{0,0};
   vec high = vec{1,1};
   uvec num_cells = uvec{1,1};  
@@ -181,7 +182,77 @@ bool test_grid_points_to_dist_1(){
   mat ref = (1 / sqrt(2.0)) * ones<mat>(1,4);
   assert(ALMOST_EQUAL(d, ref));
 
-  cout << "Finished test_points_to_dist_1" << endl; 
+  cout << "Finished test_grid_points_to_dist_1" << endl; 
+}
+
+bool test_grid_points_to_dist_2(){
+  // As above but shifted
+  vec low = vec{1,1};
+  vec high = vec{2,2};
+  uvec num_cells = uvec{1,1};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  TypedPoints p = TypedPoints(mat{{1.5,1.5}});
+  mat d = grid.points_to_cell_nodes_dist(p);
+  mat ref = (1 / sqrt(2.0)) * ones<mat>(1,4);
+  assert(ALMOST_EQUAL(d, ref));
+
+  cout << "Finished test_grid_points_to_dist_2" << endl; 
+}
+
+bool test_grid_points_to_dist_3(){
+  // As above but larger grid
+  vec low = vec{1,1};
+  vec high = vec{3,3};
+  uvec num_cells = uvec{2,2};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  TypedPoints p = TypedPoints(mat{{1.5,1.5}});
+  mat d = grid.points_to_cell_nodes_dist(p);
+  mat ref = (1 / sqrt(2.0)) * ones<mat>(1,4);
+  assert(ALMOST_EQUAL(d, ref));
+
+  cout << "Finished test_grid_points_to_dist_3" << endl; 
+}
+
+bool test_grid_points_to_dist_4(){
+  // Dead center of a 3d unit cube
+  vec low = vec{0,0,0};
+  vec high = vec{1,1,1};
+  uvec num_cells = uvec{1,1,1};
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  TypedPoints p = TypedPoints(0.5*ones<mat>(1,3));
+  mat d = grid.points_to_cell_nodes_dist(p);
+  mat ref = (sqrt(3.0 / 4.0)) * ones<mat>(1,8);
+  assert(ALMOST_EQUAL(d, ref));
+
+  cout << "Finished test_grid_points_to_dist_4" << endl; 
+}
+
+bool test_grid_points_to_dist_5(){
+  // Out of bounds
+  vec low = vec{0,0,0};
+  vec high = vec{1,1,1};
+  uvec num_cells = uvec{1,1,1};
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  TypedPoints p = TypedPoints(2*ones<mat>(1,3));
+  mat d = grid.points_to_cell_nodes_dist(p);
+  mat ref = zeros<mat>(1,8);
+  ref(0) = 1.0;
+  assert(ALMOST_EQUAL(d, ref));
+
+  cout << "Finished test_grid_points_to_dist_5" << endl; 
+}
+
+bool test_element_dist_1(){
+  vec low = vec{0,0};
+  vec high = vec{1,1};
+  uvec num_cells = uvec{1,1};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  
 }
 
 
@@ -205,5 +276,10 @@ int main(){
   test_grid_cell_coords_to_low_points_1();
   test_grid_cell_coords_to_low_points_2();
   test_grid_cell_coords_to_low_points_3();
+  
   test_grid_points_to_dist_1();
+  test_grid_points_to_dist_2();
+  test_grid_points_to_dist_3();
+  test_grid_points_to_dist_4();
+  test_grid_points_to_dist_5();
 }

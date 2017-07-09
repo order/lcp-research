@@ -8,13 +8,15 @@
 typedef std::map<uint,uint> TypeRegistry;
 typedef arma::mat Points; // Basic untyped points
 
+class TypedPoints; // Forward declaration.
+
 arma::uvec get_spatial_rows(const Points & points);
 arma::uvec get_special_rows(const Points & points);
 bool check_points(const Points & points);
 bool check_bbox(const arma::mat & bbox);
 bool check_points_in_bbox(const Points & points, const arma::mat & bbox);
+bool check_points_in_bbox(const TypedPoints & points, const arma::mat & bbox);
 
-class TypedPoints; // Forward declaration.
 
 /*****************************************************
  * TYPING RULES *
@@ -92,7 +94,8 @@ class TypedPoints{
   static const uint DEFAULT_OOB_TYPE = 1;
   static const uint SPATIAL_TYPE = 0;
   const double SPECIAL_FILL = arma::datum::nan; // Can't be static, apparently
-  
+
+  TypedPoints(const TypedPoints & other);  // Copy constructor
   TypedPoints(const Points & points, const TypeRegistry & reg);
   TypedPoints(const Points & points);
   TypedPoints();

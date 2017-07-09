@@ -503,16 +503,26 @@ TypedPoints UniformGrid::cell_coords_to_low_points(const Coords & coords) const{
 }
 
 
+TypedPoints UniformGrid::apply_rules_and_remaps(const TypedPoints & points) const{
+  TypedPoints remixed_points = TypedPoints(points);
+  remixed_points.apply_remappers(m_remap_list); // Remap first
+  remixed_points.apply_typing_rules(m_rule_list);
+}
+
+
 mat UniformGrid::points_to_cell_nodes_dist(const TypedPoints & points) const{
-  Coords coords = points_to_cell_coords(points);
-  return points_to_cell_nodes_dist(points, coords);
+  // Remaps and types points, then calls points_to_cell_nodes_dist
+  TypedPoints remixed_points = apply_rules_and_remaps(points);
+  Coords coords = points_to_cell_coords(remixed_points);
+  return points_to_cell_nodes_dist(remixed_points, coords);
 }
 
 
 mat UniformGrid::points_to_cell_nodes_dist(const TypedPoints & points,
 					   const Coords & coords) const{
   /*
-   * Takes in points, and returns a matrix with the distances to the 
+   * Takes in points, and returns a matrix with the distances to the vertices
+   * Assumes that points have been transformed so that they're in the bbox
    */
   assert(n_dim == points.m_points.n_cols);
   assert(points.check_in_bbox(m_low,m_high));
@@ -535,7 +545,10 @@ mat UniformGrid::points_to_cell_nodes_dist(const TypedPoints & points,
     mat diff = row_add(low_points.m_points, delta) - points.m_points;
     dist.col(v) = lp_norm(diff, 2, 1); // 2-norm done row-wise
   }
+
+  // Special treatment for special nodes
   dist.rows(points.get_special_mask()).fill(0);
+  dist.submat(points.get_special_mask(), uvec{0}).fill(1);
 
   return dist;
 }
