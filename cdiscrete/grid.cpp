@@ -407,11 +407,11 @@ umat UniformGrid::get_cell_node_indices() const{
 }
 
 uint UniformGrid::number_of_all_nodes() const{
-  return prod(m_num_nodes);
+  return number_of_spatial_nodes() + n_special_nodes;
 }
 
 uint UniformGrid::number_of_spatial_nodes() const{
-  return n_special_nodes;
+  return prod(m_num_nodes);
 }
 
 uint UniformGrid::number_of_cells() const{
@@ -420,7 +420,7 @@ uint UniformGrid::number_of_cells() const{
 
 
 uint UniformGrid::max_spatial_node_index() const{
-  return prod(m_num_nodes) - 1;
+  return number_of_spatial_nodes() - 1;
 }
 
 uint UniformGrid::max_node_index() const{
@@ -502,6 +502,11 @@ TypedPoints UniformGrid::cell_coords_to_low_points(const Coords & coords) const{
   return TypedPoints(raw_points, coords.m_reg);
 }
 
+TypedPoints UniformGrid::points_to_low_points(const TypedPoints & points) const{
+  Coords coords = points_to_cell_coords(points);
+  return cell_coords_to_low_points(coords);
+}
+
 
 TypedPoints UniformGrid::apply_rules_and_remaps(const TypedPoints & points) const{
   TypedPoints remixed_points = TypedPoints(points);
@@ -556,7 +561,7 @@ mat UniformGrid::points_to_cell_nodes_dist(const TypedPoints & points,
 }
 
 
-ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points)
+ElementDist UniformGrid::points_to_element_dist(const TypedPoints & not_bounded_points)
   const{
   /*
    * Does multi-linear interpolation. Points internal to the cell are mapped
@@ -569,13 +574,15 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points)
    | x  |
    o----o
    */
-  
-  // Assume points are properly bounded.
+  // Apply bounding rules
+  TypedPoints points = apply_rules_and_remaps(not_bounded_points);
   assert(points.check_in_bbox(m_low, m_high));
 
-  Coords coords = points_to_cell_coords(points);
-  mat dist = points_to_cell_nodes_dist(points, coords);
-  mat rel_dist = row_divide(dist, conv_to<rowvec>::from(m_width.t()));
+  TypedPoints low_points = points_to_low_points(points);
+  uvec spatial_mask = points.get_spatial_mask();
+  mat diff = points.m_points - low_points.m_points;
+  assert(all(all(diff.rows(spatial_mask) >= 0)));
+  mat rel_dist = row_divide(diff, conv_to<rowvec>::from(m_width.t()));
 
   uint N = points.m_points.n_rows;
   uint D = n_dim;
@@ -587,11 +594,17 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points)
   bvec mask;
   mat rep_dist;
   for(uint d = 0; d < D; d++){
-    rep_dist = repmat(rel_dist.col(d),1, halfV);
+    rep_dist = repmat(rel_dist.col(d), 1, halfV);
     mask = binmask(d,D);   
     weights.cols(find(mask == 1)) %= rep_dist;		       
     weights.cols(find(mask == 0)) %= 1 - rep_dist;
   }
+  
+  // Special node treatment.
+  uvec special_mask = points.get_special_mask();
+  weights.rows(special_mask).fill(0);
+  weights.submat(special_mask,uvec{0}).fill(1);
+  
   assert(is_finite(weights));
   assert(all(all(weights >= 0)));
   assert(all(all(weights <= 1)));
@@ -611,10 +624,12 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & points)
   }
 
   // Convert into a sparse matrix.
+  Coords coords = points_to_cell_coords(points);
   umat vert_indices = cell_coords_to_vertex_indices(coords);
   uint n_nodes = max_node_index() + 1;
   ElementDist distrib = build_sparse_dist(n_nodes, vert_indices, weights);
-
+  assert(N == distrib.n_rows);
+  assert(number_of_all_nodes() == distrib.n_cols);
   return distrib; 
 }
 
@@ -678,7 +693,7 @@ ElementDist build_sparse_dist(uint n_nodes, umat vert_indices, mat weights){
 
   // Build out the row, column, and data vectors.
   for(uint i = 0; i < N; i++){
-    uvec uni = unique(vert_indices.row(i));
+    uvec uni = unique(vert_indices.row(i)).t();
     assert(uni.n_elem == 1 || uni.n_elem == V);
     if(1 == uni.n_elem){
       // Transition to non-spatial node.
@@ -691,7 +706,7 @@ ElementDist build_sparse_dist(uint n_nodes, umat vert_indices, mat weights){
     }
     else{
       assert(V == uni.n_elem); // Proper spatial dist
-      assert(norm(weights.row(i) - 1) < PRETTY_SMALL); // Transition
+      assert((sum(weights.row(i)) - 1.0) < PRETTY_SMALL); // Transition
       for(uint j = 0; j < V; j++){
 	v_row.push_back(i);
 	v_col.push_back(vert_indices(i,j));

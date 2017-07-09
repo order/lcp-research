@@ -254,7 +254,34 @@ bool test_element_dist_1(){
   uvec num_cells = uvec{1,1};  
   UniformGrid grid = UniformGrid(low,high,num_cells,1);
 
+  TypedPoints p = TypedPoints(0.5*ones<mat>(1,2));
+  ElementDist distr = grid.points_to_element_dist(p);
+  assert(1 == distr.n_rows);
+  assert(5 == distr.n_cols);
+  mat dense = mat(distr);
+  rowvec ref = {0.25, 0.25, 0.25, 0.25, 0.0};
+  assert(ALMOST_EQUAL(dense.row(0), ref));
+
+  cout << "Finished test_element_dist_1" << endl;
+}
+
+bool test_element_dist_2(){
+  vec low = vec{0,0};
+  vec high = vec{1,1};
+  uvec num_cells = uvec{1,1};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+  grid.m_rule_list.emplace_back(new OutOfBoundsRule(grid.find_bounding_box(),
+						    1));
   
+  TypedPoints p = TypedPoints(2*ones<mat>(1,2));
+  ElementDist distr = grid.points_to_element_dist(p);
+  assert(1 == distr.n_rows);
+  assert(5 == distr.n_cols);
+  mat dense = mat(distr);
+  rowvec ref = {0, 0, 0, 0, 1};
+  assert(ALMOST_EQUAL(dense.row(0), ref));
+
+  cout << "Finished test_element_dist_2" << endl;
 }
 
 
@@ -265,12 +292,14 @@ int main(){
   test_stride_3d();
   test_shift_2d();
   test_shift_3d();
+  cout << endl;
 
   // Coord object testing
   test_coord_basic();
   test_coord_oob();
   test_coord_map_check();
   test_coord_map_check_2();
+  cout << endl;
 
   // Grid testing.
   test_grid_basic_1();
@@ -278,10 +307,16 @@ int main(){
   test_grid_cell_coords_to_low_points_1();
   test_grid_cell_coords_to_low_points_2();
   test_grid_cell_coords_to_low_points_3();
+  cout << endl;
   
   test_grid_points_to_dist_1();
   test_grid_points_to_dist_2();
   test_grid_points_to_dist_3();
   test_grid_points_to_dist_4();
   test_grid_points_to_dist_5();
+  cout << endl;
+
+  test_element_dist_1();
+  test_element_dist_2();
+
 }
