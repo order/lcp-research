@@ -236,6 +236,8 @@ bool test_grid_points_to_dist_5(){
   vec high = vec{1,1,1};
   uvec num_cells = uvec{1,1,1};
   UniformGrid grid = UniformGrid(low,high,num_cells,1);
+  grid.m_rule_list.emplace_back(new OutOfBoundsRule(grid.find_bounding_box(),
+						    1));
 
   TypedPoints p = TypedPoints(2*ones<mat>(1,3));
   mat d = grid.points_to_cell_nodes_dist(p);

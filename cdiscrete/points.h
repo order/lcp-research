@@ -125,7 +125,7 @@ class TypedPoints{
   bool check_validity() const;
   bool check_in_bbox(const arma::mat & bbox) const;
   bool check_in_bbox(const arma::vec & low, const arma::vec & high) const;
-  
+  bool equals(const TypedPoints & other) const;
   friend std::ostream& operator<<(std::ostream& os, const TypedPoints& p);  
 
  protected:

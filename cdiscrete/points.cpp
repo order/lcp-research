@@ -8,25 +8,23 @@ using namespace arma;
 using namespace std;
 
 uvec get_spatial_rows(const Points & points){
-  assert(check_points(points));
   return find_finite(points.col(0));
 }
 
 uvec get_special_rows(const Points & points){
-  assert(check_points(points));
   return find_nonfinite(points.col(0));
 }
 
-bool check_points(const Points & points){
+bool check_points(const Points & points){  
+  if(points.is_empty()) return true;
   assert(!points.has_inf());
   
-  // No non-finite elements in the "spatial" rows
-  uvec spatial = find_finite(points.col(0));
+  uvec spatial = get_spatial_rows(points);
   assert(is_finite(points.rows(spatial)));
 
-  // No finite elements in the "special" rows
-  uvec special = find_nonfinite(points.col(0));
-  assert(0 == uvec(find_finite(points.rows(special))).n_elem);
+  uvec special = get_special_rows(points);
+  uvec finite_idx = find_finite(points.rows(special));
+  assert(finite_idx.is_empty());
   return true;
 }
 
@@ -40,12 +38,14 @@ bool check_bbox(const mat & bbox){
 
 bool check_points_in_bbox(const Points & points, const mat & bbox){
   assert(check_bbox(bbox));
+  if(points.is_empty()) return true;
+  assert(check_points(points));
+
   uint D = points.n_cols;
   assert(D == bbox.n_rows);
 
-  assert(is_finite(points));
-
   uvec spatial = get_spatial_rows(points);
+  assert(is_finite(points.rows(spatial)));  // All finite
   for(uint d = 0; d < D; d++){
     uvec idx = uvec{d};
     assert(all(all(points(spatial,idx) >= bbox(d,0))));
@@ -56,6 +56,8 @@ bool check_points_in_bbox(const Points & points, const mat & bbox){
 
 
 bool check_points_in_bbox(const TypedPoints & points, const mat & bbox){
+  if(0 == points.num_spatial_nodes()) return true;
+  
   uvec mask = points.get_spatial_mask();
   Points spatial_points = points.m_points.rows(mask);
   check_points_in_bbox(spatial_points, bbox);
@@ -67,9 +69,10 @@ bool check_points_in_bbox(const TypedPoints & points, const mat & bbox){
  */
 
 TypedPoints::TypedPoints(const TypedPoints & points):
-  m_points(points.m_points), m_reg(points.m_reg){
+  m_reg(points.m_reg){
+  m_points = points.m_points;
   n_rows = points.n_rows;
-  n_cols = points.n_rows;
+  n_cols = points.n_cols;
   _ensure_blanked();
 }
 
@@ -172,7 +175,7 @@ bool TypedPoints::check_validity() const{
 }
 
 bool TypedPoints::check_in_bbox(const mat & bbox) const{
-  return check_points_in_bbox(*this, bbox);
+  return check_points_in_bbox(m_points, bbox);
 }
 
 bool TypedPoints::check_in_bbox(const arma::vec & low, const arma::vec & high) const{
@@ -183,6 +186,28 @@ bool TypedPoints::check_in_bbox(const arma::vec & low, const arma::vec & high) c
   bbox.col(1) = high;
   return check_in_bbox(bbox);
 }
+
+
+bool TypedPoints::equals(const TypedPoints & other) const{
+  // Check dimensions
+  if(other.n_rows != this->n_rows) return false;
+  if(other.n_cols != this->n_cols) return false;
+  if(other.m_reg.size() != this->m_reg.size()) return false;
+
+  // Check the registry
+  for(auto const& it : other.m_reg){
+    uint idx = it.first;
+    uint val = it.second;
+    if(this->m_reg.end() == this->m_reg.find(idx)) return false;
+    if(val != this->m_reg.at(idx)) return false;
+  }
+
+  // Check the coords
+  return approx_equal(other.m_points, this->m_points,
+		      "both", PRETTY_SMALL, PRETTY_SMALL);
+}
+
+
 
 ostream& operator<<(ostream& os, const TypedPoints& p){
   for(uint i = 0; i < p.n_rows; i++){
@@ -210,7 +235,6 @@ void TypedPoints::_ensure_blanked(){
     assert(0 == uvec(find_finite(m_points.row(it.first))).n_elem);
   }
 }
-
 
 /*
  * OUT OF BOUNDS NODE TYPE RULE

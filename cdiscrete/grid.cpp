@@ -483,11 +483,11 @@ umat UniformGrid::cell_coords_to_vertex_indices(const Coords & coords) const{
 
 Coords UniformGrid::points_to_cell_coords(const TypedPoints & points) const{
   // Takes in points, spits out cell coords
-  assert(points.check_in_bbox(m_low,m_high));
+  assert(points.check_in_bbox(m_low, m_high));
 
-  // C = floor((P - low) / width)
-  mat diff = row_diff(points.m_points, conv_to<rowvec>::from(m_low));
-  mat scaled = row_divide(diff, conv_to<rowvec>::from(m_width));
+  // C = floor((P - low) / width)  
+  mat diff = row_diff(points.m_points, conv_to<rowvec>::from(m_low.t()));
+  mat scaled = row_divide(diff, conv_to<rowvec>::from(m_width.t()));
   imat raw_coords = conv_to<imat>::from(floor(scaled));
   
   // Use all existing typing information.
@@ -505,8 +505,10 @@ TypedPoints UniformGrid::cell_coords_to_low_points(const Coords & coords) const{
 
 TypedPoints UniformGrid::apply_rules_and_remaps(const TypedPoints & points) const{
   TypedPoints remixed_points = TypedPoints(points);
+  assert(remixed_points.equals(points));
   remixed_points.apply_remappers(m_remap_list); // Remap first
   remixed_points.apply_typing_rules(m_rule_list);
+  return remixed_points;
 }
 
 
