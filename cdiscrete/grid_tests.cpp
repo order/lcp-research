@@ -266,6 +266,7 @@ bool test_element_dist_1(){
 }
 
 bool test_element_dist_2(){
+  // Out of bounds
   vec low = vec{0,0};
   vec high = vec{1,1};
   uvec num_cells = uvec{1,1};  
@@ -282,6 +283,70 @@ bool test_element_dist_2(){
   assert(ALMOST_EQUAL(dense.row(0), ref));
 
   cout << "Finished test_element_dist_2" << endl;
+}
+
+bool test_element_dist_3(){
+  vec low = vec{0,0};
+  vec high = vec{1,1};
+  uvec num_cells = uvec{1,1};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  Points points = mat{{0,0}};
+  TypedPoints p = TypedPoints(points);
+  ElementDist distr = grid.points_to_element_dist(p);
+  assert(1 == distr.n_rows);
+  assert(5 == distr.n_cols);
+  mat dense = mat(distr);
+  rowvec ref = {1.0, 0.0, 0.0, 0.0, 0.0};
+  assert(ALMOST_EQUAL(dense.row(0), ref));
+
+  cout << "Finished test_element_dist_3" << endl;
+}
+
+bool test_interpolate_1(){
+  vec low = vec{0,0};
+  vec high = vec{1,1};
+  uvec num_cells = uvec{1,1};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  vec values = {1,1,1,1,0};
+  
+  TypedPoints p = TypedPoints(0.5*ones<mat>(1,2));
+  vec interp = grid.interpolate(p, values);
+  assert(1 == interp.n_elem);
+  assert(abs(interp(0) - 1) < PRETTY_SMALL);
+  cout << "Finished test_interpolate_1" << endl;
+}
+
+bool test_interpolate_2(){
+  vec low = vec{0,0};
+  vec high = vec{1,1};
+  uvec num_cells = uvec{1,1};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+  grid.m_rule_list.emplace_back(new OutOfBoundsRule(grid.find_bounding_box(),
+						    1));
+  vec values = {1,1,1,1,0};
+  
+  TypedPoints p = TypedPoints(2*ones<mat>(1,2));
+  vec interp = grid.interpolate(p, values);
+  assert(1 == interp.n_elem);
+  assert(interp(0) < PRETTY_SMALL);
+  cout << "Finished test_interpolate_2" << endl;
+}
+
+bool test_interpolate_3(){
+  vec low = vec{0,0};
+  vec high = vec{1,1};
+  uvec num_cells = uvec{1,1};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  vec values = {1,2,1,2,0};
+  
+  TypedPoints p = TypedPoints(0.5*ones<mat>(1,2));
+  vec interp = grid.interpolate(p, values);
+  assert(1 == interp.n_elem);
+  assert(abs(interp(0) - 1.5) < PRETTY_SMALL);
+  cout << "Finished test_interpolate_3" << endl;
 }
 
 
@@ -318,5 +383,10 @@ int main(){
 
   test_element_dist_1();
   test_element_dist_2();
+  test_element_dist_3();
+  cout << endl;
 
+  test_interpolate_1();
+  test_interpolate_2();
+  test_interpolate_3();
 }

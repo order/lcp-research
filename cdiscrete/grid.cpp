@@ -608,14 +608,19 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & not_bounded_
   assert(is_finite(weights));
   assert(all(all(weights >= 0)));
   assert(all(all(weights <= 1)));
-  
+
+  #ifndef NDEBUG
   // Check the weights of the low and high nodes.
   // position 0 -> 00...0 is the low node, so weight should be prod(rel_dist)
   // position V-1 -> 11...1, so weight should be prod(1-rel_dist)
-  vec low_node_weights = prod(1 - rel_dist,1);
-  vec hi_node_weights = prod(rel_dist,1);
-  assert(approx_equal(weights.col(0),low_node_weights,"absdiff",1e-12));
-  assert(approx_equal(weights.col(V-1),hi_node_weights,"absdiff",1e-12));
+  vec low_node_weights = prod(1 - rel_dist.rows(spatial_mask), 1);
+  vec hi_node_weights = prod(rel_dist.rows(spatial_mask),1);
+  
+  assert(approx_equal(weights.submat(spatial_mask, uvec{0}),
+		      low_node_weights,"absdiff",1e-12));
+  assert(approx_equal(weights.submat(spatial_mask, uvec{V-1}),
+		      hi_node_weights,"absdiff",1e-12));
+  #endif
 
   // Sparsify
   for(uint d = 0; d < D; d++){
@@ -638,13 +643,13 @@ template <typename T> T UniformGrid::base_interpolate(const TypedPoints & points
 						      const T& data) const{  
   uint N = points.n_rows;
   uint d = points.n_cols;
-  uint NN = max_node_index() + 1;
+  uint NN = number_of_all_nodes();
   assert(data.n_rows == NN);
   
   ElementDist D = points_to_element_dist(points);
-  assert(size(D) == size(NN,N));
+  assert(size(D) == size(N,NN));
 
-  T ret = D.t() * data;
+  T ret = D * data;
   assert(ret.n_rows == N);
   assert(ret.n_cols == data.n_cols);
   return ret;
