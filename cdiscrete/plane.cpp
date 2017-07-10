@@ -1,8 +1,6 @@
 #include "planes.h"
 #include "misc.h"
 
-using namespace tet_mesh;
-
 RelativePlanesSimulator::RelativePlanesSimulator(const mat & bbox,
                                                      const mat &actions,
                                                      double noise_std,

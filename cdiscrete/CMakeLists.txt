@@ -121,6 +121,7 @@ list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
 add_executable (grid_tests grid_tests.cpp discretizer.cpp grid.cpp misc.cpp
   points.cpp)
 add_executable (point_tests point_tests.cpp misc.cpp points.cpp)
+add_executable (plane_foo plane_foo.cpp misc.cpp points.cpp)
 
 
 
@@ -165,3 +166,4 @@ message(STATUS "Libraries: ${CDISCRETE_LIBRARIES}")
 
 target_link_libraries(grid_tests ${CDISCRETE_LIBRARIES})
 target_link_libraries(point_tests ${CDISCRETE_LIBRARIES})
+target_link_libraries(plane_foo ${CDISCRETE_LIBRARIES})
