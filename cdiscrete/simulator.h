@@ -31,6 +31,32 @@ class Simulator{
   virtual uint dim_actions() const = 0;
 };
 
+class TypedSimulator{
+ public:
+
+  /*
+    Costs are (num_states, num_actions)
+   */
+  virtual mat get_costs(const TypedPoints & points) const = 0;
+  virtual vec get_state_weights(const TypedPoints & points) const = 0;
+  virtual mat get_actions() const = 0;
+  virtual TypedPoints next(const TypedPoints & points,
+			   const vec & actions) const = 0;
+  virtual sp_mat transition_matrix(const TypedDiscretizer *,
+                                   const vec & action,
+                                   bool include_oob) const = 0;
+
+  virtual mat q_mat(const TypedDiscretizer *) const = 0;
+  virtual vector<sp_mat> transition_blocks(const TypedDiscretizer *,
+                                           uint num_samples=1) const = 0;
+  virtual vector<sp_mat> lcp_blocks(const TypedDiscretizer *,
+                                    const double gamma,
+                                    uint num_samples) const = 0;
+
+  virtual uint num_actions() const = 0;
+  virtual uint dim_actions() const = 0;
+};
+
 void saturate(Points & points,
               const uvec & idx,
               const mat & bbox);

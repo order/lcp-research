@@ -12,16 +12,16 @@
  * NB: 4D if we have a previous advisory state (could be very small dim e.g. 5)
  */
 
-class RelativePlanesSimulator : public Simulator{
+class RelativePlanesSimulator : public TypedSimulator{
  public:
   RelativePlanesSimulator(const arma::mat & bbox,
 			  const arma::mat &actions,
 			  double noise_std = 0.1,
 			  double step=0.01);
-  arma::mat get_costs(const Points & points) const;
-  arma::vec get_state_weights(const Points & points) const;
+  arma::mat get_costs(const TypedPoints & points) const;
+  arma::vec get_state_weights(const TypedPoints & points) const;
   arma::mat get_actions() const;
-  Points next(const Points & points,
+  TypedPoints next(const TypedPoints & points,
               const arma::vec & actions) const;
   arma::sp_mat transition_matrix(const TypedDiscretizer * disc,
 				 const arma::vec & action,
@@ -32,7 +32,7 @@ class RelativePlanesSimulator : public Simulator{
   std::vector<arma::sp_mat> lcp_blocks(const TypedDiscretizer * disc,
                             const double gamma,
                             uint num_samples=1) const;
-  arma::mat q_mat(const Discretizer * disc) const;
+  arma::mat q_mat(const TypedDiscretizer * disc) const;
 
   uint num_actions() const;
   uint dim_actions() const;

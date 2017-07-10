@@ -40,7 +40,7 @@ mat RelativePlanesSimulator::get_actions() const{
   return m_actions;
 }
 
-Points RelativePlanesSimulator::next(const Points & points,
+TypedPoints RelativePlanesSimulator::next(const TypedPoints & points,
                                        const vec & actions) const{
   assert(TET_NUM_DIM == points.n_cols);
   assert(dim_actions() == actions.n_elem);
@@ -71,8 +71,6 @@ Points RelativePlanesSimulator::next(const Points & points,
     {-datum::pi,datum::pi}
   };
   wrap(r_points, angle_col, angle_bbox);
-
-  // 
   
   return r_points;
 }
