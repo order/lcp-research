@@ -320,11 +320,32 @@ ostream& operator<<(ostream& os, const Coords& c){
 /***************************************************************************
  * UNIFORM GRID CLASS *
  **********************/
+UniformGrid::UniformGrid(const mat & bbox,
+			 const uvec & num_cells,
+			 uint special_nodes) :
+  m_num_cells(num_cells),
+  m_num_nodes(num_cells + 1),
+  n_special_nodes(special_nodes)
+{
+  m_low = bbox.col(0);
+  m_high = bbox.col(1);
+  m_width = (m_high - m_low) / m_num_cells;
 
+  n_dim = m_low.n_elem;
+  
+  assert(n_dim == m_high.n_elem);
+  assert(n_dim == num_cells.n_elem);
+  assert(all(m_low < m_high));
+  
+  assert(approx_equal(m_high,
+		      m_low + m_width % m_num_cells,
+		      "absdiff", PRETTY_SMALL));
 
-UniformGrid::UniformGrid(vec & low,
-			 vec & high,
-			 uvec & num_cells,
+}
+
+UniformGrid::UniformGrid(const vec & low,
+			 const vec & high,
+			 const uvec & num_cells,
 			 uint special_nodes) :
   m_low(low),
   m_high(high),
@@ -332,14 +353,15 @@ UniformGrid::UniformGrid(vec & low,
   m_num_nodes(num_cells + 1),
   m_width((high - low) / num_cells),
   n_dim(low.n_elem),
-  n_special_nodes(special_nodes){
-  assert(approx_equal(m_high,
-		      m_low + m_width % m_num_cells,
-		      "absdiff", PRETTY_SMALL));
+  n_special_nodes(special_nodes)
+{
   uint D = low.n_elem;
   assert(D == high.n_elem);
   assert(D == num_cells.n_elem);
-  
+  assert(all(m_low < m_high));
+  assert(approx_equal(m_high,
+		      m_low + m_width % m_num_cells,
+		      "absdiff", PRETTY_SMALL));
 }
 
 

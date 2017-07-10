@@ -61,9 +61,13 @@ class Coords{
 
 class UniformGrid : public TypedDiscretizer{
  public:
-  UniformGrid(arma::vec & low,  // Least vertex of rectangular region
-	      arma::vec & high, // Greatest vertex of rectangular region
-	      arma::uvec & num_cells, // Resolution (in cells) of discretization
+  UniformGrid(const arma::mat & bbox,
+	      const arma::uvec & num_cells,
+	      uint special_nodes);
+  
+  UniformGrid(const arma::vec & low,  // Least vertex of rectangular region
+	      const arma::vec & high, // Greatest vertex of rectangular region
+	      const arma::uvec & num_cells, // Resolution (in cells) of discretization
 	      uint special_nodes); // Number of special (i.e. oob) nodes 
 
   TypedPoints get_spatial_nodes() const;

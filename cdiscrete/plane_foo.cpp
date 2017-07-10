@@ -1,33 +1,30 @@
-#include "di.h"
-#include "misc.h"
+#include <armadillo>
+
+#include "grid.h"
 #include "io.h"
 #include "lcp.h"
-#include "solver.h"
-#include <armadillo>
+#include "misc.h"
 #include "plane.h"
+#include "points.h"
+#include "solver.h"
 
 using namespace arma;
+using namespace std;
 
 #define GAMMA 0.99
 #define N_GRID_NODES 50
+#define N_OOB_NODES 1
 
-"""
-This is a fast-moving file for double integrator experiments.
-It generates:
-1) Mesh file
-2) Data file
-These are read and visualized in ../di_foo_viewer.py
-"""
 mat build_bbox(){
   return mat {{0,1},{0,1},{-arma::datum::pi, arma::datum::pi}};
 }
 
-RelativePlaneSimulator build_simulator(){
+RelativePlanesSimulator build_simulator(){
   mat bbox = build_bbox();
-  mat actions = vec{{0,1},{1,1},{-1,1}};
+  mat actions = mat{{0,1},{1,1},{-1,1}};
   double noise_std = 0.0;
   double step = 0.01;
-  return RelativePlaneSimulator(bbox,actions,noise_std,step);
+  return RelativePlanesSimulator(bbox,actions,noise_std,step);
 }
 
 ////////////////////
@@ -41,19 +38,21 @@ int main(int argc, char** argv)
   // Set up 3D space
   cout << "Generating initial mesh..." << endl;
   mat bbox = build_bbox();
-  UniformGrid grid = UniformGrid(bbox.col(0) bbox.col(1), N_GRID_NODES);
-  Points points = grid.get_spatial_nodes();
+  UniformGrid grid = UniformGrid(bbox,
+				 N_GRID_NODES * ones<uvec>(2),
+				 N_OOB_NODES);
+  TypedPoints points = grid.get_spatial_nodes();
   uint N = points.n_rows;
-  assert(N == mesh.number_of_spatial_nodes());
+  assert(N == grid.number_of_spatial_nodes());
   assert(N > 0);
   
   RelativePlanesSimulator sim = build_simulator();
-  uint A = di.num_actions();
+  uint A = sim.num_actions();
   assert(A >= 2);
   
   // Reference blocks
   cout << "Building LCP blocks..." << endl;
-  vector<sp_mat> blocks = sim.lcp_blocks(&grid,GAMMA);
+  vector<sp_mat> blocks = sim.lcp_blocks(&grid, GAMMA);
   vector<sp_mat> p_blocks = sim.transition_blocks(&grid);
   assert(A == blocks.size());
   assert(size(N,N) == size(blocks.at(0)));

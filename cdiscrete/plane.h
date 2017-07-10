@@ -1,11 +1,8 @@
-#ifndef __Z_DI_INCLUDED__
-#define __Z_DI_INCLUDED__
+#ifndef __Z_PLANE_INCLUDED__
+#define __Z_PLANE_INCLUDED__
 
 #include "simulator.h"
 #include "tri_mesh.h"
-
-using namespace arma;
-using namespace std;
 
 #define TWO_ACTIONS 2
 #define NMAC_RADIUS 1
@@ -17,34 +14,34 @@ using namespace std;
 
 class RelativePlanesSimulator : public Simulator{
  public:
-  RelativePlanesSimulator(const mat & bbox,
-			  const mat &actions,
+  RelativePlanesSimulator(const arma::mat & bbox,
+			  const arma::mat &actions,
 			  double noise_std = 0.1,
 			  double step=0.01);
-  mat get_costs(const Points & points) const;
-  vec get_state_weights(const Points & points) const;
-  mat get_actions() const;
+  arma::mat get_costs(const Points & points) const;
+  arma::vec get_state_weights(const Points & points) const;
+  arma::mat get_actions() const;
   Points next(const Points & points,
-              const vec & actions) const;
-  sp_mat transition_matrix(const Discretizer * disc,
-                           const vec & action,
-                           bool include_oob) const;
+              const arma::vec & actions) const;
+  arma::sp_mat transition_matrix(const TypedDiscretizer * disc,
+				 const arma::vec & action,
+				 bool include_oob) const;
 
-  vector<sp_mat> transition_blocks(const Discretizer * disc,
+  std::vector<arma::sp_mat> transition_blocks(const TypedDiscretizer * disc,
                                    uint num_samples=1) const;
-  vector<sp_mat> lcp_blocks(const Discretizer * disc,
+  std::vector<arma::sp_mat> lcp_blocks(const TypedDiscretizer * disc,
                             const double gamma,
                             uint num_samples=1) const;
-  mat q_mat(const Discretizer * disc) const;
+  arma::mat q_mat(const Discretizer * disc) const;
 
   uint num_actions() const;
   uint dim_actions() const;
 
-  mat get_bounding_box() const;
+  arma::mat get_bounding_box() const;
   
  protected:
-  mat m_actions;
-  mat m_bbox;
+  arma::mat m_actions;
+  arma::mat m_bbox;
   double m_step;
   double m_noise_std;
   double m_damp;

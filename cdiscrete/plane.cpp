@@ -25,8 +25,6 @@ mat RelativePlanesSimulator::get_costs(const Points & points) const{
   uint D = points.n_cols;
   uint A = num_actions();
   
-  assert(TET_NUM_DIM == D);
-
   vec l2_norm = lp_norm(points,2,1);
   assert(N == l2_norm.n_elem);
   assert(all(l2_norm >= 0));
@@ -79,7 +77,7 @@ Points RelativePlanesSimulator::next(const Points & points,
   return r_points;
 }
 
-mat RelativePlanesSimulator::q_mat(const Discretizer * disc) const{
+mat RelativePlanesSimulator::q_mat(const TypedDiscretizer * disc) const{
   Points points = disc->get_spatial_nodes();
   uint N = disc->number_of_all_nodes();
   assert(N == points.n_rows + 1); // One OOB node
@@ -96,9 +94,9 @@ mat RelativePlanesSimulator::q_mat(const Discretizer * disc) const{
   return Q;
 }
 
-sp_mat RelativePlanesSimulator::transition_matrix(const Discretizer * disc,
-                                                    const vec & action,
-                                                    bool include_oob) const{
+sp_mat RelativePlanesSimulator::transition_matrix(const TypedDiscretizer * disc,
+						  const vec & action,
+						  bool include_oob) const{
   Points points = disc->get_spatial_nodes();
   uint n = disc->number_of_spatial_nodes();
   uint N = disc->number_of_all_nodes();
@@ -124,7 +122,7 @@ sp_mat RelativePlanesSimulator::transition_matrix(const Discretizer * disc,
   return P;
 }
 
-vector<sp_mat> RelativePlanesSimulator::transition_blocks(const Discretizer * disc,
+vector<sp_mat> RelativePlanesSimulator::transition_blocks(const TypedDiscretizer * disc,
                                                             uint num_samples) const{
   vector<sp_mat> blocks;
   uint A = num_actions();
@@ -143,9 +141,9 @@ vector<sp_mat> RelativePlanesSimulator::transition_blocks(const Discretizer * di
   return blocks;
 }
 
-vector<sp_mat> RelativePlanesSimulator::lcp_blocks(const Discretizer * disc,
-                                                     const double gamma,
-                                                     uint num_samples) const{
+vector<sp_mat> RelativePlanesSimulator::lcp_blocks(const typedDiscretizer * disc,
+						   const double gamma,
+						   uint num_samples) const{
   uint A = num_actions();
   uint N = disc->number_of_spatial_nodes(); // Not using oob
   vector<sp_mat> blocks = transition_blocks(disc,num_samples);
@@ -156,51 +154,6 @@ vector<sp_mat> RelativePlanesSimulator::lcp_blocks(const Discretizer * disc,
     blocks[a] = speye(N,N) - gamma * blocks[a];
   }
   return blocks;
-}
-
-void RelativePlanesSimulator::add_bang_bang_curve(TriMesh & mesh,
-                                                    uint num_curve_points) const{
-  VertexHandle v_zero = mesh.locate_vertex(Point(0,0));
-
-  VertexHandle v_old = v_zero;
-  VertexHandle v_new;  
-  double x,y;
-  double N = num_curve_points;
-
-  vec lb = m_bbox.col(0);
-  vec ub = m_bbox.col(1);
-  
-  // Figure out the max y within boundaries
-  assert(lb(0) < 0);
-  double max_y = min(ub(1),std::sqrt(-lb(0)));
-  assert(max_y > 0);
-
-  //Insert +ve y, -ve x points
-  for(double i = 1; i < N; i++){
-    y = max_y * i / N; // Uniform over y
-    assert(y > 0);
-    x = - y * y;
-    if(x <= lb(0)) break;
-    v_new = mesh.insert(Point(x,y));
-    mesh.insert_constraint(v_old,v_new);
-    v_old = v_new;
-  }
-
-  //Insert -ve y, +ve x points
-  v_old = v_zero;
-  assert(ub(0) > 0);
-  double min_y = max(lb(1),-std::sqrt(ub(0)));
-  assert(min_y < 0);
-  
-  for(double i = 1; i < N; i++){
-    y = min_y * i / N;
-    assert(y < 0);
-    x = y * y;
-    if(x >= ub(0)) break;
-    v_new = mesh.insert(Point(x,y));
-    mesh.insert_constraint(v_old,v_new);
-    v_old = v_new;
-  }
 }
 
 uint RelativePlanesSimulator::num_actions() const{
