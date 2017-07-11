@@ -1,37 +1,41 @@
-#include "planes.h"
+#include "plane.h"
 #include "misc.h"
 
 RelativePlanesSimulator::RelativePlanesSimulator(const mat & bbox,
-                                                     const mat &actions,
-                                                     double noise_std,
-                                                     double step) :
+						 const mat & actions,
+						 double noise_std,
+						 double step) :
   m_bbox(bbox),m_actions(actions),m_step(step),m_noise_std(noise_std),
   m_damp(1e-4){
-  assert(TET_NUM_DIM == m_bbox.n_rows);
+  assert(THREE_DIM == m_bbox.n_rows);
   assert(TWO_ACTIONS == dim_actions());  // Ownship + othership
 }
 
-vec RelativePlanesSimulator::get_state_weights(const Points & points) const{
+vec RelativePlanesSimulator::get_state_weights(const TypedPoints & points) const{
   uint N = points.n_rows;
   uint D = points.n_cols;
-  assert(TET_NUM_DIM == D);
+  assert(THREE_DIM == 3);
   
   vec weight = ones<vec>(N) / (double) N; // Uniform
   return weight;
 }
 
-mat RelativePlanesSimulator::get_costs(const Points & points) const{
+mat RelativePlanesSimulator::get_costs(const TypedPoints & points) const{
   uint N = points.n_rows;
   uint D = points.n_cols;
   uint A = num_actions();
   
-  vec l2_norm = lp_norm(points,2,1);
+  vec l2_norm = lp_norm(points.m_points,2,1);
   assert(N == l2_norm.n_elem);
-  assert(all(l2_norm >= 0));
 
   // Any state within the NMAC_RADIUS gets unit cost
   vec cost = zeros(N);
   cost(l2_norm < NMAC_RADIUS).fill(1);
+
+  // Make sure that OOB is heaven
+  uvec special_idx = points.get_special_mask();
+  cost(special_idx).fill(0);
+  
   mat costs = repmat(cost,1,A);
   return costs;
 }
@@ -41,38 +45,30 @@ mat RelativePlanesSimulator::get_actions() const{
 }
 
 TypedPoints RelativePlanesSimulator::next(const TypedPoints & points,
-                                       const vec & actions) const{
-  assert(TET_NUM_DIM == points.n_cols);
-  assert(dim_actions() == actions.n_elem);
+					  const vec & action) const{
+  assert(THREE_DIM == points.n_cols);
+  assert(dim_actions() == action.n_elem);
     
   double h = m_step;
-  double u = action[0] + m_noise_std*randn<vec>(1); // Own action
-  double v = action[1] + m_noise_std*randn<vec>(1); // Other action
+  vec noise = randn<vec>(2);
+  double u = action[0] + m_noise_std*noise(0); // Own action
+  double v = action[1] + m_noise_std*noise(1); // Other action
 
-  vec theta = points.col(2);
+  vec theta = points.m_points.col(2);
 
   // New points after translating so the own ship is at (0,0,h*u)
-  Points t_points = Points(size(points));
-  t_points.col(0) = points.col(0) + h * (cos(theta) - 1);
-  t_points.col(1) = points.col(1) + h * sin(theta);
+  Points t_points = Points(points.n_rows, points.n_cols);
+  t_points.col(0) = points.m_points.col(0) + h * (cos(theta) - 1);
+  t_points.col(1) = points.m_points.col(1) + h * sin(theta);
 
   // New points after rotating so the own ship is a (0,0,0)
   double phi = -h * u;
-  Points r_points = Points(size(points));
+  Points r_points = Points(points.n_rows, points.n_cols);
   r_points.col(0) = cos(phi) * t_points.col(0) - sin(phi) * t_points.col(1);
   r_points.col(1) = sin(phi) * t_points.col(0) + cos(phi) * t_points.col(1);
   r_points.col(2) = theta + h * (v - u);
 
-  // Wrap the angle
-  uvec angle_col = {2};
-  mat angle_bbox = {
-    {-datum::inf,datum:inf},
-    {-datum::inf,datum:inf},
-    {-datum::pi,datum::pi}
-  };
-  wrap(r_points, angle_col, angle_bbox);
-  
-  return r_points;
+  return TypedPoints(r_points, points.m_reg);
 }
 
 mat RelativePlanesSimulator::q_mat(const TypedDiscretizer * disc) const{

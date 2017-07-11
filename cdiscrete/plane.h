@@ -4,6 +4,7 @@
 #include "simulator.h"
 #include "tri_mesh.h"
 
+#define THREE_DIM 3
 #define TWO_ACTIONS 2
 #define NMAC_RADIUS 1
 
