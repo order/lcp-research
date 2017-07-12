@@ -121,7 +121,7 @@ list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
 add_executable (grid_tests grid_tests.cpp discretizer.cpp grid.cpp misc.cpp
   points.cpp)
 add_executable (points_tests points_tests.cpp misc.cpp points.cpp)
-add_executable (plane_foo plane_foo.cpp misc.cpp plane.cpp points.cpp)
+add_executable (plane_foo grid.cpp plane_foo.cpp plane.cpp points.cpp ${COMMON_FILES})
 
 
 

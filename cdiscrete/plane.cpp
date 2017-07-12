@@ -72,16 +72,16 @@ TypedPoints RelativePlanesSimulator::next(const TypedPoints & points,
 }
 
 mat RelativePlanesSimulator::q_mat(const TypedDiscretizer * disc) const{
-  Points points = disc->get_spatial_nodes();
-  uint N = disc->number_of_all_nodes();
-  assert(N == points.n_rows + 1); // One OOB node
+  TypedPoints points = disc->get_spatial_nodes();
+  uint N = disc->number_of_spatial_nodes();
+  assert(disc->number_of_all_nodes() == N + 1);
   uint A = num_actions();
   
-  mat Q = mat(N,A+1);
+  mat Q = mat(N+1,A+1);
   
   // Set the state-weight component
-  Q.col(0).head_rows(N) = -get_state_weights(points);
-  Q(N-1,0) = 0;  // No weight for the OOB node
+  Q(span(0,N-1), 0) = -get_state_weights(points);
+  Q(N,0) = 0;  // No weight for the OOB node
 
   // Fill in costs. OOB has 0 cost (success!).
   Q.tail_cols(A) = join_cols(get_costs(points), zeros<mat>(1,A));
@@ -91,12 +91,12 @@ mat RelativePlanesSimulator::q_mat(const TypedDiscretizer * disc) const{
 sp_mat RelativePlanesSimulator::transition_matrix(const TypedDiscretizer * disc,
 						  const vec & action,
 						  bool include_oob) const{
-  Points points = disc->get_spatial_nodes();
+  TypedPoints points = disc->get_spatial_nodes();
   uint n = disc->number_of_spatial_nodes();
   uint N = disc->number_of_all_nodes();
-  assert(N == points.n_rows + 1); // single oob node
+  assert(N == n + 1); // single oob node
   
-  Points p_next = next(points,action);
+  TypedPoints p_next = next(points,action);
   ElementDist P = disc->points_to_element_dist(p_next);
   assert(size(N,n) == size(P));
 
@@ -135,7 +135,7 @@ vector<sp_mat> RelativePlanesSimulator::transition_blocks(const TypedDiscretizer
   return blocks;
 }
 
-vector<sp_mat> RelativePlanesSimulator::lcp_blocks(const typedDiscretizer * disc,
+vector<sp_mat> RelativePlanesSimulator::lcp_blocks(const TypedDiscretizer * disc,
 						   const double gamma,
 						   uint num_samples) const{
   uint A = num_actions();

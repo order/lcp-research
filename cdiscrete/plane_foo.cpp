@@ -40,10 +40,9 @@ int main(int argc, char** argv)
   arma_rng::set_seed_random();
   
   // Set up 3D space
-  cout << "Generating initial mesh..." << endl;
   mat bbox = build_bbox();
   UniformGrid grid = UniformGrid(bbox,
-				 N_GRID_NODES * ones<uvec>(2),
+				 N_GRID_NODES * ones<uvec>(THREE_DIM),
 				 N_OOB_NODES);
   mat oob_bbox = {
     {-B,B},
