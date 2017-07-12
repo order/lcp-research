@@ -193,6 +193,8 @@ bool TypedPoints::equals(const TypedPoints & other) const{
   if(other.n_rows != this->n_rows) return false;
   if(other.n_cols != this->n_cols) return false;
   if(other.m_reg.size() != this->m_reg.size()) return false;
+  if(any(get_spatial_mask() != other.get_spatial_mask())) return false;
+  if(any(get_special_mask() != other.get_special_mask())) return false;
 
   // Check the registry
   for(auto const& it : other.m_reg){
@@ -201,9 +203,13 @@ bool TypedPoints::equals(const TypedPoints & other) const{
     if(this->m_reg.end() == this->m_reg.find(idx)) return false;
     if(val != this->m_reg.at(idx)) return false;
   }
-
+  
   // Check the coords
-  return approx_equal(other.m_points, this->m_points,
+  
+  if(0 == num_spatial_nodes()) return true;
+  uvec sp_idx = get_spatial_mask();
+  return approx_equal(other.m_points.rows(sp_idx),
+		      this->m_points.rows(sp_idx),
 		      "both", PRETTY_SMALL, PRETTY_SMALL);
 }
 

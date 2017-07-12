@@ -169,6 +169,41 @@ bool test_grid_cell_coords_to_low_points_3(){
 
 }
 
+bool test_grid_cell_coords_to_vertex_indicies_1(){
+  vec low = vec{0,0};
+  vec high = vec{1,1};
+  uvec num_cells = uvec{1,1};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  TypedPoints p = TypedPoints(0.5*ones<mat>(1,2));
+  
+  Coords c = grid.points_to_cell_coords(p);
+  umat vert_indices = grid.cell_coords_to_vertex_indices(c);
+  assert(size(1,4) == size(vert_indices));
+  uvec uni_idx = unique(vert_indices.row(0).t());
+  assert(all(uni_idx == regspace<uvec>(0,3)));
+  cout << "Finished test_grid_cell_coords_to_vertex_indicies_1" << endl;
+}
+
+
+bool test_grid_cell_coords_to_vertex_indicies_2(){
+  vec low = vec{0,0};
+  vec high = vec{1,1};
+  uvec num_cells = uvec{1,1};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+  grid.m_rule_list.emplace_back(new OutOfBoundsRule(grid.find_bounding_box(),
+						    1));
+  TypedPoints p = TypedPoints(1.5*ones<mat>(1,2));
+  
+  Coords c = grid.points_to_cell_coords(p);
+  umat vert_indices = grid.cell_coords_to_vertex_indices(c);
+  assert(size(1,4) == size(vert_indices));
+  uvec uni_idx = unique(vert_indices.row(0).t());
+  assert(1 == uni_idx.n_elem);
+  assert(4 == uni_idx(0));
+  cout << "Finished test_grid_cell_coords_to_vertex_indicies_2" << endl;
+}
+
 
 bool test_grid_points_to_dist_1(){
   // Dead center of the unit cube
@@ -184,6 +219,7 @@ bool test_grid_points_to_dist_1(){
 
   cout << "Finished test_grid_points_to_dist_1" << endl; 
 }
+
 
 bool test_grid_points_to_dist_2(){
   // As above but shifted
@@ -372,6 +408,11 @@ int main(){
   test_grid_cell_coords_to_low_points_1();
   test_grid_cell_coords_to_low_points_2();
   test_grid_cell_coords_to_low_points_3();
+  cout << endl;
+
+  
+  test_grid_cell_coords_to_vertex_indicies_1();
+  test_grid_cell_coords_to_vertex_indicies_2();
   cout << endl;
   
   test_grid_points_to_dist_1();

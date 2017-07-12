@@ -503,8 +503,10 @@ umat UniformGrid::cell_coords_to_vertex_indices(const Coords & coords) const{
   return vertices;
 }
 
-Coords UniformGrid::points_to_cell_coords(const TypedPoints & points) const{
+Coords UniformGrid::points_to_cell_coords(const TypedPoints & not_bounded_points) const{
   // Takes in points, spits out cell coords
+  TypedPoints points = apply_rules_and_remaps(not_bounded_points);
+
   assert(points.check_in_bbox(m_low, m_high));
 
   // C = floor((P - low) / width)  
@@ -653,7 +655,8 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & not_bounded_
   // Convert into a sparse matrix.
   Coords coords = points_to_cell_coords(points);
   umat vert_indices = cell_coords_to_vertex_indices(coords);
-  uint n_nodes = max_node_index() + 1;
+  uint n_nodes = number_of_all_nodes();
+  
   ElementDist distrib = build_sparse_dist(n_nodes, vert_indices, weights);
   assert(N == distrib.n_rows);
   assert(number_of_all_nodes() == distrib.n_cols);
