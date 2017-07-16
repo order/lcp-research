@@ -79,17 +79,24 @@ int main(int argc, char** argv)
   cout << "Building smoother matrix..." << endl;
   sp_mat smoother = speye(N,N);
 
-  // Build and pertrub the q
+  // Build Q matrix
   cout << "Building RHS Q..." << endl;
   mat Q = sim.q_mat(&grid);
+  cout << "size(Q): " << size(Q) << endl;
+  cout << "Expected size(Q): " << size(N,A+1) << endl;
+
+  assert(size(N,A+1) == size(Q));
+
+  // Extract costs
   mat costs = Q.tail_cols(A);
-  
+
+  // Free the cost function from non-neg constraints
   bvec free_vars = zeros<bvec>((A+1)*N);
   free_vars.head(N).fill(1);
 
+  // Build the LCP
   sp_mat M = build_M(blocks);
   vec q = vectorise(Q);
-
   LCP lcp = LCP(M,q,free_vars);
 
   

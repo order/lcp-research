@@ -12,11 +12,15 @@ RelativePlanesSimulator::RelativePlanesSimulator(const mat & bbox,
 }
 
 vec RelativePlanesSimulator::get_state_weights(const TypedPoints & points) const{
-  uint N = points.n_rows;
+  
+  uint n_spatial = points.num_spatial_nodes();
+  uint n_points = points.num_all_nodes();
   uint D = points.n_cols;
   assert(THREE_DIM == 3);
   
-  vec weight = ones<vec>(N) / (double) N; // Uniform
+  vec weight = ones<vec>(n_points) / (double) n_spatial; // Uniform
+  weight(points.get_special_mask()).fill(0);
+  assert(abs(accu(weight) - 1.0) / n_points < ALMOST_ZERO);
   return weight;
 }
 
@@ -77,14 +81,13 @@ mat RelativePlanesSimulator::q_mat(const TypedDiscretizer * disc) const{
   assert(disc->number_of_all_nodes() == N + 1);
   uint A = num_actions();
   
-  mat Q = mat(N+1,A+1);
+  mat Q = mat(N,A+1); // Ignore the OOB node
   
   // Set the state-weight component
-  Q(span(0,N-1), 0) = -get_state_weights(points);
-  Q(N,0) = 0;  // No weight for the OOB node
+  Q.col(0) = -get_state_weights(points);
 
   // Fill in costs. OOB has 0 cost (success!).
-  Q.tail_cols(A) = join_cols(get_costs(points), zeros<mat>(1,A));
+  Q.tail_cols(A) = get_costs(points);
   return Q;
 }
 
@@ -105,6 +108,7 @@ sp_mat RelativePlanesSimulator::transition_matrix(const TypedDiscretizer * disc,
   if(!include_oob){
     P = resize(P,n,n); // crop; sub probability matrix
   }
+  
   return P;
 }
 
