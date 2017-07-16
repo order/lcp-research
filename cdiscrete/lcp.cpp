@@ -5,12 +5,18 @@
 LCP::LCP(){}
 LCP::LCP(const sp_mat & aM,
          const vec & aq) : M(aM),q(aq){
+  uint N = q.n_elem;
+  assert(size(N,N) == size(M));
   free_vars = zeros<bvec>(q.n_elem);
 }
 LCP::LCP(const sp_mat & aM,
          const vec & aq,
          const bvec & afree_vars) :
-  M(aM),q(aq),free_vars(afree_vars){}
+  M(aM),q(aq),free_vars(afree_vars){
+  uint N = q.n_elem;
+  assert(size(N,N) == size(M));
+  assert(N == free_vars.n_elem);
+}
 
 
 void LCP::write(const string & filename){
@@ -24,6 +30,10 @@ PLCP::PLCP(){}
 PLCP::PLCP(const sp_mat & aP,
            const sp_mat & aU,
            const vec & aq) : P(aP),U(aU),q(aq){
+  uint N = q.n_elem;
+  uint K = P.n_cols;
+  assert(size(K,N) == size(U));
+  assert(size(N,K) == size(P));
   free_vars = zeros<bvec>(q.n_elem);
 }
 PLCP::PLCP(const sp_mat & aP,
@@ -31,8 +41,11 @@ PLCP::PLCP(const sp_mat & aP,
            const vec & aq,
            const bvec & afree_vars) :
   P(aP),U(aU),q(aq),free_vars(afree_vars){
-  assert(PRETTY_SMALL > norm(conv_to<vec>::from(free_vars)
-                             - conv_to<vec>::from(afree_vars)));
+  uint N = q.n_elem;
+  uint K = P.n_cols;
+  assert(size(K,N) == size(U));
+  assert(size(N,K) == size(P));
+  assert(N == free_vars.n_elem);
 }
 
 void PLCP::write(const string & filename){

@@ -628,9 +628,17 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & not_bounded_
 
   TypedPoints low_points = points_to_low_points(points);
   uvec spatial_mask = points.get_spatial_mask();
+  
   mat diff = points.m_points - low_points.m_points;
-  assert(all(all(diff.rows(spatial_mask) >= 0)));
+  assert(all(all(diff.rows(spatial_mask) >= -ALMOST_ZERO)));
+  scalar_max_inplace(diff, 0); // Ensure hard zero min
+  
   mat rel_dist = row_divide(diff, conv_to<rowvec>::from(m_width.t()));
+  assert(all(all(rel_dist.rows(spatial_mask) >= -ALMOST_ZERO)));
+  assert(all(all(rel_dist.rows(spatial_mask) <= 1.0 + ALMOST_ZERO)));
+  scalar_max_inplace(rel_dist, 0); 
+  scalar_min_inplace(rel_dist, 1); // Ensure [0,1]
+  
 
   uint N = points.m_points.n_rows;
   uint D = n_dim;
@@ -775,7 +783,8 @@ ElementDist build_sparse_dist(uint n_nodes, umat vert_indices, mat weights){
   loc.row(0) = urowvec(v_row);
   loc.row(1) = urowvec(v_col);
   vec data = vec(v_data);
-  assert(abs(sum(data) - N) < PRETTY_SMALL);
+  double rel_error = abs(sum(data) - N) / N;
+  assert(rel_error < PRETTY_SMALL);
   return sp_mat(loc,data,N,n_nodes);
 }
 				      

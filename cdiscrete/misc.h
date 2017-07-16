@@ -76,6 +76,9 @@ void row_max_inplace(mat & A, const rowvec & b);
 void min_inplace(vec & u, const vec & b);
 void max_inplace(vec & u, const vec & b);
 
+void scalar_min_inplace(mat & A, double s);
+void scalar_max_inplace(mat & A, double s);
+
 // Index of maximum column for each row in V
 uint argmax(const vec & v);
 uint argmin(const vec & v);

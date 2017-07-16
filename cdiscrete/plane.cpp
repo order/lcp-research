@@ -97,22 +97,14 @@ sp_mat RelativePlanesSimulator::transition_matrix(const TypedDiscretizer * disc,
   assert(N == n + 1); // single oob node
   
   TypedPoints p_next = next(points,action);
-  ElementDist P = disc->points_to_element_dist(p_next);
-  assert(size(N,n) == size(P));
+  ElementDist P = disc->points_to_element_dist(p_next);  
+  assert(size(n,N) == size(P));
 
-  
   // Final row is the OOB row
   assert(!include_oob);
   if(!include_oob){
-    // Make sure we aren't pruning off important transitions
-    assert(accu(P.tail_rows(1)) < ALMOST_ZERO);
-    P = resize(P,n,n);
+    P = resize(P,n,n); // crop; sub probability matrix
   }
-  else{
-    // Add an all-zero column
-    P = resize(P,N,N);
-    assert(accu(P.tail_cols(1)) < ALMOST_ZERO);
-  }  
   return P;
 }
 

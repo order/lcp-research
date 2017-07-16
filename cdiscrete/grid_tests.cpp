@@ -164,7 +164,10 @@ bool test_grid_cell_coords_to_low_points_3(){
   assert(!c.is_special(0));
   TypedPoints p2 = grid.cell_coords_to_low_points(c);
   assert(!p2.is_special(0));
-  assert(ALMOST_EQUAL(p.m_points, p2.m_points));
+
+  Points ref = 9*ones<mat>(1,2);
+
+  assert(ALMOST_EQUAL(ref, p2.m_points));
   cout << "Finished test_grid_cell_coords_to_low_points_3" << endl;
 
 }

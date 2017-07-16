@@ -275,6 +275,16 @@ void max_inplace(vec & u, const vec & b){
   u(idx) = b(idx);
 }
 
+void scalar_min_inplace(mat & A, double s){
+  uvec idx = find(A > s);
+  A(idx).fill(s);
+}
+
+void scalar_max_inplace(mat & A, double s){
+  uvec idx = find(A < s);
+  A(idx).fill(s);
+}
+
 uint argmax(const vec & v){
   assert(v.n_elem > 0);
   uvec res = find(v == max(v),1);
