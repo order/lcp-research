@@ -496,7 +496,9 @@ umat UniformGrid::cell_coords_to_vertex_indices(const Coords & coords) const{
   uint oob_idx = max_spatial_node_index();
   for(auto const & it : coords.m_reg){
     assert(it.second > 0);
-    vertices.row(it.first).fill(oob_idx + it.second);
+    uint special_vert = oob_idx + it.second;
+    assert(special_vert < number_of_all_nodes());
+    vertices.row(it.first).fill(special_vert);
   }
   assert(!vertices.has_nan()); // All should be dealt with.
   
@@ -506,13 +508,35 @@ umat UniformGrid::cell_coords_to_vertex_indices(const Coords & coords) const{
 Coords UniformGrid::points_to_cell_coords(const TypedPoints & not_bounded_points) const{
   // Takes in points, spits out cell coords
   TypedPoints points = apply_rules_and_remaps(not_bounded_points);
-
+  uvec spatial_idx = points.get_spatial_mask();
+  uvec special_idx = points.get_special_mask();
   assert(points.check_in_bbox(m_low, m_high));
 
-  // C = floor((P - low) / width)  
+  // C = floor((P - low) / width)
   mat diff = row_diff(points.m_points, conv_to<rowvec>::from(m_low.t()));
-  mat scaled = row_divide(diff, conv_to<rowvec>::from(m_width.t()));
-  imat raw_coords = conv_to<imat>::from(floor(scaled));
+  diff += ALMOST_ZERO;
+  assert(all(all(diff.rows(spatial_idx) > 0)));
+  
+  mat scaled = floor(row_divide(diff, conv_to<rowvec>::from(m_width.t())));
+
+  imat raw_coords = conv_to<imat>::from(scaled);
+  raw_coords.rows(special_idx).fill(Coords::SPECIAL_FILL);
+  assert(all(all(raw_coords.rows(spatial_idx) >= 0)));
+
+  // Points at upper boundary will be +1 what they should be. Correct this.
+  for(uint d = 0; d < n_dim; d++){
+    uvec cidx = uvec{d};
+    assert(all(all(raw_coords(spatial_idx, cidx) <= m_num_cells(d))));
+    uvec max_idx = find(m_num_cells(d) == raw_coords.col(d));
+
+    //Only points at upper boundary
+    vec ub_dist = abs(points.m_points(max_idx,cidx) - m_high(d));
+    assert(all(ub_dist < PRETTY_SMALL));
+    raw_coords(max_idx, cidx).fill(m_num_cells(d) - 1); // Correction
+  }
+
+  assert(all(all(raw_coords.rows(spatial_idx) >= 0)));
+  assert(all(all(raw_coords.rows(special_idx) == Coords::SPECIAL_FILL)));
   
   // Use all existing typing information.
   return Coords(raw_coords, points.m_reg); // Use points information.
@@ -723,6 +747,7 @@ ElementDist build_sparse_dist(uint n_nodes, umat vert_indices, mat weights){
 
   // Build out the row, column, and data vectors.
   for(uint i = 0; i < N; i++){
+    assert(vert_indices.row(i).max() < n_nodes);
     uvec uni = unique(vert_indices.row(i)).t();
     assert(uni.n_elem == 1 || uni.n_elem == V);
     if(1 == uni.n_elem){

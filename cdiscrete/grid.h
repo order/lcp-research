@@ -10,6 +10,8 @@
 #include "misc.h"
 #include "points.h"
 
+#define BORDER_FUZZ 1e-9
+
 arma::uvec c_order_stride(const arma::uvec & points_per_dim);
 arma::uvec c_order_cell_shift(const arma::uvec & points_per_dim);
 
