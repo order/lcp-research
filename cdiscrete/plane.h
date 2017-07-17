@@ -6,7 +6,7 @@
 
 #define THREE_DIM 3
 #define TWO_ACTIONS 2
-#define NMAC_RADIUS 1
+#define NMAC_RADIUS 3
 
 /*
  * This is a simulator for a 3D relative motion model for two planes.

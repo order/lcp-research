@@ -28,8 +28,9 @@ mat RelativePlanesSimulator::get_costs(const TypedPoints & points) const{
   uint N = points.n_rows;
   uint D = points.n_cols;
   uint A = num_actions();
-  
-  vec l2_norm = lp_norm(points.m_points,2,1);
+
+  // x,y distance
+  vec l2_norm = lp_norm(points.m_points.head_cols(2),2,1);
   assert(N == l2_norm.n_elem);
 
   // Any state within the NMAC_RADIUS gets unit cost

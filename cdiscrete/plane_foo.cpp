@@ -58,6 +58,10 @@ int main(int argc, char** argv)
   grid.m_rule_list.emplace_back(new OutOfBoundsRule(oob_bbox,1));
   grid.m_remap_list.emplace_back(new WrapRemapper(angle_bbox));
 
+  cout << "Spatial nodes: " << grid.number_of_spatial_nodes() << endl;
+  cout << "Total nodes: " << grid.number_of_all_nodes() << endl;
+
+
   
   TypedPoints points = grid.get_spatial_nodes();
   uint N = points.n_rows;
@@ -101,12 +105,12 @@ int main(int argc, char** argv)
 
   
   KojimaSolver ref_solver = KojimaSolver();
-  ref_solver.comp_thresh = 1e-22;
+  ref_solver.comp_thresh = 1e-8;
   ref_solver.initial_sigma = 0.2;
-  ref_solver.aug_rel_scale = 0.75;
+  ref_solver.aug_rel_scale = 1.5;
   ref_solver.regularizer = 1e-12;
-  ref_solver.verbose = false;
-  ref_solver.iter_verbose = false;
+  ref_solver.verbose = true;
+  ref_solver.iter_verbose = true;
   
 
   cout << "Reference solve..." << endl;
@@ -117,5 +121,7 @@ int main(int argc, char** argv)
   Archiver arch = Archiver();
   arch.add_mat("ref_P",ref_P);
   arch.add_mat("ref_D",ref_D);
+  arch.add_sp_mat("M",M);
+  arch.add_mat("Q",Q);
   arch.write(DATA_FILE_NAME);
 }
