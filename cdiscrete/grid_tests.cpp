@@ -388,6 +388,31 @@ bool test_interpolate_3(){
   cout << "Finished test_interpolate_3" << endl;
 }
 
+bool test_get_points_1(){
+  vec low = vec{0,0,0};
+  vec high = vec{5,5,5};
+  uvec num_cells = uvec{5,5,5};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  TypedPoints points = grid.get_spatial_nodes();
+  assert(6*6*6 == points.n_rows);
+  assert(3 == points.n_cols);
+  cout << "Finished test_get_points_1" << endl;
+}
+
+bool test_get_points_2(){
+  vec low = vec{-10,-10,-10};
+  vec high = vec{10,10,10};
+  uvec num_cells = uvec{10,10,10};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  TypedPoints points = grid.get_spatial_nodes();
+  assert(10*10*10 == points.n_rows);
+  assert(3 == points.n_cols);
+  cout << "Finished test_get_points_2" << endl;
+}
+
+
 
 int main(){
   cout << "Tests start..." << endl;
@@ -433,4 +458,9 @@ int main(){
   test_interpolate_1();
   test_interpolate_2();
   test_interpolate_3();
+  cout << endl;
+
+  test_get_points_1();
+  test_get_points_2();
+
 }

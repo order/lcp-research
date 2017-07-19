@@ -4,9 +4,10 @@
 RelativePlanesSimulator::RelativePlanesSimulator(const mat & bbox,
 						 const mat & actions,
 						 double noise_std,
-						 double step) :
+						 double step,
+						 double nmac_radius) :
   m_bbox(bbox),m_actions(actions),m_step(step),m_noise_std(noise_std),
-  m_damp(1e-4){
+  m_damp(1e-4), m_nmac_radius(nmac_radius){
   assert(THREE_DIM == m_bbox.n_rows);
   assert(TWO_ACTIONS == dim_actions());  // Ownship + othership
 }
@@ -35,8 +36,9 @@ mat RelativePlanesSimulator::get_costs(const TypedPoints & points) const{
 
   // Any state within the NMAC_RADIUS gets unit cost
   vec cost = zeros(N);
-  cost(l2_norm < NMAC_RADIUS).fill(1);
-
+  uvec ball_mask = find(l2_norm < m_nmac_radius);
+  cost(ball_mask).fill(1);
+  
   // Make sure that OOB is heaven
   uvec special_idx = points.get_special_mask();
   cost(special_idx).fill(0);

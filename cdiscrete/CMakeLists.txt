@@ -16,7 +16,7 @@ project( mesh )
 
 
 # Explicitly set some flags
-set(CMAKE_CXX_FLAGS "-g -fstack-protector -Wformat -Werror=format-security -frounding-math -FORTIFY_SOURCE=1 -fext-numeric-literals -std=c++11")
+set(CMAKE_CXX_FLAGS "-g -fomit-frame-pointer -std=c++11 -march=native -mfpmath=sse -funroll-loops")
 
 # CGAL and its components
 find_package( CGAL QUIET COMPONENTS  )

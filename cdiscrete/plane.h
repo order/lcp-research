@@ -6,7 +6,6 @@
 
 #define THREE_DIM 3
 #define TWO_ACTIONS 2
-#define NMAC_RADIUS 3
 
 /*
  * This is a simulator for a 3D relative motion model for two planes.
@@ -18,7 +17,8 @@ class RelativePlanesSimulator : public TypedSimulator{
   RelativePlanesSimulator(const arma::mat & bbox,
 			  const arma::mat &actions,
 			  double noise_std = 0.1,
-			  double step=0.01);
+			  double step=0.01,
+			  double nmac_radius=5.0);
   arma::mat get_costs(const TypedPoints & points) const;
   arma::vec get_state_weights(const TypedPoints & points) const;
   arma::mat get_actions() const;
@@ -46,6 +46,7 @@ class RelativePlanesSimulator : public TypedSimulator{
   double m_step;
   double m_noise_std;
   double m_damp;
+  double m_nmac_radius;
 };
 
 #endif

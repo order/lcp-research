@@ -7,6 +7,8 @@
 using namespace std;
 using namespace arma;
 
+#define GH_SYSTEM_FILEPATH "/home/epz/scratch/test_gh_system.arch"
+
 double max_steplen(const vec & x,
                    const vec & dx);
 double steplen_heuristic(const vec & x,
@@ -37,6 +39,7 @@ class KojimaSolver{
   uint max_iter;
   bool verbose;
   bool iter_verbose; // Just print iteration
+  bool save_system;
   double regularizer;
   double aug_rel_scale;
   double initial_sigma;

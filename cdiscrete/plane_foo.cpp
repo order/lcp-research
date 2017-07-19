@@ -15,7 +15,7 @@ using namespace std;
 #define GAMMA 0.99
 #define N_GRID_NODES 10
 #define N_OOB_NODES 1
-#define B 10
+#define B 1
 
 #define DATA_FILE_NAME "/home/epz/scratch/test.data"
 
@@ -28,7 +28,8 @@ RelativePlanesSimulator build_simulator(){
   mat actions = mat{{0,1},{1,1},{-1,1}};
   double noise_std = 0.0;
   double step = 0.01;
-  return RelativePlanesSimulator(bbox, actions, noise_std, step);
+  double nmac_radius = 0.25;
+  return RelativePlanesSimulator(bbox, actions, noise_std, step, nmac_radius);
 }
 
 ////////////////////
@@ -65,6 +66,7 @@ int main(int argc, char** argv)
   
   TypedPoints points = grid.get_spatial_nodes();
   uint N = points.n_rows;
+  cout << "Generated " << N << " spatial nodes" << endl;
   assert(N == grid.number_of_spatial_nodes());
   assert(N > 0);
   
@@ -100,17 +102,19 @@ int main(int argc, char** argv)
 
   // Build the LCP
   sp_mat M = build_M(blocks);
+  cout << "Generated LCP matrix: " << size(M) << endl;
   vec q = vectorise(Q);
   LCP lcp = LCP(M,q,free_vars);
 
   
   KojimaSolver ref_solver = KojimaSolver();
-  ref_solver.comp_thresh = 1e-8;
+  ref_solver.comp_thresh = 1e-6;
   ref_solver.initial_sigma = 0.2;
   ref_solver.aug_rel_scale = 1.5;
-  ref_solver.regularizer = 1e-12;
+  ref_solver.regularizer = 1e-9;
   ref_solver.verbose = true;
   ref_solver.iter_verbose = true;
+  ref_solver.save_system = true;
   
 
   cout << "Reference solve..." << endl;

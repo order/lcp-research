@@ -1,8 +1,10 @@
 #include <vector>
 #include <assert.h>
+#include <ctime>
 
-#include "solver.h"
 #include "io.h"
+#include "solver.h"
+
 
 double max_steplen(const vec & x,
                    const vec & dx){
@@ -68,6 +70,7 @@ KojimaSolver::KojimaSolver(){
   regularizer = 1e-8;
   aug_rel_scale = 0.75;
   initial_sigma = 0.95;
+  save_system = false;
 }
 
 // Really should be always using this.
@@ -90,7 +93,8 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
   superlu_opts opts;
   opts.equilibrate = true;
   opts.permutation = superlu_opts::COLAMD;
-  opts.refine = superlu_opts::REF_SINGLE;
+  opts.refine = superlu_opts::REF_NONE;
+  opts.pivot_thresh = 1.0;
   
   vec q = lcp.q;
   sp_mat M = lcp.M + regularizer * speye(size(lcp.M));
@@ -140,6 +144,7 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
   // Start iteration
   double mean_comp, steplen;
   double sigma = initial_sigma;
+  double total_solve_time = 0;
   uint iter;  
   for(iter = 0; iter < max_iter; iter++){
     if(verbose or iter_verbose)
@@ -163,14 +168,23 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
     h.head(NB) = sigma * mean_comp - b % s;
     h.subvec(NB,size(res_f)) = res_f;
     h.tail(NB) = res_b;
-    
-    //Archiver arch;
-    //arch.add_sp_mat("G",G);
-    //arch.add_vec("h",h);
-    //arch.write("test.sys");
+
+    if(save_system && 0 == iter){
+      Archiver arch;
+      arch.add_sp_mat("G",G);
+      arch.add_vec("h",h);
+      arch.write(GH_SYSTEM_FILEPATH);
+    }
 
     // Solve and extract directions
+    clock_t sp_solve_start = clock();
     vec dir = spsolve(G,h,"superlu",opts);
+    double delta_t = (clock() - sp_solve_start)
+      / (double)(CLOCKS_PER_SEC);
+    total_solve_time += delta_t;
+    if(iter_verbose)
+      cout << "\t Iteration solve time: " << delta_t << "s" << endl;
+
     assert((N+NB) == dir.n_elem);
     vec df = dir.head(NF);
     vec db = dir.subvec(NF,N-1);
@@ -188,18 +202,24 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
 
     if(verbose){
       double res = norm(join_vert(res_f,res_b));
-      cout <<"\t Mean complementarity: " << mean_comp
-           <<"\n\t Residual norm: " << res
-           <<"\n\t |df|: " << norm(df)
-           <<"\n\t |db|: " << norm(db)
-           <<"\n\t |ds|: " << norm(ds)
-           <<"\n\t Step length: " << steplen
-           <<"\n\t Centering sigma: " << sigma << endl;
+      double linalg_res = norm(G*dir - h);
+      cout << "\t Mean complementarity: " << mean_comp << endl
+           << "\t Solver res norm: " << linalg_res << endl
+           << "\t Residual norm: " << res << endl	
+           << "\t |df|: " << norm(df) << endl
+           << "\t |db|: " << norm(db) << endl
+           << "\t |ds|: " << norm(ds) << endl
+           << "\t Step length: " << steplen << endl
+           << "\t Centering sigma: " << sigma << endl
+	   << "\t G-system sparsity: " << sparsity(G) << endl;
+
     }
   }
   if(verbose){
-    cout << "Finished"
-         <<"\n\t Final mean complementarity: " << mean_comp << endl;
+    cout << "Finished" << endl
+         << "\t Final mean complementarity: " << mean_comp << endl
+	 << "\t Total sparse solve time: " << total_solve_time << "s"
+	 << endl;
   }
   x(free_idx) = f;
   x(bound_idx) = b;
