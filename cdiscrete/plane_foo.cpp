@@ -12,8 +12,8 @@
 using namespace arma;
 using namespace std;
 
-#define GAMMA 0.99
-#define N_GRID_NODES 10
+#define GAMMA 0.997
+#define N_GRID_NODES 16
 #define N_OOB_NODES 1
 #define B 1
 
@@ -25,8 +25,8 @@ mat build_bbox(){
 
 RelativePlanesSimulator build_simulator(){
   mat bbox = build_bbox();
-  mat actions = mat{{0,1},{1,1},{-1,1}};
-  double noise_std = 0.0;
+  mat actions = mat{{0,0},{1,0},{-1,0}};
+  double noise_std = 0.1;
   double step = 0.01;
   double nmac_radius = 0.25;
   return RelativePlanesSimulator(bbox, actions, noise_std, step, nmac_radius);

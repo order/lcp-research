@@ -1,10 +1,10 @@
 # Created by the script cgal_create_CMakeLists
 # This is the CMake script for compiling a set of CGAL applications.
 
-project( mesh )
+project(mesh)
 
 
-cmake_minimum_required(VERSION 2.8.11)
+cmake_minimum_required(VERSION 3.0)
 
 # CCACHE
 find_program(CCACHE_PROGRAM ccache)
@@ -37,7 +37,7 @@ if ( NOT Boost_FOUND )
   return()  
 endif()
 
-#find_package(Eigen3 REQUIRED)
+find_package(Eigen3 REQUIRED NO_MODULE)
 find_package(LibArchive REQUIRED)
 find_package(Armadillo REQUIRED)
 find_package(LAPACK REQUIRED)
@@ -52,7 +52,7 @@ include_directories( ${Boost_INCLUDE_DIR} )
 include_directories(${ARMADILLO_INCLUDE_DIRS})
 include_directories(${LibArchive_INCLUDE_DIRS})
 include_directories(${LAPACK_INCLUDE_DIR})
-#include_directories(${EIGEN3_INCLUDE_DIR})
+include_directories(${EIGEN3_INCLUDE_DIR})
 include_directories(${SUPERLU_INCLUDE_DIR})
 include_directories(${OPENBLAS_INCLUDE_DIR})
 

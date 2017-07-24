@@ -5,6 +5,24 @@
 #include "io.h"
 #include "solver.h"
 
+eigen_sp_mat convert_sp_mat_arma_to_eigen(const sp_mat & M){
+  clock_t sp_convert_start = clock();
+
+  typedef Eigen::Triplet<double> T;
+  vector<T> tripletList;
+  tripletList.reserve(M.n_nonzero);
+  for(sp_mat::const_iterator it = M.begin(); it != M.end(); ++it)
+    {
+      tripletList.push_back(T(it.row(),it.col(),*it));
+    }
+  eigen_sp_mat eigen_M(M.n_rows,M.n_cols);
+  eigen_M.setFromTriplets(tripletList.begin(), tripletList.end());
+  double delta_t = (clock() - sp_convert_start)
+    / (double)(CLOCKS_PER_SEC);
+  cout << "ARMA->EIGEN CONVERT: " << delta_t << "s" << endl;
+  return eigen_M;
+}
+
 
 double max_steplen(const vec & x,
                    const vec & dx){
@@ -177,6 +195,8 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
     }
 
     // Solve and extract directions
+    eigen_sp_mat eigen_G = convert_sp_mat_arma_to_eigen(G);
+
     clock_t sp_solve_start = clock();
     vec dir = spsolve(G,h,"superlu",opts);
     double delta_t = (clock() - sp_solve_start)

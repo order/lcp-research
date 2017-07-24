@@ -4,17 +4,20 @@
 #include "lcp.h"
 #include <armadillo>
 
-using namespace std;
-using namespace arma;
+#include <Eigen/Sparse>
 
 #define GH_SYSTEM_FILEPATH "/home/epz/scratch/test_gh_system.arch"
 
-double max_steplen(const vec & x,
-                   const vec & dx);
-double steplen_heuristic(const vec & x,
-                         const vec & y,
-                         const vec & dx,
-                         const vec & dy,
+typedef Eigen::SparseMatrix<double> eigen_sp_mat;
+
+eigen_sp_mat convert_sp_mat_arma_to_eigen(const arma::sp_mat & M);
+
+double max_steplen(const arma::vec & x,
+                   const arma::vec & dx);
+double steplen_heuristic(const arma::vec & x,
+                         const arma::vec & y,
+                         const arma::vec & dx,
+                         const arma::vec & dy,
                          double scale);
 double sigma_heuristic(double sigma,
                        double steplen);
@@ -33,7 +36,7 @@ class KojimaSolver{
  public:
   KojimaSolver();
   SolverResult aug_solve(const LCP & lcp) const;
-  SolverResult solve(const LCP & lcp, vec & x, vec & y) const;
+  SolverResult solve(const LCP & lcp, arma::vec & x, arma::vec & y) const;
 
   double comp_thresh;
   uint max_iter;
@@ -49,9 +52,11 @@ class ProjectiveSolver{
  public:
   ProjectiveSolver();
   SolverResult aug_solve(const PLCP & plcp) const;
-  SolverResult aug_solve(const PLCP & plcp,vec & x,vec & y) const;
+  SolverResult aug_solve(const PLCP & plcp,
+			 arma::vec & x, arma::vec & y) const;
 
-  SolverResult solve(const PLCP & plcp,vec& x, vec& y, vec& w) const;
+  SolverResult solve(const PLCP & plcp,
+		     arma::vec & x, arma::vec & y, arma::vec & w) const;
 
   double comp_thresh;
   uint max_iter;
