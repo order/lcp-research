@@ -13,7 +13,7 @@ using namespace arma;
 using namespace std;
 
 #define GAMMA 0.997
-#define N_GRID_NODES 16
+#define N_GRID_NODES 12
 #define N_OOB_NODES 1
 #define B 1
 

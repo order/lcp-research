@@ -2,6 +2,8 @@
 #include <assert.h>
 #include <ctime>
 
+#include <Eigen/IterativeLinearSolvers>
+
 #include "io.h"
 #include "solver.h"
 
@@ -21,6 +23,15 @@ eigen_sp_mat convert_sp_mat_arma_to_eigen(const sp_mat & M){
     / (double)(CLOCKS_PER_SEC);
   cout << "ARMA->EIGEN CONVERT: " << delta_t << "s" << endl;
   return eigen_M;
+}
+
+eigen_vec convert_vec_arma_to_eigen(const arma::vec & x){
+  clock_t sp_convert_start = clock();
+
+  typedef std::vector<double> stdvec;
+
+  stdvec stdx = conv_to<stdvec>::from(x);
+  return eigen_vec::Map(stdx.data(), stdx.size());
 }
 
 
@@ -158,6 +169,9 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
   block_G.push_back(block_sp_vec{sp_mat(),sp_mat(),sp_mat(NB,NB)});
   block_G.push_back(block_sp_vec{-M_part[0][0],-M_part[0][1],sp_mat()});
   block_G.push_back(block_sp_vec{-M_part[1][0],-M_part[1][1],speye(NB,NB)});
+
+  Eigen::BiCGSTAB<eigen_sp_mat, Eigen::IncompleteLUT<double>> eigen_solver;
+
  
   // Start iteration
   double mean_comp, steplen;
@@ -194,16 +208,27 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
       arch.write(GH_SYSTEM_FILEPATH);
     }
 
-    // Solve and extract directions
-    eigen_sp_mat eigen_G = convert_sp_mat_arma_to_eigen(G);
-
+    // Solve and extract directions with an Eigen solver
+    eigen_sp_mat eigen_G = convert_sp_mat_arma_to_eigen(G + 0.75 * speye(size(G)));
+    eigen_vec eigen_h = convert_vec_arma_to_eigen(h);
+    clock_t eigen_solve_start = clock();
+    eigen_solver.compute(eigen_G);
+    eigen_vec eigen_dir = eigen_solver.solve(eigen_h);
+    double eigen_delta_t = (clock() - eigen_solve_start)
+      / (double)(CLOCKS_PER_SEC);
+    cout << "#iterations:     " << eigen_solver.iterations() << endl;
+    cout << "estimated error: " << eigen_solver.error()      << endl;
+    if(iter_verbose)
+      cout << "\t BICGSTAB solve time: " << eigen_delta_t << "s" << endl;
+    
+    // Solve and extract directions with SuperLU
     clock_t sp_solve_start = clock();
     vec dir = spsolve(G,h,"superlu",opts);
     double delta_t = (clock() - sp_solve_start)
       / (double)(CLOCKS_PER_SEC);
     total_solve_time += delta_t;
     if(iter_verbose)
-      cout << "\t Iteration solve time: " << delta_t << "s" << endl;
+      cout << "\t SuperLU solve time: " << delta_t << "s" << endl;
 
     assert((N+NB) == dir.n_elem);
     vec df = dir.head(NF);
