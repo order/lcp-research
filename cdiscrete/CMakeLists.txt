@@ -67,7 +67,7 @@ include_directories(${OPENBLAS_INCLUDE_DIR})
 
 include( CGAL_CreateSingleSourceCGALProgram )
 list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
-  "lcp.cpp" "discretizer.cpp" "solver.cpp" "basis.cpp")
+  "lcp.cpp" "discretizer.cpp" "solver.cpp" "basis.cpp" "sparse.cpp")
 
 # create_single_source_cgal_program("di_basis.cpp" "tri_mesh.cpp" "di.cpp"
 #   "refine.cpp" "solver.cpp" "smooth.cpp"

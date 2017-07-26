@@ -10,6 +10,10 @@
 using namespace std;
 using namespace arma;
 
+double time_delta(const clock_t & start){
+      return (clock() - start) / (double)(CLOCKS_PER_SEC);
+}
+
 void print_shape(const uvec & u){
   cout << '(' << u.n_elem << ')' << endl;
 }

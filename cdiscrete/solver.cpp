@@ -2,41 +2,9 @@
 #include <assert.h>
 #include <ctime>
 
-#include <Eigen/SparseLU>
-#include <Eigen/OrderingMethods>
-#include <iostream>
-#include <unsupported/Eigen/src/IterativeSolvers/Scaling.h>
-
 #include "io.h"
 #include "solver.h"
-
-eigen_sp_mat convert_sp_mat_arma_to_eigen(const sp_mat & M){
-  clock_t sp_convert_start = clock();
-
-  typedef Eigen::Triplet<double> T;
-  vector<T> tripletList;
-  tripletList.reserve(M.n_nonzero);
-  for(sp_mat::const_iterator it = M.begin(); it != M.end(); ++it)
-    {
-      tripletList.push_back(T(it.row(),it.col(),*it));
-    }
-  eigen_sp_mat eigen_M(M.n_rows,M.n_cols);
-  eigen_M.setFromTriplets(tripletList.begin(), tripletList.end());
-  double delta_t = (clock() - sp_convert_start)
-    / (double)(CLOCKS_PER_SEC);
-  cout << "ARMA->EIGEN CONVERT: " << delta_t << "s" << endl;
-  eigen_M.makeCompressed();
-  return eigen_M;
-}
-
-eigen_vec convert_vec_arma_to_eigen(const arma::vec & x){
-  clock_t sp_convert_start = clock();
-
-  typedef std::vector<double> stdvec;
-
-  stdvec stdx = conv_to<stdvec>::from(x);
-  return eigen_vec::Map(stdx.data(), stdx.size());
-}
+#include "sparse.h"
 
 
 double max_steplen(const vec & x,
@@ -123,11 +91,6 @@ SolverResult KojimaSolver::aug_solve(const LCP & lcp) const{
 SolverResult KojimaSolver::solve(const LCP & lcp,
                                  vec & x,
                                  vec & y) const{
-  superlu_opts opts;
-  opts.equilibrate = true;
-  opts.permutation = superlu_opts::COLAMD;
-  opts.refine = superlu_opts::REF_NONE;
-  opts.pivot_thresh = 1.0;
   
   vec q = lcp.q;
   sp_mat M = lcp.M + regularizer * speye(size(lcp.M));
@@ -174,10 +137,6 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
   block_G.push_back(block_sp_vec{-M_part[0][0],-M_part[0][1],sp_mat()});
   block_G.push_back(block_sp_vec{-M_part[1][0],-M_part[1][1],speye(NB,NB)});
 
-  Eigen::SparseLU<eigen_sp_mat,
-		  Eigen::COLAMDOrdering<int> > eigen_solver;
-  Eigen::IterScaling<eigen_sp_mat > scaling;
- 
   // Start iteration
   double mean_comp, steplen;
   double sigma = initial_sigma;
@@ -213,39 +172,13 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
       arch.write(GH_SYSTEM_FILEPATH);
     }
 
-    // Solve and extract directions with an Eigen solver
-    eigen_sp_mat eigen_G = convert_sp_mat_arma_to_eigen(G
-							+ 0*speye(size(G)));
-    eigen_vec eigen_h = convert_vec_arma_to_eigen(h);
-    clock_t eigen_solve_start = clock();
-    if(true){
-      clock_t analyze_start = clock();
-      eigen_solver.analyzePattern(eigen_G);
-      double analyze_delta_t = (clock() - analyze_start)
-	/ (double)(CLOCKS_PER_SEC);
-      cout << "\t EIGEN analyze time: " << analyze_delta_t << "s" << endl;
-    }
-    //scaling.computeRef(eigen_G);
-    //eigen_h = scaling.LeftScaling().cwiseProduct(eigen_h);
-    eigen_solver.factorize(eigen_G); 
-    eigen_vec eigen_dir = eigen_solver.solve(eigen_h);
-    //eigen_dir = scaling.RightScaling().cwiseProduct(eigen_dir);
-    double eigen_delta_t = (clock() - eigen_solve_start)
-      / (double)(CLOCKS_PER_SEC);
-    if(iter_verbose){
-      cout << "\t EIGEN solve time: " << eigen_delta_t << "s" << endl
-	   <<  "\t EIGEN solution res: "
-	   << (eigen_G * eigen_dir - eigen_h).norm() / eigen_h.norm() << endl;
-    }
-
-    // Solve and extract directions with SuperLU
+    // Solve and extract directions
     clock_t sp_solve_start = clock();
-    vec dir = spsolve(G,h,"superlu",opts);
-    double delta_t = (clock() - sp_solve_start)
-      / (double)(CLOCKS_PER_SEC);
+    vec dir = sparse_solve(G, h, SPARSE_SOLVER_EIGENLU);
+    double delta_t = time_delta(sp_solve_start);
     total_solve_time += delta_t;
     if(iter_verbose)
-      cout << "\t SuperLU solve time: " << delta_t << "s" << endl;
+      cout << "\t Sparse solve time: " << delta_t << "s" << endl;
 
     assert((N+NB) == dir.n_elem);
     vec df = dir.head(NF);

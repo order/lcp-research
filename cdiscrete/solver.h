@@ -8,11 +8,11 @@
 
 #define GH_SYSTEM_FILEPATH "/home/epz/scratch/test_gh_system.arch"
 
-typedef typename Eigen::SparseMatrix<double, Eigen::ColMajor> eigen_sp_mat;
-typedef typename Eigen::VectorXd eigen_vec;
+#define SPARSE_SOLVER_SUPERLU 0
+#define SPARSE_SOLVER_EIGENLU 1
+#define SPARSE_SOLVER_BICGSTAB 2
+#define SPARSE_SOLVER_GMRES 3
 
-eigen_sp_mat convert_sp_mat_arma_to_eigen(const arma::sp_mat & M);
-eigen_vec convert_vec_arma_to_eigen(const arma::vec & x);
 
 double max_steplen(const arma::vec & x,
                    const arma::vec & dx);

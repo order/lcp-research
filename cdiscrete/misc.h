@@ -11,6 +11,8 @@
 
 using namespace arma;
 
+double time_delta(const clock_t & start);
+
 void print_shape(const uvec & u);
 void print_shape(const vec & v);
 void print_shape(const mat & A);
