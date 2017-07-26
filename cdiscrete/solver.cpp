@@ -2,7 +2,10 @@
 #include <assert.h>
 #include <ctime>
 
-#include <Eigen/IterativeLinearSolvers>
+#include <Eigen/SparseLU>
+#include <Eigen/OrderingMethods>
+#include <iostream>
+#include <unsupported/Eigen/src/IterativeSolvers/Scaling.h>
 
 #include "io.h"
 #include "solver.h"
@@ -22,6 +25,7 @@ eigen_sp_mat convert_sp_mat_arma_to_eigen(const sp_mat & M){
   double delta_t = (clock() - sp_convert_start)
     / (double)(CLOCKS_PER_SEC);
   cout << "ARMA->EIGEN CONVERT: " << delta_t << "s" << endl;
+  eigen_M.makeCompressed();
   return eigen_M;
 }
 
@@ -170,8 +174,9 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
   block_G.push_back(block_sp_vec{-M_part[0][0],-M_part[0][1],sp_mat()});
   block_G.push_back(block_sp_vec{-M_part[1][0],-M_part[1][1],speye(NB,NB)});
 
-  Eigen::BiCGSTAB<eigen_sp_mat, Eigen::IncompleteLUT<double>> eigen_solver;
-
+  Eigen::SparseLU<eigen_sp_mat,
+		  Eigen::COLAMDOrdering<int> > eigen_solver;
+  Eigen::IterScaling<eigen_sp_mat > scaling;
  
   // Start iteration
   double mean_comp, steplen;
@@ -209,18 +214,30 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
     }
 
     // Solve and extract directions with an Eigen solver
-    eigen_sp_mat eigen_G = convert_sp_mat_arma_to_eigen(G + 0.75 * speye(size(G)));
+    eigen_sp_mat eigen_G = convert_sp_mat_arma_to_eigen(G
+							+ 0*speye(size(G)));
     eigen_vec eigen_h = convert_vec_arma_to_eigen(h);
     clock_t eigen_solve_start = clock();
-    eigen_solver.compute(eigen_G);
+    if(true){
+      clock_t analyze_start = clock();
+      eigen_solver.analyzePattern(eigen_G);
+      double analyze_delta_t = (clock() - analyze_start)
+	/ (double)(CLOCKS_PER_SEC);
+      cout << "\t EIGEN analyze time: " << analyze_delta_t << "s" << endl;
+    }
+    //scaling.computeRef(eigen_G);
+    //eigen_h = scaling.LeftScaling().cwiseProduct(eigen_h);
+    eigen_solver.factorize(eigen_G); 
     eigen_vec eigen_dir = eigen_solver.solve(eigen_h);
+    //eigen_dir = scaling.RightScaling().cwiseProduct(eigen_dir);
     double eigen_delta_t = (clock() - eigen_solve_start)
       / (double)(CLOCKS_PER_SEC);
-    cout << "#iterations:     " << eigen_solver.iterations() << endl;
-    cout << "estimated error: " << eigen_solver.error()      << endl;
-    if(iter_verbose)
-      cout << "\t BICGSTAB solve time: " << eigen_delta_t << "s" << endl;
-    
+    if(iter_verbose){
+      cout << "\t EIGEN solve time: " << eigen_delta_t << "s" << endl
+	   <<  "\t EIGEN solution res: "
+	   << (eigen_G * eigen_dir - eigen_h).norm() / eigen_h.norm() << endl;
+    }
+
     // Solve and extract directions with SuperLU
     clock_t sp_solve_start = clock();
     vec dir = spsolve(G,h,"superlu",opts);

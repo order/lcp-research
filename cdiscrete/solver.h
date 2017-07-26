@@ -8,8 +8,8 @@
 
 #define GH_SYSTEM_FILEPATH "/home/epz/scratch/test_gh_system.arch"
 
-typedef Eigen::SparseMatrix<double> eigen_sp_mat;
-typedef Eigen::VectorXd eigen_vec;
+typedef typename Eigen::SparseMatrix<double, Eigen::ColMajor> eigen_sp_mat;
+typedef typename Eigen::VectorXd eigen_vec;
 
 eigen_sp_mat convert_sp_mat_arma_to_eigen(const arma::sp_mat & M);
 eigen_vec convert_vec_arma_to_eigen(const arma::vec & x);
