@@ -191,6 +191,41 @@ sp_mat make_ball_basis(const Points & points,
   return basis;
 }
 
+
+mat make_rbf_basis(const TypedPoints & points,
+                   const Points & centers,
+                   double bandwidth,
+                   double cutoff_thresh){
+  uint N = points.n_rows;
+  uint K = centers.n_rows;
+  uint S = points.num_special_nodes();
+  
+  mat basis = zeros<mat>(N,K+1+S);
+  for(uint k = 0; k < K; k++){
+    basis.col(k) = gaussian(points.m_points, centers.row(k).t(), bandwidth);
+  }
+
+  basis.col(K) = ones<vec>(N); // All ones
+
+  if(S > 0){
+    uvec special_rows = points.get_special_mask();
+    uvec special_cols = regspace<uvec>(K + 1, K + 1 + S);
+    assert(S == special_rows.n_elem);
+    assert(S == special_cols.n_elem);
+    basis.rows(special_rows).fill(0); // Zero out special
+    basis.submat(special_rows, special_cols) = eye(S,S);
+  }
+  
+  basis(find(basis < cutoff_thresh)).fill(0);
+  basis = orth(basis); // Not ortho at all; need to do explicitly
+  if(basis.n_cols < (K+1+S)){
+    cerr << "WARNING: Basis degenerate... ("
+	 << basis.n_cols << "/" << (K + S + 1) << " cols )"  << endl;
+  }
+  return basis;
+}
+
+
 mat make_rbf_basis(const Points & points,
                    const Points & centers,
                    double bandwidth,
@@ -203,7 +238,8 @@ mat make_rbf_basis(const Points & points,
   for(uint k = 0; k < K; k++){
     basis.col(k) = gaussian(points,centers.row(k).t(),bandwidth);
   }
-  //basis(find(basis < cutoff_thresh)).fill(0);
+  
+  basis(find(basis < cutoff_thresh)).fill(0);
   basis = orth(basis); // Not ortho at all; need to do explicitly
   if(basis.n_cols < (K+1)){
     cerr << "WARNING: Basis degenerate..." << endl;

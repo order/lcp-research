@@ -56,6 +56,12 @@ mat make_rbf_basis(const Points & points,
                    const Points & centers,
                    double bandwidth,
 		   double cutoff_thresh=1e-6);
+
+mat make_rbf_basis(const TypedPoints & points,
+                   const Points & centers,
+                   double bandwidth,
+		   double cutoff_thresh=1e-6);
+
 sp_mat make_radial_fourier_basis(const Points & points,
                               uint K, double max_freq);
 
