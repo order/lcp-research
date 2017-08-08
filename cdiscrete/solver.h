@@ -8,10 +8,6 @@
 
 #define GH_SYSTEM_FILEPATH "/home/epz/scratch/test_gh_system.arch"
 
-#define SPARSE_SOLVER_SUPERLU 0
-#define SPARSE_SOLVER_EIGENLU 1
-#define SPARSE_SOLVER_BICGSTAB 2
-#define SPARSE_SOLVER_GMRES 3
 
 
 double max_steplen(const arma::vec & x,
@@ -67,6 +63,16 @@ class ProjectiveSolver{
   double regularizer;
   double aug_rel_scale;
   double initial_sigma;
+};
+
+class ValueIteration{
+ public:
+  ValueIteration();
+  vec solve(const vector<sp_mat> & blocks, double gamma, const mat & costs);
+
+  double change_thresh;
+  uint max_iter;
+  bool verbose;
 };
 
 #endif

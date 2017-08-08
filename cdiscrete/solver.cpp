@@ -376,3 +376,44 @@ SolverResult ProjectiveSolver::solve(const PLCP & plcp,
   }
   return SolverResult(x,y,iter);
 }
+
+
+ValueIteration::ValueIteration(){
+  max_iter = 1e6;
+  change_thresh = 1e-12;
+  verbose = false;
+}
+
+vec ValueIteration::solve(const vector<sp_mat> & blocks,
+			  double gamma, const mat & costs){
+  uint A = blocks.size();
+  assert(A > 0);
+
+  uint N = blocks.at(0).n_rows;
+  assert(N == blocks.at(0).n_cols);
+
+  assert(size(N,A) == size(costs));
+
+  vec v = zeros(N);
+  vec new_v = vec(N);
+  mat block_v = mat(N,A);
+  for(uint i = 0; i < max_iter; i++){
+    if(verbose){
+      cout << "---Iteration " << i << "---" << endl;
+    }
+
+    for(uint a = 0; a < A; a++){
+      block_v.col(a) = costs.col(a) + gamma * blocks.at(a) * v;
+    }
+
+    new_v = min(block_v, 1);
+    assert(N == new_v.n_elem);
+
+    if(norm(new_v - v) < change_thresh)
+      return new_v;
+    v = new_v;
+    
+  }
+  return v;
+  
+}
