@@ -25,7 +25,7 @@ class Simulator{
                                            uint num_samples=1) const = 0;
   virtual vector<sp_mat> lcp_blocks(const Discretizer *,
                                     const double gamma,
-                                    uint num_samples) const = 0;
+                                    uint num_samples=1) const = 0;
 
   virtual uint num_actions() const = 0;
   virtual uint dim_actions() const = 0;
@@ -51,7 +51,7 @@ class TypedSimulator{
                                            uint num_samples=1) const = 0;
   virtual vector<sp_mat> lcp_blocks(const TypedDiscretizer *,
                                     const double gamma,
-                                    uint num_samples) const = 0;
+                                    uint num_samples=1) const = 0;
 
   virtual uint num_actions() const = 0;
   virtual uint dim_actions() const = 0;

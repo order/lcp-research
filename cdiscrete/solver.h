@@ -68,7 +68,7 @@ class ProjectiveSolver{
 class ValueIteration{
  public:
   ValueIteration();
-  vec solve(const vector<sp_mat> & blocks, double gamma, const mat & costs);
+  vec solve(const vector<sp_mat> & p_blocks, double gamma, const mat & costs);
 
   double change_thresh;
   uint max_iter;

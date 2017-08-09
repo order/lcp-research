@@ -13,11 +13,13 @@ using namespace arma;
 using namespace std;
 
 #define GAMMA 0.997
-#define N_GRID_NODES 12
+#define N_XY_GRID_NODES 16
+#define N_T_GRID_NODES 8
 #define N_OOB_NODES 1
+#define N_SAMPLES 5
 #define B 1
 
-#define DATA_FILE_NAME "/home/epz/scratch/test.data"
+#define KOJIMA true
 
 mat build_bbox(){
   return mat {{-B,B},{-B,B},{-datum::pi, datum::pi}};
@@ -25,7 +27,7 @@ mat build_bbox(){
 
 RelativePlanesSimulator build_simulator(){
   mat bbox = build_bbox();
-  mat actions = mat{{0,0},{1,0},{-1,0}};
+  mat actions = mat{{1,0},{-1,0}};
   double noise_std = 0.1;
   double step = 0.01;
   double nmac_radius = 0.25;
@@ -36,14 +38,56 @@ RelativePlanesSimulator build_simulator(){
 // MAIN FUNCTION //
 ///////////////////
 
+
+void kojima_solve(const LCP & lcp, const mat & Q, uint N, uint A){
+  cout << "Solving with Kojima's LCP algorithm..." << endl;
+
+  KojimaSolver solver = KojimaSolver();
+  solver.comp_thresh = 1e-6;
+  solver.initial_sigma = 0.2;
+  solver.aug_rel_scale = 1.5;
+  solver.regularizer = 0;
+  solver.verbose = true;
+  solver.iter_verbose = true;
+  solver.save_system = true;
+
+
+  SolverResult ref_sol = solver.aug_solve(lcp);
+  mat ref_P = reshape(ref_sol.p,N,A+1);
+  mat ref_D = reshape(ref_sol.d,N,A+1);
+  
+  Archiver arch = Archiver();
+  arch.add_mat("ref_P",ref_P);
+  arch.add_mat("ref_D",ref_D);
+  arch.add_mat("Q",Q);
+  arch.write("/home/epz/scratch/plane_foo_kojima.data");
+}
+
+void value_iter_solve(const vector<sp_mat> & p_blocks, const mat & costs){
+  cout << "Solving with value iteration..." << endl;
+  ValueIteration solver = ValueIteration();
+  solver.change_thresh = 1e-12;
+  solver.max_iter = 1e8;
+  solver.verbose = true;
+  
+  vec v = solver.solve(p_blocks, GAMMA, costs); 
+  
+  Archiver arch = Archiver();
+  arch.add_vec("v", v);
+  arch.add_mat("costs", costs);
+  arch.write("/home/epz/scratch/plane_foo_value_iter.data");
+}
+
+
 int main(int argc, char** argv)
 {
   arma_rng::set_seed_random();
   
   // Set up 3D space
   mat bbox = build_bbox();
+  uvec grid_dim = {N_XY_GRID_NODES, N_XY_GRID_NODES, N_T_GRID_NODES};
   UniformGrid grid = UniformGrid(bbox,
-				 N_GRID_NODES * ones<uvec>(THREE_DIM),
+				 grid_dim,
 				 N_OOB_NODES);
   mat oob_bbox = {
     {-B,B},
@@ -73,59 +117,39 @@ int main(int argc, char** argv)
   RelativePlanesSimulator sim = build_simulator();
   uint A = sim.num_actions();
   assert(A >= 2);
-  
-  // Reference blocks
-  cout << "Building LCP blocks..." << endl;
-  vector<sp_mat> blocks = sim.lcp_blocks(&grid, GAMMA);
-  vector<sp_mat> p_blocks = sim.transition_blocks(&grid);
-  assert(A == blocks.size());
-  assert(size(N,N) == size(blocks.at(0)));
-  
-  // Build smoother
-  cout << "Building smoother matrix..." << endl;
-  sp_mat smoother = speye(N,N);
 
+  
   // Build Q matrix
   cout << "Building RHS Q..." << endl;
   mat Q = sim.q_mat(&grid);
-  cout << "size(Q): " << size(Q) << endl;
-  cout << "Expected size(Q): " << size(N,A+1) << endl;
-
   assert(size(N,A+1) == size(Q));
 
-  // Extract costs
-  mat costs = Q.tail_cols(A);
+  if(KOJIMA){
+    // Reference blocks
+    cout << "Building LCP blocks..." << endl;
+    vector<sp_mat> blocks = sim.lcp_blocks(&grid, GAMMA, N_SAMPLES);
+    assert(A == blocks.size());
+    assert(size(N,N) == size(blocks.at(0)));
+ 
+    // Free the cost function from non-neg constraints
+    bvec free_vars = zeros<bvec>((A+1)*N);
+    free_vars.head(N).fill(1);
 
-  // Free the cost function from non-neg constraints
-  bvec free_vars = zeros<bvec>((A+1)*N);
-  free_vars.head(N).fill(1);
+    // Build the LCP
+    sp_mat M = build_M(blocks);
+    cout << "Generated LCP matrix: " << size(M) << endl;
+    vec q = vectorise(Q);
+    LCP lcp = LCP(M,q,free_vars);
+    
+    kojima_solve(lcp, Q, N, A);
+  }
+  else{
+    cout << "Building transition blocks..." << endl;
+    vector<sp_mat> p_blocks = sim.transition_blocks(&grid, N_SAMPLES);
+    mat costs = Q.tail_cols(A);
 
-  // Build the LCP
-  sp_mat M = build_M(blocks);
-  cout << "Generated LCP matrix: " << size(M) << endl;
-  vec q = vectorise(Q);
-  LCP lcp = LCP(M,q,free_vars);
+    value_iter_solve(p_blocks, costs);
+  }
 
-  
-  KojimaSolver ref_solver = KojimaSolver();
-  ref_solver.comp_thresh = 1e-6;
-  ref_solver.initial_sigma = 0.2;
-  ref_solver.aug_rel_scale = 1.5;
-  ref_solver.regularizer = 1e-9;
-  ref_solver.verbose = true;
-  ref_solver.iter_verbose = true;
-  ref_solver.save_system = true;
-  
 
-  cout << "Reference solve..." << endl;
-  SolverResult ref_sol = ref_solver.aug_solve(lcp);
-  mat ref_P = reshape(ref_sol.p,N,A+1);
-  mat ref_D = reshape(ref_sol.d,N,A+1);
-  
-  Archiver arch = Archiver();
-  arch.add_mat("ref_P",ref_P);
-  arch.add_mat("ref_D",ref_D);
-  arch.add_sp_mat("M",M);
-  arch.add_mat("Q",Q);
-  arch.write(DATA_FILE_NAME);
 }

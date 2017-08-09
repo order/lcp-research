@@ -91,9 +91,14 @@ SolverResult KojimaSolver::aug_solve(const LCP & lcp) const{
 SolverResult KojimaSolver::solve(const LCP & lcp,
                                  vec & x,
                                  vec & y) const{
+
   
   vec q = lcp.q;
-  sp_mat M = lcp.M + regularizer * speye(size(lcp.M));
+  sp_mat M;
+  if(regularizer > 0)
+    M = lcp.M + regularizer * speye(size(lcp.M));
+  else
+    M = lcp.M;
   uint N = q.n_elem;
 
   assert(N == x.n_elem);
@@ -123,8 +128,6 @@ SolverResult KojimaSolver::solve(const LCP & lcp,
 
   // Split M matrix into blocks based on free and bound indicies
   block_sp_mat M_part = sp_partition(M,free_idx,bound_idx);
-  sp_mat M_recon = block_mat(M_part);
-  assert(PRETTY_SMALL > norm(M_recon - M));
   vec qf = q(free_idx);
   vec qb = q(bound_idx);
   vec b = x(bound_idx);
@@ -384,13 +387,19 @@ ValueIteration::ValueIteration(){
   verbose = false;
 }
 
-vec ValueIteration::solve(const vector<sp_mat> & blocks,
+vec ValueIteration::solve(const vector<sp_mat> & p_blocks,
 			  double gamma, const mat & costs){
-  uint A = blocks.size();
+  /*
+   * Run value iteration
+   * p_blocks: sparse transition blocks
+   * gamma: discount factor
+   * cost: cost matrix (action per column)
+   */
+  uint A = p_blocks.size();
   assert(A > 0);
 
-  uint N = blocks.at(0).n_rows;
-  assert(N == blocks.at(0).n_cols);
+  uint N = p_blocks.at(0).n_rows;
+  assert(N == p_blocks.at(0).n_cols);
 
   assert(size(N,A) == size(costs));
 
@@ -403,13 +412,20 @@ vec ValueIteration::solve(const vector<sp_mat> & blocks,
     }
 
     for(uint a = 0; a < A; a++){
-      block_v.col(a) = costs.col(a) + gamma * blocks.at(a) * v;
+      // c + g * P'v
+      block_v.col(a) = costs.col(a) + gamma * p_blocks.at(a).t() * v;
     }
 
     new_v = min(block_v, 1);
     assert(N == new_v.n_elem);
 
-    if(norm(new_v - v) < change_thresh)
+    double change = norm(new_v - v);
+    if(verbose){
+      cout << "\tChange: " << change << endl;
+    }
+		     
+		     
+    if(change < change_thresh)
       return new_v;
     v = new_v;
     

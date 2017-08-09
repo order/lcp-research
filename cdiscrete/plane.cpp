@@ -94,7 +94,8 @@ mat RelativePlanesSimulator::q_mat(const TypedDiscretizer * disc) const{
   return Q;
 }
 
-sp_mat RelativePlanesSimulator::transition_matrix(const TypedDiscretizer * disc,
+sp_mat RelativePlanesSimulator::transition_matrix(
+						  const TypedDiscretizer * disc,
 						  const vec & action,
 						  bool include_oob) const{
   TypedPoints points = disc->get_spatial_nodes();
@@ -115,7 +116,8 @@ sp_mat RelativePlanesSimulator::transition_matrix(const TypedDiscretizer * disc,
   return P;
 }
 
-vector<sp_mat> RelativePlanesSimulator::transition_blocks(const TypedDiscretizer * disc,
+vector<sp_mat> RelativePlanesSimulator::transition_blocks(
+							  const TypedDiscretizer * disc,
                                                             uint num_samples) const{
   vector<sp_mat> blocks;
   uint A = num_actions();
@@ -124,8 +126,10 @@ vector<sp_mat> RelativePlanesSimulator::transition_blocks(const TypedDiscretizer
   bool include_oob = false;
   uint n = disc->number_of_spatial_nodes();
   for(uint a = 0; a < A; a++){
+    cout << "Forming transition block for action " << a << "..." << endl;
     sp_mat T = sp_mat(n,n);
     for(uint s = 0; s < num_samples;s++){
+      cout << "\tSample " << s << "..." << endl;
       T += transition_matrix(disc,m_actions.row(a).t(),include_oob);
     }
     T /= (double)num_samples;

@@ -13,14 +13,17 @@ using namespace arma;
 using namespace std;
 
 #define GAMMA 0.997
-#define N_GRID_NODES 20
+#define N_XY_GRID_NODES 32
+#define N_T_GRID_NODES 16
 #define N_OOB_NODES 1
+#define N_SAMPLES 5
 #define B 1
 
-#define BASIS_G 4
-#define BASIS_BW 5.0
 
-#define DATA_FILE_NAME "/home/epz/scratch/test.data"
+#define BASIS_G 3
+#define BASIS_BW 10.0
+
+#define DATA_FILE_NAME "/home/epz/scratch/plane_refine.data"
 
 mat build_bbox(){
   return mat {{-B,B},{-B,B},{-datum::pi, datum::pi}};
@@ -43,7 +46,7 @@ mat make_basis(const TypedPoints & points){
 
 RelativePlanesSimulator build_simulator(){
   mat bbox = build_bbox();
-  mat actions = mat{{0,0},{1,0},{-1,0}};
+  mat actions = mat{{1,0},{-1,0}};
   double noise_std = 0.1;
   double step = 0.01;
   double nmac_radius = 0.25;
@@ -62,11 +65,11 @@ SolverResult find_solution(const sp_mat & basis,
   assert(size(N,A+1) == size(Q));
 
   ProjectiveSolver psolver = ProjectiveSolver();
-  psolver.comp_thresh = 1e-8;
+  psolver.comp_thresh = 1e-12;
   psolver.initial_sigma = 0.25;
   psolver.verbose = true;
   psolver.iter_verbose = true;
-  psolver.regularizer = 1e-12;
+  psolver.regularizer = 0;
   
   PLCP plcp = approx_lcp(sp_mat(basis),smoother,
                          blocks,Q,free_vars);
@@ -96,8 +99,9 @@ int main(int argc, char** argv)
   
   // Set up 3D space
   mat bbox = build_bbox();
+  uvec grid_dim = {N_XY_GRID_NODES, N_XY_GRID_NODES, N_T_GRID_NODES};
   UniformGrid grid = UniformGrid(bbox,
-				 N_GRID_NODES * ones<uvec>(THREE_DIM),
+				 grid_dim,
 				 N_OOB_NODES);
   mat oob_bbox = {
     {-B,B},
@@ -130,8 +134,7 @@ int main(int argc, char** argv)
   
   // Reference blocks
   cout << "Building LCP blocks..." << endl;
-  vector<sp_mat> blocks = sim.lcp_blocks(&grid, GAMMA);
-  vector<sp_mat> p_blocks = sim.transition_blocks(&grid);
+  vector<sp_mat> blocks = sim.lcp_blocks(&grid, GAMMA,N_SAMPLES);
   assert(A == blocks.size());
   assert(size(N,N) == size(blocks.at(0)));
   
@@ -164,6 +167,7 @@ int main(int argc, char** argv)
   Archiver arch = Archiver();
   arch.add_vec("p",sol.p);
   arch.add_vec("d",sol.d);
-  //arch.add_mat("basis", basis);
+  arch.add_vec("q",vectorise(Q));
+  arch.add_mat("basis", basis);
   arch.write(DATA_FILE_NAME);
 }
