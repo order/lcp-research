@@ -14,15 +14,15 @@ using namespace arma;
 using namespace std;
 
 #define GAMMA 0.997
-#define N_XY_GRID_NODES 20
-#define N_T_GRID_NODES 12
+#define N_XY_GRID_NODES 32
+#define N_T_GRID_NODES 16
 #define N_OOB_NODES 1
 #define N_SAMPLES 5
 #define B 1.5
 #define IGNORE_Q false
 
 
-#define BASIS_G 5
+#define BASIS_G 3
 #define BASIS_BW 10.0
 
 #define DATA_FILE_NAME "/home/epz/scratch/plane_refine.data"
