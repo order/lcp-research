@@ -122,7 +122,7 @@ add_executable (grid_tests grid_tests.cpp discretizer.cpp grid.cpp misc.cpp
   points.cpp)
 add_executable (points_tests points_tests.cpp misc.cpp points.cpp)
 add_executable (plane_foo grid.cpp plane_foo.cpp plane.cpp points.cpp ${COMMON_FILES})
-add_executable (plane_refine grid.cpp plane_refine.cpp plane.cpp points.cpp ${COMMON_FILES})
+add_executable (plane_refine grid.cpp plane_refine.cpp plane.cpp points.cpp refine.cpp ${COMMON_FILES})
 
 
 

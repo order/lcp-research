@@ -288,7 +288,7 @@ sp_mat make_fourier_basis(const Points & points,
 
 sp_mat make_voronoi_basis(const Points & points,
                        const Points & centers){
-  VoronoiBasis v_basis(points,centers);
+  VoronoiBasis v_basis(points, centers);
   return v_basis.get_basis();
 }
 
@@ -416,6 +416,8 @@ vector<sp_mat> make_freebie_flow_bases_ignore_q(const sp_mat & value_basis,
   vector<sp_mat> flow_bases;
   uint A = blocks.size();
   for(uint a = 0; a < A; a++){
+    cout << "\t\tMaking freebie flow basis " << a << " (ignoring q)..."
+	 << endl;
     sp_mat raw_basis = blocks.at(a).t() * value_basis;
     flow_bases.push_back(sp_mat(orth(mat(raw_basis))));
     // Orthonorm (TODO: do directly in sparse?)
@@ -430,6 +432,8 @@ vector<sp_mat> make_freebie_flow_bases(const sp_mat & value_basis,
   uint A = blocks.size();
   assert((A+1) == Q.n_cols);
   for(uint a = 0; a < A; a++){
+     cout << "\t\tMaking freebie flow basis " << a << "..."
+	  << endl;
     mat raw_basis = join_horiz(mat(blocks.at(a).t() * value_basis),
                                Q.col(a+1));
     flow_bases.push_back(sp_mat(orth(raw_basis)));
@@ -456,7 +460,10 @@ PLCP approx_lcp(const sp_mat & value_basis,
                 const sp_mat & smoother,
                 const vector<sp_mat> & blocks,
                 const mat & Q,
-                const bvec & free_vars){
+                const bvec & free_vars,
+		bool ignore_q){
+
+  cout << "Approximating LCP as PLCP..." << endl;
 
   //Sizing and checking
   uint n = smoother.n_rows;
@@ -470,25 +477,32 @@ PLCP approx_lcp(const sp_mat & value_basis,
   assert(n == value_basis.n_rows);
 
   // Smooth blocks
-  vector<sp_mat> sblocks = block_rmult(smoother,blocks);
+  cout << "\tSmoothing transition blocks..." << endl;
+  vector<sp_mat> sblocks = block_rmult(smoother, blocks);
 
   // Build freebie flow bases for the smoothed problem
-  bool ignore_q = false;
   vector<sp_mat> flow_bases;
   vec q;
+  cout << "\tForming freebie bases..." << endl;
   if(ignore_q){
+    cout << "\t\tIgnoring Q" << endl; 
     flow_bases = make_freebie_flow_bases_ignore_q(value_basis,
                                                   sblocks);
     // Project smoothed costs onto `freebie' basis
+    cout << "\t\tProjecting Q onto bases..." << endl;
     mat sQ = mat(size(Q));  
     sQ.col(0) = Q.col(0);
     for(uint a = 0; a < A; a++){
+      cout << "\t\t\tAction " << a << "..." << endl;
+
       sp_mat F = flow_bases.at(a);
-      sQ.col(a+1) = F * F.t() * smoother * Q.col(a+1);
+      sQ.col(a+1) = F * (F.t() * (smoother * Q.col(a+1)));
     }
     q = vectorise(sQ);
   }
   else{
+    cout << "\t\tUsing Q" << endl; 
+
     mat sQ = mat(size(Q));  
     sQ.col(0) = Q.col(0);
     sQ.tail_cols(A) = smoother * Q.tail_cols(A);
@@ -498,6 +512,7 @@ PLCP approx_lcp(const sp_mat & value_basis,
                                          sblocks,
                                          sQ);
   }
+  cout << "\tBuilding block diagonal Phi..." << endl;
   // Build the basis blocks and the basis matrix
   block_sp_vec p_blocks;
   p_blocks.reserve(A + 1);
@@ -508,9 +523,10 @@ PLCP approx_lcp(const sp_mat & value_basis,
   assert((A+1) == p_blocks.size());
   sp_mat P = block_diag(p_blocks);
 
+  cout << "\tForming coefficients U..." << endl;
   // Build LCP matrix M and the U coefficient matrix
-  sp_mat M = build_M(sblocks);// + 1e-10 * speye(N,N); // Regularize
-  sp_mat U = P.t() * M * P * P.t();
+  sp_mat M = build_M(sblocks);
+  sp_mat U = P.t() * M; // * P * P.t();
   return PLCP(P,U,q,free_vars);
 
 }

@@ -55,12 +55,12 @@ sp_mat make_ball_basis(const Points & points,
 mat make_rbf_basis(const Points & points,
                    const Points & centers,
                    double bandwidth,
-		   double cutoff_thresh=1e-6);
+		   double cutoff_thresh=1e-5);
 
 mat make_rbf_basis(const TypedPoints & points,
                    const Points & centers,
                    double bandwidth,
-		   double cutoff_thresh=1e-6);
+		   double cutoff_thresh=1e-5);
 
 sp_mat make_radial_fourier_basis(const Points & points,
                               uint K, double max_freq);
@@ -117,6 +117,7 @@ PLCP approx_lcp(const sp_mat & value_basis,
                 const sp_mat & smoother,
                 const vector<sp_mat> & blocks,
                 const mat & Q,
-                const bvec & free_vars);
+                const bvec & free_vars,
+		bool ignore_q);
 
 #endif

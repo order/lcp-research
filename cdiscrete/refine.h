@@ -23,6 +23,13 @@ vec bellman_residual_at_nodes(const Discretizer * disc,
 			      int steps = 0,
 			      uint samples = 25);
 
+vec bellman_residual_at_nodes(const TypedDiscretizer * disc,
+			      const TypedSimulator * sim,
+			      const vec & values,
+			      double gamma,
+			      int steps = 0,
+			      uint samples = 25);
+
 vec bellman_residual_at_centers(const Discretizer * disc,
 				const Simulator * sim,
 				const vec & values,

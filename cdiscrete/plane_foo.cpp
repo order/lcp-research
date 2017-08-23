@@ -13,13 +13,13 @@ using namespace arma;
 using namespace std;
 
 #define GAMMA 0.997
-#define N_XY_GRID_NODES 16
-#define N_T_GRID_NODES 8
+#define N_XY_GRID_NODES 32
+#define N_T_GRID_NODES 16
 #define N_OOB_NODES 1
 #define N_SAMPLES 5
-#define B 1
+#define B 1.5
 
-#define KOJIMA true
+#define KOJIMA false
 
 mat build_bbox(){
   return mat {{-B,B},{-B,B},{-datum::pi, datum::pi}};
@@ -27,7 +27,7 @@ mat build_bbox(){
 
 RelativePlanesSimulator build_simulator(){
   mat bbox = build_bbox();
-  mat actions = mat{{1,0},{-1,0}};
+  mat actions = mat{{1,0},{0,0},{-1,0}};
   double noise_std = 0.1;
   double step = 0.01;
   double nmac_radius = 0.25;
@@ -66,7 +66,7 @@ void kojima_solve(const LCP & lcp, const mat & Q, uint N, uint A){
 void value_iter_solve(const vector<sp_mat> & p_blocks, const mat & costs){
   cout << "Solving with value iteration..." << endl;
   ValueIteration solver = ValueIteration();
-  solver.change_thresh = 1e-12;
+  solver.change_thresh = 1e-6;
   solver.max_iter = 1e8;
   solver.verbose = true;
   

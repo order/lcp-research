@@ -164,3 +164,52 @@ mat estimate_Q(const Points & points,
   return Q;
 }
 
+mat estimate_Q(const TypedPoints & points,
+               const TypedDiscretizer * disc,
+               const TypedSimulator * sim,
+               const vec & values,
+               double gamma,
+               int steps,
+               uint samples){
+  assert(steps >= 0);
+  uint N = points.n_rows;
+  uint D = points.n_cols;
+  
+  mat Q = sim->get_costs(points);
+  assert(N == Q.n_rows);
+  uint A = Q.n_cols;
+  
+  mat actions = sim->get_actions();
+  assert(A == actions.n_rows);
+  uint Ad = actions.n_cols;
+
+  vec next_v;
+  mat next_Q;  
+  for(uint a = 0; a < A; a++){
+    vec action = actions.row(a).t();
+    next_v = zeros<vec>(N);
+    if(steps > 0){
+      next_Q = zeros<mat>(N,A);
+    }
+    
+    // Averages over samples
+    for(uint i = 0; i < samples; i++){
+      TypedPoints next_points = sim->next(points, action);
+      if(steps == 0){
+        next_v += disc->interpolate(next_points, values);
+      }
+      else{
+        next_Q += estimate_Q(next_points,disc,sim,
+                             values,gamma,
+                             steps-1,
+                             samples);
+      }
+    }
+    if(steps > 0){
+      next_v = min(next_Q,1);
+    }
+    next_v /= (double) samples;
+    Q.col(a) += gamma * next_v;
+  }
+  return Q;
+}

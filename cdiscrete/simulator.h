@@ -81,4 +81,12 @@ mat estimate_Q(const Points & points,
                int steps=0,
                uint samples=25);
 
+mat estimate_Q(const TypedPoints & points,
+               const TypedDiscretizer * mesh,
+               const TypedSimulator * sim,
+               const vec & values,
+               double gamma,
+               int steps=0,
+               uint samples=25);
+
 #endif
