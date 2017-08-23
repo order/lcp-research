@@ -33,6 +33,7 @@ class Discretizer{
 
 class TypedDiscretizer{
  public:
+  virtual TypedPoints get_all_nodes() const = 0;
   virtual TypedPoints get_spatial_nodes() const = 0;
   virtual TypedPoints get_cell_centers() const = 0;
   virtual umat get_cell_node_indices() const = 0;

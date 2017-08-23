@@ -72,6 +72,7 @@ class UniformGrid : public TypedDiscretizer{
 	      const arma::uvec & num_cells, // Resolution (in cells) of discretization
 	      uint special_nodes); // Number of special (i.e. oob) nodes 
 
+  TypedPoints get_all_nodes() const;
   TypedPoints get_spatial_nodes() const;
   TypedPoints get_cell_centers() const;
   arma::umat get_cell_node_indices() const;

@@ -75,22 +75,20 @@ TypedPoints RelativePlanesSimulator::next(const TypedPoints & points,
   r_points.col(1) = sin(phi) * t_points.col(0) + cos(phi) * t_points.col(1);
   r_points.col(2) = theta + h * (v - u);
 
+  //Just copy registry over; remapping happens in points_to_element_dist.
   return TypedPoints(r_points, points.m_reg);
 }
 
 mat RelativePlanesSimulator::q_mat(const TypedDiscretizer * disc) const{
-  TypedPoints points = disc->get_spatial_nodes();
-  uint N = disc->number_of_spatial_nodes();
-  assert(disc->number_of_all_nodes() == N + 1);
+  TypedPoints points = disc->get_all_nodes();
+  uint N = disc->number_of_all_nodes();
+  assert(N == disc->number_of_spatial_nodes() + 1);
   uint A = num_actions();
   
-  mat Q = mat(N,A+1); // Ignore the OOB node
-  
-  // Set the state-weight component
+  mat Q = mat(N,A+1);
   Q.col(0) = -get_state_weights(points);
-
-  // Fill in costs. OOB has 0 cost (success!).
   Q.tail_cols(A) = get_costs(points);
+  
   return Q;
 }
 
@@ -103,14 +101,17 @@ sp_mat RelativePlanesSimulator::transition_matrix(
   uint N = disc->number_of_all_nodes();
   assert(N == n + 1); // single oob node
   
-  TypedPoints p_next = next(points,action);
+  TypedPoints p_next = next(points, action);
   ElementDist P = disc->points_to_element_dist(p_next);  
   assert(size(n,N) == size(P));
 
   // Final row is the OOB row
-  assert(!include_oob);
   if(!include_oob){
-    P = resize(P,n,n); // crop; sub probability matrix
+    P.resize(n,n); // crop; sub probability matrix
+  }
+  else{
+    P.resize(N,N);
+    P(N-1,N-1) = 1.0;
   }
   
   return P;
@@ -122,17 +123,32 @@ vector<sp_mat> RelativePlanesSimulator::transition_blocks(
   vector<sp_mat> blocks;
   uint A = num_actions();
 
-  // Swap out if there are oob
-  bool include_oob = false;
+  bool include_oob = true;  // Promote to a MACRO
+  cout << "Include out-of-bound nodes: " << include_oob << endl;
   uint n = disc->number_of_spatial_nodes();
+  uint N = disc->number_of_all_nodes();
+  assert(N == n+1);
+  
   for(uint a = 0; a < A; a++){
     cout << "Forming transition block for action " << a << "..." << endl;
-    sp_mat T = sp_mat(n,n);
+    sp_mat T;
+    if(include_oob){
+      T = sp_mat(N,N);
+    }
+    else{
+      T = sp_mat(n,n);
+    }
     for(uint s = 0; s < num_samples;s++){
       cout << "\tSample " << s << "..." << endl;
-      T += transition_matrix(disc,m_actions.row(a).t(),include_oob);
+      T += transition_matrix(disc,m_actions.row(a).t(), include_oob);
     }
     T /= (double)num_samples;
+    if(include_oob){
+      assert(size(N,N) == size(T));
+    }
+    else{
+      assert(size(n,n) == size(T));
+    }
     blocks.push_back(T);
   }
   return blocks;
@@ -142,8 +158,8 @@ vector<sp_mat> RelativePlanesSimulator::lcp_blocks(const TypedDiscretizer * disc
 						   const double gamma,
 						   uint num_samples) const{
   uint A = num_actions();
-  uint N = disc->number_of_spatial_nodes(); // Not using oob
-  vector<sp_mat> blocks = transition_blocks(disc,num_samples);
+  uint N = disc->number_of_all_nodes(); // Not using oob
+  vector<sp_mat> blocks = transition_blocks(disc, num_samples);
   assert(A == blocks.size());
 
   for(uint a = 0; a < A; a++){

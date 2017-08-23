@@ -209,7 +209,7 @@ mat make_rbf_basis(const TypedPoints & points,
 
   if(S > 0){
     uvec special_rows = points.get_special_mask();
-    uvec special_cols = regspace<uvec>(K + 1, K + 1 + S);
+    uvec special_cols = regspace<uvec>(K + 1, K + S); // regspace include end
     assert(S == special_rows.n_elem);
     assert(S == special_cols.n_elem);
     basis.rows(special_rows).fill(0); // Zero out special

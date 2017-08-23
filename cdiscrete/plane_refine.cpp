@@ -14,8 +14,8 @@ using namespace arma;
 using namespace std;
 
 #define GAMMA 0.997
-#define N_XY_GRID_NODES 32
-#define N_T_GRID_NODES 16
+#define N_XY_GRID_NODES 8
+#define N_T_GRID_NODES 4
 #define N_OOB_NODES 1
 #define N_SAMPLES 5
 #define B 1.5
@@ -125,8 +125,8 @@ int main(int argc, char** argv)
     {-datum::pi, datum::pi}
   };
 
-  //grid.m_rule_list.emplace_back(new OutOfBoundsRule(oob_bbox,1));
-  grid.m_remap_list.emplace_back(new SaturateRemapper(oob_bbox));
+  grid.m_rule_list.emplace_back(new OutOfBoundsRule(oob_bbox,1));
+  //grid.m_remap_list.emplace_back(new SaturateRemapper(oob_bbox));
   grid.m_remap_list.emplace_back(new WrapRemapper(angle_bbox));
 
   cout << "Spatial nodes: " << grid.number_of_spatial_nodes() << endl;
@@ -134,10 +134,11 @@ int main(int argc, char** argv)
 
 
   
-  TypedPoints points = grid.get_spatial_nodes();
+  TypedPoints points = grid.get_all_nodes();
   uint N = points.n_rows;
   cout << "Generated " << N << " spatial nodes" << endl;
-  assert(N == grid.number_of_spatial_nodes());
+  assert(N == grid.number_of_all_nodes());
+  assert(N == grid.number_of_spatial_nodes() + 1);
   assert(N > 0);
   
   RelativePlanesSimulator sim = build_simulator();

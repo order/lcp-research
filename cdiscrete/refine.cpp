@@ -33,23 +33,13 @@ vec bellman_residual_at_nodes(const Discretizer * disc,
 				int steps,
 				uint samples){
   
-  uint n = disc->number_of_spatial_nodes();
-  uint N = disc->number_of_all_nodes();
-  assert(N == (n+1));
-  double max_val = 1.0 / (1.0 - gamma);
-
-  vec V;
-  if(n == values.n_elem){
-    V = join_vert(values, vec{max_val}); // Pad
-  }
-  else{
-    V = values;
-  }
+  uint N = disc->number_of_spatial_nodes();
+  assert(N == values.n_elem);
 
   Points nodes = disc->get_spatial_nodes();
-  mat Q = estimate_Q(nodes,disc,sim,V,
-                     gamma,steps,samples);
-  assert(n == Q.n_rows);
+  mat Q = estimate_Q(nodes, disc, sim, values,
+                     gamma, steps, samples);
+  assert(N == Q.n_rows);
   
   vec v_q_est = min(Q,1);
   return v_q_est - values;
@@ -62,23 +52,13 @@ vec bellman_residual_at_nodes(const TypedDiscretizer * disc,
 			      int steps,
 			      uint samples){
   
-  uint n = disc->number_of_spatial_nodes();
   uint N = disc->number_of_all_nodes();
-  assert(N == (n+1));
-  double max_val = 1.0 / (1.0 - gamma);
+  assert(N == values.n_elem);
 
-  vec V;
-  if(n == values.n_elem){
-    V = join_vert(values, vec{max_val}); // Pad
-  }
-  else{
-    V = values;
-  }
-
-  TypedPoints nodes = disc->get_spatial_nodes();
-  mat Q = estimate_Q(nodes, disc, sim, V,
+  TypedPoints nodes = disc->get_all_nodes();
+  mat Q = estimate_Q(nodes, disc, sim, values,
                      gamma, steps, samples);
-  assert(n == Q.n_rows);
+  assert(N == Q.n_rows);
   
   vec v_q_est = min(Q,1);
   return v_q_est - values;

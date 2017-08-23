@@ -364,6 +364,28 @@ UniformGrid::UniformGrid(const vec & low,
 		      "absdiff", PRETTY_SMALL));
 }
 
+TypedPoints UniformGrid::get_all_nodes() const{
+  TypedPoints points = get_spatial_nodes();
+  uint N = number_of_all_nodes();
+  uint n = number_of_spatial_nodes();
+
+  assert(n == points.num_spatial_nodes());
+  assert(N == points.num_spatial_nodes() + n_special_nodes);
+  assert(0 == points.num_special_nodes());
+
+  // Add in the canonical special nodes
+  points.m_points.resize(N, points.n_cols);
+  points.m_points.tail_rows(n_special_nodes).fill(points.SPECIAL_FILL);
+  points.n_rows += n_special_nodes;
+  assert(points.n_rows == points.m_points.n_rows);
+  
+  for(uint i = 0; i < n_special_nodes; i++){
+    assert(i + n < N);
+    points.m_reg[i + n] = i; 
+  }
+  
+  return points;
+}
 
 TypedPoints UniformGrid::get_spatial_nodes() const{
   /*
