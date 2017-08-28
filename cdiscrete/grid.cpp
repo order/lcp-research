@@ -381,7 +381,7 @@ TypedPoints UniformGrid::get_all_nodes() const{
   
   for(uint i = 0; i < n_special_nodes; i++){
     assert(i + n < N);
-    points.m_reg[i + n] = i; 
+    points.m_reg[i + n] = i + 1; // Spatial nodes 0; special nodes +ve
   }
   
   return points;
@@ -530,6 +530,8 @@ umat UniformGrid::cell_coords_to_vertex_indices(const Coords & coords) const{
 Coords UniformGrid::points_to_cell_coords(const TypedPoints & not_bounded_points) const{
   // Takes in points, spits out cell coords
   TypedPoints points = apply_rules_and_remaps(not_bounded_points);
+  assert(points.check_validity());
+ 
   uvec spatial_idx = points.get_spatial_mask();
   uvec special_idx = points.get_special_mask();
   assert(points.check_in_bbox(m_low, m_high));
@@ -579,10 +581,15 @@ TypedPoints UniformGrid::points_to_low_points(const TypedPoints & points) const{
 
 
 TypedPoints UniformGrid::apply_rules_and_remaps(const TypedPoints & points) const{
+  assert(points.check_validity());
   TypedPoints remixed_points = TypedPoints(points);
+  assert(remixed_points.m_reg == points.m_reg);
+  
   assert(remixed_points.equals(points));
   remixed_points.apply_remappers(m_remap_list); // Remap first
   remixed_points.apply_typing_rules(m_rule_list);
+  
+  assert(remixed_points.check_validity());
   return remixed_points;
 }
 

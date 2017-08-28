@@ -14,12 +14,15 @@ using namespace arma;
 using namespace std;
 
 #define GAMMA 0.997
-#define N_XY_GRID_NODES 8
-#define N_T_GRID_NODES 4
+#define N_XY_GRID_NODES 32
+#define N_T_GRID_NODES 16
 #define N_OOB_NODES 1
 #define N_SAMPLES 5
 #define B 1.5
 #define IGNORE_Q false
+
+#define COMP_THRESH 1e-12
+#define NUM_ADD_ROUNDS 4
 
 
 #define BASIS_G 3
@@ -75,7 +78,7 @@ SolverResult find_solution(const sp_mat & basis,
   assert(size(N,A+1) == size(Q));
 
   ProjectiveSolver psolver = ProjectiveSolver();
-  psolver.comp_thresh = 1e-12;
+  psolver.comp_thresh = COMP_THRESH;
   psolver.initial_sigma = 0.25;
   psolver.verbose = true;
   psolver.iter_verbose = true;
@@ -174,43 +177,55 @@ int main(int argc, char** argv)
   sp_mat basis = make_basis(points);
   mat dense_basis = mat(basis);
 
-  cout << "Finding a solution..." << endl;
-  SolverResult sol = find_solution(basis, smoother, blocks, Q, free_vars);
-  mat P = reshape(sol.p, N, A+1);
-  mat D = reshape(sol.d, N, A+1);
-  vec V = P.col(0);
-  mat F = P.tail_cols(A);
+  cube primals = cube(N,A+1,NUM_ADD_ROUNDS+1);
+  cube duals = cube(N,A+1,NUM_ADD_ROUNDS+1);
+  cube added_bases = cube(N,A,NUM_ADD_ROUNDS);
 
-  vec res = find_residual(grid, sim, P);
-  uvec pi = index_max(F, 1);
-  
-  // SECOND ROUND
-  cout << "SECOND ROUND..." << endl;
-  mat new_bases = mat(N, A);
-  for(uint a = 0; a < A; a++){
-    vec heur = res;
-    uvec mask = find(a == pi);
-    heur(mask).fill(0); // mask out
-    cout << "\tForming residual basis element " << a << "..." << endl;
-    new_bases.col(a) = spsolve(smoother * blocks.at(a).t(), heur);
-    Archiver basis_arch = Archiver();
-    basis_arch.add_mat("basis", new_bases);
-    basis_arch.write("/home/epz/scratch/basis.data");   
+  for(uint I = 0; I < NUM_ADD_ROUNDS; I++){
+        cout << "Running " << I << "/" << NUM_ADD_ROUNDS  << endl;
+
+	cout << "\tFinding a solution..." << endl;
+	SolverResult sol = find_solution(basis,
+					 smoother,
+					 blocks,
+					 Q,
+					 free_vars);
+	mat P = reshape(sol.p, N, A+1);
+	mat D = reshape(sol.d, N, A+1);
+	primals.slice(I) = P;
+	duals.slice(I) = D;
+
+	if(NUM_ADD_ROUNDS == I + 1){
+	  break; // Final Round
+	}
+	
+	vec res = find_residual(grid, sim, P);
+	vec bellman_res_norm = vec{
+	  norm(res,1),
+	  norm(res,2),
+	  norm(res,"inf")};
+	cout << "\tBellman residual norm:" << bellman_res_norm.t() << endl;
+	
+	uvec pi = index_max(P.tail_cols(A), 1);
+	mat new_bases = mat(N, A);
+	for(uint a = 0; a < A; a++){
+	  vec heur = res;
+	  uvec mask = find(a == pi);
+	  heur(mask).fill(0); // mask out
+	  cout << "\tForming residual basis element " << a << "..." << endl;
+	  new_bases.col(a) = spsolve(smoother * blocks.at(a).t(), heur);
+	}
+	added_bases.slice(I) = new_bases;
+
+	cout << "Orthgonalizing and appending..." << endl;
+	dense_basis = join_horiz(dense_basis, new_bases);
+	dense_basis = orth(dense_basis);
+	basis = sp_mat(basis);
   }
-
-  cout << "Orthgonalizing and appending..." << endl;
-  dense_basis = join_horiz(dense_basis, new_bases);
-  dense_basis = orth(dense_basis);
-  basis = sp_mat(basis);
-
-  cout << "Finding a (second) solution..." << endl;
-  sol = find_solution(basis, smoother, blocks, Q, free_vars);
   
   Archiver arch = Archiver();
-  arch.add_vec("p", sol.p);
-  arch.add_vec("d", sol.d);
-  arch.add_vec("q", vectorise(Q));
-  arch.add_sp_mat("basis", basis);
-  arch.add_vec("res", res);
+  arch.add_cube("primals", primals);
+  arch.add_cube("duals", duals);
+  arch.add_cube("added_bases", added_bases);
   arch.write(DATA_FILE_NAME);
 }

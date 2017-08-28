@@ -171,6 +171,8 @@ mat estimate_Q(const TypedPoints & points,
                double gamma,
                int steps,
                uint samples){
+  assert(points.check_validity());
+  
   assert(steps >= 0);
   uint N = points.n_rows;
   uint D = points.n_cols;
@@ -195,6 +197,8 @@ mat estimate_Q(const TypedPoints & points,
     // Averages over samples
     for(uint i = 0; i < samples; i++){
       TypedPoints next_points = sim->next(points, action);
+      assert(next_points.check_validity());
+
       if(steps == 0){
         next_v += disc->interpolate(next_points, values);
       }

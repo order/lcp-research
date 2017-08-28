@@ -137,6 +137,7 @@ void TypedPoints::apply_typing_rule(const TypeRule & rule){
     m_reg[it.first] = it.second;
     m_points.row(it.first).fill(datum::nan);
   }
+  assert(check_validity());
 }
 
 void TypedPoints::apply_typing_rules(const TypeRuleList & rules){
@@ -146,10 +147,12 @@ void TypedPoints::apply_typing_rules(const TypeRuleList & rules){
   for(auto const & it : rules){
     apply_typing_rule(*it);
   }
+
 }
 
 void TypedPoints::apply_remapper(const NodeRemapper & remapper){
   remapper.remap(m_points);
+  assert(check_validity());
 }
 
 void TypedPoints::apply_remappers(const NodeRemapperList & remappers){
@@ -172,6 +175,12 @@ bool TypedPoints::check_validity() const{
       assert(m_reg.at(i) > SPATIAL_TYPE); // Special types not Euclidean
     }
   }
+
+  for(auto const & it : m_reg){
+    assert(it.first < N); // Valid index
+    assert(it.second > SPATIAL_TYPE); // Special nodes only.
+  }
+  return true;
 }
 
 bool TypedPoints::check_in_bbox(const mat & bbox) const{
@@ -250,6 +259,7 @@ OutOfBoundsRule::OutOfBoundsRule(const mat & bounding_box,
 				 uint oob_type) :
   m_bbox(bounding_box), m_type(oob_type) {
   assert(check_bbox(m_bbox));
+  assert(oob_type > TypedPoints::SPATIAL_TYPE);
 }
 
 TypeRegistry OutOfBoundsRule::type_elements(const mat & points) const{
@@ -277,6 +287,7 @@ TypeRegistry OutOfBoundsRule::type_elements(const mat & points) const{
 
   TypeRegistry ret;
   for(auto const & it : violations){
+    assert(m_type > TypedPoints::SPATIAL_TYPE);
     ret[it] = m_type;
   }
   return ret;
