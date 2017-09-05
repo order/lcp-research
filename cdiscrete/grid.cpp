@@ -669,7 +669,7 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & not_bounded_
   scalar_min_inplace(rel_dist, 1); // Ensure [0,1]
   
 
-  uint N = points.m_points.n_rows;
+  uint N = points.n_rows;
   uint D = n_dim;
   uint V = pow(2.0,D);
   uint halfV = pow(2.0,D-1);
@@ -694,7 +694,7 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & not_bounded_
   assert(all(all(weights >= 0)));
   assert(all(all(weights <= 1)));
 
-  #ifndef NDEBUG
+#ifndef NDEBUG
   // Check the weights of the low and high nodes.
   // position 0 -> 00...0 is the low node, so weight should be prod(rel_dist)
   // position V-1 -> 11...1, so weight should be prod(1-rel_dist)
@@ -705,7 +705,7 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & not_bounded_
 		      low_node_weights,"absdiff",1e-12));
   assert(approx_equal(weights.submat(spatial_mask, uvec{V-1}),
 		      hi_node_weights,"absdiff",1e-12));
-  #endif
+#endif
 
   // Sparsify
   for(uint d = 0; d < D; d++){
@@ -719,8 +719,8 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & not_bounded_
   uint n_nodes = number_of_all_nodes();
   
   ElementDist distrib = build_sparse_dist(n_nodes, vert_indices, weights);
-  assert(N == distrib.n_rows);
-  assert(number_of_all_nodes() == distrib.n_cols);
+  assert(N == distrib.n_cols);
+  assert(number_of_all_nodes() == distrib.n_rows);
   return distrib; 
 }
 
@@ -792,16 +792,16 @@ ElementDist build_sparse_dist(uint n_nodes, umat vert_indices, mat weights){
       // Currently assume that there is a unique special node with all the
       // weight.
       assert(norm(weights(i,0) - 1) < PRETTY_SMALL); // All weight
-      v_row.push_back(i);
-      v_col.push_back(uni(0));
+      v_col.push_back(i);
+      v_row.push_back(uni(0));
       v_data.push_back(1.0);
     }
     else{
       assert(V == uni.n_elem); // Proper spatial dist
       assert((sum(weights.row(i)) - 1.0) < PRETTY_SMALL); // Transition
       for(uint j = 0; j < V; j++){
-	v_row.push_back(i);
-	v_col.push_back(vert_indices(i,j));
+	v_col.push_back(i);
+	v_row.push_back(vert_indices(i,j));
 	v_data.push_back(weights(i,j));
       }
     }
@@ -814,6 +814,6 @@ ElementDist build_sparse_dist(uint n_nodes, umat vert_indices, mat weights){
   vec data = vec(v_data);
   double rel_error = abs(sum(data) - N) / N;
   assert(rel_error < PRETTY_SMALL);
-  return sp_mat(loc,data,N,n_nodes);
+  return sp_mat(loc,data,n_nodes,N);
 }
 				      

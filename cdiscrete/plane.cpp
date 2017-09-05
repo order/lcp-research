@@ -103,7 +103,7 @@ sp_mat RelativePlanesSimulator::transition_matrix(
   
   TypedPoints p_next = next(points, action);
   ElementDist P = disc->points_to_element_dist(p_next);  
-  assert(size(n,N) == size(P));
+  assert(size(N,n) == size(P));
 
   // Final row is the OOB row
   if(!include_oob){
@@ -112,7 +112,13 @@ sp_mat RelativePlanesSimulator::transition_matrix(
   else{
     P.resize(N,N);
     P(N-1,N-1) = 1.0;
+
+#ifndef NDEBUG
+    for(uint i = 0; i < N; i++){
+      assert(abs(1.0 - accu(P.col(i))) < PRETTY_SMALL); 
+    }
   }
+#endif
   
   return P;
 }

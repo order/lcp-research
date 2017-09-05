@@ -14,19 +14,19 @@ using namespace arma;
 using namespace std;
 
 #define GAMMA 0.997
-#define N_XY_GRID_NODES 32
-#define N_T_GRID_NODES 16
+#define N_XY_GRID_NODES 8
+#define N_T_GRID_NODES 8
 #define N_OOB_NODES 1
 #define N_SAMPLES 5
-#define B 1.5
+#define B 1
 #define IGNORE_Q false
 
 #define COMP_THRESH 1e-12
-#define NUM_ADD_ROUNDS 4
+#define NUM_ADD_ROUNDS 2
 
 
 #define BASIS_G 3
-#define BASIS_BW 10.0
+#define BASIS_BW 1.0
 
 #define DATA_FILE_NAME "/home/epz/scratch/plane_refine.data"
 
@@ -34,8 +34,9 @@ mat build_bbox(){
   return mat {{-B,B},{-B,B},{-datum::pi, datum::pi}};
 }
 
-sp_mat make_basis(const TypedPoints & points){
+mat make_basis(const TypedPoints & points){
   uint N = points.n_rows;
+  cout << points.m_points << endl;
 
   // General basis
   vector<vec> grids;
@@ -43,11 +44,13 @@ sp_mat make_basis(const TypedPoints & points){
   grids.push_back(linspace<vec>(-B,B,BASIS_G));
   grids.push_back(linspace<vec>(-datum::pi,datum::pi,BASIS_G));
   Points grid_points = make_points<mat,vec>(grids);
-  
-  sp_mat basis = sp_mat(make_rbf_basis(points, grid_points, BASIS_BW));
-  //sp_mat basis = make_voronoi_basis(points.m_points, grid_points);
 
-  return basis; // Don't normalize here
+  mat dense_basis = make_rbf_basis(points, grid_points, BASIS_BW);
+  Archiver arch = Archiver();
+  arch.add_mat("basis", dense_basis);
+  arch.write("/home/epz/scratch/basis.data");
+  
+  return dense_basis;
 }
 
 RelativePlanesSimulator build_simulator(){
@@ -150,7 +153,7 @@ int main(int argc, char** argv)
   
   // Reference blocks
   cout << "Building LCP blocks..." << endl;
-  vector<sp_mat> blocks = sim.lcp_blocks(&grid, GAMMA,N_SAMPLES);
+  vector<sp_mat> blocks = sim.lcp_blocks(&grid, GAMMA, N_SAMPLES);
   assert(A == blocks.size());
   assert(size(N,N) == size(blocks.at(0)));
   
@@ -174,12 +177,13 @@ int main(int argc, char** argv)
   free_vars.head(N).fill(1);
 
   cout << "Making value basis..." << endl;
-  sp_mat basis = make_basis(points);
-  mat dense_basis = mat(basis);
+  mat dense_basis = make_basis(points);
+  sp_mat basis = sp_mat(dense_basis);
 
   cube primals = cube(N,A+1,NUM_ADD_ROUNDS+1);
   cube duals = cube(N,A+1,NUM_ADD_ROUNDS+1);
   cube added_bases = cube(N,A,NUM_ADD_ROUNDS);
+  mat residuals = mat(N,NUM_ADD_ROUNDS);
 
   for(uint I = 0; I < NUM_ADD_ROUNDS; I++){
         cout << "Running " << I << "/" << NUM_ADD_ROUNDS  << endl;
@@ -200,6 +204,7 @@ int main(int argc, char** argv)
 	}
 	
 	vec res = find_residual(grid, sim, P);
+	residuals.col(I) = res;
 	vec bellman_res_norm = vec{
 	  norm(res,1),
 	  norm(res,2),
@@ -220,12 +225,13 @@ int main(int argc, char** argv)
 	cout << "Orthgonalizing and appending..." << endl;
 	dense_basis = join_horiz(dense_basis, new_bases);
 	dense_basis = orth(dense_basis);
-	basis = sp_mat(basis);
+	basis = sp_mat(dense_basis);
   }
   
   Archiver arch = Archiver();
   arch.add_cube("primals", primals);
   arch.add_cube("duals", duals);
   arch.add_cube("added_bases", added_bases);
+  arch.add_mat("residuals", residuals);
   arch.write(DATA_FILE_NAME);
 }
