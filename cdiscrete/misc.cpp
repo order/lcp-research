@@ -482,11 +482,7 @@ sp_mat block_diag(const block_sp_vec & D){
   return block_mat(blocks);
 }
 
-sp_mat spdiag(const vec & v){
-  return spdiag(v,0);
-}
-
-sp_mat spdiag(const vec & v, const int d){
+sp_mat spdiag(const vec & v, int d=0){
   uint n = v.n_elem;
   uint N = n + abs(d);
 
@@ -578,7 +574,7 @@ sp_mat h_join_sp_mat_vector(const vector<sp_mat> & comps){
   uint n_cols = 0;
   for(uint i = 0; i < N; i++){
     assert(n_rows == comps.at(i).n_rows);
-    n_cols += comps.at(i).n_cols;
+    n_cols+= comps.at(i).n_cols;
   }
 
   sp_mat ret = sp_mat(n_rows, n_cols);
