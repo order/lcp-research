@@ -19,8 +19,8 @@ vec RelativePlanesSimulator::get_state_weights(const TypedPoints & points) const
   uint D = points.n_cols;
   assert(THREE_DIM == 3);
   
-  vec weight = ones<vec>(n_points) / (double) n_spatial; // Uniform
-  weight(points.get_special_mask()).fill(0);
+  vec weight = ones<vec>(n_points) / (double) n_points; // Uniform
+  //weight(points.get_special_mask()).fill(0);
   assert(abs(accu(weight) - 1.0) / n_points < ALMOST_ZERO);
   return weight;
 }

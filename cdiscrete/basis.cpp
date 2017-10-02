@@ -292,6 +292,12 @@ sp_mat make_voronoi_basis(const Points & points,
   return v_basis.get_basis();
 }
 
+sp_mat make_voronoi_basis(const TypedPoints & points,
+                       const Points & centers){
+  TypedVoronoiBasis v_basis(points, centers);
+  return v_basis.get_basis();
+}
+
 
 VoronoiBasis::VoronoiBasis(const Points & points): m_points(points){
   n_basis = 0;
@@ -342,6 +348,7 @@ uint VoronoiBasis::min_count() const{
 sp_mat VoronoiBasis::get_basis() const{
   umat loc = umat(2,n_points);
   uvec P = col_argmin(m_dist); // Partition assignment
+  
   loc.row(0) = regspace<urowvec>(0,n_points-1).eval();
   loc.row(1) = P.t();
   vec data = ones(n_points);
@@ -349,6 +356,43 @@ sp_mat VoronoiBasis::get_basis() const{
   return sp_normalise(basis,2,0); // l2 normalize each column
 }
 
+////////////////////////////////////////////////////////////////////////////
+// Typed Voronoi Basis
+
+TypedVoronoiBasis::TypedVoronoiBasis(const TypedPoints & points,
+				     const Points & centers) : 
+  m_typed_points(points), m_centers(centers)
+{
+  assert(points.n_cols == centers.n_cols);
+  m_dist = dist_mat(m_typed_points.m_points,m_centers);
+  n_basis = centers.n_rows;
+  n_dim = points.n_cols;
+  n_points = points.n_rows;
+  assert(n_dim == centers.n_cols);
+}
+
+
+sp_mat TypedVoronoiBasis::get_basis() const{
+  umat loc = umat(2,n_points);
+  uvec P = uvec(n_points);
+  uvec spatial_mask = m_typed_points.get_spatial_mask();
+  P.rows(spatial_mask)= col_argmin(m_dist.rows(spatial_mask));
+
+  // Only supporting one OOB for now.
+  uint oob_idx = max(P) + 1;
+  assert(1 == m_typed_points.num_special_nodes());
+  P(m_typed_points.get_special_mask()).fill(oob_idx);
+  
+  loc.row(0) = regspace<urowvec>(0,n_points-1).eval();
+  loc.row(1) = P.t();
+  vec data = ones(n_points);
+  sp_mat basis = sp_mat(loc,data);
+  return sp_normalise(basis,2,0); // l2 normalize each column
+}
+
+////////////////////////////////////////////////////////////////////////////
+// Freebie basis functions //
+/////////////////////////////
 
 sp_mat make_basis(const string & mode,
                   const vector<double> & params,
@@ -411,6 +455,64 @@ LCP smooth_lcp(const sp_mat & smoother,
   return LCP(M,q,free_vars);
 }
 
+sp_mat make_freebie_flow_basis(const sp_mat value_basis, const sp_mat block){
+  return block.t() * value_basis;
+}
+
+sp_mat make_freebie_value_basis(const sp_mat flow_basis, const sp_mat block){
+
+  sp_mat value_basis = sp_mat(size(flow_basis));
+  uint K = flow_basis.n_cols;
+  for(uint i = 0; i < K; i++){
+    // Iterate throught columns and do a sparse matrix solve
+    value_basis.col(i) = spsolve(block.t(),
+				 vec(flow_basis.col(i)));
+  }
+  return value_basis;
+}
+
+
+vector<sp_mat> balance_bases(const vector<sp_mat> initial_bases,
+			      const vector<sp_mat> blocks){
+  /*
+   * Take in initial bases, and balanced them via the S&S "freebie" 
+   * relationship
+   */
+  
+  uint A = blocks.size();
+  assert(A + 1 == initial_bases.size());
+  assert(A > 0);
+
+
+  // Explicitly add initial value basis
+  vector<sp_mat> value_basis_vector;
+  value_basis_vector.push_back(initial_bases.at(0));
+  
+  // Add freebie flow components so the the value basis will span the initial
+  // flow basis
+  for(uint i = 0; i < A; i++){
+    if(0 == initial_bases.at(i+1).n_cols) continue;
+    sp_mat val_comp = make_freebie_value_basis(initial_bases.at(i+1),
+					       blocks.at(i));
+    value_basis_vector.push_back(val_comp);
+  }
+
+  // Join value components into a single sparse matrix
+  sp_mat balanced_value_basis = h_join_sp_mat_vector(value_basis_vector);
+
+  // Generated the freebie flow bases; each should span the initial flow bases
+  vector<sp_mat> balanced_bases_vector;
+   balanced_bases_vector.push_back(balanced_value_basis);
+  for(uint i = 0; i < A; i++){
+    sp_mat balanced_flow_basis = make_freebie_flow_basis(balanced_value_basis,
+					       blocks.at(i));
+    balanced_bases_vector.push_back(balanced_flow_basis);
+  }
+
+  return balanced_bases_vector;
+}
+
+
 vector<sp_mat> make_freebie_flow_bases_ignore_q(const sp_mat & value_basis,
                                                 const vector<sp_mat> blocks){
   vector<sp_mat> flow_bases;
@@ -420,7 +522,6 @@ vector<sp_mat> make_freebie_flow_bases_ignore_q(const sp_mat & value_basis,
 	 << endl;
     sp_mat raw_basis = blocks.at(a).t() * value_basis;
     flow_bases.push_back(sp_mat(orth(mat(raw_basis))));
-    // Orthonorm (TODO: do directly in sparse?)
   }
   return flow_bases;
 }

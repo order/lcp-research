@@ -13,13 +13,13 @@ using namespace arma;
 using namespace std;
 
 #define GAMMA 0.997
-#define N_XY_GRID_NODES 8
-#define N_T_GRID_NODES 4
+#define N_XY_GRID_NODES 16
+#define N_T_GRID_NODES 8
 #define N_OOB_NODES 1
 #define N_SAMPLES 5
-#define B 1.5
+#define B 1
 
-#define KOJIMA true
+#define KOJIMA false
 
 mat build_bbox(){
   return mat {{-B,B},{-B,B},{-datum::pi, datum::pi}};

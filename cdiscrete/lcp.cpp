@@ -259,15 +259,13 @@ PLCP augment_plcp(const PLCP & original,
   assert(all(y >= 0));
 
   vec res = x - y + q;
-  w = spsolve(P.t()*P + 1e-15*speye(K,K),P.t()*(x - y + q));
+  w = spsolve(P.t()*P + 1e-12 * speye(K,K), P.t()*res);
 
-  vec w_res = P * w - res;
+  vec w_res = (P * w - res) / N;
   if(norm(w_res) >= PRETTY_SMALL){
     cerr << "Error: Reduced vector w residual large ("
-	 << w_res << ")..." << endl;
+	 << norm(w_res) << ")..." << endl;
   }
-
-  assert(norm(w_res) < PRETTY_SMALL);
   
   vec b = P.t()*x - U*x - w;
   assert(K == b.n_elem);

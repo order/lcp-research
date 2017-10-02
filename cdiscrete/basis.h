@@ -70,13 +70,15 @@ sp_mat make_fourier_basis(const Points & points,
 sp_mat make_voronoi_basis(const Points & points,
                           const Points & centers);
 
+sp_mat make_voronoi_basis(const TypedPoints & points,
+			  const Points & cuts);
+
 
 class VoronoiBasis{
  public:
   VoronoiBasis(const Points & points);
   VoronoiBasis(const Points & points,
                const Points & centers);
-
   void add_center(const vec & center);
   void replace_last_center(const vec & center);
   
@@ -87,6 +89,21 @@ class VoronoiBasis{
   sp_mat get_basis() const;
 
   Points m_points;
+  Points m_centers;
+  mat m_dist;
+
+  uint n_dim;
+  uint n_basis;
+  uint n_points;
+};
+
+class TypedVoronoiBasis{
+ public:
+  TypedVoronoiBasis(const TypedPoints & points,
+		    const Points & centers);
+  sp_mat get_basis() const;
+
+  TypedPoints m_typed_points;
   Points m_centers;
   mat m_dist;
 

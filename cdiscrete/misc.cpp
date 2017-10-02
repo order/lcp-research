@@ -569,3 +569,24 @@ sp_mat sp_normalise(const sp_mat & A,
 double sparsity(const sp_mat & A){
   return (double)A.n_nonzero / (double) A.n_elem;
 }
+
+sp_mat h_join_sp_mat_vector(const vector<sp_mat> & comps){
+  uint N = comps.size();
+  assert(N > 0);
+  
+  uint n_rows = comps.at(0).n_rows;
+  uint n_cols = 0;
+  for(uint i = 0; i < N; i++){
+    assert(n_rows == comps.at(i).n_rows);
+    n_cols += comps.at(i).n_cols;
+  }
+
+  sp_mat ret = sp_mat(n_rows, n_cols);
+  uint head = 0;
+  for(uint i = 0; i < N; i++){
+    uint n = comps.at(i).n_cols;
+    ret.cols(i,i+n-1) = comps.at(i);
+  }
+
+  return ret;
+}

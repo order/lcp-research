@@ -14,15 +14,21 @@ using namespace arma;
 using namespace std;
 
 #define GAMMA 0.997
-#define N_XY_GRID_NODES 8
+#define SIM_STEP 0.1
+#define NOISE_STD 0.0
+#define NMAC_RADIUS 0.25
+
+#define N_XY_GRID_NODES 16
 #define N_T_GRID_NODES 8
 #define N_OOB_NODES 1
 #define N_SAMPLES 5
 #define B 1
-#define IGNORE_Q false
+#define IGNORE_Q true
 
-#define COMP_THRESH 1e-12
-#define NUM_ADD_ROUNDS 2
+#define COMP_THRESH 1e-8
+#define NUM_ADD_ROUNDS 4
+
+#define USE_OOB_NODE
 
 
 #define BASIS_G 3
@@ -36,7 +42,6 @@ mat build_bbox(){
 
 mat make_basis(const TypedPoints & points){
   uint N = points.n_rows;
-  cout << points.m_points << endl;
 
   // General basis
   vector<vec> grids;
@@ -45,20 +50,17 @@ mat make_basis(const TypedPoints & points){
   grids.push_back(linspace<vec>(-datum::pi,datum::pi,BASIS_G));
   Points grid_points = make_points<mat,vec>(grids);
 
-  mat dense_basis = make_rbf_basis(points, grid_points, BASIS_BW);
-  Archiver arch = Archiver();
-  arch.add_mat("basis", dense_basis);
-  arch.write("/home/epz/scratch/basis.data");
-  
+  //mat dense_basis = make_rbf_basis(points, grid_points, BASIS_BW);
+  mat dense_basis = mat(make_voronoi_basis(points, grid_points));
   return dense_basis;
 }
 
 RelativePlanesSimulator build_simulator(){
   mat bbox = build_bbox();
   mat actions = mat{{1,0},{0,0},{-1,0}};
-  double noise_std = 0.1;
-  double step = 0.01;
-  double nmac_radius = 0.25;
+  double noise_std = NOISE_STD;
+  double step = SIM_STEP;
+  double nmac_radius = NMAC_RADIUS;
   return RelativePlanesSimulator(bbox, actions, noise_std, step, nmac_radius);
 }
 
@@ -71,10 +73,10 @@ vec find_residual(const UniformGrid & grid,
 
 
 SolverResult find_solution(const sp_mat & basis,
-                const sp_mat & smoother,
-                const vector<sp_mat> & blocks,
-                const mat & Q,
-                const bvec & free_vars){
+			   const sp_mat & smoother,
+			   const vector<sp_mat> & blocks,
+			   const mat & Q,
+			   const bvec & free_vars){
   uint N = basis.n_rows;
   assert(size(N,N) == size(smoother));
   uint A = blocks.size();
@@ -90,14 +92,15 @@ SolverResult find_solution(const sp_mat & basis,
   
   PLCP plcp = approx_lcp(sp_mat(basis),smoother,
                          blocks,Q,free_vars, IGNORE_Q);
+  sp_mat M = build_M(blocks);
   return psolver.aug_solve(plcp);
 }
 
 SolverResult find_solution(const mat & basis,
-                const sp_mat & smoother,
-                const vector<sp_mat> & blocks,
-                const mat & Q,
-                const bvec & free_vars){
+			   const sp_mat & smoother,
+			   const vector<sp_mat> & blocks,
+			   const mat & Q,
+			   const bvec & free_vars){
   sp_mat sp_basis = sp_mat(basis);
   return find_solution(sp_basis,
 		       smoother,
@@ -178,6 +181,7 @@ int main(int argc, char** argv)
 
   cout << "Making value basis..." << endl;
   mat dense_basis = make_basis(points);
+  //mat dense_basis = eye(N,N);  // AHHHH UNDO
   sp_mat basis = sp_mat(dense_basis);
 
   cube primals = cube(N,A+1,NUM_ADD_ROUNDS+1);
@@ -185,47 +189,61 @@ int main(int argc, char** argv)
   cube added_bases = cube(N,A,NUM_ADD_ROUNDS);
   mat residuals = mat(N,NUM_ADD_ROUNDS);
 
-  for(uint I = 0; I < NUM_ADD_ROUNDS; I++){
-        cout << "Running " << I << "/" << NUM_ADD_ROUNDS  << endl;
+  for(uint I = 0; I < NUM_ADD_ROUNDS+1; I++){
+    cout << "Running " << (I+1) << "/" << (NUM_ADD_ROUNDS+1)  << endl;
+    
+    cout << "\tFinding a solution..." << endl;
+    SolverResult sol = find_solution(basis,
+				     smoother,
+				     blocks,
+				     Q,
+				     free_vars);
+    mat P = reshape(sol.p, N, A+1);
+    mat D = reshape(sol.d, N, A+1);
+    primals.slice(I) = P;
+    duals.slice(I) = D;
 
-	cout << "\tFinding a solution..." << endl;
-	SolverResult sol = find_solution(basis,
-					 smoother,
-					 blocks,
-					 Q,
-					 free_vars);
-	mat P = reshape(sol.p, N, A+1);
-	mat D = reshape(sol.d, N, A+1);
-	primals.slice(I) = P;
-	duals.slice(I) = D;
+    if(NUM_ADD_ROUNDS == I){
+      break; // Final Round
+    }
 
-	if(NUM_ADD_ROUNDS == I + 1){
-	  break; // Final Round
-	}
+    vec md_res = min(D.tail_cols(A),1);
+    vec res = find_residual(grid, sim, P);
+    residuals.col(I) = res;
+    vec bellman_res_norm = vec{
+      norm(res,1),
+      norm(res,2),
+      norm(res,"inf")};
+    vec md_res_norm = vec{
+      norm(md_res,1),
+      norm(md_res,2),
+      norm(md_res,"inf")};
+
+    cout << "\tBellman residual norm:" << bellman_res_norm.t() << endl;
+    cout << "\tMin. dual residual norm:" << md_res_norm.t() << endl;
 	
-	vec res = find_residual(grid, sim, P);
-	residuals.col(I) = res;
-	vec bellman_res_norm = vec{
-	  norm(res,1),
-	  norm(res,2),
-	  norm(res,"inf")};
-	cout << "\tBellman residual norm:" << bellman_res_norm.t() << endl;
-	
-	uvec pi = index_max(P.tail_cols(A), 1);
-	mat new_bases = mat(N, A);
-	for(uint a = 0; a < A; a++){
-	  vec heur = res;
-	  uvec mask = find(a == pi);
-	  heur(mask).fill(0); // mask out
-	  cout << "\tForming residual basis element " << a << "..." << endl;
-	  new_bases.col(a) = spsolve(smoother * blocks.at(a).t(), heur);
-	}
-	added_bases.slice(I) = new_bases;
+    uvec pi = index_max(P.tail_cols(A), 1);
+    mat new_bases = mat(N, A);
+    for(uint a = 0; a < A; a++){
+      vec heur;
+      if (norm(md_res,"inf") < 2){
+	heur = res;
+      }
+      else{
+	heur = md_res;
+      }
+      heur = Q.col(1);
+      uvec mask = find(a != pi);
+      heur(mask).fill(0); // mask out
+      cout << "\tForming residual basis element " << a << "..." << endl;
+      new_bases.col(a) = spsolve(smoother * blocks.at(a).t(), heur);
+    }
+    added_bases.slice(I) = new_bases;
 
-	cout << "Orthgonalizing and appending..." << endl;
-	dense_basis = join_horiz(dense_basis, new_bases);
-	dense_basis = orth(dense_basis);
-	basis = sp_mat(dense_basis);
+    cout << "Orthgonalizing and appending..." << endl;
+    dense_basis = join_horiz(dense_basis, new_bases);
+    dense_basis = orth(dense_basis);
+    basis = sp_mat(dense_basis);
   }
   
   Archiver arch = Archiver();
