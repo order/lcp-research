@@ -127,6 +127,8 @@ vector<sp_mat> make_freebie_flow_bases_ignore_q(const sp_mat & value_basis,
 vector<sp_mat> make_freebie_flow_bases(const sp_mat & value_basis,
                                        const vector<sp_mat> blocks,
                                        const mat & Q);
+vector<sp_mat> balance_bases(const vector<sp_mat> initial_bases,
+			     const vector<sp_mat> blocks);
 vector<mat> make_raw_freebie_flow_bases(const mat & raw_value_basis,
                                         const vector<sp_mat> blocks,
                                         const mat & Q);

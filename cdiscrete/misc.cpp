@@ -482,7 +482,7 @@ sp_mat block_diag(const block_sp_vec & D){
   return block_mat(blocks);
 }
 
-sp_mat spdiag(const vec & v, int d=0){
+sp_mat spdiag(const vec & v, int d){
   uint n = v.n_elem;
   uint N = n + abs(d);
 

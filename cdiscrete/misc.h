@@ -112,7 +112,7 @@ block_sp_vec block_rmult(const arma::sp_mat & A, const block_sp_vec & Bs);
 
 arma::sp_mat block_mat(const block_sp_mat & B);
 arma::sp_mat block_diag(const block_sp_vec & D);
-arma::sp_mat spdiag(const arma::vec & v, int d);
+arma::sp_mat spdiag(const arma::vec & v, int d=0);
 
 
 arma::sp_mat sp_submatrix(const arma::sp_mat & A,
