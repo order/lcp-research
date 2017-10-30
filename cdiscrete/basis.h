@@ -139,4 +139,20 @@ PLCP approx_lcp(const sp_mat & value_basis,
                 const bvec & free_vars,
 		bool ignore_q);
 
+
+class GridBasis{
+  GridBasis(const TypedPoints & points, mat bounds);
+  sp_mat get_basis() const;
+  bool can_split(uint basis_idx, uint dim_idx) const;
+  std::pair<uint, uint> split_basis(uint basis_idx, uint dim_idx);
+  
+  
+  TypedPoints m_typed_points;
+  uint n_bases;
+  uint n_dim;
+  vector<uvec> m_point_assign;
+  vector<mat> m_basis_bounds;
+};
+
+
 #endif

@@ -304,11 +304,12 @@ VoronoiBasis::VoronoiBasis(const Points & points): m_points(points){
   n_dim = points.n_cols;
   n_points = points.n_rows;
 };
+
 VoronoiBasis::VoronoiBasis(const Points & points,
                            const Points & centers):
   m_points(points),m_centers(centers){
   assert(points.n_cols == centers.n_cols);
-  m_dist = dist_mat(m_points,m_centers);
+  m_dist = dist_mat(m_points, m_centers);
   n_basis = centers.n_rows;
   n_dim = points.n_cols;
   n_points = points.n_rows;
@@ -347,8 +348,10 @@ uint VoronoiBasis::min_count() const{
 
 sp_mat VoronoiBasis::get_basis() const{
   umat loc = umat(2,n_points);
+
   uvec P = col_argmin(m_dist); // Partition assignment
-  
+
+
   loc.row(0) = regspace<urowvec>(0,n_points-1).eval();
   loc.row(1) = P.t();
   vec data = ones(n_points);
@@ -369,6 +372,8 @@ TypedVoronoiBasis::TypedVoronoiBasis(const TypedPoints & points,
   n_dim = points.n_cols;
   n_points = points.n_rows;
   assert(n_dim == centers.n_cols);
+  assert(m_dist.n_rows == points.n_rows);
+  assert(m_dist.n_cols == centers.n_rows);
 }
 
 
@@ -379,10 +384,12 @@ sp_mat TypedVoronoiBasis::get_basis() const{
   P.rows(spatial_mask)= col_argmin(m_dist.rows(spatial_mask));
 
   // Only supporting one OOB for now.
-  uint oob_idx = max(P) + 1;
+  uint oob_idx = m_centers.n_rows;
   assert(1 == m_typed_points.num_special_nodes());
   P(m_typed_points.get_special_mask()).fill(oob_idx);
-  
+  assert(max(P) == oob_idx);
+
+  // Convert into a space matrix
   loc.row(0) = regspace<urowvec>(0,n_points-1).eval();
   loc.row(1) = P.t();
   vec data = ones(n_points);
@@ -632,3 +639,77 @@ PLCP approx_lcp(const sp_mat & value_basis,
 
 }
 
+
+////////////////////////////////////////////////////////////////////////////
+// Grid Basis //
+////////////////
+
+GridBasis::GridBasis(const TypedPoints & points, mat bounds) :
+  m_typed_points(points)
+{
+  n_bases = 2;
+  n_dim = points.n_cols;
+  
+  assert(size(n_dim, 2) == size(bounds));
+  assert(1 == points.num_special_nodes());
+  
+  // Add the special basis
+  m_basis_bounds.push_back(mat(0,0));
+  m_point_assign.push_back(points.get_special_mask());
+
+  // Add the spatial basis
+  m_basis_bounds.push_back(bounds);  
+  m_point_assign.push_back(points.get_spatial_mask());
+}
+
+bool GridBasis::can_split(uint basis_idx, uint dim_idx) const{
+  assert(dim_idx < n_dim);
+  assert(basis_idx < n_bases);
+
+  if(0 == basis_idx) return false;  // Special basis
+  uvec mask =  m_point_assign.at(basis_idx);
+  if(mask.n_elem < 2) return false; // Singleton basis
+
+  // Check that there is diversity in the column
+  vec split_col = m_typed_points.m_points.submat(mask, uvec{dim_idx});
+  if(min(split_col) > max(split_col) + PRETTY_SMALL) return false;
+
+  return true;
+}
+
+std::pair<uint, uint> GridBasis::split_basis(uint basis_idx, uint dim_idx){
+  assert(can_split(basis_idx, dim_idx));
+  mat bounds = m_basis_bounds[basis_idx];
+  uvec& assign = m_point_assign[basis_idx];
+
+  double lo = bounds(dim_idx, 0);
+  double hi = bounds(dim_idx, 1);
+  double mid = 0.5 * (lo + hi);
+  uint new_basis_idx = m_basis_bounds.size();
+
+  // Make new basis
+  m_basis_bounds.push_back(bounds);  // Copies
+  m_basis_bounds[new_basis_idx](dim_idx,0) = mid;
+  
+  // Update old basis
+  m_basis_bounds[basis_idx](dim_idx,1) = mid;
+
+
+  // Split assignment
+  vector<uint> old_basis;
+  vector<uint> new_basis;
+  for(auto const & it : assign){
+    if(m_typed_points.m_points(it, dim_idx) < mid){
+      old_basis.push_back(it);
+    }
+    else{
+      new_basis.push_back(it);
+    }
+  }
+
+  // Update old assignment
+  m_point_assign[basis_idx] = conv_to<uvec>::from(old_basis);
+  // Add new assignment
+  m_point_assign.push_back(conv_to<uvec>::from(new_basis));
+  
+}

@@ -18,20 +18,21 @@ using namespace std;
 #define NOISE_STD 0.0
 #define NMAC_RADIUS 0.25
 
+#define N_ACTIONS 3
 #define N_XY_GRID_NODES 16
-#define N_T_GRID_NODES 8
+#define N_T_GRID_NODES 16
 #define N_OOB_NODES 1
-#define N_SAMPLES 5
+#define N_SAMPLES 1
 #define B 1
 #define IGNORE_Q true
 
-#define COMP_THRESH 1e-8
-#define NUM_ADD_ROUNDS 4
+#define COMP_THRESH 1e-12
+#define NUM_ADD_ROUNDS 10
 
 #define USE_OOB_NODE
 
 
-#define BASIS_G 3
+#define BASIS_G 2
 #define BASIS_BW 1.0
 
 #define DATA_FILE_NAME "/home/epz/scratch/plane_refine.data"
@@ -40,28 +41,66 @@ mat build_bbox(){
   return mat {{-B,B},{-B,B},{-datum::pi, datum::pi}};
 }
 
-mat make_basis(const TypedPoints & points){
+mat make_basis(const TypedPoints & points,
+	       const vector<sp_mat> & blocks,
+	       const mat & Q){
+  /*
+    Makes the basis for the plane refinement problem
+   */
   uint N = points.n_rows;
+  assert(size(N,N_ACTIONS+1) == size(Q));
 
-  // General basis
+  // Generic value basis: Voronoi.
   vector<vec> grids;
   grids.push_back(linspace<vec>(-B,B,BASIS_G));
   grids.push_back(linspace<vec>(-B,B,BASIS_G));
   grids.push_back(linspace<vec>(-datum::pi,datum::pi,BASIS_G));
   Points grid_points = make_points<mat,vec>(grids);
 
-  //mat dense_basis = make_rbf_basis(points, grid_points, BASIS_BW);
-  mat dense_basis = mat(make_voronoi_basis(points, grid_points));
-  return dense_basis;
+  // Make the Voronoi basis; has special OOB column
+  vector<sp_mat> init_bases;
+  vector<sp_mat> init_value_basis;
+  init_value_basis.push_back(make_voronoi_basis(points, grid_points));
+  sp_mat cost_vect = sp_mat(N,1);
+  cost_vect.col(0) = Q.col(1);  // Cost is a good initial guess
+  init_value_basis.push_back(make_voronoi_basis(points, grid_points));
+  init_value_basis.push_back(cost_vect);
+
+  sp_mat value_basis = h_join_sp_mat_vector(init_value_basis);
+  
+  init_bases.push_back(value_basis);
+
+  // Make the initial flow bases; have their Q vector and column for the
+  // special OOB node.
+  uvec special_mask = points.get_special_mask();
+  assert(1 == special_mask.n_elem);
+  uint special_idx = special_mask(0);
+  for(uint a = 0; a < N_ACTIONS; a++){
+    sp_mat flow_basis = sp_mat(N,2);
+    flow_basis.col(0) = Q.col(a+1); // Add cost
+    flow_basis(special_idx,0) = 0; // Make sure special idx is zero
+    flow_basis(special_idx,1) = 1; // Special OOB flow column.
+    init_bases.push_back(flow_basis);
+  }
+
+  // Balance the bases in the S&S sense
+  vector<sp_mat> bal_bases = balance_bases(init_bases, blocks);
+
+  // Orthonormalize and convert to dense.
+  // TODO: reuse the balanced flow bases better.
+  mat dense_value_basis = orth(mat(bal_bases.at(0)));
+  return dense_value_basis;
 }
 
 RelativePlanesSimulator build_simulator(){
   mat bbox = build_bbox();
   mat actions = mat{{1,0},{0,0},{-1,0}};
-  double noise_std = NOISE_STD;
-  double step = SIM_STEP;
-  double nmac_radius = NMAC_RADIUS;
-  return RelativePlanesSimulator(bbox, actions, noise_std, step, nmac_radius);
+  assert(size(N_ACTIONS, 2) == size(actions));
+  return RelativePlanesSimulator(bbox,
+				 actions,
+				 NOISE_STD,
+				 SIM_STEP,
+				 NMAC_RADIUS);
 }
 
 vec find_residual(const UniformGrid & grid,
@@ -90,8 +129,8 @@ SolverResult find_solution(const sp_mat & basis,
   psolver.regularizer = 0;
 
   
-  PLCP plcp = approx_lcp(sp_mat(basis),smoother,
-                         blocks,Q,free_vars, IGNORE_Q);
+  PLCP plcp = approx_lcp(basis, smoother,
+                         blocks, Q, free_vars, IGNORE_Q);
   sp_mat M = build_M(blocks);
   return psolver.aug_solve(plcp);
 }
@@ -180,7 +219,7 @@ int main(int argc, char** argv)
   free_vars.head(N).fill(1);
 
   cout << "Making value basis..." << endl;
-  mat dense_basis = make_basis(points);
+  mat dense_basis = make_basis(points, blocks, Q);
   //mat dense_basis = eye(N,N);  // AHHHH UNDO
   sp_mat basis = sp_mat(dense_basis);
 
@@ -226,13 +265,13 @@ int main(int argc, char** argv)
     mat new_bases = mat(N, A);
     for(uint a = 0; a < A; a++){
       vec heur;
-      if (norm(md_res,"inf") < 2){
+      //if (norm(md_res,"inf") < 2){
+      if(1 == I % 2){
 	heur = res;
       }
       else{
 	heur = md_res;
       }
-      heur = Q.col(1);
       uvec mask = find(a != pi);
       heur(mask).fill(0); // mask out
       cout << "\tForming residual basis element " << a << "..." << endl;

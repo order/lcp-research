@@ -22,6 +22,16 @@ sp_mat build_shift_block(uint N, int shift, double p){
   return p * speye(N,N) + (1 - p) * shift_diag + (1 - p) * mod_diag;
 }
 
+bool in_span(const sp_mat & S, const sp_mat & b, double abstol=1e-9){
+  assert(abstol > 0);
+  mat A = mat(S);
+  mat B = mat(b);
+
+  mat X = solve(A,B);
+  mat R = A * X;
+  return norm(R - B) < abstol;
+}
+
 void test_build_shift_1(){
   cout << "test_build_shift_1...";
   cout.flush();
@@ -37,28 +47,79 @@ void test_build_shift_1(){
 
 void test_balance_basis_1(){
   cout << "test_balance_basis_1...";
+  uint N = 5;
 
-  sp_mat shift = build_shift_block(3, 1, 0.1);
+  sp_mat shift = speye(N,N) - 0.95 * build_shift_block(N, 1, 0.1);
   vector<sp_mat> blocks;
   blocks.push_back(shift);
   
   vector<sp_mat> init;
-  sp_mat val = sp_mat(3,1);
+  sp_mat val = sp_mat(N,1);
   val(0,0) = 1;
   init.push_back(val);
-  init.push_back(sp_mat(3,0));
+  init.push_back(sp_mat(N,0));
   
   vector<sp_mat> bal = balance_bases(init, blocks);
-  assert(size(3,1) == size(bal.at(0)));
+  assert(size(N,1) == size(bal.at(0)));
   assert(norm(val - bal.at(0)) < 1e-9);  // Same as input
   
-  assert(size(3,1) == size(bal.at(1)));
+  assert(size(N,1) == size(bal.at(1)));
   cout << " PASSED." << endl;
+}
 
+void test_balance_basis_2(){
+  cout << "test_balance_basis_2...";
+  uint N = 6;
+  
+  sp_mat shift = speye(N, N) - 0.9 * build_shift_block(N, 1, 0.1);
+  vector<sp_mat> blocks;
+  blocks.push_back(shift);
+  
+  vector<sp_mat> init;
+  sp_mat flow = sp_mat(N,1);
+  flow(0,0) = 1;
+  init.push_back(sp_mat(N,0));
+  init.push_back(flow);
+  
+  vector<sp_mat> bal = balance_bases(init, blocks);
+  assert(size(N,1) == size(bal.at(0)));
+  
+  assert(size(N,1) == size(bal.at(1)));
+  assert(norm(flow - bal.at(1)) < 1e-9);  // Same as input
+
+  cout << " PASSED." << endl;
+}
+
+void test_balance_basis_3(){
+  cout << "test_balance_basis_2...";
+  uint N = 6;
+  
+  sp_mat shift = speye(N, N) - 0.9 * build_shift_block(N, 1, 0.1);
+  vector<sp_mat> blocks;
+  blocks.push_back(shift);
+  
+  vector<sp_mat> init;
+  sp_mat flow = sp_mat(N,1);
+  flow(0,0) = 1;
+  sp_mat val = sp_mat(N,1);
+  val(3,0) = 1;
+  init.push_back(val);
+  init.push_back(flow);
+  
+  vector<sp_mat> bal = balance_bases(init, blocks);
+  
+  assert(size(N,2) == size(bal.at(0)));
+  assert(in_span(bal.at(0), val));
+  assert(size(N,2) == size(bal.at(1)));
+  assert(in_span(bal.at(1), flow));
+
+  cout << " PASSED." << endl;
 }
 
 int main(){
   test_build_shift_1();
   
   test_balance_basis_1();
+  test_balance_basis_2();
+  test_balance_basis_3();
 }

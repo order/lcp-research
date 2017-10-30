@@ -580,8 +580,13 @@ sp_mat h_join_sp_mat_vector(const vector<sp_mat> & comps){
   sp_mat ret = sp_mat(n_rows, n_cols);
   uint head = 0;
   for(uint i = 0; i < N; i++){
+    assert(head < n_cols);
     uint n = comps.at(i).n_cols;
-    ret.cols(i,i+n-1) = comps.at(i);
+    if(0 == n) continue;
+    
+    assert(head + n <= n_cols);
+    ret.cols(head,head+n-1) = comps.at(i);
+    head += n;
   }
 
   return ret;

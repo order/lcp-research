@@ -13,13 +13,20 @@ using namespace arma;
 using namespace std;
 
 #define GAMMA 0.997
+#define SIM_STEP 0.1
+#define NOISE_STD 0.0
+#define NMAC_RADIUS 0.25
+
 #define N_XY_GRID_NODES 16
 #define N_T_GRID_NODES 8
 #define N_OOB_NODES 1
-#define N_SAMPLES 5
+#define N_SAMPLES 1
 #define B 1
 
-#define KOJIMA false
+#define COMP_THRESH 1e-8
+
+
+#define KOJIMA true
 
 mat build_bbox(){
   return mat {{-B,B},{-B,B},{-datum::pi, datum::pi}};
@@ -28,10 +35,11 @@ mat build_bbox(){
 RelativePlanesSimulator build_simulator(){
   mat bbox = build_bbox();
   mat actions = mat{{1,0},{0,0},{-1,0}};
-  double noise_std = 0.1;
-  double step = 0.01;
-  double nmac_radius = 0.25;
-  return RelativePlanesSimulator(bbox, actions, noise_std, step, nmac_radius);
+  return RelativePlanesSimulator(bbox,
+				 actions,
+				 NOISE_STD,
+				 SIM_STEP,
+				 NMAC_RADIUS);
 }
 
 ////////////////////
@@ -43,7 +51,7 @@ void kojima_solve(const LCP & lcp, const mat & Q, uint N, uint A){
   cout << "Solving with Kojima's LCP algorithm..." << endl;
 
   KojimaSolver solver = KojimaSolver();
-  solver.comp_thresh = 1e-6;
+  solver.comp_thresh = COMP_THRESH;
   solver.initial_sigma = 0.2;
   solver.aug_rel_scale = 1.5;
   solver.regularizer = 0;
@@ -66,7 +74,7 @@ void kojima_solve(const LCP & lcp, const mat & Q, uint N, uint A){
 void value_iter_solve(const vector<sp_mat> & p_blocks, const mat & costs){
   cout << "Solving with value iteration..." << endl;
   ValueIteration solver = ValueIteration();
-  solver.change_thresh = 1e-6;
+  solver.change_thresh = COMP_THRESH;
   solver.max_iter = 1e8;
   solver.verbose = true;
   
