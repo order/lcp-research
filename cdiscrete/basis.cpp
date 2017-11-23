@@ -641,51 +641,106 @@ PLCP approx_lcp(const sp_mat & value_basis,
 
 
 ////////////////////////////////////////////////////////////////////////////
-// Grid Basis //
-////////////////
+// Variable resolution bases //
+///////////////////////////////
 
-GridBasis::GridBasis(const TypedPoints & points, mat bounds) :
+TabularVarResBasis::TabularVarResBasis(const TypedPoints & points, mat bounds) :
   m_typed_points(points)
 {
-  n_bases = 2;
-  n_dim = points.n_cols;
+  typedef vector<uint> stduvec;
+  n_bases = 0;
+  n_rows = points.n_rows;
+  n_cols = points.n_cols;
   
-  assert(size(n_dim, 2) == size(bounds));
-  assert(1 == points.num_special_nodes());
-  
-  // Add the special basis
-  m_basis_bounds.push_back(mat(0,0));
-  m_point_assign.push_back(points.get_special_mask());
+  assert(size(n_cols, 2) == size(bounds));
+  assert(1 >= points.num_special_nodes());
 
+  // Add the special basis
+  if(points.num_special_nodes() > 0){
+    m_basis_bounds.push_back(mat(0,0));
+
+    stduvec special_idx = conv_to<stduvec>::from(points.get_special_mask());
+    m_point_assign.push_back(special_idx);
+    
+    n_bases++;
+  }
+  
   // Add the spatial basis
-  m_basis_bounds.push_back(bounds);  
-  m_point_assign.push_back(points.get_spatial_mask());
+  m_basis_bounds.push_back(bounds);
+  stduvec spatial_idx = conv_to<stduvec>::from(points.get_spatial_mask());
+  m_point_assign.push_back(spatial_idx);
+  
+  n_bases++;
 }
 
-bool GridBasis::can_split(uint basis_idx, uint dim_idx) const{
-  assert(dim_idx < n_dim);
+
+sp_mat TabularVarResBasis::get_basis() const{
+  /*
+   * Convert the internal representation into an Nxk sparse basis matrix
+   */
+  assert(n_bases > 0);
+
+  umat loc = umat(2, n_rows);
+  vec data = vec(n_rows);
+  assert(m_point_assign.size() == n_bases);
+  uint I = 0;
+  for(uint i = 0; i < n_bases; i++){
+    double basis_points = (double)m_point_assign.at(i).size();
+    double p = 1.0 / basis_points;
+    assert(basis_points > 0);
+    for(auto const& it : m_point_assign.at(i)){
+      loc(0,I) = it;
+      loc(1,I) = i;
+      data(I) = p;
+      I++;
+    }
+  }
+  return sp_mat(loc, data);
+}
+
+
+bool TabularVarResBasis::can_split(uint basis_idx, uint dim_idx) const{
+  /*
+   * Checks if the basis vector can be split on a dimension.
+   * Makes sure that each resulting basis has at least one point
+   * NB: currently assumes a regular spacing; will need to modify for
+   * irregular points
+   */
+  assert(dim_idx < n_cols);
   assert(basis_idx < n_bases);
 
-  if(0 == basis_idx) return false;  // Special basis
-  uvec mask =  m_point_assign.at(basis_idx);
-  if(mask.n_elem < 2) return false; // Singleton basis
+  vector<uint> std_indices =  m_point_assign.at(basis_idx);
+  if(std_indices.size() < 2){
+    return false; // Singleton basis
+  }
+  uvec indices = conv_to<uvec>::from(std_indices);
 
   // Check that there is diversity in the column
-  vec split_col = m_typed_points.m_points.submat(mask, uvec{dim_idx});
-  if(min(split_col) > max(split_col) + PRETTY_SMALL) return false;
+  vec split_col = m_typed_points.m_points.submat(indices, uvec{dim_idx});
+  if(abs(min(split_col) - max(split_col)) < PRETTY_SMALL){
+    return false;
+  }
 
   return true;
 }
 
-std::pair<uint, uint> GridBasis::split_basis(uint basis_idx, uint dim_idx){
+
+std::pair<uint, uint> TabularVarResBasis::split_basis(uint basis_idx, uint dim_idx){
+  /*
+   * Splits a basis cell along a given dimension.
+   * Updates the old basis as the [lo,mid) cell, and makes a new cell
+   * as the [mid, hi) cell.
+   */
+  
   assert(can_split(basis_idx, dim_idx));
   mat bounds = m_basis_bounds[basis_idx];
-  uvec& assign = m_point_assign[basis_idx];
+  vector<uint>& assign = m_point_assign[basis_idx];
 
   double lo = bounds(dim_idx, 0);
   double hi = bounds(dim_idx, 1);
   double mid = 0.5 * (lo + hi);
   uint new_basis_idx = m_basis_bounds.size();
+  n_bases++;
 
   // Make new basis
   m_basis_bounds.push_back(bounds);  // Copies
@@ -708,8 +763,71 @@ std::pair<uint, uint> GridBasis::split_basis(uint basis_idx, uint dim_idx){
   }
 
   // Update old assignment
-  m_point_assign[basis_idx] = conv_to<uvec>::from(old_basis);
+  m_point_assign[basis_idx] = old_basis;
   // Add new assignment
-  m_point_assign.push_back(conv_to<uvec>::from(new_basis));
+  m_point_assign.push_back(new_basis);
   
+}
+
+
+uvec box2vert(const umat & bbox, uvec grid_size){
+  /*
+   Convert a bounding bound of grid point indices to their vertex indices.
+   E.g. if grid_size = <3,3> then the grid is:
+
+   6 - 7 - 8
+   |   |   | 
+   3 - 4 - 5
+   |   |   |
+   0 - 1 - 2
+
+   and bbox = [[0,2],[1,2]], then this refers to the box:
+   7 - 8
+   |   |
+   4 - 5
+   |   |
+   1 - 2
+   and we return [1, 2, 7, 8]
+  */
+  uint D = grid_size.n_elem;
+  assert(size(D,2) == size(bbox));
+  
+  vector<vector<uint>> fringe;
+  vector<uint> elem;
+  elem.push_back(bbox(0,1));
+  fringe.push_back(elem);
+  elem[0] = bbox(0,0);
+
+  // DFS
+  uvec vert_ids = uvec(2**D);
+  uint I = 0;
+  while(fringe.size() > 0){
+    vector<uint> cursor = fringe.pop_back();
+    uint d = cursor.size();
+    assert(d > 0);
+    assert(d <= D);
+    if(D == d){
+      vert_ids[I] = coords_to_indices(grid_size, coords);
+      I++;
+    }
+    else{
+      cursor.push_back(bbox(d,1));
+      fringe.push_back(cursor);
+      cursor[d] = bbox[d,1];
+      fringe.push_back(cursor);
+    }
+    assert(I <= 2**D);
+  }
+  assert(I == 2**D);
+  return vert_ids;
+}
+
+MultiLinearVarResBasis::MultiLinearVarResBasis(const vector<vec> & grid) : m_grid(grid){
+  uint D = grid.size();
+  m_grid_size = uvec(D);
+  for(uint d = 0; d < D; d++){
+    m_grid_size[d] = grid[d].size();
+  }
+
+ 
 }

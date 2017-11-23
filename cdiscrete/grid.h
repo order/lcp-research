@@ -97,7 +97,7 @@ class UniformGrid : public TypedDiscretizer{
   arma::mat points_to_cell_nodes_dist(const TypedPoints & points,
 				      const Coords & coords) const;
 
-  //
+  // Multi-linear interpolation; point -> weights over discrete elements
   ElementDist points_to_element_dist(const TypedPoints &) const;
   template <typename T> T base_interpolate(const TypedPoints & points,
 					   const T& data) const;

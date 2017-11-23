@@ -139,9 +139,17 @@ PLCP approx_lcp(const sp_mat & value_basis,
                 const bvec & free_vars,
 		bool ignore_q);
 
+////////////////////////////////////////////////////////////////////////////
+// Variable resolution bases //
+///////////////////////////////
 
-class GridBasis{
-  GridBasis(const TypedPoints & points, mat bounds);
+class TabularVarResBasis{
+  /*
+   * Groups the discrete points into axis-parallel boxes, each with a uniform
+   * value
+   */
+ public:
+  TabularVarResBasis(const TypedPoints & points, mat bounds);
   sp_mat get_basis() const;
   bool can_split(uint basis_idx, uint dim_idx) const;
   std::pair<uint, uint> split_basis(uint basis_idx, uint dim_idx);
@@ -149,10 +157,27 @@ class GridBasis{
   
   TypedPoints m_typed_points;
   uint n_bases;
-  uint n_dim;
-  vector<uvec> m_point_assign;
+  uint n_rows;
+  uint n_cols;
+  vector<vector<uint>> m_point_assign;
   vector<mat> m_basis_bounds;
 };
+
+class MultiLinearVarResBasis{
+ public:
+  MultiLinearVarResBasis(const vector<vec> & grid);
+  sp_mat get_basis() const;
+  bool can_split(uint basis_idx, uint dim_idx) const;
+  std::pair<uint, uint> split_basis(uint basis_idx, uint dim_idx);
+
+  vector<vec> m_grid;
+  uvec m_grid_size;
+
+  map<uint, uvec> m_cell_to_point;
+  map<uint, mat> m_cell_to_bbox;
+  map<uint, set<uint> m_point_to_cells;
+}
+
 
 
 #endif
