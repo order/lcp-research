@@ -769,58 +769,34 @@ std::pair<uint, uint> TabularVarResBasis::split_basis(uint basis_idx, uint dim_i
   
 }
 
-
-uvec box2vert(const umat & bbox, uvec grid_size){
-  /*
-   Convert a bounding bound of grid point indices to their vertex indices.
-   E.g. if grid_size = <3,3> then the grid is:
-
-   6 - 7 - 8
-   |   |   | 
-   3 - 4 - 5
-   |   |   |
-   0 - 1 - 2
-
-   and bbox = [[0,2],[1,2]], then this refers to the box:
-   7 - 8
-   |   |
-   4 - 5
-   |   |
-   1 - 2
-   and we return [1, 2, 7, 8]
-  */
+umat box2points(const umat & bbox, uvec grid_size){
   uint D = grid_size.n_elem;
-  assert(size(D,2) == size(bbox));
-  
-  vector<vector<uint>> fringe;
-  vector<uint> elem;
-  elem.push_back(bbox(0,1));
-  fringe.push_back(elem);
-  elem[0] = bbox(0,0);
-
-  // DFS
-  uvec vert_ids = uvec(2**D);
-  uint I = 0;
-  while(fringe.size() > 0){
-    vector<uint> cursor = fringe.pop_back();
-    uint d = cursor.size();
-    assert(d > 0);
-    assert(d <= D);
-    if(D == d){
-      vert_ids[I] = coords_to_indices(grid_size, coords);
-      I++;
-    }
-    else{
-      cursor.push_back(bbox(d,1));
-      fringe.push_back(cursor);
-      cursor[d] = bbox[d,1];
-      fringe.push_back(cursor);
-    }
-    assert(I <= 2**D);
+  vector<uvec> marginal;
+  for(uint d = 0; d < D; d++){
+    marginal.push_back(regspace<uvec>(bbox(d,0), regspace(d,1)));
   }
-  assert(I == 2**D);
-  return vert_ids;
+  return make_points(marginal);
 }
+
+umat box2vert(const umat & bbox, uvec grid_size){
+  uint D = grid_size.n_elem;
+  vector<uvec> marginal;
+  for(uint d = 0; d < D; d++){
+    marginal.push_back(conv_to<uvec>::from(bbox.row(d)));
+  }
+  return make_points(marginal);
+}
+
+uvec box2width(const umat & bbox){
+  uint D = bbox.n_rows;
+  uvec width = uvec(D);
+  for(uint d = 0; d < D; d++){
+    assert(bbox(d,1) >= bbox(d,0));
+    width(d) = bbox(d,1) - bbox(d,0);
+  }
+  return width;
+}
+
 
 MultiLinearVarResBasis::MultiLinearVarResBasis(const vector<vec> & grid) : m_grid(grid){
   uint D = grid.size();
@@ -828,6 +804,98 @@ MultiLinearVarResBasis::MultiLinearVarResBasis(const vector<vec> & grid) : m_gri
   for(uint d = 0; d < D; d++){
     m_grid_size[d] = grid[d].size();
   }
+  umat box = zeros<umat>(D,2);
+  box.col(1) = m_grid_size;
+  m_cell_to_bbox[0] = box;
+}
 
- 
+sp_mat MultiLinearVarResBasis::get_basis() const{
+  /*
+   * Create the basis from the multi linear grid.
+   * Each basis is a cell vertex, and it's support is the
+   * set of elements that depend on that vertex.
+   */
+  uint n_weights = 0;
+  uint D = m_grid_size.n_elem;
+  uint V = pow(2,D);
+
+  uint nnz = 0;
+  map<uint, map<uint, double>> weight_map;
+
+  for(auto const & it : m_cell_to_bbox){
+    uint cell_id = it.first;
+    umat cell_box = it.second;
+
+    uvec width = box2width(cell_box);
+    uint P = prod(width);
+    
+    umat vertices = box2vert(cell_box, m_grid_size);
+    uvec vidx = coords_to_indices(Coords(vertices));
+    assert(shape(V,D) == shape(vertices));
+    
+    umat points = box2vert(cell_box, m_grid_size);
+    uvec pidx = coords_to_indices(Coords(points));
+    assert(shape(P,D) == shape(points));
+
+    // Subtract out the least vertex
+    mat delta = row_diff(conv_to<mat>::from(points),
+			 conv_to<vec>::from(vertices.row(0)));
+    assert(all(all(delta >= -ALMOST_ZERO)));
+
+    // Divide by the width of the cell
+    delta = row_divide(delta, conv_to<rowvec>::from(width.t()));
+    assert(all(all(delta >= -ALMOST_ZERO)));
+    assert(all(all(delta <= 1 + ALMOST_ZERO)));
+    scalar_max_inplace(delta, 0); 
+    scalar_min_inplace(delta, 1); // Ensure [0,1] 
+    // Now is the fraction of the cell away from the least vertex
+
+    // Do the multilinear interpolation
+    uint halfV = V / 2;
+    mat weights = ones<mat>(P, V);
+    bvec mask;
+    mat rep_delta;
+    for(uint d = 0; d < D; d++){
+      rep_dist = repmat(delta.col(d), 1, halfV);
+      mask = binmaks(d,D);
+      weights.cols(find(mask == 1)) %= rep_dist;		       
+      weights.cols(find(mask == 0)) %= 1 - rep_dist;
+    }
+    assert(is_finite(weights));
+    assert(all(all(weights >= 0)));
+    assert(all(all(weights <= 1))); 
+
+    for(uint p = 0; p < P; p++){
+      uint pid = pidx[p];
+      if(weight_map.end() != weight_map.find(pid)){
+	// Already represented (not in interior of a cell)
+	continue;
+      }
+      for(uint v = 0; v < V; v++){
+	uint vid = vidx[v];
+	if(weights(p,v) < ALMOST_ZERO){
+	  // Zero; ignore
+	  continue;
+	}
+	weight_map[p][v] = weights(p,v);
+	nnz++;
+      }
+    }
+  }
+
+  // Convert to sp_mat
+  umat loc = umat(2,nnz);
+  vec data = vec(nnz);
+  uint I = 0
+    for(auto const & pit : weight_map){
+      for(auto const & vit : pit.second){
+	loc(0,I) = pit.first;
+	loc(1,I) = vit.first;
+	data(I) = vit.second;
+	I++;
+      }
+    }
+
+  // TODO: vertex point id -> basis id (sorted point id order?)
+  return(loc, data, ??, ??);
 }
