@@ -365,10 +365,13 @@ bvec num2binvec(uint n, uint D){
 }
 
 bvec binmask(uint d, uint D){
-  // For all of numbers in 0,..., 2**D-1, do they have bit d lit up?
-  // e.g. binmask(0,D) will be: [0,1,0,1,...]
-  // e.g. binmask(1,D) will be: [0,0,1,1,0,0,1,1,...]
-
+  /*
+   * For all numbers in 0, ..., (2**D)-1; do they have bit d lit up?
+   * NB: bit 0 is the least significant digit.
+   * e.g. binmask(1,D) will be: [0,0,1,1,0,0,1,1,...]
+   * e.g. binmask(0,D) will be: [0,1,0,1,...]
+   */
+  assert(d < D);
   uint N = pow(2,D);
   bvec mask = bvec(N);
   for(uint b = 0; b < N; ++b){

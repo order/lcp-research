@@ -152,7 +152,7 @@ class TabularVarResBasis{
   TabularVarResBasis(const TypedPoints & points, mat bounds);
   sp_mat get_basis() const;
   bool can_split(uint basis_idx, uint dim_idx) const;
-  std::pair<uint, uint> split_basis(uint basis_idx, uint dim_idx);
+  uint split_basis(uint basis_idx, uint dim_idx);
   
   
   TypedPoints m_typed_points;
@@ -167,17 +167,13 @@ class MultiLinearVarResBasis{
  public:
   MultiLinearVarResBasis(const vector<vec> & grid);
   sp_mat get_basis() const;
-  bool can_split(uint basis_idx, uint dim_idx) const;
-  std::pair<uint, uint> split_basis(uint basis_idx, uint dim_idx);
+  bool can_split(uint cell_idx, uint dim_idx) const;
+  uint split_cell(uint cell_idx, uint dim_idx);
 
   vector<vec> m_grid;
   uvec m_grid_size;
-
-  map<uint, uvec> m_cell_to_point;
-  map<uint, mat> m_cell_to_bbox;
-  map<uint, set<uint> m_point_to_cells;
-}
-
-
+  uint m_num_oob;  // Fixed to one for now.
+  vector<umat> m_cell_to_bbox;
+};
 
 #endif

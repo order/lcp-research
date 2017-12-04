@@ -680,7 +680,7 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & not_bounded_
   mat rep_dist;
   for(uint d = 0; d < D; d++){
     rep_dist = repmat(rel_dist.col(d), 1, halfV);
-    mask = binmask(d,D);   
+    mask = binmask(d,D);
     weights.cols(find(mask == 1)) %= rep_dist;		       
     weights.cols(find(mask == 0)) %= 1 - rep_dist;
   }
@@ -726,18 +726,24 @@ ElementDist UniformGrid::points_to_element_dist(const TypedPoints & not_bounded_
 
 
 template <typename T> T UniformGrid::base_interpolate(const TypedPoints & points,
-						      const T& data) const{  
+						      const T& data) const{
+  /*
+   * Points is a N x d TypedPoints structure
+   * data is a NN x k matrix structure containing values.
+   * Will return a N x k matrix of interpolated values.
+   */
   uint N = points.n_rows;
   uint d = points.n_cols;
-  uint NN = number_of_all_nodes();
-  assert(data.n_rows == NN);
+  uint k = data.n_cols;
+  uint NN = data.n_rows;
+  assert(number_of_all_nodes() == NN);
   
   ElementDist D = points_to_element_dist(points);
-  assert(size(D) == size(N,NN));
+  assert(size(D) == size(NN,N));
 
-  T ret = D * data;
+  T ret = D.t() * data;
   assert(ret.n_rows == N);
-  assert(ret.n_cols == data.n_cols);
+  assert(ret.n_cols == k);
   return ret;
 }
 

@@ -295,11 +295,11 @@ bool test_element_dist_1(){
 
   TypedPoints p = TypedPoints(0.5*ones<mat>(1,2));
   ElementDist distr = grid.points_to_element_dist(p);
-  assert(1 == distr.n_rows);
-  assert(5 == distr.n_cols);
+  assert(5 == distr.n_rows);
+  assert(1 == distr.n_cols);
   mat dense = mat(distr);
-  rowvec ref = {0.25, 0.25, 0.25, 0.25, 0.0};
-  assert(ALMOST_EQUAL(dense.row(0), ref));
+  vec ref = {0.25, 0.25, 0.25, 0.25, 0.0};
+  assert(ALMOST_EQUAL(dense.col(0), ref));
 
   cout << "Finished test_element_dist_1" << endl;
 }
@@ -315,11 +315,11 @@ bool test_element_dist_2(){
   
   TypedPoints p = TypedPoints(2*ones<mat>(1,2));
   ElementDist distr = grid.points_to_element_dist(p);
-  assert(1 == distr.n_rows);
-  assert(5 == distr.n_cols);
+  assert(5 == distr.n_rows);
+  assert(1 == distr.n_cols);
   mat dense = mat(distr);
-  rowvec ref = {0, 0, 0, 0, 1};
-  assert(ALMOST_EQUAL(dense.row(0), ref));
+  vec ref = {0, 0, 0, 0, 1};
+  assert(ALMOST_EQUAL(dense.col(0), ref));
 
   cout << "Finished test_element_dist_2" << endl;
 }
@@ -333,13 +333,29 @@ bool test_element_dist_3(){
   Points points = mat{{0,0}};
   TypedPoints p = TypedPoints(points);
   ElementDist distr = grid.points_to_element_dist(p);
-  assert(1 == distr.n_rows);
-  assert(5 == distr.n_cols);
+  assert(5 == distr.n_rows);
+  assert(1 == distr.n_cols);
   mat dense = mat(distr);
-  rowvec ref = {1.0, 0.0, 0.0, 0.0, 0.0};
-  assert(ALMOST_EQUAL(dense.row(0), ref));
+  vec ref = {1.0, 0.0, 0.0, 0.0, 0.0};
+  assert(ALMOST_EQUAL(dense.col(0), ref));
 
   cout << "Finished test_element_dist_3" << endl;
+}
+
+bool test_element_dist_4(){
+  vec low = vec{0,0};
+  vec high = vec{1,1};
+  uvec num_cells = uvec{1,1};  
+  UniformGrid grid = UniformGrid(low,high,num_cells,1);
+
+  TypedPoints points = grid.get_all_nodes();
+  cout << points << endl;
+  ElementDist distr = grid.points_to_element_dist(points);
+  assert(5 == distr.n_rows);
+  assert(5 == distr.n_cols);
+  assert(ALMOST_EQUAL(mat(distr), eye(5,5)));
+  
+  cout << "Finished test_element_dist_4" << endl;
 }
 
 bool test_interpolate_1(){
@@ -407,7 +423,7 @@ bool test_get_points_2(){
   UniformGrid grid = UniformGrid(low,high,num_cells,1);
 
   TypedPoints points = grid.get_spatial_nodes();
-  assert(10*10*10 == points.n_rows);
+  assert(11*11*11 == points.n_rows);
   assert(3 == points.n_cols);
   cout << "Finished test_get_points_2" << endl;
 }
@@ -453,6 +469,8 @@ int main(){
   test_element_dist_1();
   test_element_dist_2();
   test_element_dist_3();
+  test_element_dist_4();
+
   cout << endl;
 
   test_interpolate_1();

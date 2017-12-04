@@ -1,5 +1,6 @@
 #include <assert.h>
 #include "basis.h"
+#include "grid.h"
 #include "misc.h"
 
 vec gabor_wavelet(const vec & points,
@@ -725,11 +726,13 @@ bool TabularVarResBasis::can_split(uint basis_idx, uint dim_idx) const{
 }
 
 
-std::pair<uint, uint> TabularVarResBasis::split_basis(uint basis_idx, uint dim_idx){
+uint TabularVarResBasis::split_basis(uint basis_idx, uint dim_idx){
   /*
    * Splits a basis cell along a given dimension.
    * Updates the old basis as the [lo,mid) cell, and makes a new cell
    * as the [mid, hi) cell.
+   *
+   * Returns the new basis' index
    */
   
   assert(can_split(basis_idx, dim_idx));
@@ -764,18 +767,21 @@ std::pair<uint, uint> TabularVarResBasis::split_basis(uint basis_idx, uint dim_i
 
   // Update old assignment
   m_point_assign[basis_idx] = old_basis;
+  
   // Add new assignment
   m_point_assign.push_back(new_basis);
-  
+
+  // Return the new basis index
+  return m_point_assign.size() - 1;
 }
 
 umat box2points(const umat & bbox, uvec grid_size){
   uint D = grid_size.n_elem;
   vector<uvec> marginal;
   for(uint d = 0; d < D; d++){
-    marginal.push_back(regspace<uvec>(bbox(d,0), regspace(d,1)));
+    marginal.push_back(regspace<uvec>(bbox(d,0), bbox(d,1)));
   }
-  return make_points(marginal);
+  return make_points<umat, uvec>(marginal);
 }
 
 umat box2vert(const umat & bbox, uvec grid_size){
@@ -784,15 +790,18 @@ umat box2vert(const umat & bbox, uvec grid_size){
   for(uint d = 0; d < D; d++){
     marginal.push_back(conv_to<uvec>::from(bbox.row(d)));
   }
-  return make_points(marginal);
+  return make_points<umat,uvec>(marginal);
 }
 
 uvec box2width(const umat & bbox){
+  /*
+   * Number of points in the box. Note that [0,0] has one point.
+   */
   uint D = bbox.n_rows;
   uvec width = uvec(D);
   for(uint d = 0; d < D; d++){
     assert(bbox(d,1) >= bbox(d,0));
-    width(d) = bbox(d,1) - bbox(d,0);
+    width(d) = bbox(d,1) - bbox(d,0) + 1;
   }
   return width;
 }
@@ -802,11 +811,15 @@ MultiLinearVarResBasis::MultiLinearVarResBasis(const vector<vec> & grid) : m_gri
   uint D = grid.size();
   m_grid_size = uvec(D);
   for(uint d = 0; d < D; d++){
+    uint grid_size = grid[d].size();
+    assert(grid_size > 0);
     m_grid_size[d] = grid[d].size();
   }
   umat box = zeros<umat>(D,2);
-  box.col(1) = m_grid_size;
-  m_cell_to_bbox[0] = box;
+  box.col(1) = (m_grid_size - 1);
+  m_cell_to_bbox.push_back(box);
+
+  m_num_oob = 1;
 }
 
 sp_mat MultiLinearVarResBasis::get_basis() const{
@@ -820,30 +833,36 @@ sp_mat MultiLinearVarResBasis::get_basis() const{
   uint V = pow(2,D);
 
   uint nnz = 0;
+  // point_id -> {vertex_id -> weight}
   map<uint, map<uint, double>> weight_map;
+  
+  // Stores the points found as bases with non-zero weights.
+  // There will be a bases around each.
+  set<uint> bases;
 
-  for(auto const & it : m_cell_to_bbox){
-    uint cell_id = it.first;
-    umat cell_box = it.second;
-
+  for(auto const & cell_box : m_cell_to_bbox){
     uvec width = box2width(cell_box);
     uint P = prod(width);
-    
+
+    // Set up the vertices and their indices
     umat vertices = box2vert(cell_box, m_grid_size);
-    uvec vidx = coords_to_indices(Coords(vertices));
-    assert(shape(V,D) == shape(vertices));
-    
+    uvec vidx = coords_to_indices(m_grid_size,
+				  Coords(conv_to<imat>::from(vertices)));
+    assert(size(V,D) == size(vertices));
+
+    // Set up the points and their indices
     umat points = box2vert(cell_box, m_grid_size);
-    uvec pidx = coords_to_indices(Coords(points));
-    assert(shape(P,D) == shape(points));
+    uvec pidx = coords_to_indices(m_grid_size,
+				  Coords(conv_to<imat>::from(points)));
+    assert(size(P,D) == size(points));
 
     // Subtract out the least vertex
     mat delta = row_diff(conv_to<mat>::from(points),
-			 conv_to<vec>::from(vertices.row(0)));
+			 conv_to<rowvec>::from(vertices.row(0)));
     assert(all(all(delta >= -ALMOST_ZERO)));
 
     // Divide by the width of the cell
-    delta = row_divide(delta, conv_to<rowvec>::from(width.t()));
+    delta = row_divide(delta, conv_to<rowvec>::from(width.t() - 1));
     assert(all(all(delta >= -ALMOST_ZERO)));
     assert(all(all(delta <= 1 + ALMOST_ZERO)));
     scalar_max_inplace(delta, 0); 
@@ -852,19 +871,57 @@ sp_mat MultiLinearVarResBasis::get_basis() const{
 
     // Do the multilinear interpolation
     uint halfV = V / 2;
-    mat weights = ones<mat>(P, V);
+    mat weights = ones<mat>(P, V);  // Initialize with unity weights
     bvec mask;
     mat rep_delta;
     for(uint d = 0; d < D; d++){
-      rep_dist = repmat(delta.col(d), 1, halfV);
-      mask = binmaks(d,D);
-      weights.cols(find(mask == 1)) %= rep_dist;		       
-      weights.cols(find(mask == 0)) %= 1 - rep_dist;
-    }
-    assert(is_finite(weights));
-    assert(all(all(weights >= 0)));
-    assert(all(all(weights <= 1))); 
+      /*
+	---===Interpolation code explaination===---
+	For 2D grid on box [0,A] x [0,B] there are 4 vertices in C-order:
+	     x y
+	0 -> 0 0
+	1 -> 0 B
+	2 -> A 0
+	3 -> A B
+	NB: each vertex also has a point index; but these are there "local
+	vertices indices" for the purposes of talking about weights.
+	
+	Consider the point (1, 1). It's multilinear interpolation weights
+	over vertices is:
+	0 -> [(A - 1) / A] * [(B - 1) / B]
+	1 -> [(A - 1) / A] * [1 / B]
+	2 -> [1 / A] * [(B - 1) / B]
+	3 -> [1 / A] * [1 / B]
+	Notice that the contribution of the x-dim distances are:
+	 [(A - 1) / A]
+	 [(A - 1) / A]
+	 [1 / A]
+	 [1 / A]
+	 So the behavior of the first column's contribution to the weights
+	 is the behavior of the most-significant bit in binary.
 
+	 The delta matrix holds the [1 / A, 1 / B] values.
+      */
+
+      // This mask is the (D-d-1)^th column of the binary expansion matrix
+      // [[0 ... 0], [0 ... 1], ..., [1 ... 1]
+      mask = binmask(D-d-1, D);
+
+      // If you match the 1 you get the (1 / A) contribution
+      rep_delta = repmat(delta.col(d), 1, halfV); // Applies to exactly half
+      weights.cols(find(mask == 1)) %= rep_delta;
+
+      // If you match the 0 you get the (A - 1) / A contribution
+      weights.cols(find(mask == 0)) %= 1 - rep_delta;
+    }
+
+    //Basic sanity check: weights seem reasonable..
+    assert(is_finite(weights));
+    assert(all(all(weights >= 0))); 
+    assert(all(all(weights <= 1)));
+    assert(abs(accu(weights) - P) < PRETTY_SMALL);
+
+    // Convert the weight matrix into the weight map
     for(uint p = 0; p < P; p++){
       uint pid = pidx[p];
       if(weight_map.end() != weight_map.find(pid)){
@@ -877,25 +934,70 @@ sp_mat MultiLinearVarResBasis::get_basis() const{
 	  // Zero; ignore
 	  continue;
 	}
-	weight_map[p][v] = weights(p,v);
+	bases.insert(vid);
+	weight_map[pid][vid] = weights(p,v);
 	nnz++;
       }
     }
   }
 
-  // Convert to sp_mat
-  umat loc = umat(2,nnz);
-  vec data = vec(nnz);
-  uint I = 0
-    for(auto const & pit : weight_map){
-      for(auto const & vit : pit.second){
-	loc(0,I) = pit.first;
-	loc(1,I) = vit.first;
-	data(I) = vit.second;
-	I++;
-      }
-    }
+  // Index the vertices as bases
+  map<uint, uint> vert_to_basis_map;
+  uint basis_id = 0;
+  for(auto const & it : bases){
+    vert_to_basis_map[it] = basis_id++;
+  }
 
-  // TODO: vertex point id -> basis id (sorted point id order?)
-  return(loc, data, ??, ??);
+  // Convert to sp_mat
+  umat loc = umat(2,nnz + m_num_oob);
+  vec data = vec(nnz + m_num_oob);
+  uint I = 0;
+  for(auto const & pit : weight_map){
+    for(auto const & vit : pit.second){
+      cout << pit.first << " " << vit.first << endl;
+      loc(0,I) = pit.first;
+      loc(1,I) = vert_to_basis_map[vit.first];
+      data(I) = vit.second;
+      I++;
+    }
+  }
+
+  // TODO: Sanity check (all points covered)
+  uint n_nodes = prod(m_grid_size) + m_num_oob;
+  uint n_bases = bases.size() + m_num_oob;
+  
+  // Add OOB as isolated node
+  loc(0,nnz) = n_nodes - 1;
+  loc(1,nnz) = n_bases - 1;
+  data(nnz) = 1.0;
+
+  return sp_mat(loc, data, n_nodes, n_bases);
+}
+
+bool MultiLinearVarResBasis::can_split(uint cell_idx, uint dim_idx) const{
+  assert(cell_idx < m_cell_to_bbox.size());
+  umat cell_box = m_cell_to_bbox[cell_idx];
+  // Needs to be at least one intermediate points along that dimension
+  // E.g. if the interval is [1,2] then there are no intermendiate points
+  // And we cannot split.
+  return cell_box(dim_idx, 1) > cell_box(dim_idx, 0) + 1;
+}
+
+uint MultiLinearVarResBasis::split_cell(uint cell_idx, uint dim_idx){
+  assert(can_split(cell_idx, dim_idx));
+
+  umat cell_bbox = m_cell_to_bbox[cell_idx];
+  uint width = cell_bbox(dim_idx, 1) - cell_bbox(dim_idx, 0) + 1;
+  assert(width >= 3);
+  uint mid = width / 2; // floor
+
+  // Add new bbox
+  umat new_bbox = umat(cell_bbox);
+  new_bbox(dim_idx,0) = mid;  // [mid, high]
+  m_cell_to_bbox.push_back(new_bbox);
+
+  // Update old bbox
+  m_cell_to_bbox[cell_idx](dim_idx,1) = mid;  // [low, mid]
+
+  return m_cell_to_bbox.size() - 1;
 }

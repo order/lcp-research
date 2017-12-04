@@ -108,7 +108,7 @@ void test_balance_basis_2(){
 }
 
 void test_balance_basis_3(){
-  cout << "test_balance_basis_2...";
+  cout << "test_balance_basis_3...";
   uint N = 6;
   
   sp_mat shift = speye(N, N) - 0.9 * build_shift_block(N, 1, 0.1);
@@ -134,24 +134,28 @@ void test_balance_basis_3(){
 }
 
 void test_grid_basis_1(){
+  cout << "test_grid_basis_1...";
   mat raw_points = mat{ {0, 0}, {0, 1}, {1, 0}, {1, 1}};
   mat bounds = {{0,1}, {0,1}};
  
   TypedPoints points = TypedPoints(raw_points);
 
-  GridBasis basis_factory = GridBasis(points, bounds);
+  TabularVarResBasis basis_factory = TabularVarResBasis(points, bounds);
   sp_mat basis_mat = basis_factory.get_basis();
   assert(size(4,1) == size(basis_mat));
   assert(abs(basis_mat(0,0) - 0.25) < 1e-9);
+  cout << " PASSED." << endl;
 }
 
 void test_grid_basis_2(){
+  cout << "test_grid_basis_2...";
+
   mat raw_points = mat{ {0, 0}, {0, 1}, {1, 0}, {1, 1}};
   mat bounds = {{0,1}, {0,1}};
  
   TypedPoints points = TypedPoints(raw_points);
 
-  GridBasis basis_factory = GridBasis(points, bounds);
+  TabularVarResBasis basis_factory = TabularVarResBasis(points, bounds);
   assert(basis_factory.can_split(0,0));
   basis_factory.split_basis(0,0);
   assert(!basis_factory.can_split(0,0));
@@ -163,27 +167,49 @@ void test_grid_basis_2(){
   assert(abs(basis_mat(1,0) - 0.5) < 1e-9);
   assert(abs(basis_mat(2,1) - 0.5) < 1e-9);
   assert(abs(basis_mat(3,1) - 0.5) < 1e-9);
+  cout << " PASSED." << endl;
+
 }
 
 void test_grid_basis_3(){
+  cout << "test_grid_basis_3...";
+
   mat raw_points = mat{ {0, 0}, {0, 1}, {1, 0}, {1, 1}};
   mat bounds = {{0,1}, {0,1}};
  
   TypedPoints points = TypedPoints(raw_points);
 
-  GridBasis basis_factory = GridBasis(points, bounds);
+  TabularVarResBasis basis_factory = TabularVarResBasis(points, bounds);
   basis_factory.split_basis(0,0);
   basis_factory.split_basis(0,1);
 
   sp_mat basis_mat = basis_factory.get_basis();
-  cout << basis_mat << endl;
   assert(size(4,3) == size(basis_mat));
   assert(abs(basis_mat(0,0) - 1) < 1e-9);
   assert(abs(basis_mat(1,2) - 1) < 1e-9);
   assert(abs(basis_mat(2,1) - 0.5) < 1e-9);
   assert(abs(basis_mat(3,1) - 0.5) < 1e-9);
-  
+  cout << " PASSED." << endl;
+
 }
+
+
+void test_interp_grid_basis_1(){
+  cout << "test_interp_grid_basis_1...";
+  vector<vec> grid;
+  vec grid_points = regspace(0,1);
+  grid.push_back(grid_points);
+  grid.push_back(grid_points);
+  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid);
+  
+  sp_mat basis = basis_factory.get_basis();
+  cout << basis << endl;
+  assert(5 == basis.n_rows);
+  assert(5 == basis.n_cols);
+  cout << " PASSED." << endl;
+
+}
+
 
 
 int main(){
@@ -197,4 +223,5 @@ int main(){
   test_grid_basis_2();
   test_grid_basis_3();
 
+  test_interp_grid_basis_1();
 }
