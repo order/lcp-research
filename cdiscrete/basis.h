@@ -163,12 +163,15 @@ class TabularVarResBasis{
   vector<mat> m_basis_bounds;
 };
 
+umat box2vert(const umat & bbox, uvec grid_size);
 class MultiLinearVarResBasis{
  public:
   MultiLinearVarResBasis(const vector<vec> & grid);
   sp_mat get_basis() const;
   bool can_split(uint cell_idx, uint dim_idx) const;
   uint split_cell(uint cell_idx, uint dim_idx);
+
+  void split_per_dimension(uint cell_idx, uvec split);
 
   vector<vec> m_grid;
   uvec m_grid_size;

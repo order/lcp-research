@@ -775,6 +775,32 @@ uint TabularVarResBasis::split_basis(uint basis_idx, uint dim_idx){
   return m_point_assign.size() - 1;
 }
 
+void MultiLinearVarResBasis::split_per_dimension(uint cell_idx, uvec split){
+  assert(cell_idx < m_cell_to_bbox.size()); // Valid cell id
+  uint n_dim =  m_grid_size.n_elem;
+  assert(n_dim == split.n_elem); // Same dimension
+  
+  // Split the cells
+  vector<uint> frontier;
+  frontier.push_back(cell_idx);
+  uint n_new_bases = prod(split + 1);
+  frontier.reserve(n_new_bases);
+  for(uint split_dim = 0; split_dim < n_dim; split_dim++){
+    for(uint i = 0; i < split[split_dim]; i++){
+      vector<uint> new_elements;
+      for(auto const & it : frontier){
+	assert(can_split(it, split_dim));
+	uint new_cell_id = split_cell(it, split_dim);
+	new_elements.push_back(new_cell_id);
+      }
+      frontier.insert(frontier.end(),
+		      new_elements.begin(),
+		      new_elements.end());
+    }
+  }
+  assert(n_new_bases == frontier.size());
+}
+
 umat box2points(const umat & bbox, uvec grid_size){
   uint D = grid_size.n_elem;
   vector<uvec> marginal;
@@ -851,10 +877,11 @@ sp_mat MultiLinearVarResBasis::get_basis() const{
     assert(size(V,D) == size(vertices));
 
     // Set up the points and their indices
-    umat points = box2vert(cell_box, m_grid_size);
+    umat points = box2points(cell_box, m_grid_size);
+    assert(size(P,D) == size(points));
     uvec pidx = coords_to_indices(m_grid_size,
 				  Coords(conv_to<imat>::from(points)));
-    assert(size(P,D) == size(points));
+    assert(P == pidx.n_elem);
 
     // Subtract out the least vertex
     mat delta = row_diff(conv_to<mat>::from(points),
@@ -954,7 +981,6 @@ sp_mat MultiLinearVarResBasis::get_basis() const{
   uint I = 0;
   for(auto const & pit : weight_map){
     for(auto const & vit : pit.second){
-      cout << pit.first << " " << vit.first << endl;
       loc(0,I) = pit.first;
       loc(1,I) = vert_to_basis_map[vit.first];
       data(I) = vit.second;

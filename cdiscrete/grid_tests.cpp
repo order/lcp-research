@@ -349,7 +349,6 @@ bool test_element_dist_4(){
   UniformGrid grid = UniformGrid(low,high,num_cells,1);
 
   TypedPoints points = grid.get_all_nodes();
-  cout << points << endl;
   ElementDist distr = grid.points_to_element_dist(points);
   assert(5 == distr.n_rows);
   assert(5 == distr.n_cols);

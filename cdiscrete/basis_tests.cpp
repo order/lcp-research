@@ -2,6 +2,7 @@
 
 #include <armadillo>
 #include "basis.h"
+#include "grid.h"
 
 using namespace std;
 using namespace arma;
@@ -203,13 +204,90 @@ void test_interp_grid_basis_1(){
   MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid);
   
   sp_mat basis = basis_factory.get_basis();
-  cout << basis << endl;
   assert(5 == basis.n_rows);
   assert(5 == basis.n_cols);
   cout << " PASSED." << endl;
 
 }
 
+void test_interp_grid_basis_2(){
+  cout << "test_interp_grid_basis_2...";
+  vector<vec> grid;
+  
+  vec grid_points = regspace(0,2);
+  grid.push_back(grid_points);
+  grid.push_back(grid_points);
+  
+  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid);
+  
+  mat basis = mat(basis_factory.get_basis());
+  assert(10 == basis.n_rows);
+  assert(5 == basis.n_cols);
+
+  // Rows sum to 1
+  assert(abs(accu(sum(basis,1) - 1)) < PRETTY_SMALL);
+
+  
+  uvec grid_size = uvec{3,3};
+  umat vertices = box2vert(umat{{0,2},{0,2}}, grid_size); 
+  uvec vidx = coords_to_indices(grid_size,
+				Coords(conv_to<imat>::from(vertices)));
+
+  for(uint i = 0; i < vidx.n_elem; i++){
+    // Rows for vertices are pure
+    
+    assert(abs(max(basis.row(vidx(i))) - 1) < PRETTY_SMALL);
+  }
+  
+  cout << " PASSED." << endl;
+}
+
+void test_interp_grid_basis_3(){
+  cout << "test_interp_grid_basis_3...";
+  vector<vec> grid;
+  
+  vec grid_points = regspace(0,3);
+  grid.push_back(grid_points);
+  grid.push_back(grid_points);
+
+  // Make the basis factory
+  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid);
+  assert(basis_factory.can_split(0,0));
+
+  // Split into two
+  uint new_cell = basis_factory.split_cell(0,0);
+  assert(1 == new_cell);
+
+  // Expected number of points: 17 (4 x 4 + 1)
+  // Expected number of bases: 7 (6 + 1)
+  // o - o - o
+  // |   |   |
+  // o - o - o   (*)
+  mat basis = mat(basis_factory.get_basis());
+  assert(size(17,7) == size(basis));
+
+  cout << " PASSED." << endl;
+}
+
+void test_interp_grid_basis_4(){
+  cout << "test_interp_grid_basis_4...";
+  vector<vec> grid;
+  
+  vec grid_points = regspace(0,3);
+  grid.push_back(grid_points);
+  grid.push_back(grid_points);
+
+  // Make the basis factory
+  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid);
+  basis_factory.split_per_dimension(0, uvec{1,1});
+
+  assert(4 == basis_factory.m_cell_to_bbox.size()); // 4 cells
+  mat basis = mat(basis_factory.get_basis());
+  assert(size(17,10) == size(basis));
+  cout << endl << basis << endl;
+  cout << " PASSED." << endl;
+
+}
 
 
 int main(){
@@ -224,4 +302,7 @@ int main(){
   test_grid_basis_3();
 
   test_interp_grid_basis_1();
+  test_interp_grid_basis_2();
+  test_interp_grid_basis_3();
+  test_interp_grid_basis_4();
 }
