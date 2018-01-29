@@ -7,6 +7,12 @@ using namespace arma;
 using namespace std;
 
 /*
+ * Test functions for uniform grid functions 
+ *
+ */
+
+
+/*
  * Helper function tests
  */
 #define ALMOST_EQUAL(A,B) approx_equal(A,B,"both",PRETTY_SMALL,PRETTY_SMALL)

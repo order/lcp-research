@@ -7,6 +7,11 @@
 using namespace std;
 using namespace arma;
 
+/*
+ * Test functions for basis functions.
+ * Including MultiLinearVarResBasis, the variable resolution multi-linear interpolation basis
+ */
+
 sp_mat build_shift_block(uint N, int shift, double p){
   /*
    * Build the N-state hallway transition matrix on a 1D "torus"
@@ -284,7 +289,6 @@ void test_interp_grid_basis_4(){
   assert(4 == basis_factory.m_cell_to_bbox.size()); // 4 cells
   mat basis = mat(basis_factory.get_basis());
   assert(size(17,10) == size(basis));
-  cout << endl << basis << endl;
   cout << " PASSED." << endl;
 
 }
