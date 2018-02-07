@@ -642,12 +642,23 @@ PLCP approx_lcp(const sp_mat & value_basis,
 
 
 ////////////////////////////////////////////////////////////////////////////
-// Variable resolution bases //
-///////////////////////////////
+// Table-based variable resolution basis factory //
+///////////////////////////////////////////////////
 
 TabularVarResBasis::TabularVarResBasis(const TypedPoints & points, mat bounds) :
   m_typed_points(points)
 {
+  /*
+   * This is the constructor for a variable resolution "grid" basis. E.g.
+   * o--oo-o
+   * |  || |
+   * |  |o-o
+   * |  |o-o
+   * |  || |
+   * o--oo-o
+   * For the tabular basis, all values in the same cell have the same value.
+   * Each "cell" is a rectangular set of points.
+   */
   typedef vector<uint> stduvec;
   n_bases = 0;
   n_rows = points.n_rows;
@@ -775,32 +786,6 @@ uint TabularVarResBasis::split_basis(uint basis_idx, uint dim_idx){
   return m_point_assign.size() - 1;
 }
 
-void MultiLinearVarResBasis::split_per_dimension(uint cell_idx, uvec split){
-  assert(cell_idx < m_cell_to_bbox.size()); // Valid cell id
-  uint n_dim =  m_grid_size.n_elem;
-  assert(n_dim == split.n_elem); // Same dimension
-  
-  // Split the cells
-  vector<uint> frontier;
-  frontier.push_back(cell_idx);
-  uint n_new_bases = prod(split + 1);
-  frontier.reserve(n_new_bases);
-  for(uint split_dim = 0; split_dim < n_dim; split_dim++){
-    for(uint i = 0; i < split[split_dim]; i++){
-      vector<uint> new_elements;
-      for(auto const & it : frontier){
-	assert(can_split(it, split_dim));
-	uint new_cell_id = split_cell(it, split_dim);
-	new_elements.push_back(new_cell_id);
-      }
-      frontier.insert(frontier.end(),
-		      new_elements.begin(),
-		      new_elements.end());
-    }
-  }
-  assert(n_new_bases == frontier.size());
-}
-
 umat box2points(const umat & bbox, uvec grid_size){
   uint D = grid_size.n_elem;
   vector<uvec> marginal;
@@ -832,16 +817,49 @@ uvec box2width(const umat & bbox){
   return width;
 }
 
+////////////////////////////////////////////////////////////////////////////
+// Multilinear interpolation based variable resolution basis factory //
+///////////////////////////////////////////////////////////////////////
 
-MultiLinearVarResBasis::MultiLinearVarResBasis(const vector<vec> & grid) : m_grid(grid){
-  uint D = grid.size();
-  m_grid_size = uvec(D);
-  for(uint d = 0; d < D; d++){
+MultiLinearVarResBasis::MultiLinearVarResBasis(const vector<vec> & grid)
+  : m_grid(grid)
+{
+  /*
+   * Takes in a vector of arma::vec objects, this describes the "underlying"
+   * grid discretization.
+   * 
+   * This underlying grid defines the point index <-> coordinate mapping.
+   * so if grid = [[-1,0,1], [0,1,2,3]], then this is a 2x3 set of 
+   * underlying cells, with vertices indexed in C-order (row-major):
+   * 
+   * 3   9 -10 -11
+   *     |   |   |
+   * 2   6 - 7 - 8
+   *     |   | x | <-- (0.5, 1.1) here
+   * 1   3 - 4 - 5
+   *     |   |   |
+   * 0   0 - 1 - 2
+   *
+   *    -1   0   1
+   * then continuous point (0.5,1.1) is in the underlying grid cell 
+   * [0,1] x [1,2], which has discrete 
+   * vertices coordinates: [1,1], [1,2], [2,1], [2,2]
+   * These correspond to continuous vertices: 
+   * (0, -2), (0,-1), (1, -2), (1,-1)
+   * And indices: [4, 7, 5, 8]
+   */
+  uint n_dim = grid.size();
+  m_grid_size = uvec(n_dim);
+
+  // Get grid-points
+  for(uint d = 0; d < n_dim; d++){
     uint grid_size = grid[d].size();
     assert(grid_size > 0);
     m_grid_size[d] = grid[d].size();
   }
-  umat box = zeros<umat>(D,2);
+
+  // Sets up a single basis grid cell for the discretized space.
+  umat box = zeros<umat>(n_dim,2);
   box.col(1) = (m_grid_size - 1);
   m_cell_to_bbox.push_back(box);
 
@@ -851,12 +869,13 @@ MultiLinearVarResBasis::MultiLinearVarResBasis(const vector<vec> & grid) : m_gri
 sp_mat MultiLinearVarResBasis::get_basis() const{
   /*
    * Create the basis from the multi linear grid.
-   * Each basis is a cell vertex, and it's support is the
+   *
+   * Each basis column represents is a cell vertex, and its support is the
    * set of elements that depend on that vertex.
    */
   uint n_weights = 0;
-  uint D = m_grid_size.n_elem;
-  uint V = pow(2,D);
+  uint D = m_grid_size.n_elem; // Number of dimensions
+  uint V = pow(2,D); // Number of vertices per rectangle
 
   uint nnz = 0;
   // point_id -> {vertex_id -> weight}
@@ -1001,6 +1020,13 @@ sp_mat MultiLinearVarResBasis::get_basis() const{
 }
 
 bool MultiLinearVarResBasis::can_split(uint cell_idx, uint dim_idx) const{
+  /*
+   * Check that cell_idx can be split along dim_idx.
+   *
+   * Needs to be at least one intermediate points along that dimension.
+   * E.g. if the interval is [1,2] then there are no intermendiate points
+   * and we cannot split.
+   */
   assert(cell_idx < m_cell_to_bbox.size());
   umat cell_box = m_cell_to_bbox[cell_idx];
   // Needs to be at least one intermediate points along that dimension
@@ -1026,4 +1052,47 @@ uint MultiLinearVarResBasis::split_cell(uint cell_idx, uint dim_idx){
   m_cell_to_bbox[cell_idx](dim_idx,1) = mid;  // [low, mid]
 
   return m_cell_to_bbox.size() - 1;
+}
+
+void MultiLinearVarResBasis::split_per_dimension(uint cell_idx, uvec split){
+  /*
+   * Split an indexed cell multiple times.
+   * cell_idx: the cell index to split
+   * split: split[d] is the number of times to split the cell in half along
+   *        dimension d.
+   *
+   * Example: if cell_idx i is the set of points [0,2] x [0,2] then 
+   *   split_per_dimension(i,[1,1]) will split this cell once per dimension,
+   *   leading to 4 cells: [0,1]x[0,1], [0,1]x[1,2], [1,2]x[0,1], [1,2]x[1,2]
+   *   Note that since none of these cells contain "intermediate nodes", 
+   *   these cells will behave, locally, as the identity basis.
+   * Example: if cell_idx i is [0,4]x[0,4], then split_per_dimension(i,[1,2])
+   *   will create 8 cells:
+   *   [0,2]x[0,1], [0,2]x[1,2],...,[2,4]x[0,1],...,[2,4]x[3,4]
+   */
+
+  // Make sure the input is sane.
+  assert(cell_idx < m_cell_to_bbox.size()); // Valid cell id
+  uint n_dim =  m_grid_size.n_elem;
+  assert(n_dim == split.n_elem); // Same dimension
+  
+  // Split the cells.
+  vector<uint> frontier;
+  frontier.push_back(cell_idx);
+  uint n_new_bases = prod(split + 1);
+  frontier.reserve(n_new_bases);
+  for(uint split_dim = 0; split_dim < n_dim; split_dim++){
+    for(uint i = 0; i < split[split_dim]; i++){
+      vector<uint> new_elements;
+      for(auto const & it : frontier){
+	assert(can_split(it, split_dim));
+	uint new_cell_id = split_cell(it, split_dim);
+	new_elements.push_back(new_cell_id);
+      }
+      frontier.insert(frontier.end(),
+		      new_elements.begin(),
+		      new_elements.end());
+    }
+  }
+  assert(n_new_bases == frontier.size());
 }
