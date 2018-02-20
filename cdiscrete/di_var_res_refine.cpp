@@ -18,18 +18,17 @@
  * resolution "active" grid.
  */
 
-#include <boost/program_options.hpp>
-namespace po = boost::program_options;
-
 // Bounding box [-B, B] x [-B, B]
 
-#define B 5.0
+#define N_GRID_POINTS 32
+#define UVEC_GRID_SIZE uvec{N_GRID_POINTS, N_GRID_POINTS}
+#define BOUNDARY 5.0
 
 mat build_bbox(){
   // Build the D x 2 bounding box
   mat bbox = mat(2,2);
-  bbox.col(0).fill(-B);
-  bbox.col(1).fill(B);
+  bbox.col(0).fill(-BOUNDARY);
+  bbox.col(1).fill(BOUNDARY);
   return bbox;
 }
 
@@ -37,6 +36,8 @@ MultiLinearVarResBasis make_basis(){
   /*
    * Set up the initial basis.
    */
+  uvec grid_size = UVEC_GRID_SIZE;
+  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid_size);
 }
 
 DoubleIntegratorSimulator build_di_simulator(){
@@ -140,8 +141,8 @@ int main(int argc, char** argv)
   // Set up 2D space
   cout << "Generating underlying discretization..." << endl;
   mat bbox = build_bbox();
-  uvec grid_sizes = uvec{N_GRID_POINTS, N_GRID_POINTS};
-  UniformGrid grid = UniformGrid(bbox, grid_sizes);
+  uvec grid_size = UVEC_GRID_SIZE;
+  UniformGrid grid = UniformGrid(bbox, grid_size);
 
   TypedPoints points = grid.get_all_nodes();
   uint n_points = points.n_rows;

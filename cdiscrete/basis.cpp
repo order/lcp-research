@@ -821,15 +821,15 @@ uvec box2width(const umat & bbox){
 // Multilinear interpolation based variable resolution basis factory //
 ///////////////////////////////////////////////////////////////////////
 
-MultiLinearVarResBasis::MultiLinearVarResBasis(const vector<vec> & grid)
-  : m_grid(grid)
+MultiLinearVarResBasis::MultiLinearVarResBasis(const uvec & grid_size)
+  : m_grid_size(grid_size)
 {
   /*
-   * Takes in a vector of arma::vec objects, this describes the "underlying"
+   * Takes in a uvec that discribes the number of points in the underlying
    * grid discretization.
    * 
    * This underlying grid defines the point index <-> coordinate mapping.
-   * so if grid = [[-1,0,1], [0,1,2,3]], then this is a 2x3 set of 
+   * so if grid_size is [3,4], then this is a 2x3 set of 
    * underlying cells, with vertices indexed in C-order (row-major):
    * 
    * 3   9 -10 -11
@@ -848,15 +848,8 @@ MultiLinearVarResBasis::MultiLinearVarResBasis(const vector<vec> & grid)
    * (0, -2), (0,-1), (1, -2), (1,-1)
    * And indices: [4, 7, 5, 8]
    */
-  uint n_dim = grid.size();
-  m_grid_size = uvec(n_dim);
-
-  // Get grid-points
-  for(uint d = 0; d < n_dim; d++){
-    uint grid_size = grid[d].size();
-    assert(grid_size > 0);
-    m_grid_size[d] = grid[d].size();
-  }
+  
+  uint n_dim = grid_size.size();
 
   // Sets up a single basis grid cell for the discretized space.
   umat box = zeros<umat>(n_dim,2);

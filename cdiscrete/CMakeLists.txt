@@ -119,6 +119,7 @@ list(APPEND COMMON_FILES "misc.cpp" "io.cpp" "simulator.cpp"
 #add_executable (hallway_approx hallway_approx.cpp hallway.cpp ${COMMON_FILES})
 
 add_executable (basis_tests basis_tests.cpp grid.cpp points.cpp ${COMMON_FILES})
+add_executable (di_var_res_refine di_var_res_refine.cpp di.cpp grid.cpp refine.cpp points.cpp ${COMMON_FILES})
 add_executable (grid_tests grid_tests.cpp discretizer.cpp grid.cpp misc.cpp
   points.cpp)
 add_executable (points_tests points_tests.cpp misc.cpp points.cpp)
