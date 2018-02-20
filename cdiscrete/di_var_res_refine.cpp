@@ -8,17 +8,25 @@
 #include "refine.h"
 
 /*
- * Double Integrator simulation with the variable resolution basis
+ * Double Integrator simulation with the variable resolution basis.
+ *
+ * This script tests out how Munos & Moore (Variable Resolution 
+ * Discretization in Optimal Control; 1999) style variable resolution grid
+ * refinement works for the Double Integrator 2D dynamics.
+ *
+ * Uses an underlying regular state-space discretization with a variable 
+ * resolution "active" grid.
  */
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
-using namespace tri_mesh;
+// Bounding box [-B, B] x [-B, B]
 
-# define B 5.0
+#define B 5.0
 
 mat build_bbox(){
+  // Build the D x 2 bounding box
   mat bbox = mat(2,2);
   bbox.col(0).fill(-B);
   bbox.col(1).fill(B);
@@ -26,7 +34,9 @@ mat build_bbox(){
 }
 
 MultiLinearVarResBasis make_basis(){
-
+  /*
+   * Set up the initial basis.
+   */
 }
 
 DoubleIntegratorSimulator build_di_simulator(){
@@ -37,7 +47,7 @@ DoubleIntegratorSimulator build_di_simulator(){
   mat actions = vec{-1,1};
   double noise_std = 0.0;
   double step = 0.025;
-  return DoubleIntegratorSimulator(bbox,actions,noise_std,step);
+  return DoubleIntegratorSimulator(bbox, actions, noise_std, step);
 }
 
 SolverResult find_solution(const sp_mat & sp_basis,
@@ -130,16 +140,17 @@ int main(int argc, char** argv)
   // Set up 2D space
   cout << "Generating underlying discretization..." << endl;
   mat bbox = build_bbox();
-  UniformGrid grid = UniformGrid(bbox, uvec{N_GRID_POINTS, N_GRID_POINTS});
+  uvec grid_sizes = uvec{N_GRID_POINTS, N_GRID_POINTS};
+  UniformGrid grid = UniformGrid(bbox, grid_sizes);
 
   TypedPoints points = grid.get_all_nodes();
   uint n_points = points.n_rows;
-  assert(N > 0);
+  assert(n_points > 0);
 
   // Set up the simulator
   DoubleIntegratorSimulator di = build_di_simulator();
   uint n_actions = di.num_actions();
-  assert(A >= 2);
+  assert(n_actions >= 2);
 
   // Build the "exact" LCP P blocks
   cout << "Building LCP blocks..." << endl;
@@ -157,17 +168,17 @@ int main(int argc, char** argv)
 
   // Set up the value basis factory
   cout << "Making value basis factory..." << endl;
-  
   MultiLinearVarResBasis basis_factory = make_basis(points, bbox);
 
   // Set up per-iteration result data structures
   DiResultRecorder recorder = DiResultRecorder(n_points,
 					       n_actions,
 					       NUM_ADD_ROUNDS);
-  
-  
+
+  // Run the basis refinement rounds
   for(uint I = 0; I < NUM_ADD_ROUNDS; I++){
-    cout << "Running " << I << "/" << NUM_ADD_ROUNDS  << endl;
+    cout << "Running basis improvement round: "
+	 << I << "/" << NUM_ADD_ROUNDS  << endl;
 
     cout << "Generating basis..." << endl;
     sp_mat sp_basis = basis_factor.get_basis();
@@ -180,6 +191,7 @@ int main(int argc, char** argv)
     // TODO: split the basis based on some Munos & Moore criterion
     
   }
-  recorder.write_to_file("/home/epz/data/di_var_res_refine.data");
 
+  // Write to file
+  recorder.write_to_file("/home/epz/data/di_var_res_refine.data");
 }
