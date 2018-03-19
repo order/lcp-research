@@ -147,6 +147,7 @@ message(STATUS "Libraries: ${CDISCRETE_LIBRARIES}")
 #target_link_libraries(di_grid_approx ${CDISCRETE_LIBRARIES})
 #target_link_libraries(di_bw_origin_approx ${CDISCRETE_LIBRARIES})
 #target_link_libraries(di_iso_bw_origin_approx ${CDISCRETE_LIBRARIES})
+target_link_libraries(di_var_res_refine ${CDISCRETE_LIBRARIES})
 
 #target_link_libraries(hillcar_gen ${CDISCRETE_LIBRARIES})
 #target_link_libraries(hillcar_refine ${CDISCRETE_LIBRARIES})

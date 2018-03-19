@@ -481,7 +481,7 @@ sp_mat make_freebie_value_basis(const sp_mat flow_basis, const sp_mat block){
 
 
 vector<sp_mat> balance_bases(const vector<sp_mat> initial_bases,
-			      const vector<sp_mat> blocks){
+			     const vector<sp_mat> blocks){
   /*
    * Take in initial bases, and balanced them via the S&S "freebie" 
    * relationship
@@ -577,7 +577,7 @@ PLCP approx_lcp(const sp_mat & value_basis,
   //Sizing and checking
   uint n = smoother.n_rows;
   assert(n == smoother.n_cols);
-  uint A = blocks.size();
+  int A = blocks.size();
   assert(A >= 1);
   assert(size(n,n) == size(blocks.at(0)));
   assert(size(n,A+1) == size(Q));
@@ -840,7 +840,7 @@ MultiLinearVarResBasis::MultiLinearVarResBasis(const uvec & grid_size)
    *     |   |   |
    * 0   0 - 1 - 2
    *
-   *    -1   0   1
+   *     0   1   2
    * then continuous point (0.5,1.1) is in the underlying grid cell 
    * [0,1] x [1,2], which has discrete 
    * vertices coordinates: [1,1], [1,2], [2,1], [2,2]
@@ -850,8 +850,6 @@ MultiLinearVarResBasis::MultiLinearVarResBasis(const uvec & grid_size)
    */
   
   uint n_dim = grid_size.size();
-
-  // Sets up a single basis grid cell for the discretized space.
   umat box = zeros<umat>(n_dim,2);
   box.col(1) = (m_grid_size - 1);
   m_cell_to_bbox.push_back(box);

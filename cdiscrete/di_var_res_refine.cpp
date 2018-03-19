@@ -1,4 +1,5 @@
 #include "di.h"
+#include "grid.h"
 #include "misc.h"
 #include "io.h"
 #include "lcp.h"
@@ -21,8 +22,15 @@
 // Bounding box [-B, B] x [-B, B]
 
 #define N_GRID_POINTS 32
+#define N_OOB 1
 #define UVEC_GRID_SIZE uvec{N_GRID_POINTS, N_GRID_POINTS}
+
 #define BOUNDARY 5.0
+#define GAMMA 0.99
+
+#define IGNORE_Q true
+
+#define N_ADD_ROUNDS 1
 
 mat build_bbox(){
   // Build the D x 2 bounding box
@@ -38,6 +46,7 @@ MultiLinearVarResBasis make_basis(){
    */
   uvec grid_size = UVEC_GRID_SIZE;
   MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid_size);
+  return basis_factory;
 }
 
 DoubleIntegratorSimulator build_di_simulator(){
@@ -76,11 +85,12 @@ SolverResult find_solution(const sp_mat & sp_basis,
   psolver.regularizer = 1e-12;
 
   // Build the LCP
-  PLCP plcp = approx_lcp(basis,
+  PLCP plcp = approx_lcp(sp_basis,
 			 smoother,
                          blocks,
 			 Q,
-			 free_vars);
+			 free_vars,
+			 IGNORE_Q);
 
   // Run the augmented solve
   return psolver.aug_solve(plcp);
@@ -93,7 +103,7 @@ SolverResult find_solution(const sp_mat & sp_basis,
 class DiResultRecorder{
 public:
   DiResultRecorder(uint n_nodes, uint n_actions, uint n_rounds);
-  void record(const SolutionResult & result);
+  void record(const SolverResult & result);
   void write_to_file(const string & filename) const;
 
   cube _primals;
@@ -115,12 +125,12 @@ DiResultRecorder::DiResultRecorder(uint n_nodes,
   _curr_round = 0;
 }
 
-void DiResultRecorder::record(const SolutionResult & result){
+void DiResultRecorder::record(const SolverResult & result){
   assert(_curr_round < _n_rounds);
   mat P = reshape(result.p, _n_nodes, _n_actions+1);
   mat D = reshape(result.d, _n_nodes, _n_actions+1);
-  primals.slice(_curr_round) = P;    
-  duals.slice(_curr_round) = D;
+  _primals.slice(_curr_round) = P;
+  _duals.slice(_curr_round) = D;
   _curr_round++;
 }
 
@@ -141,8 +151,8 @@ int main(int argc, char** argv)
   // Set up 2D space
   cout << "Generating underlying discretization..." << endl;
   mat bbox = build_bbox();
-  uvec grid_size = UVEC_GRID_SIZE;
-  UniformGrid grid = UniformGrid(bbox, grid_size);
+  uvec grid_size = UVEC_GRID_SIZE - 1;  // n_grid -> n_cells
+  UniformGrid grid = UniformGrid(bbox, grid_size, N_OOB);
 
   TypedPoints points = grid.get_all_nodes();
   uint n_points = points.n_rows;
@@ -169,24 +179,24 @@ int main(int argc, char** argv)
 
   // Set up the value basis factory
   cout << "Making value basis factory..." << endl;
-  MultiLinearVarResBasis basis_factory = make_basis(points, bbox);
+  MultiLinearVarResBasis basis_factory = make_basis();
 
   // Set up per-iteration result data structures
   DiResultRecorder recorder = DiResultRecorder(n_points,
 					       n_actions,
-					       NUM_ADD_ROUNDS);
+					       N_ADD_ROUNDS);
 
   // Run the basis refinement rounds
-  for(uint I = 0; I < NUM_ADD_ROUNDS; I++){
+  for(uint I = 0; I < N_ADD_ROUNDS; I++){
     cout << "Running basis improvement round: "
-	 << I << "/" << NUM_ADD_ROUNDS  << endl;
+	 << I << "/" << N_ADD_ROUNDS  << endl;
 
     cout << "Generating basis..." << endl;
-    sp_mat sp_basis = basis_factor.get_basis();
+    sp_mat sp_basis = basis_factory.get_basis();
     // TODO: ensure orthogonal
     
     cout << "Starting PLCP solve..." << endl;
-    SolverResult sol = find_solution(basis, blocks, Q, free_vars);
+    SolverResult sol = find_solution(sp_basis, blocks, Q, free_vars);
     recorder.record(sol);
 
     // TODO: split the basis based on some Munos & Moore criterion

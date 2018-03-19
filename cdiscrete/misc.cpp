@@ -407,7 +407,8 @@ block_sp_vec block_lmult(const sp_mat & A,
 block_sp_vec block_rmult(const sp_mat & A,
                          const block_sp_vec & Bs){
   
-  uint n = Bs.size();
+  int n = Bs.size();
+  assert(n > 0);
   block_sp_vec Cs;
   Cs.reserve(n);
   for(uint i = 0; i < n; i++){

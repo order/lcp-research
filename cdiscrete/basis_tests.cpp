@@ -202,11 +202,8 @@ void test_grid_basis_3(){
 
 void test_interp_grid_basis_1(){
   cout << "test_interp_grid_basis_1...";
-  vector<vec> grid;
-  vec grid_points = regspace(0,1);
-  grid.push_back(grid_points);
-  grid.push_back(grid_points);
-  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid);
+  uvec grid_size = {2,2};
+  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid_size);
   
   sp_mat basis = basis_factory.get_basis();
   assert(5 == basis.n_rows);
@@ -217,13 +214,9 @@ void test_interp_grid_basis_1(){
 
 void test_interp_grid_basis_2(){
   cout << "test_interp_grid_basis_2...";
-  vector<vec> grid;
   
-  vec grid_points = regspace(0,2);
-  grid.push_back(grid_points);
-  grid.push_back(grid_points);
-  
-  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid);
+  uvec grid_size = {3,3};
+  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid_size);
   
   mat basis = mat(basis_factory.get_basis());
   assert(10 == basis.n_rows);
@@ -233,7 +226,6 @@ void test_interp_grid_basis_2(){
   assert(abs(accu(sum(basis,1) - 1)) < PRETTY_SMALL);
 
   
-  uvec grid_size = uvec{3,3};
   umat vertices = box2vert(umat{{0,2},{0,2}}, grid_size); 
   uvec vidx = coords_to_indices(grid_size,
 				Coords(conv_to<imat>::from(vertices)));
@@ -249,14 +241,9 @@ void test_interp_grid_basis_2(){
 
 void test_interp_grid_basis_3(){
   cout << "test_interp_grid_basis_3...";
-  vector<vec> grid;
   
-  vec grid_points = regspace(0,3);
-  grid.push_back(grid_points);
-  grid.push_back(grid_points);
-
-  // Make the basis factory
-  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid);
+  uvec grid_size = {4,4};
+  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid_size);
   assert(basis_factory.can_split(0,0));
 
   // Split into two
@@ -276,14 +263,9 @@ void test_interp_grid_basis_3(){
 
 void test_interp_grid_basis_4(){
   cout << "test_interp_grid_basis_4...";
-  vector<vec> grid;
-  
-  vec grid_points = regspace(0,3);
-  grid.push_back(grid_points);
-  grid.push_back(grid_points);
 
-  // Make the basis factory
-  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid);
+  uvec grid_size = {4,4};
+  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid_size);
   basis_factory.split_per_dimension(0, uvec{1,1});
 
   assert(4 == basis_factory.m_cell_to_bbox.size()); // 4 cells
