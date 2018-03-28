@@ -1067,11 +1067,12 @@ void MultiLinearVarResBasis::split_per_dimension(uint cell_idx, uvec split){
   uint n_dim =  m_grid_size.n_elem;
   assert(n_dim == split.n_elem); // Same dimension
   
-  // Split the cells.
+  // Set up the frontier
   vector<uint> frontier;
+  uint n_bases = pow(2, accu(split));
+  frontier.reserve(n_bases);  
   frontier.push_back(cell_idx);
-  uint n_new_bases = prod(split + 1);
-  frontier.reserve(n_new_bases);
+
   for(uint split_dim = 0; split_dim < n_dim; split_dim++){
     for(uint i = 0; i < split[split_dim]; i++){
       vector<uint> new_elements;
@@ -1085,5 +1086,5 @@ void MultiLinearVarResBasis::split_per_dimension(uint cell_idx, uvec split){
 		      new_elements.end());
     }
   }
-  assert(n_new_bases == frontier.size());
+  assert(n_bases == frontier.size());
 }

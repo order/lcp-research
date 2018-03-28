@@ -21,7 +21,7 @@
 
 // Bounding box [-B, B] x [-B, B]
 
-#define N_GRID_POINTS 32
+#define N_GRID_POINTS 65
 #define N_OOB 1
 #define UVEC_GRID_SIZE uvec{N_GRID_POINTS, N_GRID_POINTS}
 
@@ -46,6 +46,8 @@ MultiLinearVarResBasis make_basis(){
    */
   uvec grid_size = UVEC_GRID_SIZE;
   MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid_size);
+  basis_factory.split_per_dimension(0, uvec{2,1});
+  cout << "Number of cells: " << basis_factory.m_cell_to_bbox.size() << endl;
   return basis_factory;
 }
 
@@ -193,7 +195,7 @@ int main(int argc, char** argv)
 
     cout << "Generating basis..." << endl;
     sp_mat sp_basis = basis_factory.get_basis();
-    // TODO: ensure orthogonal
+    sp_basis = sp_mat(orth(mat(sp_basis))); // Yeah, I know.
     
     cout << "Starting PLCP solve..." << endl;
     SolverResult sol = find_solution(sp_basis, blocks, Q, free_vars);

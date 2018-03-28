@@ -275,6 +275,19 @@ void test_interp_grid_basis_4(){
 
 }
 
+void test_interp_grid_basis_5(){
+  cout << "test_interp_grid_basis_5...";
+
+  uvec grid_size = {8,8};
+  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid_size);
+  basis_factory.split_per_dimension(0, uvec{2,2});
+
+  assert(16 == basis_factory.m_cell_to_bbox.size()); // 16 cells
+
+  cout << " PASSED." << endl;
+
+}
+
 
 int main(){
   test_build_shift_1();
@@ -291,4 +304,6 @@ int main(){
   test_interp_grid_basis_2();
   test_interp_grid_basis_3();
   test_interp_grid_basis_4();
+  test_interp_grid_basis_5();
+
 }

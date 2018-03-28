@@ -90,8 +90,8 @@ Points DoubleIntegratorSimulator::next(const Points & points,
 
 TypedPoints DoubleIntegratorSimulator::next(const TypedPoints & points,
 					    const vec & actions) const{
-  // TODO
-  assert(false);
+  Points new_points = next(points.m_points, actions);
+  return TypedPoints(new_points, points.m_reg);
 }
 
 mat DoubleIntegratorSimulator::q_mat(const TypedDiscretizer * disc) const{
