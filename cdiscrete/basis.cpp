@@ -1029,12 +1029,12 @@ sp_mat MultiLinearVarResBasis::get_basis() const{
 }
 
 
-vec MultiLinearVarResBasis::get_cell_min(const vec & x){
+vec MultiLinearVarResBasis::get_cell_min(const vec & x) const{
   /*
    * Paint the cell with the min of the vertices.
    * Vector provided by x.
    */
-  uint n_non_obb_nodes = prod(m_grid_size)
+  uint n_non_obb_nodes = prod(m_grid_size);
   uint n_nodes = n_non_obb_nodes + m_num_oob;
   vec cell_mins = zeros<vec>(n_nodes);
 
@@ -1058,15 +1058,15 @@ vec MultiLinearVarResBasis::get_cell_min(const vec & x){
     // Adjust boundary; largest faces of the cell belong to the next cell
     // E.g. if cell is [0,n], then [n] belongs to the next cell over.
     for(uint d = 0; d < n_dim; d++){
-      if(cell_box[d,1] != m_grid_size - 1){
-	cell_box[d,1] -= 1;
+      if(cell_box(d,1) != m_grid_size(d) - 1){
+	cell_box(d,1) -= 1;
       }
     }
     
     umat points = box2points(cell_box, m_grid_size);
     uvec pidx = coords_to_indices(m_grid_size,
 				  Coords(conv_to<imat>::from(points)));
-    cell_mins.elem(pidx) = cell_min;
+    cell_mins.elem(pidx).fill(cell_min);
   }
 
   return cell_mins;
