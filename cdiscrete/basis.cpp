@@ -484,13 +484,12 @@ vector<sp_mat> balance_bases(const vector<sp_mat> initial_bases,
 			     const vector<sp_mat> blocks){
   /*
    * Take in initial bases, and balanced them via the S&S "freebie" 
-   * relationship
+   * relationship.
    */
   
   uint A = blocks.size();
   assert(A + 1 == initial_bases.size());
   assert(A > 0);
-
 
   // Explicitly add initial value basis
   vector<sp_mat> value_basis_vector;
@@ -817,6 +816,21 @@ uvec box2width(const umat & bbox){
   return width;
 }
 
+bool is_bbox(const umat & bbox){
+  if(2 != bbox.n_cols){
+    return false;
+  }
+  uint dim = bbox.n_rows;
+
+  for(uint d = 0; d < dim; d++){
+    if(bbox(d,1) < bbox(d,0)){
+      return false;
+    }
+  }
+  return true;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////
 // Multilinear interpolation based variable resolution basis factory //
 ///////////////////////////////////////////////////////////////////////
@@ -850,12 +864,16 @@ MultiLinearVarResBasis::MultiLinearVarResBasis(const uvec & grid_size)
    */
   
   uint n_dim = grid_size.size();
+  
   umat box = zeros<umat>(n_dim,2);
   box.col(1) = (m_grid_size - 1);
+  assert(is_bbox(box));
   m_cell_to_bbox.push_back(box);
-
+  
   m_num_oob = 1;
 }
+
+
 
 sp_mat MultiLinearVarResBasis::get_basis() const{
   /*
@@ -1010,6 +1028,51 @@ sp_mat MultiLinearVarResBasis::get_basis() const{
   return sp_mat(loc, data, n_nodes, n_bases);
 }
 
+
+vec MultiLinearVarResBasis::get_cell_min(const vec & x){
+  /*
+   * Paint the cell with the min of the vertices.
+   * Vector provided by x.
+   */
+  uint n_non_obb_nodes = prod(m_grid_size)
+  uint n_nodes = n_non_obb_nodes + m_num_oob;
+  vec cell_mins = zeros<vec>(n_nodes);
+
+  assert(n_nodes == x.n_elem);
+  
+  uint n_dim = m_grid_size.n_elem;
+  
+  // OOB node its own min.
+  cell_mins(n_non_obb_nodes) = x(n_non_obb_nodes);
+
+  // Cells
+  for(auto const & cell_it : m_cell_to_bbox){
+    umat cell_box = umat(cell_it); // Copy
+
+    // Get the vertices
+    umat vertices = box2vert(cell_box, m_grid_size);
+    uvec vidx = coords_to_indices(m_grid_size,
+				  Coords(conv_to<imat>::from(vertices)));
+    double cell_min = min(x.elem(vidx));
+
+    // Adjust boundary; largest faces of the cell belong to the next cell
+    // E.g. if cell is [0,n], then [n] belongs to the next cell over.
+    for(uint d = 0; d < n_dim; d++){
+      if(cell_box[d,1] != m_grid_size - 1){
+	cell_box[d,1] -= 1;
+      }
+    }
+    
+    umat points = box2points(cell_box, m_grid_size);
+    uvec pidx = coords_to_indices(m_grid_size,
+				  Coords(conv_to<imat>::from(points)));
+    cell_mins.elem(pidx) = cell_min;
+  }
+
+  return cell_mins;
+}
+
+  
 bool MultiLinearVarResBasis::can_split(uint cell_idx, uint dim_idx) const{
   /*
    * Check that cell_idx can be split along dim_idx.
@@ -1032,15 +1095,17 @@ uint MultiLinearVarResBasis::split_cell(uint cell_idx, uint dim_idx){
   umat cell_bbox = m_cell_to_bbox[cell_idx];
   uint width = cell_bbox(dim_idx, 1) - cell_bbox(dim_idx, 0) + 1;
   assert(width >= 3);
-  uint mid = width / 2; // floor
+  uint mid = width / 2 + cell_bbox(dim_idx, 0); // floor
 
   // Add new bbox
   umat new_bbox = umat(cell_bbox);
   new_bbox(dim_idx,0) = mid;  // [mid, high]
+  assert(is_bbox(new_bbox));
   m_cell_to_bbox.push_back(new_bbox);
 
   // Update old bbox
-  m_cell_to_bbox[cell_idx](dim_idx,1) = mid;  // [low, mid]
+  m_cell_to_bbox[cell_idx](dim_idx,1) = mid;  // [low, mid]  
+  assert(is_bbox(m_cell_to_bbox[cell_idx]));
 
   return m_cell_to_bbox.size() - 1;
 }

@@ -21,12 +21,18 @@
 
 // Bounding box [-B, B] x [-B, B]
 
-#define N_GRID_POINTS 65
+// Power of 2 + 1
+#define N_GRID_POINTS 129
+#define N_INITIAL_SPLIT 3
 #define N_OOB 1
 #define UVEC_GRID_SIZE uvec{N_GRID_POINTS, N_GRID_POINTS}
 
+#define SIM_ACTIONS vec{-1,1}
+#define SIM_STEP 0.025
+#define SIM_NOISE_STD 0.0
+
 #define BOUNDARY 5.0
-#define GAMMA 0.99
+#define GAMMA 0.997
 
 #define IGNORE_Q true
 
@@ -43,11 +49,13 @@ mat build_bbox(){
 MultiLinearVarResBasis make_basis(){
   /*
    * Set up the initial basis.
+   * Uniformly splits each cell in each dimension N_INITIAL_SPLIT times.
    */
   uvec grid_size = UVEC_GRID_SIZE;
   MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid_size);
-  basis_factory.split_per_dimension(0, uvec{2,1});
+  basis_factory.split_per_dimension(0, uvec{N_INITIAL_SPLIT,N_INITIAL_SPLIT});
   cout << "Number of cells: " << basis_factory.m_cell_to_bbox.size() << endl;
+  
   return basis_factory;
 }
 
@@ -56,16 +64,13 @@ DoubleIntegratorSimulator build_di_simulator(){
    * Set up the continuous space simulator
    */
   mat bbox = build_bbox();
-  mat actions = vec{-1,1};
-  double noise_std = 0.0;
-  double step = 0.025;
-  return DoubleIntegratorSimulator(bbox, actions, noise_std, step);
+  return DoubleIntegratorSimulator(bbox, SIM_ACTIONS, SIM_NOISE_STD, SIM_STEP);
 }
 
 SolverResult find_solution(const sp_mat & sp_basis,
-                const vector<sp_mat> & blocks,
-                const mat & Q,
-                const bvec & free_vars){
+			   const vector<sp_mat> & blocks,
+			   const mat & Q,
+			   const bvec & free_vars){
   /*
    * Set up and solve the projective LCP from basis and block information
    */
@@ -95,6 +100,10 @@ SolverResult find_solution(const sp_mat & sp_basis,
 			 IGNORE_Q);
 
   // Run the augmented solve
+  Archiver arch = Archiver();
+  arch.add_sp_mat("basis", plcp.P);
+  arch.write("/home/epz/data/di_var_res_refine_basis.data");
+
   return psolver.aug_solve(plcp);
 }
 
