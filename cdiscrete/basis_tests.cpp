@@ -2,6 +2,7 @@
 
 #include <armadillo>
 #include "basis.h"
+#include "io.h"
 #include "grid.h"
 
 using namespace std;
@@ -288,6 +289,57 @@ void test_interp_grid_basis_5(){
 
 }
 
+void test_cell_min_1(){
+  cout << "test_cell_min_1...";
+
+  uint N = pow(2, 3);
+
+  uvec grid_size = {N, N}; // 8 x 8 cell 
+  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid_size);
+  basis_factory.split_per_dimension(0, uvec{2, 2}); // 4 x 4 cells
+
+  vec x = regspace<vec>(0, N * N); // + 1 OOB
+    
+  vec y = basis_factory.get_cell_min(x);
+  assert(x.size() == y.size());
+
+  assert(0 == min(y));
+  assert(N * N == max(y));
+
+  vec z = unique(y);
+  assert(17 == z.n_elem); // 16 for the cells + 1 for OOB
+  
+  cout << " PASSED. (Saving to /tmp/cell_min.arch for viz.)" << endl;
+  Archiver arch = Archiver();
+  arch.add_vec("x", x);
+  arch.add_vec("y", y);
+  arch.write("/tmp/cell_min.arch");  
+}
+
+void test_cell_var_1(){
+  cout << "test_cell_var_1...";
+
+  uint N = pow(2, 3);
+
+  uvec grid_size = {N, N}; // 8 x 8 cell 
+  MultiLinearVarResBasis basis_factory = MultiLinearVarResBasis(grid_size);
+  basis_factory.split_per_dimension(0, uvec{2, 2}); // 4 x 4 cells
+
+  vec x = regspace<vec>(0, N * N); // + 1 OOB
+  x %= x;
+    
+  vec y = basis_factory.get_cell_var(x);
+  assert(x.size() == y.size());
+
+  vec z = unique(y);
+  assert(17 == z.n_elem); // 16 for the cells + 1 for OOB
+  
+  cout << " PASSED. (Saving to /tmp/cell_var.arch for viz.)" << endl;
+  Archiver arch = Archiver();
+  arch.add_vec("x", x);
+  arch.add_vec("y", y);
+  arch.write("/tmp/cell_var.arch");  
+}
 
 int main(){
   test_build_shift_1();
@@ -305,5 +357,8 @@ int main(){
   test_interp_grid_basis_3();
   test_interp_grid_basis_4();
   test_interp_grid_basis_5();
+
+  test_cell_min_1();
+  test_cell_var_1();
 
 }

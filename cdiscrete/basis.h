@@ -174,7 +174,8 @@ class MultiLinearVarResBasis{
   sp_mat get_basis() const;
 
   vec get_cell_min(const vec & x) const;
-  
+  vec get_cell_var(const vec & x) const;
+
   bool can_split(uint cell_idx, uint dim_idx) const;
   uint split_cell(uint cell_idx, uint dim_idx);
 

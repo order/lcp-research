@@ -1072,6 +1072,49 @@ vec MultiLinearVarResBasis::get_cell_min(const vec & x) const{
   return cell_mins;
 }
 
+vec MultiLinearVarResBasis::get_cell_var(const vec & x) const{
+  /*
+   * Paint the cell with the variance of the vertices.
+   * Vector provided by x.
+   */
+  uint n_non_obb_nodes = prod(m_grid_size);
+  uint n_nodes = n_non_obb_nodes + m_num_oob;
+  vec cell_vars = zeros<vec>(n_nodes);
+
+  assert(n_nodes == x.n_elem);
+  
+  uint n_dim = m_grid_size.n_elem;
+  
+  // OOB node its own min.
+  cell_vars(n_non_obb_nodes) = x(n_non_obb_nodes);
+
+  // Cells
+  for(auto const & cell_it : m_cell_to_bbox){
+    umat cell_box = umat(cell_it); // Copy
+
+    // Get the vertices
+    umat vertices = box2vert(cell_box, m_grid_size);
+    uvec vidx = coords_to_indices(m_grid_size,
+				  Coords(conv_to<imat>::from(vertices)));
+    double cell_var = var(x.elem(vidx));
+
+    // Adjust boundary; largest faces of the cell belong to the next cell
+    // E.g. if cell is [0,n], then [n] belongs to the next cell over.
+    for(uint d = 0; d < n_dim; d++){
+      if(cell_box(d,1) != m_grid_size(d) - 1){
+	cell_box(d,1) -= 1;
+      }
+    }
+    
+    umat points = box2points(cell_box, m_grid_size);
+    uvec pidx = coords_to_indices(m_grid_size,
+				  Coords(conv_to<imat>::from(points)));
+    cell_vars.elem(pidx).fill(cell_var);
+  }
+
+  return cell_vars;
+}
+
   
 bool MultiLinearVarResBasis::can_split(uint cell_idx, uint dim_idx) const{
   /*
