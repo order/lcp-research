@@ -22,7 +22,7 @@
 // Bounding box [-B, B] x [-B, B]
 
 // Power of 2 + 1
-#define N_GRID_POINTS 129
+#define N_GRID_POINTS 65
 #define N_INITIAL_SPLIT 3
 #define N_OOB 1
 #define UVEC_GRID_SIZE uvec{N_GRID_POINTS, N_GRID_POINTS}
@@ -34,9 +34,11 @@
 #define BOUNDARY 5.0
 #define GAMMA 0.997
 
+#define COMP_THRESH 1e-6
+
 #define IGNORE_Q true
 
-#define N_ADD_ROUNDS 1
+#define N_ADD_ROUNDS 6
 
 mat build_bbox(){
   // Build the D x 2 bounding box
@@ -85,11 +87,11 @@ SolverResult find_solution(const sp_mat & sp_basis,
   
   // Set up the solver options
   ProjectiveSolver psolver = ProjectiveSolver();
-  psolver.comp_thresh = 1e-12;
+  psolver.comp_thresh = COMP_THRESH;
   psolver.initial_sigma = 0.25;
   psolver.verbose = true;
   psolver.iter_verbose = true;
-  psolver.regularizer = 1e-12;
+  psolver.regularizer = 0;
 
   // Build the LCP
   PLCP plcp = approx_lcp(sp_basis,
@@ -116,6 +118,13 @@ public:
   DiResultRecorder(uint n_nodes, uint n_actions, uint n_rounds);
   void record(const SolverResult & result);
   void write_to_file(const string & filename) const;
+
+  vec get_vector(uint action, uint rount) const;
+  
+  vec get_last_value() const;
+  vec get_value(uint round) const;
+
+  vec get_agg_flow(uint round) const;
 
   cube _primals;
   cube _duals;
@@ -150,6 +159,36 @@ void DiResultRecorder::write_to_file(const string & filename) const{
   arch.add_cube("primals", _primals);
   arch.add_cube("duals", _duals);
   arch.write(filename);
+}
+
+vec DiResultRecorder::get_vector(uint action, uint round) const{
+  assert(action <= _n_actions);
+  assert(round < _n_rounds);
+
+  return _primals.subcube(
+			  0, action, round,
+			  _n_nodes - 1, action, round);
+}
+
+vec DiResultRecorder::get_agg_flow(uint round) const{
+  assert(round < _n_rounds);
+
+  vec agg_flow = sum(_primals.subcube(
+				      0, 1, round,
+				      _n_nodes - 1, _n_actions, round
+				      ), 1);
+  assert(_n_nodes == agg_flow.n_elem);
+  return agg_flow;
+}
+
+vec DiResultRecorder::get_value(uint round) const{
+  return get_vector(0, round);
+}
+
+
+vec DiResultRecorder::get_last_value() const{
+  // Get the final value vector.
+  return get_value(_n_rounds - 1);
 }
 
 
@@ -200,7 +239,7 @@ int main(int argc, char** argv)
   // Run the basis refinement rounds
   for(uint I = 0; I < N_ADD_ROUNDS; I++){
     cout << "Running basis improvement round: "
-	 << I << "/" << N_ADD_ROUNDS  << endl;
+	 << (I + 1) << "/" << N_ADD_ROUNDS  << endl;
 
     cout << "Generating basis..." << endl;
     sp_mat sp_basis = basis_factory.get_basis();
@@ -210,10 +249,29 @@ int main(int argc, char** argv)
     SolverResult sol = find_solution(sp_basis, blocks, Q, free_vars);
     recorder.record(sol);
 
-    // TODO: split the basis based on some Munos & Moore criterion
-    
-  }
+    if(I < N_ADD_ROUNDS - 1){
+      // Compute the splitting heuristic
+      vec value = recorder.get_value(I);
+      vec agg_flow = recorder.get_agg_flow(I);
+      // TODO: implement:
+      vec cell_agg_flow = basis_factory.get_cell_avg_reduced(agg_flow);
+      vec cell_vars = basis_factory.get_cell_var_reduced(value);
+      vec heur = cell_vars % cell_agg_flow;  // NB: OOB not a cell
 
+      // Right now just do the single max
+      uint split_id = cell_vars.index_max();
+      cout << "Splitting: " << split_id << endl;
+      cout << "Variance: " << cell_vars(split_id) << endl;
+      basis_factory.split_per_dimension(split_id, uvec{1,1});
+    } 
+  }
+  vec value = recorder.get_last_value();
+  vec cell_vars = basis_factory.get_cell_var(value);
+  Archiver arch = Archiver();
+  arch.add_vec("x", value);
+  arch.add_vec("y", cell_vars);
+  arch.write("/tmp/cell_var.arch");
+  
   // Write to file
   recorder.write_to_file("/home/epz/data/di_var_res_refine.data");
 }
