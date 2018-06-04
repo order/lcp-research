@@ -1029,21 +1029,17 @@ sp_mat MultiLinearVarResBasis::get_basis() const{
 }
 
 
-vec MultiLinearVarResBasis::get_cell_min(const vec & x) const{
-  /*
-   * Paint the cell with the min of the vertices.
-   * Vector provided by x.
-   */
-  uint n_non_obb_nodes = prod(m_grid_size);
-  uint n_nodes = n_non_obb_nodes + m_num_oob;
-  vec cell_mins = zeros<vec>(n_nodes);
+vec MultiLinearVarResBasis::get_cell_mean(const vec & x) const{
+  uint n_non_oob_nodes = prod(m_grid_size);
+  uint n_nodes = n_non_oob_nodes + m_num_oob;
+  vec cell_values = zeros<vec>(n_nodes);
 
   assert(n_nodes == x.n_elem);
   
   uint n_dim = m_grid_size.n_elem;
   
-  // OOB node its own min.
-  cell_mins(n_non_obb_nodes) = x(n_non_obb_nodes);
+  // OOB node its own value.
+  cell_values(n_non_oob_nodes) = x(n_non_oob_nodes);
 
   // Cells
   for(auto const & cell_it : m_cell_to_bbox){
@@ -1053,7 +1049,7 @@ vec MultiLinearVarResBasis::get_cell_min(const vec & x) const{
     umat vertices = box2vert(cell_box, m_grid_size);
     uvec vidx = coords_to_indices(m_grid_size,
 				  Coords(conv_to<imat>::from(vertices)));
-    double cell_min = min(x.elem(vidx));
+    double cell_value = mean(x.elem(vidx));
 
     // Adjust boundary; largest faces of the cell belong to the next cell
     // E.g. if cell is [0,n], then [n] belongs to the next cell over.
@@ -1066,23 +1062,18 @@ vec MultiLinearVarResBasis::get_cell_min(const vec & x) const{
     umat points = box2points(cell_box, m_grid_size);
     uvec pidx = coords_to_indices(m_grid_size,
 				  Coords(conv_to<imat>::from(points)));
-    cell_mins.elem(pidx).fill(cell_min);
+    cell_values.elem(pidx).fill(cell_value);
   }
 
-  return cell_mins;
+  return cell_values;
 }
 
-vec MultiLinearVarResBasis::get_cell_var_reduced(const vec & x) const{
-  /*
-   * Maps cell to variance of the vertices.
-   * Vector provided by x.
-   */
-
+vec MultiLinearVarResBasis::get_cell_mean_reduced(const vec & x) const{
   uint n_cells = m_cell_to_bbox.size();
-  vec cell_vars = zeros<vec>(n_cells);
+  vec cell_values = zeros<vec>(n_cells);
 
-  uint n_non_obb_nodes = prod(m_grid_size);
-  uint n_nodes = n_non_obb_nodes + m_num_oob;
+  uint n_non_oob_nodes = prod(m_grid_size);
+  uint n_nodes = n_non_oob_nodes + m_num_oob;
   assert(n_nodes == x.n_elem);
   
   uint n_dim = m_grid_size.n_elem;
@@ -1094,32 +1085,34 @@ vec MultiLinearVarResBasis::get_cell_var_reduced(const vec & x) const{
     umat vertices = box2vert(m_cell_to_bbox.at(i), m_grid_size);
     uvec vidx = coords_to_indices(m_grid_size,
 				  Coords(conv_to<imat>::from(vertices)));
-    double cell_var = var(x.elem(vidx));
-    cell_vars(i) = cell_var;
+    double cell_value = mean(x.elem(vidx));
+    cell_values(i) = cell_value;
   }
-  return cell_vars;
+  return cell_values;
 }
 
 vec MultiLinearVarResBasis::get_cell_var(const vec & x) const{
-  /*
-   * Paint the cell pixels with the variance of the vertices.
-   * Vector provided by x.
-   */
-  uint n_non_obb_nodes = prod(m_grid_size);
-  uint n_nodes = n_non_obb_nodes + m_num_oob;
+  uint n_non_oob_nodes = prod(m_grid_size);
+  uint n_nodes = n_non_oob_nodes + m_num_oob;
+  vec cell_values = zeros<vec>(n_nodes);
+
   assert(n_nodes == x.n_elem);
-
-  uint n_dim = m_grid_size.n_elem;
-
-  vec reduced_cell_vars = get_cell_var_reduced(x);
-  uint n_cells = reduced_cell_vars.n_elem;
   
-  // Fill in each pixel with the appropriate cell value
-  vec cell_vars = zeros<vec>(n_nodes);
-  cell_vars(n_non_obb_nodes) = 0;
-  for(uint i = 0; i < n_cells; i++){
-    umat cell_box = umat(m_cell_to_bbox.at(i)); // Copy
-    
+  uint n_dim = m_grid_size.n_elem;
+  
+  // OOB node its own value.
+  cell_values(n_non_oob_nodes) = x(n_non_oob_nodes);
+
+  // Cells
+  for(auto const & cell_it : m_cell_to_bbox){
+    umat cell_box = umat(cell_it); // Copy
+
+    // Get the vertices
+    umat vertices = box2vert(cell_box, m_grid_size);
+    uvec vidx = coords_to_indices(m_grid_size,
+				  Coords(conv_to<imat>::from(vertices)));
+    double cell_value = var(x.elem(vidx));
+
     // Adjust boundary; largest faces of the cell belong to the next cell
     // E.g. if cell is [0,n], then [n] belongs to the next cell over.
     for(uint d = 0; d < n_dim; d++){
@@ -1127,18 +1120,39 @@ vec MultiLinearVarResBasis::get_cell_var(const vec & x) const{
 	cell_box(d,1) -= 1;
       }
     }
-
-    // Find the point ids for the points in the cell
+    
     umat points = box2points(cell_box, m_grid_size);
     uvec pidx = coords_to_indices(m_grid_size,
 				  Coords(conv_to<imat>::from(points)));
-
-    // Fill the appropriate points with the cell value
-    cell_vars.elem(pidx).fill(reduced_cell_vars(i));
+    cell_values.elem(pidx).fill(cell_value);
   }
 
-  return cell_vars;
+  return cell_values;
 }
+
+vec MultiLinearVarResBasis::get_cell_var_reduced(const vec & x) const{
+  uint n_cells = m_cell_to_bbox.size();
+  vec cell_values = zeros<vec>(n_cells);
+
+  uint n_non_oob_nodes = prod(m_grid_size);
+  uint n_nodes = n_non_oob_nodes + m_num_oob;
+  assert(n_nodes == x.n_elem);
+  
+  uint n_dim = m_grid_size.n_elem;
+  
+  // Cells
+  for(uint i = 0; i < n_cells; i++){
+
+    // Get the vertices
+    umat vertices = box2vert(m_cell_to_bbox.at(i), m_grid_size);
+    uvec vidx = coords_to_indices(m_grid_size,
+				  Coords(conv_to<imat>::from(vertices)));
+    double cell_value = var(x.elem(vidx));
+    cell_values(i) = cell_value;
+  }
+  return cell_values;
+}
+
   
 bool MultiLinearVarResBasis::can_split(uint cell_idx, uint dim_idx) const{
   /*

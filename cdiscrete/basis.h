@@ -173,13 +173,8 @@ class MultiLinearVarResBasis{
   MultiLinearVarResBasis(const uvec & grid_size);
   sp_mat get_basis() const;
 
-  // TODO: implement with fn pointers
-  vec get_cell_fn_reduced(const vec & x, int(*fn)(const * vec)) const;
-  vec get_cell_fn(const vec & x, int(*fn)(const * vec)) const;
-
-  // Make instance of the above fns
-  vec get_cell_min(const vec & x) const;
-  vec get_cell_avg(const vec & x) const;
+  vec get_cell_mean(const vec & x) const;
+  vec get_cell_mean_reduced(const vec & x) const;
   vec get_cell_var(const vec & x) const;
   vec get_cell_var_reduced(const vec & x) const;
 

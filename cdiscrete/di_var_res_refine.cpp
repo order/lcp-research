@@ -253,8 +253,7 @@ int main(int argc, char** argv)
       // Compute the splitting heuristic
       vec value = recorder.get_value(I);
       vec agg_flow = recorder.get_agg_flow(I);
-      // TODO: implement:
-      vec cell_agg_flow = basis_factory.get_cell_avg_reduced(agg_flow);
+      vec cell_agg_flow = basis_factory.get_cell_mean_reduced(agg_flow);
       vec cell_vars = basis_factory.get_cell_var_reduced(value);
       vec heur = cell_vars % cell_agg_flow;  // NB: OOB not a cell
 
